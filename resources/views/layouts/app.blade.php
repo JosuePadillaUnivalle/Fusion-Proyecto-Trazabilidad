@@ -493,7 +493,6 @@
                                 <li class="nav-item">
                                     <a href="{{ route('envios.transportistas') }}"
                                         class="nav-link {{ request()->routeIs('envios.transportistas') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
                                         <p>Transportistas</p>
                                     </a>
                                 </li>
@@ -502,7 +501,6 @@
                                 <li class="nav-item">
                                     <a href="{{ route('envios.vehiculos') }}"
                                         class="nav-link {{ request()->routeIs('envios.vehiculos') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
                                         <p>Vehículos</p>
                                     </a>
                                 </li>
@@ -511,7 +509,6 @@
                                 <li class="nav-item">
                                     <a href="{{ route('envios.direcciones') }}"
                                         class="nav-link {{ request()->routeIs('envios.direcciones') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
                                         <p>Direcciones</p>
                                     </a>
                                 </li>
@@ -520,7 +517,6 @@
                                 <li class="nav-item">
                                     <a href="{{ route('envios.reportes-distribucion') }}"
                                         class="nav-link {{ request()->routeIs('envios.reportes-distribucion') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
                                         <p>Reportes de distribución</p>
                                     </a>
                                 </li>

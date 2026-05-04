@@ -156,7 +156,7 @@ class DatosPruebaSeeder extends Seeder
         // 5) Certificación (1)
         DB::table('certificacion_lote')->updateOrInsert(
             ['codigo_certificado' => 'CERT-2026-0001'],
-            ['loteid' => $lote1, 'usuarioid' => $admin->usuarioid, 'observaciones' => 'Certificación de lote con control de trazabilidad completo.', 'fecha_certificacion' => now()]
+            ['loteid' => $lote1, 'usuarioid' => $adminUsuario->usuarioid, 'observaciones' => 'Certificación de lote con control de trazabilidad completo.', 'fecha_certificacion' => now()]
         );
 
         // 6) Envío (1) en cola local de envíos pendientes
@@ -176,7 +176,7 @@ class DatosPruebaSeeder extends Seeder
                 ]),
                 'estado' => 'pendiente',
                 'intentos' => 0,
-                'usuarioid' => $admin->usuarioid,
+                'usuarioid' => $adminUsuario->usuarioid,
                 'updated_at' => now(),
                 'created_at' => now(),
             ]);
