@@ -30,6 +30,7 @@ class EnvioAsignacionMultiple extends Model
         'rutamultientregaid' => 'integer',
         'almacenid' => 'integer',
         'fecha_asignacion' => 'datetime',
+        'detalles_productos' => 'array',
     ];
 
     public function pedido(): BelongsTo

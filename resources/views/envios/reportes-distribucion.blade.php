@@ -1,5 +1,40 @@
 @extends('layouts.app')
 
+@section('content')
+<div class="container">
+    <h3>Reportes de distribución</h3>
+
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card p-3">Total asignaciones<br><strong>{{ $counts['total'] }}</strong></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3">Pendientes<br><strong>{{ $counts['pendientes'] }}</strong></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3">Asignados<br><strong>{{ $counts['asignados'] }}</strong></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3">En ruta<br><strong>{{ $counts['en_ruta'] }}</strong></div>
+        </div>
+    </div>
+
+    <h5 class="mt-4">Top transportistas por asignaciones</h5>
+    <table class="table table-sm">
+        <thead><tr><th>Transportista</th><th>Cantidad</th></tr></thead>
+        <tbody>
+        @foreach($topTransportistas as $t)
+            <tr>
+                <td>{{ optional(\App\Models\Usuario::find($t->transportista_usuarioid))->nombre ?? 'N/A' }}</td>
+                <td>{{ $t->c }}</td>
+            </tr>
+        @endforeach
+        </tbody>
+    </table>
+</div>
+@endsection
+@extends('layouts.app')
+
 @section('title', 'Reportes de Distribucion')
 @section('page_title', 'Reportes de distribucion de envios')
 

@@ -29,6 +29,11 @@ class AsignacionMultipleController extends Controller
         return view('logistica.asignaciones.index', compact('asignaciones'));
     }
 
+    public function create(): View
+    {
+        return view('logistica.asignaciones.create');
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -68,6 +73,9 @@ class AsignacionMultipleController extends Controller
             'rutamultientregaid' => ['nullable', 'integer', 'exists:ruta_multi_entrega,rutamultientregaid'],
             'vehiculo_ref' => ['nullable', 'string', 'max:80'],
             'almacenid' => ['nullable', 'integer', 'exists:almacen,almacenid'],
+            'productos' => ['nullable', 'array'],
+            'productos.*.sku' => ['nullable', 'string'],
+            'productos.*.cantidad' => ['nullable', 'numeric'],
         ]);
 
         foreach ($validated['envio_ids'] as $envioId) {
@@ -83,6 +91,7 @@ class AsignacionMultipleController extends Controller
                     'almacenid' => $validated['almacenid'] ?? null,
                     'estado' => 'asignado',
                     'fecha_asignacion' => now(),
+                    'detalles_productos' => $validated['productos'] ?? null,
                 ]
             );
         }
