@@ -52,6 +52,8 @@ use App\Http\Controllers\Web\RutaMultiEntregaController;
 use App\Http\Controllers\Web\IncidenteEnvioController;
 use App\Http\Controllers\Web\DocumentoEntregaController;
 use App\Http\Controllers\Web\AlmacenMovimientoController;
+use App\Http\Controllers\Web\OrgTrack\TransportistaController;
+use App\Http\Controllers\Web\OrgTrack\EnvioFusionController;
 
 // ======================================================
 // RUTAS PÚBLICAS (SIN LOGIN)
@@ -283,6 +285,23 @@ Route::middleware('auth')->group(function () {
     });
 
     // ==============================
+    // ORGTRACK / FUSION - CRUD locales
+    Route::prefix('orgtrack')->name('orgtrack.')->group(function () {
+        // Transportistas (CRUD sobre `usuario` role=transportista)
+        Route::get('transportistas', [TransportistaController::class, 'index'])->name('transportistas.index')->middleware('action.permission:transportistas,read');
+        Route::get('transportistas/create', [TransportistaController::class, 'create'])->name('transportistas.create')->middleware('action.permission:transportistas,create');
+        Route::post('transportistas', [TransportistaController::class, 'store'])->name('transportistas.store')->middleware('action.permission:transportistas,create');
+        Route::get('transportistas/{transportista}/edit', [TransportistaController::class, 'edit'])->name('transportistas.edit')->middleware('action.permission:transportistas,update');
+        Route::put('transportistas/{transportista}', [TransportistaController::class, 'update'])->name('transportistas.update')->middleware('action.permission:transportistas,update');
+        Route::delete('transportistas/{transportista}', [TransportistaController::class, 'destroy'])->name('transportistas.destroy')->middleware('action.permission:transportistas,delete');
+
+        // Envios - Fusion (CRUD sobre envio_asignacion_multiple)
+        Route::get('envios', [EnvioFusionController::class, 'index'])->name('envios.index')->middleware('action.permission:envios,read');
+        Route::get('envios/{envio}', [EnvioFusionController::class, 'show'])->name('envios.show')->middleware('action.permission:envios,read');
+        Route::get('envios/{envio}/edit', [EnvioFusionController::class, 'edit'])->name('envios.edit')->middleware('action.permission:envios,update');
+        Route::put('envios/{envio}', [EnvioFusionController::class, 'update'])->name('envios.update')->middleware('action.permission:envios,update');
+        Route::delete('envios/{envio}', [EnvioFusionController::class, 'destroy'])->name('envios.destroy')->middleware('action.permission:envios,delete');
+    });
     // LOGISTICA OPERATIVA (SISTEMA PLANTA)
     // ==============================
     Route::prefix('logistica')->name('logistica.')->group(function () {
