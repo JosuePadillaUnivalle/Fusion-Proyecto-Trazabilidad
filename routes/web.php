@@ -261,7 +261,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/transportistas', fn() => view('envios.transportistas'))->name('transportistas')->middleware('action.permission:transportistas,read');
         Route::get('/vehiculos', fn() => view('envios.vehiculos'))->name('vehiculos')->middleware('action.permission:vehiculos,read');
         Route::get('/direcciones', fn() => view('envios.direcciones'))->name('direcciones')->middleware('action.permission:direcciones,read');
-        Route::get('/reportes-distribucion', fn() => view('envios.reportes-distribucion'))->name('reportes-distribucion')->middleware('action.permission:reportes,read');
+        Route::get('/reportes-distribucion', [\App\Http\Controllers\Web\OrgTrackReportController::class, 'index'])->name('reportes-distribucion')->middleware('action.permission:reportes,read');
 
         // ==============================
         // PROXY API EXTERNA (evita CORS)
@@ -308,6 +308,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/asignaciones', [AsignacionMultipleController::class, 'index'])
             ->name('asignaciones.index')
             ->middleware('action.permission:asignaciones,read');
+        Route::get('/asignaciones/create', [AsignacionMultipleController::class, 'create'])
+            ->name('asignaciones.create')
+            ->middleware('action.permission:asignaciones,create');
         Route::post('/asignaciones', [AsignacionMultipleController::class, 'store'])
             ->name('asignaciones.store')
             ->middleware('action.permission:asignaciones,create');
