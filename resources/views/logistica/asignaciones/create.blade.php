@@ -10,18 +10,32 @@
         <div class="card p-3 mb-3" id="step-1">
             <h5>Paso 1 — Seleccionar transportista y vehículo</h5>
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <label>Transportista</label>
                     <select id="transportista" class="form-control">
                         <option value="">-- Seleccione --</option>
-                        @foreach(\App\Models\Usuario::where('role','transportista')->get() as $t)
-                            <option value="{{ $t->usuarioid }}">{{ $t->nombre }} {{ $t->apellido }}</option>
+                        @foreach(\App\Models\Usuario::where('role','transportista')->where('activo', true)->get() as $t)
+                            <option value="{{ $t->usuarioid }}">{{ $t->nombre }} {{ $t->apellido }} ({{ $t->nombreusuario ?? '' }})</option>
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-6">
-                    <label>Vehículo (referencia)</label>
-                    <input id="vehiculo_ref" class="form-control" placeholder="Placa o referencia">
+                <div class="col-md-4">
+                    <label>Vehículo</label>
+                    <select id="vehiculo_ref" class="form-control">
+                        <option value="">-- Ninguno --</option>
+                        @foreach(\App\Support\LocalOrgTrackFallback::vehiculosPayload()['data'] ?? [] as $v)
+                            <option value="{{ $v['placa'] ?? ($v['tipoVehiculo']['nombre'] ?? '') }}">{{ $v['placa'] ?? '—' }} — {{ $v['tipoVehiculo']['nombre'] ?? ($v['tipo_vehiculo']['nombre'] ?? '') }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label>Ruta existente (opcional)</label>
+                    <select id="rutamultientregaid" class="form-control">
+                        <option value="">-- Ninguna --</option>
+                        @foreach(\App\Models\RutaMultiEntrega::orderByDesc('created_at')->limit(200)->get() as $r)
+                            <option value="{{ $r->rutamultientregaid }}">{{ $r->nombre }} @if($r->transportista) — {{ $r->transportista->nombreusuario }} @endif</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
             <div class="mt-3">
@@ -32,15 +46,16 @@
         <div class="card p-3 mb-3 d-none" id="step-2">
             <h5>Paso 2 — Seleccionar envíos</h5>
             <p>Marca los envíos que quieres asignar al transportista/vehículo.</p>
-            <table class="table table-sm">
-                <thead><tr><th></th><th>ID Env.</th><th>Pedido</th><th>Destino</th><th>Estado</th></tr></thead>
+                <table class="table table-sm">
+                <thead><tr><th></th><th>SKU (ID Env.)</th><th>Cantidad</th><th>Pedido/Destino</th><th>Estado</th></tr></thead>
                 <tbody id="envios-list">
                 @foreach(\App\Support\LocalOrgTrackFallback::enviosPayload()['data'] ?? [] as $env)
+                    @php $sku = $env['externo_envio_id'] ?? $env['id']; $qty = $env['cantidad'] ?? '' @endphp
                     <tr>
-                        <td><input type="checkbox" class="envio-checkbox" value="{{ $env['externo_envio_id'] ?? $env['id'] }}"></td>
-                        <td>{{ $env['externo_envio_id'] ?? $env['id'] }}</td>
+                        <td><input type="checkbox" class="envio-checkbox" data-sku="{{ $sku }}" data-cantidad="{{ $qty }}" value="{{ $sku }}"></td>
+                        <td>{{ $sku }}</td>
+                        <td>{{ $qty !== null && $qty !== '' ? $qty : '-' }}</td>
                         <td>{{ $env['destino'] ?? $env['nombre_destino'] ?? '-' }}</td>
-                        <td>{{ $env['direccion_destino'] ?? '-' }}</td>
                         <td>{{ $env['estado'] ?? '-' }}</td>
                     </tr>
                 @endforeach
@@ -62,10 +77,10 @@
             </table>
 
             <div class="d-flex gap-2">
-                <input id="producto-sku" class="form-control" placeholder="SKU o nombre">
-                <input id="producto-cantidad" class="form-control" placeholder="Cantidad" type="number">
-                <button class="btn btn-outline-primary" id="add-producto">Añadir</button>
-            </div>
+                        <input id="producto-sku" class="form-control" placeholder="SKU o nombre">
+                        <input id="producto-cantidad" class="form-control" placeholder="Cantidad" type="number">
+                        <button class="btn btn-outline-primary" id="add-producto">Añadir</button>
+                    </div>
 
             <div class="mt-3">
                 <button class="btn btn-secondary" id="back-step-2">Atrás</button>
@@ -89,6 +104,16 @@ document.getElementById('back-step-1').addEventListener('click', () => {
 document.getElementById('to-step-3').addEventListener('click', () => {
     const any = Array.from(document.querySelectorAll('.envio-checkbox')).some(c => c.checked);
     if (!any) { alert('Selecciona al menos un envío'); return; }
+    // Prefill productos table using selected envíos (SKU = envío id, cantidad from payload)
+    const productosTbody = document.querySelector('#productos-table tbody');
+    productosTbody.innerHTML = '';
+    Array.from(document.querySelectorAll('.envio-checkbox')).filter(c=>c.checked).forEach((c)=>{
+        const sku = c.dataset.sku || c.value;
+        const cantidad = c.dataset.cantidad || '';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${sku}</td><td><input class="form-control producto-cant" value="${cantidad}" /></td><td><button class="btn btn-sm btn-danger remove">X</button></td>`;
+        productosTbody.appendChild(tr);
+    });
     document.getElementById('step-2').classList.add('d-none');
     document.getElementById('step-3').classList.remove('d-none');
 });
@@ -117,10 +142,11 @@ document.addEventListener('click', (e) => {
 document.getElementById('submit-wizard').addEventListener('click', async () => {
     const transportista = document.getElementById('transportista').value;
     const vehiculo = document.getElementById('vehiculo_ref').value;
+    const rutamultientregaid = document.getElementById('rutamultientregaid').value || '';
     const envioIds = Array.from(document.querySelectorAll('.envio-checkbox')).filter(c=>c.checked).map(c=>c.value);
     const productos = Array.from(document.querySelectorAll('#productos-table tbody tr')).map(r=>({
         sku: r.cells[0].textContent.trim(),
-        cantidad: parseFloat(r.cells[1].textContent.trim())
+        cantidad: parseFloat((r.querySelector('.producto-cant')?.value || r.cells[1].textContent).trim() || 0)
     }));
 
     if (!transportista) { alert('Transportista requerido'); return; }
@@ -132,6 +158,7 @@ document.getElementById('submit-wizard').addEventListener('click', async () => {
     envioIds.forEach(id => form.append('envio_ids[]', id));
     form.append('transportista_usuarioid', transportista);
     form.append('vehiculo_ref', vehiculo);
+    if (rutamultientregaid) form.append('rutamultientregaid', rutamultientregaid);
 
     // Append productos as form fields so Laravel validation sees them as arrays
     productos.forEach((p, i) => {

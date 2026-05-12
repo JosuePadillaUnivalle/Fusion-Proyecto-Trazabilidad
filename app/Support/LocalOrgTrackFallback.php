@@ -33,6 +33,13 @@ final class LocalOrgTrackFallback
             $p = $a->pedido;
             $alm = $a->almacen;
             $origen = $alm ? trim(($alm->nombre ?? '').' · '.($alm->ubicacion ?? '')) : 'Origen almacén';
+            $cantidad = null;
+            if ($p) {
+                $detalles = $p->detalles()->get();
+                if ($detalles->isNotEmpty()) {
+                    $cantidad = $detalles->sum('cantidad');
+                }
+            }
 
             return [
                 'id' => $a->externo_envio_id,
@@ -46,6 +53,7 @@ final class LocalOrgTrackFallback
                 'direccion_origen' => $origen,
                 'origen_direccion' => $origen,
                 'origen' => $origen,
+                'cantidad' => $cantidad,
             ];
         })->values()->all();
 
