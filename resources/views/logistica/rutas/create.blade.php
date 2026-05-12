@@ -54,16 +54,14 @@
                             <div class="col-md-5 form-group">
                                 <label>Destino</label>
                                 <input name="paradas[0][destino]" class="form-control">
+                                <input type="hidden" name="paradas[0][lat]" class="parada-lat" />
+                                <input type="hidden" name="paradas[0][lng]" class="parada-lng" />
                             </div>
                             <div class="col-md-4 form-group">
                                 <label>Envío</label>
                                 <input name="paradas[0][externo_envio_id]" class="form-control">
                             </div>
                             <div class="col-md-3 form-group">
-                            <div class="col-md-3 form-group">
-                                <label>Fecha salida</label>
-                                <input type="datetime-local" name="fecha_salida" class="form-control">
-                            </div>
                                 <label>Pedido ID</label>
                                 <input type="number" name="paradas[0][pedidoid]" class="form-control">
                             </div>
@@ -85,99 +83,86 @@
     const addBtn = document.getElementById('add-parada');
     let idx = 1;
 
-    addBtn.addEventListener('click', () => {
-        const row = document.createElement('div');
-        row.className = 'row parada-item';
-        row.innerHTML = `
-            <div class="col-md-5 form-group">
-                <label>Destino</label>
-                <input name="paradas[${idx}][destino]" class="form-control">
-            </div>
-            <div class="col-md-4 form-group">
-                <label>Envío</label>
-    (() => {
-        const wrapper = document.getElementById('paradas-wrapper');
-        const addBtn = document.getElementById('add-parada');
-        let idx = 1;
+    // Leaflet map setup
+    const LScript = document.createElement('script');
+    LScript.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    LScript.onload = () => {
+        const map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
 
-        // Leaflet map setup
-        const LScript = document.createElement('script');
-        LScript.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-        LScript.onload = () => {
-            const map = L.map('map').setView([0, 0], 2);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(map);
+        const markers = {};
+        let poly = L.polyline([], { color: 'blue' }).addTo(map);
 
-            const markers = {};
-            let poly = L.polyline([], { color: 'blue' }).addTo(map);
+        function refreshPolyline() {
+            const latlngs = Object.keys(markers).map(k => markers[k].getLatLng());
+            poly.setLatLngs(latlngs);
+            if (latlngs.length) map.fitBounds(poly.getBounds().pad(0.2));
+        }
 
-            function refreshPolyline() {
-                const latlngs = Object.keys(markers).map(k => markers[k].getLatLng());
-                poly.setLatLngs(latlngs);
-                if (latlngs.length) map.fitBounds(poly.getBounds().pad(0.2));
+        function addParadaRow(dest = '', externo = '', pedido = '', lat = '', lng = '') {
+            const row = document.createElement('div');
+            row.className = 'row parada-item';
+            row.dataset.idx = idx;
+            row.innerHTML = `
+                <div class="col-md-5 form-group">
+                    <label>Destino</label>
+                    <input name="paradas[${idx}][destino]" class="form-control" value="${dest}">
+                    <input type="hidden" name="paradas[${idx}][lat]" class="parada-lat" value="${lat}" />
+                    <input type="hidden" name="paradas[${idx}][lng]" class="parada-lng" value="${lng}" />
+                </div>
+                <div class="col-md-4 form-group">
+                    <label>Envío</label>
+                    <input name="paradas[${idx}][externo_envio_id]" class="form-control" value="${externo}">
+                </div>
+                <div class="col-md-2 form-group">
+                    <label>Pedido ID</label>
+                    <input type="number" name="paradas[${idx}][pedidoid]" class="form-control" value="${pedido}">
+                </div>
+                <div class="col-md-1 form-group d-flex align-items-end">
+                    <button type="button" class="btn btn-danger btn-sm remove-parada">X</button>
+                </div>
+            `;
+            wrapper.appendChild(row);
+
+            // If coordinates provided, add marker
+            if (lat !== '' && lng !== '') {
+                const m = L.marker([parseFloat(lat), parseFloat(lng)]).addTo(map).bindPopup(dest || `${lat}, ${lng}`);
+                markers[idx] = m;
+                refreshPolyline();
             }
 
-            function addParadaRow(dest = '', externo = '', pedido = '', lat = '', lng = '') {
-                const row = document.createElement('div');
-                row.className = 'row parada-item';
-                row.dataset.idx = idx;
-                row.innerHTML = `
-                    <div class="col-md-5 form-group">
-                        <label>Destino</label>
-                        <input name="paradas[${idx}][destino]" class="form-control" value="${dest}">
-                        <input type="hidden" name="paradas[${idx}][lat]" class="parada-lat" value="${lat}" />
-                        <input type="hidden" name="paradas[${idx}][lng]" class="parada-lng" value="${lng}" />
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label>Envío</label>
-                        <input name="paradas[${idx}][externo_envio_id]" class="form-control" value="${externo}">
-                    </div>
-                    <div class="col-md-2 form-group">
-                        <label>Pedido ID</label>
-                        <input type="number" name="paradas[${idx}][pedidoid]" class="form-control" value="${pedido}">
-                    </div>
-                    <div class="col-md-1 form-group d-flex align-items-end">
-                        <button type="button" class="btn btn-danger btn-sm remove-parada">X</button>
-                    </div>
-                `;
-                wrapper.appendChild(row);
+            idx++;
+        }
 
-                // If coordinates provided, add marker
-                if (lat !== '' && lng !== '') {
-                    const m = L.marker([parseFloat(lat), parseFloat(lng)]).addTo(map).bindPopup(dest || `${lat}, ${lng}`);
-                    markers[idx] = m;
+        // Map click adds a parada using coordinates
+        map.on('click', (e) => {
+            const lat = e.latlng.lat.toFixed(6);
+            const lng = e.latlng.lng.toFixed(6);
+            addParadaRow(`Mapa: ${lat}, ${lng}`, '', '', lat, lng);
+        });
+
+        addBtn.addEventListener('click', () => {
+            addParadaRow();
+        });
+
+        wrapper.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-parada')) {
+                const row = e.target.closest('.parada-item');
+                const id = row?.dataset?.idx;
+                if (id && markers[id]) {
+                    map.removeLayer(markers[id]);
+                    delete markers[id];
                     refreshPolyline();
                 }
-
-                idx++;
+                row.remove();
             }
-
-            // Map click adds a parada using coordinates
-            map.on('click', (e) => {
-                const lat = e.latlng.lat.toFixed(6);
-                const lng = e.latlng.lng.toFixed(6);
-                addParadaRow(`Mapa: ${lat}, ${lng}`, '', '', lat, lng);
-            });
-
-            addBtn.addEventListener('click', () => {
-                addParadaRow();
-            });
-
+        });
+    };
+    document.head.appendChild(LScript);
+})();
+</script>
             wrapper.addEventListener('click', (e) => {
-                if (e.target.classList.contains('remove-parada')) {
-                    const row = e.target.closest('.parada-item');
-                    const id = row?.dataset?.idx;
-                    if (id && markers[id]) {
-                        map.removeLayer(markers[id]);
-                        delete markers[id];
-                        refreshPolyline();
-                    }
-                    row.remove();
-                }
-            });
-        };
-        document.head.appendChild(LScript);
-    })();
 
