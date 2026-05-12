@@ -3,7 +3,7 @@
 <style>
 .x-card{border:0;border-radius:14px;box-shadow:0 8px 24px rgba(18,38,63,.08)}
 .section-title{font-weight:700;color:#2c5530}
-    #map{height:400px;border-radius:8px;}
+    #map{height:400px;width:100%;border-radius:8px;}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-sA+e2XQ6k9sRk1p3pGkJkN5FQ5p1wQv1Y+5s5m0h3k0=" crossorigin=""/>
 @endpush
@@ -26,7 +26,7 @@
                             <label>Nombre de ruta</label>
                             <input name="nombre" class="form-control" required>
                         </div>
-                        <div class="mb-3">
+                        <div class="col-12 mb-3">
                             <h5 class="section-title">Mapa de la ruta</h5>
                             <div id="map"></div>
                             <p class="text-muted small">Haz click en el mapa para añadir una parada (se añadirá abajo en "Paradas iniciales").</p>
@@ -87,7 +87,7 @@
     const LScript = document.createElement('script');
     LScript.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
     LScript.onload = () => {
-        const map = L.map('map').setView([0, 0], 2);
+    const map = L.map('map').setView([0, 0], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap contributors'
@@ -160,7 +160,11 @@
                 row.remove();
             }
         });
-    };
+            // Fix sizing issues when map is inside responsive/layout containers
+            setTimeout(() => {
+                try { map.invalidateSize(); } catch (e) { /* ignore */ }
+            }, 300);
+        };
     document.head.appendChild(LScript);
 })();
 </script>
