@@ -96,7 +96,7 @@ class AsignacionMultipleController extends Controller
             );
         }
 
-        return back()->with('success', 'Asignación múltiple aplicada correctamente.');
+        return redirect()->route('logistica.asignaciones.index')->with('success', 'Asignación múltiple aplicada correctamente.');
     }
 }
 
