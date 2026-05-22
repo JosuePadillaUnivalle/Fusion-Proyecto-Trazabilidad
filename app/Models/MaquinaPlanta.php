@@ -21,5 +21,10 @@ class MaquinaPlanta extends Model
     {
         return $this->hasMany(Produccion::class, 'maquinaplantaid', 'maquinaplantaid');
     }
+
+    public function procesoMaquinas(): HasMany
+    {
+        return $this->hasMany(ProcesoMaquinaPlanta::class, 'maquinaplantaid', 'maquinaplantaid');
+    }
 }
 

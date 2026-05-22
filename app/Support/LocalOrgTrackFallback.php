@@ -5,6 +5,8 @@ namespace App\Support;
 use App\Models\EnvioAsignacionMultiple;
 use App\Models\IncidenteEnvio;
 use App\Models\RutaMultiEntrega;
+use App\Models\TipoEmpaque;
+use App\Models\TipoTransporte;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\Schema;
 
@@ -14,6 +16,56 @@ use Illuminate\Support\Facades\Schema;
  */
 final class LocalOrgTrackFallback
 {
+    /**
+     * Lista compatible con la vista mandar-envio: [{ "id": int, "nombre": string }, ...]
+     * (semillas del bloque A en tabla tipo_transporte).
+     */
+    public static function tiposTransporteList(): array
+    {
+        if (! Schema::hasTable('tipo_transporte')) {
+            return [];
+        }
+
+        return TipoTransporte::query()
+            ->orderBy('nombre')
+            ->get()
+            ->map(fn (TipoTransporte $row) => [
+                'id' => (int) $row->tipotransporteid,
+                'nombre' => (string) $row->nombre,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Catálogo de tipos de empaque para mandar-envio (medidas opcionales rellenadas en vacío si no existen en BD).
+     */
+    public static function tiposEmpaqueCatalogList(): array
+    {
+        if (! Schema::hasTable('tipo_empaque')) {
+            return [];
+        }
+
+        return TipoEmpaque::query()
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get()
+            ->map(function (TipoEmpaque $e) {
+                return [
+                    'id' => (int) $e->tipoempaqueid,
+                    'nombre' => (string) $e->nombre,
+                    'largo' => '',
+                    'ancho' => '',
+                    'alto' => '',
+                    'tara' => '',
+                    'capacidad' => '',
+                    'unidades_por_pallet' => '',
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     public static function enviosPayload(): array
     {
         if (! Schema::hasTable('envio_asignacion_multiple')) {

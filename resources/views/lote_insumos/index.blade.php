@@ -254,10 +254,12 @@
                     </div>
                 </div>
                 <div class="col-md-7 text-md-right mt-3 mt-md-0 d-flex justify-content-md-end align-items-center gap-2">
+                    @can('inventario.create')
                     <a href="{{ route('lote-insumos.create') }}" class="btn btn-success text-white mr-3"
                         style="border-radius: 20px; background-color: #28a745; border-color: #28a745;">
                         <i class="fas fa-plus mr-1"></i> Nueva Aplicación
                     </a>
+                    @endcan
                     <div class="btn-group view-toggle">
                         <button type="button" class="btn btn-outline-secondary active" id="btnCardView"><i
                                 class="fas fa-th-large"></i></button>
@@ -316,13 +318,17 @@
                     <div class="d-flex align-items-center gap-1">
                         <a href="{{ route('lote-insumos.show', $li) }}" class="btn btn-custom-action btn-info text-white"
                             title="Ver"><i class="fas fa-eye"></i></a>
+                        @can('inventario.update')
                         <a href="{{ route('lote-insumos.edit', $li) }}" class="btn btn-custom-action btn-warning text-white"
                             title="Editar"><i class="fas fa-edit"></i></a>
+                        @endcan
+                        @can('inventario.delete')
                         <form action="{{ route('lote-insumos.destroy', $li) }}" method="POST" class="d-inline on-submit-confirm"
                             title="Eliminar">
                             @csrf @method('DELETE')
                             <button class="btn btn-custom-action btn-danger"><i class="fas fa-trash"></i></button>
                         </form>
+                        @endcan
                     </div>
                 </div>
             </div>
@@ -331,7 +337,9 @@
                 <div class="card-body text-center py-5">
                     <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
                     <h4 class="text-muted">No hay aplicaciones registradas</h4>
+                    @can('inventario.create')
                     <a href="{{ route('lote-insumos.create') }}" class="btn btn-success mt-2">Registrar Primera Aplicación</a>
+                    @endcan
                 </div>
             </div>
         @endforelse
@@ -368,13 +376,17 @@
                                     <td class="text-right">
                                         <a href="{{ route('lote-insumos.show', $li) }}"
                                             class="btn btn-sm btn-info text-white"><i class="fas fa-eye"></i></a>
+                                        @can('inventario.update')
                                         <a href="{{ route('lote-insumos.edit', $li) }}"
                                             class="btn btn-sm btn-warning text-white"><i class="fas fa-edit"></i></a>
+                                        @endcan
+                                        @can('inventario.delete')
                                         <form action="{{ route('lote-insumos.destroy', $li) }}" method="POST"
                                             class="d-inline on-submit-confirm">
                                             @csrf @method('DELETE')
                                             <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
                                         </form>
+                                        @endcan
                                     </td>
                                 </tr>
                             @endforeach

@@ -73,4 +73,19 @@ class Usuario extends Authenticatable
     {
         return $this->belongsTo(Almacen::class, 'almacenid', 'almacenid');
     }
+
+    public function operadorPlanta()
+    {
+        return $this->hasOne(OperadorPlanta::class, 'usuarioid', 'usuarioid');
+    }
+
+    public function direccionesGeoEnvio()
+    {
+        return $this->hasMany(DireccionGeoEnvio::class, 'usuarioid', 'usuarioid');
+    }
+
+    public function almacenUsuarios()
+    {
+        return $this->hasMany(AlmacenUsuario::class, 'usuarioid', 'usuarioid');
+    }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\EnvioAsignacionMultiple;
+use App\Support\EnvioAsignacionEstadoCatalogo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -50,7 +51,7 @@ class AsignacionMultipleController extends Controller
                 'externo_envio_id' => $validated['externo_envio_id'],
                 'transportista_usuarioid' => $validated['transportista_usuarioid'],
             ],
-            [
+            EnvioAsignacionEstadoCatalogo::applyToAttributes([
                 'pedidoid' => $validated['pedidoid'] ?? null,
                 'asignadopor_usuarioid' => auth()->id(),
                 'rutamultientregaid' => $validated['rutamultientregaid'] ?? null,
@@ -58,7 +59,7 @@ class AsignacionMultipleController extends Controller
                 'almacenid' => $validated['almacenid'] ?? null,
                 'estado' => 'asignado',
                 'fecha_asignacion' => now(),
-            ]
+            ])
         );
 
         return back()->with('success', 'Envío asignado correctamente.');
@@ -84,7 +85,7 @@ class AsignacionMultipleController extends Controller
                     'externo_envio_id' => $envioId,
                     'transportista_usuarioid' => $validated['transportista_usuarioid'],
                 ],
-                [
+                EnvioAsignacionEstadoCatalogo::applyToAttributes([
                     'asignadopor_usuarioid' => auth()->id(),
                     'rutamultientregaid' => $validated['rutamultientregaid'] ?? null,
                     'vehiculo_ref' => $validated['vehiculo_ref'] ?? null,
@@ -92,11 +93,21 @@ class AsignacionMultipleController extends Controller
                     'estado' => 'asignado',
                     'fecha_asignacion' => now(),
                     'detalles_productos' => $validated['productos'] ?? null,
-                ]
+                ])
             );
         }
 
         return back()->with('success', 'Asignación múltiple aplicada correctamente.');
+    }
+
+    public function markDelivered(EnvioAsignacionMultiple $asignacion): RedirectResponse
+    {
+        $asignacion->update(EnvioAsignacionEstadoCatalogo::applyToAttributes([
+            'estado' => 'entregado',
+            'fecha_asignacion' => now(),
+        ]));
+
+        return back()->with('success', 'Recepción registrada correctamente.');
     }
 }
 

@@ -23,7 +23,7 @@ class CertificacionController extends Controller
         $certificados = CertificacionLote::query()
             ->with(['lote', 'usuario'])
             ->orderByDesc('fecha_certificacion')
-            ->limit(20)
+            ->limit(50)
             ->get();
 
         return view('certificaciones.index', compact('lotes', 'certificados'));
@@ -42,11 +42,14 @@ class CertificacionController extends Controller
             ['descripcion' => 'Lote validado para despacho y trazabilidad']
         );
 
+        $usuarioId = (int) auth()->id();
+        $codigo = 'CERT-'.str_pad((string) $lote->loteid, 5, '0', STR_PAD_LEFT).'-'.now()->format('Ymd');
+
         $certificacion = CertificacionLote::updateOrCreate(
             ['loteid' => $lote->loteid],
             [
-                'usuarioid' => auth()->id(),
-                'codigo_certificado' => 'CERT-'.str_pad((string) $lote->loteid, 5, '0', STR_PAD_LEFT),
+                'usuarioid' => $usuarioId,
+                'codigo_certificado' => $codigo,
                 'observaciones' => $validated['observaciones'] ?? null,
                 'fecha_certificacion' => now(),
             ]
@@ -59,7 +62,7 @@ class CertificacionController extends Controller
             'estadolotetipoid' => $estadoCertificado->estadolotetipoid,
             'fecha_cambio' => now(),
             'observaciones' => 'Certificación registrada: '.$certificacion->codigo_certificado,
-            'usuarioid' => auth()->id(),
+            'usuarioid' => $usuarioId,
         ]);
 
         return redirect()

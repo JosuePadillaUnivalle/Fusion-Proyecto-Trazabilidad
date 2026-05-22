@@ -16,9 +16,12 @@ use App\Models\RutaMultiEntrega;
 use App\Models\Usuario;
 use App\Models\Cultivo;
 use App\Models\AlmacenMovimiento;
+use App\Models\AlmacenProducto;
+use App\Models\InventarioAlmacenEnvio;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
@@ -364,6 +367,8 @@ class DashboardController extends Controller
                     'envios_recibidos' => 0,
                     'por_recibir' => 0,
                     'inventario_total' => 0.0,
+                    'stock_productos_distribucion' => 0.0,
+                    'lineas_inventario_envio' => 0,
                     'recibidos_hoy' => 0,
                     'incidentes_abiertos' => 0,
                     'notas_entrega' => 0,
@@ -382,11 +387,20 @@ class DashboardController extends Controller
 
         $movimientos = AlmacenMovimiento::query()->where('almacenid', $almacenId);
 
+        $stockProductos = Schema::hasTable('almacen_producto')
+            ? (float) AlmacenProducto::query()->where('almacenid', $almacenId)->sum('stock')
+            : 0.0;
+        $lineasInvEnvio = Schema::hasTable('inventario_almacen_envio')
+            ? (int) InventarioAlmacenEnvio::query()->where('almacenid', $almacenId)->count()
+            : 0;
+
         return [
             'stats' => [
                 'envios_recibidos' => (clone $asignaciones)->where('estado', 'entregado')->count(),
                 'por_recibir' => (clone $asignaciones)->whereIn('estado', ['asignado', 'en_ruta'])->count(),
                 'inventario_total' => (float) Insumo::query()->where('almacenid', $almacenId)->sum('stock'),
+                'stock_productos_distribucion' => $stockProductos,
+                'lineas_inventario_envio' => $lineasInvEnvio,
                 'recibidos_hoy' => (clone $asignaciones)->whereDate('updated_at', now()->toDateString())->where('estado', 'entregado')->count(),
                 'incidentes_abiertos' => (clone $incidentes)->where('estado', 'abierto')->count(),
                 'notas_entrega' => $documentos->count(),

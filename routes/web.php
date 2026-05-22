@@ -159,22 +159,14 @@ Route::middleware('auth')->group(function () {
     Route::delete('ventas/{venta}', [VentaController::class, 'destroy'])->name('ventas.destroy')->middleware('action.permission:ventas,delete');
     Route::resource('tipoalmacenes', TipoAlmacenController::class)
         ->parameters(['tipoalmacenes' => 'tipoalmacen']);
-    Route::resource('almacenes', AlmacenController::class)
-        ->parameters(['almacenes' => 'almacen'])
-        ->only(['index', 'show'])
-        ->middleware('action.permission:inventario,read');
-    Route::resource('almacenes', AlmacenController::class)
-        ->parameters(['almacenes' => 'almacen'])
-        ->only(['create', 'store'])
-        ->middleware('action.permission:inventario,create');
-    Route::resource('almacenes', AlmacenController::class)
-        ->parameters(['almacenes' => 'almacen'])
-        ->only(['edit', 'update'])
-        ->middleware('action.permission:inventario,update');
-    Route::resource('almacenes', AlmacenController::class)
-        ->parameters(['almacenes' => 'almacen'])
-        ->only(['destroy'])
-        ->middleware('action.permission:inventario,delete');
+    // Evita conflicto /almacenes/create vs /almacenes/{almacen} (404 por model binding)
+    Route::get('almacenes', [AlmacenController::class, 'index'])->name('almacenes.index')->middleware('action.permission:inventario,read');
+    Route::get('almacenes/create', [AlmacenController::class, 'create'])->name('almacenes.create')->middleware('action.permission:inventario,create');
+    Route::post('almacenes', [AlmacenController::class, 'store'])->name('almacenes.store')->middleware('action.permission:inventario,create');
+    Route::get('almacenes/{almacen}', [AlmacenController::class, 'show'])->name('almacenes.show')->middleware('action.permission:inventario,read');
+    Route::get('almacenes/{almacen}/edit', [AlmacenController::class, 'edit'])->name('almacenes.edit')->middleware('action.permission:inventario,update');
+    Route::put('almacenes/{almacen}', [AlmacenController::class, 'update'])->name('almacenes.update')->middleware('action.permission:inventario,update');
+    Route::delete('almacenes/{almacen}', [AlmacenController::class, 'destroy'])->name('almacenes.destroy')->middleware('action.permission:inventario,delete');
     Route::resource('producciones_almacenamiento', ProduccionAlmacenamientoController::class)->only(['index', 'show'])->middleware('action.permission:inventario,read');
     Route::resource('producciones_almacenamiento', ProduccionAlmacenamientoController::class)->only(['create', 'store'])->middleware('action.permission:inventario,create');
     Route::resource('producciones_almacenamiento', ProduccionAlmacenamientoController::class)->only(['edit', 'update'])->middleware('action.permission:inventario,update');
@@ -317,6 +309,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/asignaciones/lote', [AsignacionMultipleController::class, 'storeBatch'])
             ->name('asignaciones.store-batch')
             ->middleware('action.permission:asignaciones,multiple');
+        Route::patch('/asignaciones/{asignacion}/recepcion', [AsignacionMultipleController::class, 'markDelivered'])
+            ->name('asignaciones.mark-delivered')
+            ->middleware('action.permission:asignaciones,create');
 
         Route::get('/rutas-multi', [RutaMultiEntregaController::class, 'index'])
             ->name('rutas.index')

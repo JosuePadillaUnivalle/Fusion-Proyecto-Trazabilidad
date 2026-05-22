@@ -190,7 +190,10 @@ class ExternalApiProxyController extends Controller
 
     public function getTiposEmpaque()
     {
-        return $this->proxyGet('/api/catalogo-tipos-empaque');
+        return $this->proxyGetWithLocalFallback(
+            '/api/catalogo-tipos-empaque',
+            fn () => LocalOrgTrackFallback::tiposEmpaqueCatalogList()
+        );
     }
 
     public function getTamanoConteo()
@@ -200,7 +203,10 @@ class ExternalApiProxyController extends Controller
 
     public function getTiposTransporte()
     {
-        return $this->proxyGet('/api/tipo-transporte');
+        return $this->proxyGetWithLocalFallback(
+            '/api/tipo-transporte',
+            fn () => LocalOrgTrackFallback::tiposTransporteList()
+        );
     }
 
     // =============================================

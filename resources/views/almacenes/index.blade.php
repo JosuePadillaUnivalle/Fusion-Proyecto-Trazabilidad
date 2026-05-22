@@ -264,10 +264,12 @@
                     </div>
                 </div>
                 <div class="col-md-7 text-md-right mt-3 mt-md-0 d-flex justify-content-md-end align-items-center gap-2">
+                    @can('inventario.create')
                     <a href="{{ route('almacenes.create') }}" class="btn btn-success text-white mr-3"
                         style="border-radius: 20px; background-color: #28a745; border-color: #28a745;">
                         <i class="fas fa-plus mr-1"></i> Nuevo Almacén
                     </a>
+                    @endcan
                     <div class="btn-group view-toggle">
                         <button type="button" class="btn btn-outline-secondary active" id="btnCardView"><i
                                 class="fas fa-th-large"></i></button>
@@ -322,12 +324,16 @@
                     <div>
                         <a href="{{ route('almacenes.show', $a) }}" class="btn btn-sm btn-info text-white"><i
                                 class="fas fa-eye"></i></a>
+                        @can('inventario.update')
                         <a href="{{ route('almacenes.edit', $a) }}" class="btn btn-sm btn-warning text-white"><i
                                 class="fas fa-edit"></i></a>
+                        @endcan
+                        @can('inventario.delete')
                         <form action="{{ route('almacenes.destroy', $a) }}" method="POST" class="d-inline on-submit-confirm">
                             @csrf @method('DELETE')
                             <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
                         </form>
+                        @endcan
                     </div>
                 </div>
             </div>
@@ -336,7 +342,9 @@
                 <div class="card-body text-center py-5">
                     <i class="fas fa-warehouse fa-3x text-muted mb-3"></i>
                     <h4 class="text-muted">No hay almacenes registrados</h4>
+                    @can('inventario.create')
                     <a href="{{ route('almacenes.create') }}" class="btn btn-success mt-2">Crear Primer Almacén</a>
+                    @endcan
                 </div>
             </div>
         @endforelse
@@ -378,13 +386,17 @@
                                     <td class="text-right">
                                         <a href="{{ route('almacenes.show', $a) }}" class="btn btn-sm btn-info text-white"><i
                                                 class="fas fa-eye"></i></a>
+                                        @can('inventario.update')
                                         <a href="{{ route('almacenes.edit', $a) }}" class="btn btn-sm btn-warning text-white"><i
                                                 class="fas fa-edit"></i></a>
+                                        @endcan
+                                        @can('inventario.delete')
                                         <form action="{{ route('almacenes.destroy', $a) }}" method="POST"
                                             class="d-inline on-submit-confirm">
                                             @csrf @method('DELETE')
                                             <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
                                         </form>
+                                        @endcan
                                     </td>
                                 </tr>
                             @endforeach

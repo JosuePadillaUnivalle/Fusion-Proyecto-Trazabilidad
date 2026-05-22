@@ -58,6 +58,9 @@
                             <th>Vehículo</th>
                             <th>Estado</th>
                             <th>Fecha</th>
+                            @can('asignaciones.create')
+                            <th>Acción</th>
+                            @endcan
                         </tr>
                     </thead>
                     <tbody>
@@ -69,9 +72,24 @@
                                 <td>{{ $asignacion->vehiculo_ref ?? 'N/D' }}</td>
                                 <td><span class="badge badge-pill {{ $asignacion->estado === 'entregado' ? 'badge-success' : ($asignacion->estado === 'en_ruta' ? 'badge-info' : 'badge-warning') }}">{{ $asignacion->estado }}</span></td>
                                 <td>{{ optional($asignacion->fecha_asignacion)->format('d/m/Y H:i') }}</td>
+                                @can('asignaciones.create')
+                                <td>
+                                    @if($asignacion->estado !== 'entregado')
+                                        <form method="POST" action="{{ route('logistica.asignaciones.mark-delivered', $asignacion) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit" class="btn btn-sm btn-success">
+                                                <i class="fas fa-check-circle mr-1"></i>Registrar recepción
+                                            </button>
+                                        </form>
+                                    @else
+                                        <span class="text-muted small">Recepción registrada</span>
+                                    @endif
+                                </td>
+                                @endcan
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="x-empty"><i class="far fa-folder-open mr-1"></i>Sin asignaciones registradas</td></tr>
+                            <tr><td colspan="{{ auth()->user()?->can('asignaciones.create') ? 7 : 6 }}" class="x-empty"><i class="far fa-folder-open mr-1"></i>Sin asignaciones registradas</td></tr>
                         @endforelse
                     </tbody>
                 </table>

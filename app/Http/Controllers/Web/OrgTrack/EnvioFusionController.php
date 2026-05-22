@@ -35,7 +35,14 @@ class EnvioFusionController extends Controller
             'estado' => 'nullable|string|max:50',
             'vehiculo_ref' => 'nullable|string|max:100',
             'transportista_usuarioid' => 'nullable|integer',
+            'tipotransporteid' => 'nullable|integer|exists:tipo_transporte,tipotransporteid',
+            'motivocancelacionid' => 'nullable|integer|exists:motivo_cancelacion_envio,motivocancelacionid',
+            'recogidaentregaid' => 'nullable|integer|exists:recogida_entrega,recogidaentregaid',
         ]);
+
+        if (! empty($data['estado'])) {
+            $data = \App\Support\EnvioAsignacionEstadoCatalogo::applyToAttributes($data);
+        }
 
         $envio->update($data);
 

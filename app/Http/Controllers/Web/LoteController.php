@@ -33,8 +33,8 @@ class LoteController extends Controller
         // Estadísticas
         $stats = [
             'total' => Lote::count(),
-            'en_produccion' => Lote::whereHas('estadoTipo', fn($q) => $q->where('nombre', 'en producción'))->count(),
-            'cosechados' => Lote::whereHas('estadoTipo', fn($q) => $q->where('nombre', 'cosechado'))->count(),
+            'en_produccion' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en producción']))->count(),
+            'cosechados' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['cosechado']))->count(),
             'hectareas' => Lote::sum('superficie') ?? 0,
         ];
 

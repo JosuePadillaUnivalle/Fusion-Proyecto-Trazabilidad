@@ -45,4 +45,9 @@ class UnidadMedida extends Model
     {
         return $this->hasMany(ProduccionAlmacenamiento::class, 'unidadmedidaid', 'unidadmedidaid');
     }
+
+    public function cargasEnvio()
+    {
+        return $this->hasMany(CargaEnvio::class, 'unidadmedidaid', 'unidadmedidaid');
+    }
 }
