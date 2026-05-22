@@ -5,7 +5,13 @@
 @section('content')
 <div class="card">
     <div class="card-header bg-info text-white">
-        <h3 class="card-title"><i class="fas fa-tasks mr-2"></i>Registrar Actividad</h3>
+        <h3 class="card-title"><i class="fas fa-tasks mr-2"></i>Registrar Actividad (excepción manual)</h3>
+    </div>
+
+    <div class="alert alert-warning m-3 mb-0">
+        <i class="fas fa-robot mr-1"></i>
+        Las actividades se crean <strong>automáticamente</strong> al aplicar insumos en un lote o al registrar una cosecha.
+        Solo use este formulario si debe corregir o agregar una actividad puntual.
     </div>
 
     @if($errors->any())

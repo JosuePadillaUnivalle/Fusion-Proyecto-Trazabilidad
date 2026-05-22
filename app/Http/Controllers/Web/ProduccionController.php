@@ -13,6 +13,7 @@ use App\Models\Almacen;
 use App\Models\ProduccionAlmacenamiento;
 use App\Models\ProcesoPlanta;
 use App\Models\MaquinaPlanta;
+use App\Services\OperacionAgricolaAutomaticaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -217,12 +218,15 @@ class ProduccionController extends Controller
                 ]);
             }
 
+            app(OperacionAgricolaAutomaticaService::class)->desdeProduccion($produccion);
+
             DB::commit();
 
             $unidad = UnidadMedida::find($data['unidadmedidaid']);
             return redirect()
                 ->route('producciones.index')
-                ->with('success', "¡Cosecha registrada! {$data['cantidad']} {$unidad->abreviatura} de {$lote->cultivo->nombre}" . $mensajeAlmacen);
+                ->with('success', "¡Cosecha registrada! {$data['cantidad']} {$unidad->abreviatura} de {$lote->cultivo->nombre}"
+                    . $mensajeAlmacen.' · Actividad de cosecha generada automáticamente.');
 
         } catch (\Exception $e) {
             DB::rollBack();

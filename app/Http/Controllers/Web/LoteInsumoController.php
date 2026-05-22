@@ -7,6 +7,7 @@ use App\Models\LoteInsumo;
 use App\Models\Lote;
 use App\Models\Insumo;
 use App\Models\EstadoLoteInsumo;
+use App\Services\OperacionAgricolaAutomaticaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -70,7 +71,7 @@ class LoteInsumoController extends Controller
             $costoTotal = $data['cantidadusada'] * ($insumo->preciounitario ?? 0);
 
             // Crear el registro con usuario automático del lote y fecha actual
-            LoteInsumo::create([
+            $loteInsumo = LoteInsumo::create([
                 'loteid' => $data['loteid'],
                 'insumoid' => $data['insumoid'],
                 'usuarioid' => $lote->usuarioid, // Usuario responsable del lote (automático)
@@ -80,6 +81,8 @@ class LoteInsumoController extends Controller
                 'estadoloteinsumoid' => $data['estadoloteinsumoid'] ?? 1, // Por defecto "aplicado"
                 'observaciones' => $data['observaciones'],
             ]);
+
+            app(OperacionAgricolaAutomaticaService::class)->desdeLoteInsumo($loteInsumo);
 
             DB::commit();
 

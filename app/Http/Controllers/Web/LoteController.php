@@ -9,9 +9,11 @@ use App\Models\Cultivo;
 use App\Models\ActorAbastecimiento;
 use App\Models\EstadoLoteTipo;
 use App\Models\Produccion;
+use App\Support\LoteDefaults;
+use App\Services\OperacionAgricolaAutomaticaService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 // use App\Services\SupabaseStorage; // COMENTADO TEMPORALMENTE
 
 class LoteController extends Controller
@@ -157,9 +159,35 @@ class LoteController extends Controller
 
         unset($data['imagen']);
 
-        Lote::create($data);
+        $data = LoteDefaults::enrich($data, true);
+        $lote = Lote::create($data);
+        LoteDefaults::registrarHistorialInicial($lote);
 
         return redirect()->route('lotes.index')->with('success', 'Lote creado exitosamente.');
+    }
+
+    /**
+     * Fuerza sincronización operativa (clima, actividades desde insumos/cosechas, riegos).
+     */
+    public function sincronizarOperacion(Request $request, OperacionAgricolaAutomaticaService $service)
+    {
+        abort_unless(
+            $request->user()?->hasRole('admin') || $request->user()?->hasRole('operador'),
+            403
+        );
+
+        $r = $service->sincronizarTodo();
+
+        return redirect()
+            ->route('lotes.index')
+            ->with('success', sprintf(
+                'Operación sincronizada: %d clima, %d act. insumo, %d cosechas, %d riegos, %d alertas clima.',
+                $r['clima_lotes'],
+                $r['actividades_insumo'],
+                $r['actividades_cosecha'],
+                $r['actividades_riego'],
+                $r['actividades_clima']
+            ));
     }
 
     public function show(Lote $lote)
@@ -299,8 +327,6 @@ class LoteController extends Controller
             'estadolotetipoid' => 'nullable|exists:estadolote_tipo,estadolotetipoid',
             'latitud' => 'nullable|numeric|between:-90,90',
             'longitud' => 'nullable|numeric|between:-180,180',
-            'latitud' => 'nullable|numeric|between:-90,90',
-            'longitud' => 'nullable|numeric|between:-180,180',
             'imagen' => 'nullable|image|max:2048',
         ]);
 
@@ -317,7 +343,7 @@ class LoteController extends Controller
 
         unset($data['imagen']);
 
-        $lote->update($data);
+        $lote->update(LoteDefaults::enrich($data, false));
 
         return redirect()->route('lotes.index')->with('success', 'Lote actualizado.');
     }

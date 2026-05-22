@@ -275,6 +275,14 @@
                                 <i class="fas fa-plus mr-1"></i> Nuevo Lote
                             </a>
                         @endcan
+                        @can('lotes.update')
+                            <form action="{{ route('lotes.sincronizar-operacion') }}" method="POST" class="d-inline mr-3">
+                                @csrf
+                                <button type="submit" class="btn btn-info" title="Clima por lote, actividades desde insumos/cosechas y riegos programados">
+                                    <i class="fas fa-sync mr-1"></i> Sincronizar operación
+                                </button>
+                            </form>
+                        @endcan
                         <a href="{{ route('lotes.mapa') }}" class="btn btn-outline-success">
                             <i class="fas fa-map-marked-alt mr-1"></i> Ver Mapa
                         </a>

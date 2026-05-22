@@ -48,6 +48,12 @@ class Insumo extends Model
         return $this->belongsTo(TipoInsumo::class, 'tipoinsumoid', 'tipoinsumoid');
     }
 
+    /** Alias usado en vistas legacy (p. ej. lote_insumos). */
+    public function tipoInsumo()
+    {
+        return $this->belongsTo(TipoInsumo::class, 'tipoinsumoid', 'tipoinsumoid');
+    }
+
     public function unidadMedida()
     {
         return $this->belongsTo(UnidadMedida::class, 'unidadmedidaid', 'unidadmedidaid');

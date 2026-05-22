@@ -52,6 +52,14 @@
             </div>
         @endif
 
+        <div class="alert alert-info m-3 mb-0">
+            <i class="fas fa-robot mr-1"></i>
+            <strong>Operación automática:</strong> en producción las actividades se generan al registrar
+            <a href="{{ route('lote-insumos.create') }}">aplicación de insumos</a> o
+            <a href="{{ route('producciones.create') }}">cosechas</a>.
+            Use este formulario solo para dar de alta una parcela nueva (excepción).
+        </div>
+
         <form action="{{ route('lotes.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
             <div class="card-body">
@@ -107,9 +115,9 @@
                         </div>
 
                         <div class="form-group">
-                            <label><i class="fas fa-id-badge mr-1"></i> Código de trazabilidad</label>
+                            <label><i class="fas fa-id-badge mr-1"></i> Código de trazabilidad <small class="text-muted">(opcional, se genera solo)</small></label>
                             <input type="text" name="codigo_trazabilidad" class="form-control" maxlength="80"
-                                value="{{ old('codigo_trazabilidad') }}" placeholder="Ej: LT-2026-0001">
+                                value="{{ old('codigo_trazabilidad') }}" placeholder="Vacío = TRAZ-20260519-XXXXXX">
                         </div>
 
                         <div class="form-group">

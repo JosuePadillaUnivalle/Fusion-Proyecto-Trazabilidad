@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Lote;
+use App\Support\LoteDefaults;
 use Illuminate\Http\Request;
 
 class LoteController extends Controller
@@ -38,9 +39,10 @@ class LoteController extends Controller
             'imagenurl' => 'nullable|string|max:250',
         ]);
 
-        $lote = Lote::create($data);
+        $lote = Lote::create(LoteDefaults::enrich($data, true));
+        LoteDefaults::registrarHistorialInicial($lote);
 
-        return response()->json($lote, 201);
+        return response()->json($lote->fresh(['usuario', 'cultivo', 'estadoTipo']), 201);
     }
 
     public function update(Request $request, $id)

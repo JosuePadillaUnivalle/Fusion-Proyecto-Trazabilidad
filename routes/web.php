@@ -128,6 +128,7 @@ Route::middleware('auth')->group(function () {
     Route::get('lotes/mapa', [LoteController::class, 'mapa'])->name('lotes.mapa')->middleware('action.permission:lotes,read');
     Route::get('lotes', [LoteController::class, 'index'])->name('lotes.index')->middleware('action.permission:lotes,read');
     Route::get('lotes/create', [LoteController::class, 'create'])->name('lotes.create')->middleware('action.permission:lotes,create');
+    Route::post('lotes/sincronizar-operacion', [LoteController::class, 'sincronizarOperacion'])->name('lotes.sincronizar-operacion')->middleware('action.permission:lotes,update');
     Route::post('lotes', [LoteController::class, 'store'])->name('lotes.store')->middleware('action.permission:lotes,create');
     Route::get('lotes/{lote}', [LoteController::class, 'show'])->name('lotes.show')->middleware('action.permission:lotes,read');
     Route::get('lotes/{lote}/edit', [LoteController::class, 'edit'])->name('lotes.edit')->middleware('action.permission:lotes,update');

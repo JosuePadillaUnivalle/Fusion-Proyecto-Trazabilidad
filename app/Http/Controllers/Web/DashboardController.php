@@ -149,8 +149,8 @@ class DashboardController extends Controller
         // ========================================
         // INSUMOS CON STOCK BAJO (para alertas)
         // ========================================
-        $insumosStockBajo = Insumo::with('tipoInsumo')
-            ->whereRaw('stock <= stockminimo')
+        $insumosStockBajo = Insumo::with('tipo')
+            ->whereRaw('stock <= COALESCE(stockminimo, 10)')
             ->orderBy('stock')
             ->limit(5)
             ->get();
