@@ -85,21 +85,72 @@
         }
 
         #map {
-            height: 300px;
+            height: 340px;
             width: 100%;
+            border-radius: 0 0 10px 10px;
+            z-index: 1;
+        }
+
+        .ficha-chip {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 14px;
+            background: #f8f9fc;
             border-radius: 10px;
-            border: 2px solid #e9ecef;
+            border: 1px solid #eef0f2;
+            margin-bottom: 10px;
         }
 
-        .info-table td {
-            padding: 10px 0;
-            border-bottom: 1px solid #f1f3f4;
+        .ficha-chip i {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary-color);
+            color: #fff;
+            flex-shrink: 0;
         }
 
-        .info-table td:first-child {
+        .ficha-chip .chip-label {
+            font-size: .75rem;
+            text-transform: uppercase;
+            color: #6c757d;
+            letter-spacing: .03em;
+        }
+
+        .ficha-chip .chip-value {
             font-weight: 600;
-            color: #495057;
-            width: 40%;
+            color: #1a252f;
+        }
+
+        .resumen-mini {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .resumen-mini .item {
+            background: #f8f9fc;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #eef0f2;
+        }
+
+        .resumen-mini .item h4 {
+            margin: 0;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .timeline-panel {
+            max-height: 420px;
+            overflow-y: auto;
+            padding-right: 8px;
         }
 
         .lote-image {
@@ -231,22 +282,8 @@
             font-weight: 500;
         }
 
-        .nav-tabs .nav-link {
-            border: none;
-            color: #6c757d;
-            font-weight: 500;
-            padding: 12px 20px;
-        }
-
-        .nav-tabs .nav-link.active {
-            color: var(--primary-color);
-            border-bottom: 3px solid var(--primary-color);
-            background: transparent;
-        }
-
-        .nav-tabs .nav-link:hover {
-            border-color: transparent;
-            color: var(--primary-color);
+        .map-card .card-header {
+            background: linear-gradient(135deg, #f8f9fc, #fff);
         }
     </style>
 @endpush
@@ -352,190 +389,170 @@
         </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="card">
-        <div class="card-header p-0">
-            <ul class="nav nav-tabs" id="loteTabs" role="tablist">
-                <li class="nav-item">
-                    <a class="nav-link active" id="info-tab" data-toggle="tab" href="#info" role="tab">
-                        <i class="fas fa-info-circle mr-1"></i> Información
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" id="trazabilidad-tab" data-toggle="tab" href="#trazabilidad" role="tab">
-                        <i class="fas fa-history mr-1"></i> Trazabilidad
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" id="mapa-tab" data-toggle="tab" href="#mapa" role="tab">
-                        <i class="fas fa-map mr-1"></i> Ubicación
-                    </a>
-                </li>
-            </ul>
+    <!-- Vista unificada: ubicación + ficha + historial -->
+    <div class="row">
+        <div class="col-lg-5 mb-4">
+            <div class="card map-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong><i class="fas fa-map-marked-alt text-success mr-2"></i>Parcela en el mapa</strong>
+                    @if($lote->latitud && $lote->longitud)
+                        <a href="https://www.google.com/maps?q={{ $lote->latitud }},{{ $lote->longitud }}" target="_blank" rel="noopener"
+                           class="btn btn-sm btn-outline-success">
+                            <i class="fas fa-external-link-alt mr-1"></i>Abrir en Maps
+                        </a>
+                    @endif
+                </div>
+                @if($lote->latitud && $lote->longitud)
+                    <div id="map"></div>
+                    <div class="card-body py-2 small text-muted">
+                        <i class="fas fa-map-pin mr-1"></i>{{ $lote->ubicacion ?? 'Ubicación GPS' }}
+                        <span class="float-right font-monospace">{{ number_format((float) $lote->latitud, 5) }}, {{ number_format((float) $lote->longitud, 5) }}</span>
+                    </div>
+                @else
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-map-marked-alt fa-3x text-muted mb-3"></i>
+                        <p class="text-muted mb-3">Sin coordenadas GPS registradas.</p>
+                        @can('lotes.update')
+                            <a href="{{ route('lotes.edit', $lote) }}" class="btn btn-success btn-sm">
+                                <i class="fas fa-map-pin mr-1"></i>Marcar en mapa
+                            </a>
+                        @endcan
+                    </div>
+                @endif
+            </div>
         </div>
-        <div class="card-body">
-            <div class="tab-content" id="loteTabsContent">
-                <!-- Info -->
-                <div class="tab-pane fade show active" id="info" role="tabpanel">
+
+        <div class="col-lg-7 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <strong><i class="fas fa-id-card text-success mr-2"></i>Ficha y operación del lote</strong>
+                </div>
+                <div class="card-body">
+                    <div class="resumen-mini">
+                        <div class="item">
+                            <h4>{{ $estadisticas['actividades_completadas'] }}</h4>
+                            <small class="text-muted">Actividades hechas</small>
+                        </div>
+                        <div class="item">
+                            <h4>{{ max(0, $estadisticas['total_actividades'] - $estadisticas['actividades_completadas']) }}</h4>
+                            <small class="text-muted">Pendientes</small>
+                        </div>
+                        <div class="item">
+                            <h4>{{ $estadisticas['total_insumos'] }}</h4>
+                            <small class="text-muted">Aplicaciones</small>
+                        </div>
+                        <div class="item">
+                            <h4>{{ number_format($estadisticas['produccion_total'], 0) }} kg</h4>
+                            <small class="text-muted">Producidos</small>
+                        </div>
+                    </div>
+
                     <div class="row">
                         <div class="col-md-6">
-                            <h5 class="mb-3"><i class="fas fa-clipboard-list mr-2 text-success"></i>Datos del Lote</h5>
-                            <table class="table info-table">
-                                <tr>
-                                    <td>ID</td>
-                                    <td><strong>#{{ $lote->loteid }}</strong></td>
-                                </tr>
-                                <tr>
-                                    <td>Propietario</td>
-                                    <td>{{ $lote->usuario->nombre ?? '-' }} {{ $lote->usuario->apellido ?? '' }}</td>
-                                </tr>
-                                <tr>
-                                    <td>Cultivo</td>
-                                    <td>@if($lote->cultivo)<span
-                                    class="badge badge-success">{{ $lote->cultivo->nombre }}</span>@else<span
-                                            class="text-muted">Sin cultivo</span>@endif</td>
-                                </tr>
-                                <tr>
-                                    <td>Estado</td>
-                                    <td><span
-                                            class="badge {{ $estadoClass }}">{{ ucfirst($lote->estadoTipo->nombre ?? 'Sin estado') }}</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Superficie</td>
-                                    <td><strong>{{ $lote->superficie }}</strong> ha</td>
-                                </tr>
-                                <tr>
-                                    <td>Fecha Siembra</td>
-                                    <td>@if($lote->fechasiembra){{ \Carbon\Carbon::parse($lote->fechasiembra)->format('d/m/Y') }}
-                                        <small class="text-muted">({{ $estadisticas['dias_desde_siembra'] }}
-                                    días)</small>@else<span class="text-muted">No registrada</span>@endif
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Ubicación</td>
-                                    <td>{{ $lote->ubicacion ?? 'No especificada' }}</td>
-                                </tr>
-                                <tr>
-                                    <td>Coordenadas</td>
-                                    <td>@if($lote->latitud && $lote->longitud)<code>{{ $lote->latitud }}, {{ $lote->longitud }}</code>@else<span
-                                    class="text-muted">No registradas</span>@endif</td>
-                                </tr>
-                            </table>
+                            <div class="ficha-chip">
+                                <i class="fas fa-hashtag"></i>
+                                <div>
+                                    <div class="chip-label">Identificación</div>
+                                    <div class="chip-value">#{{ $lote->loteid }}
+                                        @if($lote->codigo_trazabilidad)
+                                            <span class="badge badge-light border ml-1">{{ $lote->codigo_trazabilidad }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ficha-chip">
+                                <i class="fas fa-user"></i>
+                                <div>
+                                    <div class="chip-label">Responsable</div>
+                                    <div class="chip-value">{{ trim(($lote->usuario->nombre ?? '').' '.($lote->usuario->apellido ?? '')) ?: '—' }}</div>
+                                </div>
+                            </div>
+                            <div class="ficha-chip">
+                                <i class="fas fa-seedling"></i>
+                                <div>
+                                    <div class="chip-label">Cultivo · Estado</div>
+                                    <div class="chip-value">
+                                        @if($lote->cultivo)<span class="badge badge-success">{{ $lote->cultivo->nombre }}</span>@else<span class="text-muted">Sin cultivo</span>@endif
+                                        <span class="badge {{ $estadoClass }} ml-1">{{ ucfirst($lote->estadoTipo->nombre ?? '—') }}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-md-6">
+                            <div class="ficha-chip">
+                                <i class="fas fa-ruler-combined"></i>
+                                <div>
+                                    <div class="chip-label">Superficie</div>
+                                    <div class="chip-value">{{ $lote->superficie }} ha</div>
+                                </div>
+                            </div>
+                            <div class="ficha-chip">
+                                <i class="fas fa-calendar-day"></i>
+                                <div>
+                                    <div class="chip-label">Siembra</div>
+                                    <div class="chip-value">
+                                        @if($lote->fechasiembra)
+                                            {{ \Carbon\Carbon::parse($lote->fechasiembra)->format('d/m/Y') }}
+                                            <small class="text-muted">({{ $estadisticas['dias_desde_siembra'] }} días)</small>
+                                        @else
+                                            <span class="text-muted">No registrada</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                             @if($lote->imagenurl)
-                                <h5 class="mb-3"><i class="fas fa-image mr-2 text-success"></i>Imagen</h5>
-                                <div class="text-center mb-4">
-                                    <img src="{{ $lote->imagenurl }}" alt="Lote" class="img-fluid rounded shadow-sm"
-                                        style="max-height: 300px;">
+                                <div class="text-center mt-2">
+                                    <img src="{{ $lote->imagenurl }}" alt="Lote" class="img-fluid rounded" style="max-height: 120px;">
                                 </div>
                             @endif
-                            <h5 class="mb-3"><i class="fas fa-chart-pie mr-2 text-success"></i>Resumen</h5>
-                            <div class="p-3 bg-light rounded text-center">
-                                <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
-                                <h4 class="mb-0">{{ $estadisticas['actividades_completadas'] }}</h4>
-                                <small class="text-muted">Completadas</small>
-                            </div>
                         </div>
-                        <div class="col-6 mb-3">
-                            <div class="p-3 bg-light rounded text-center">
-                                <i class="fas fa-clock text-warning fa-2x mb-2"></i>
-                                <h4 class="mb-0">
-                                    {{ $estadisticas['total_actividades'] - $estadisticas['actividades_completadas'] }}
-                                </h4>
-                                <small class="text-muted">Pendientes</small>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0 font-weight-bold"><i class="fas fa-history text-success mr-2"></i>Historial de trazabilidad</h6>
+                        <span class="badge badge-secondary">{{ $trazabilidad->count() }} eventos</span>
+                    </div>
+
+                    <div class="timeline-panel">
+                        @if($trazabilidad->count() > 0)
+                            <div class="timeline mb-0">
+                                @foreach($trazabilidad as $evento)
+                                    <div class="timeline-item">
+                                        <div class="timeline-icon {{ $evento['color'] }}">
+                                            <i class="fas fa-{{ $evento['icono'] }}"></i>
+                                        </div>
+                                        <div class="timeline-content {{ $evento['color'] }}">
+                                            <div class="timeline-date">
+                                                <i class="fas fa-calendar-alt mr-1"></i>
+                                                {{ $evento['fecha'] instanceof \Carbon\Carbon ? $evento['fecha']->format('d/m/Y H:i') : \Carbon\Carbon::parse($evento['fecha'])->format('d/m/Y H:i') }}
+                                                @if(isset($evento['completada']))
+                                                    <span class="badge badge-{{ $evento['completada'] ? 'success' : 'warning' }} ml-2">
+                                                        {{ $evento['completada'] ? 'Hecha' : 'Pendiente' }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            <div class="timeline-title">{{ $evento['titulo'] }}</div>
+                                            <p class="timeline-desc">{{ $evento['descripcion'] }}</p>
+                                            @if(!empty($evento['usuario']))
+                                                <div class="timeline-user"><i class="fas fa-user mr-1"></i>{{ $evento['usuario'] }}</div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
                             </div>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <div class="p-3 bg-light rounded text-center">
-                                <i class="fas fa-flask text-info fa-2x mb-2"></i>
-                                <h4 class="mb-0">{{ $estadisticas['total_insumos'] }}</h4>
-                                <small class="text-muted">Aplicaciones</small>
+                        @else
+                            <div class="empty-timeline py-4">
+                                <i class="fas fa-history"></i>
+                                <h6>Sin eventos aún</h6>
+                                <p class="text-muted small mb-0">Aparecerán siembras, insumos, actividades y cosechas vinculadas a este lote.</p>
                             </div>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <div class="p-3 bg-light rounded text-center">
-                                <i class="fas fa-leaf text-success fa-2x mb-2"></i>
-                                <h4 class="mb-0">{{ number_format($estadisticas['produccion_total'], 0) }}</h4>
-                                <small class="text-muted">Kg Producidos</small>
-                            </div>
-                        </div>
+                        @endif
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Trazabilidad -->
-        <div class="tab-pane fade" id="trazabilidad" role="tabpanel">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h5 class="mb-0"><i class="fas fa-history mr-2 text-success"></i>Historial Completo</h5>
-                <span class="badge badge-secondary">{{ $trazabilidad->count() }} eventos</span>
-            </div>
-
-            @if($trazabilidad->count() > 0)
-                <div class="timeline">
-                    @foreach($trazabilidad as $evento)
-                        <div class="timeline-item">
-                            <div class="timeline-icon {{ $evento['color'] }}">
-                                <i class="fas fa-{{ $evento['icono'] }}"></i>
-                            </div>
-                            <div class="timeline-content {{ $evento['color'] }}">
-                                <div class="timeline-date">
-                                    <i class="fas fa-calendar-alt mr-1"></i>
-                                    {{ $evento['fecha'] instanceof \Carbon\Carbon ? $evento['fecha']->format('d/m/Y H:i') : \Carbon\Carbon::parse($evento['fecha'])->format('d/m/Y H:i') }}
-                                    @if(isset($evento['completada']))
-                                        <span
-                                            class="badge badge-{{ $evento['completada'] ? 'success' : 'warning' }} ml-2">{{ $evento['completada'] ? 'Completada' : 'Pendiente' }}</span>
-                                    @endif
-                                </div>
-                                <div class="timeline-title">{{ $evento['titulo'] }}</div>
-                                <p class="timeline-desc">{{ $evento['descripcion'] }}</p>
-                                @if(isset($evento['usuario']) && $evento['usuario'])
-                                    <div class="timeline-user"><i class="fas fa-user mr-1"></i> {{ $evento['usuario'] }}</div>
-                                @endif
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            @else
-                <div class="empty-timeline">
-                    <i class="fas fa-history"></i>
-                    <h5>Sin historial registrado</h5>
-                    <p class="text-muted">Los eventos aparecerán cuando se registren siembras, insumos, actividades o
-                        cosechas.</p>
-                </div>
-            @endif
-        </div>
-
-        <!-- Mapa -->
-        <div class="tab-pane fade" id="mapa" role="tabpanel">
-            @if($lote->latitud && $lote->longitud)
-                <div id="map"></div>
-                <div class="row mt-3">
-                    <div class="col-md-6">
-                        <div class="p-3 bg-light rounded"><strong><i class="fas fa-map-pin mr-1"></i> Latitud:</strong>
-                            {{ $lote->latitud }}</div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="p-3 bg-light rounded"><strong><i class="fas fa-map-pin mr-1"></i> Longitud:</strong>
-                            {{ $lote->longitud }}</div>
-                    </div>
-                </div>
-            @else
-                <div class="text-center py-5">
-                    <i class="fas fa-map-marked-alt fa-4x text-muted mb-3"></i>
-                    <h5>Sin coordenadas</h5>
-                    <p class="text-muted">Este lote no tiene ubicación geográfica.</p>
-                    @can('lotes.update')
-                    <a href="{{ route('lotes.edit', $lote) }}" class="btn btn-success"><i class="fas fa-edit mr-1"></i>
-                        Agregar</a>
-                    @endcan
-                </div>
-            @endif
-        </div>
-    </div>
-    </div>
     </div>
 
     <!-- Acciones -->
@@ -565,23 +582,25 @@
 
 @push('scripts')
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    @if($lote->latitud && $lote->longitud)
     <script>
-        $(function () {
-            $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
-                if ($(e.target).attr('href') === '#mapa') initMap();
-            });
-
-            function initMap() {
-                @if($lote->latitud && $lote->longitud)
-                    if (typeof window.loteMap !== 'undefined') return;
-                    var lat = {{ $lote->latitud }}, lng = {{ $lote->longitud }}, sup = {{ $lote->superficie ?? 0 }};
-                    window.loteMap = L.map('map').setView([lat, lng], 15);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(loteMap);
-                    L.marker([lat, lng]).addTo(loteMap).bindPopup('<strong>{{ $lote->nombre }}</strong><br>{{ $lote->superficie }} ha').openPopup();
-                    if (sup > 0) L.circle([lat, lng], { color: '#2c5530', fillColor: '#28a745', fillOpacity: 0.3, radius: Math.sqrt(sup * 10000 / Math.PI) }).addTo(loteMap);
-                    setTimeout(function () { loteMap.invalidateSize(); }, 100);
-                @endif
+        (function () {
+            var lat = {{ $lote->latitud }};
+            var lng = {{ $lote->longitud }};
+            var sup = {{ $lote->superficie ?? 0 }};
+            var map = L.map('map').setView([lat, lng], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+            L.marker([lat, lng]).addTo(map)
+                .bindPopup({!! json_encode($lote->nombre.' · '.$lote->superficie.' ha'.($lote->cultivo ? ' · '.$lote->cultivo->nombre : '')) !!})
+                .openPopup();
+            if (sup > 0) {
+                L.circle([lat, lng], {
+                    color: '#2c5530', fillColor: '#28a745', fillOpacity: 0.28,
+                    radius: Math.sqrt(sup * 10000 / Math.PI)
+                }).addTo(map);
             }
-        });
+            setTimeout(function () { map.invalidateSize(); }, 200);
+        })();
     </script>
+    @endif
 @endpush

@@ -231,6 +231,33 @@
         .pagination {
             margin: 0;
         }
+
+        .sync-ayuda {
+            line-height: 1.35;
+        }
+
+        .lotes-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .lotes-toolbar-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .lotes-vista-toggle {
+            flex-shrink: 0;
+        }
+
+        .lotes-vista-toggle .btn {
+            min-width: 42px;
+        }
     </style>
 @endpush
 
@@ -239,66 +266,143 @@
     <div class="row stats-row">
         <div class="col-md-3 col-6 mb-3">
             <div class="stat-box">
-                <h3>{{ $lotes->total() }}</h3>
+                <h3>{{ $stats['total'] ?? 0 }}</h3>
                 <p><i class="fas fa-map mr-1"></i> Total Lotes</p>
             </div>
         </div>
         <div class="col-md-3 col-6 mb-3">
             <div class="stat-box produccion">
-                <h3>{{ $lotes->filter(fn($l) => strtolower($l->estadoTipo->nombre ?? '') == 'en producción')->count() }}
-                </h3>
+                <h3>{{ $stats['en_produccion'] ?? 0 }}</h3>
                 <p><i class="fas fa-leaf mr-1"></i> En Producción</p>
             </div>
         </div>
         <div class="col-md-3 col-6 mb-3">
             <div class="stat-box sembrado">
-                <h3>{{ $lotes->filter(fn($l) => strtolower($l->estadoTipo->nombre ?? '') == 'sembrado')->count() }}</h3>
+                <h3>{{ $stats['sembrados'] ?? 0 }}</h3>
                 <p><i class="fas fa-seedling mr-1"></i> Sembrados</p>
             </div>
         </div>
         <div class="col-md-3 col-6 mb-3">
             <div class="stat-box cosechado">
-                <h3>{{ $lotes->sum('superficie') }}</h3>
+                <h3>{{ number_format($stats['hectareas'] ?? 0, 2) }}</h3>
                 <p><i class="fas fa-ruler-combined mr-1"></i> Hectáreas</p>
             </div>
         </div>
     </div>
 
-    <!-- Filtros y Acciones -->
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show">
+            {{ session('success') }}
+            <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
+        </div>
+    @endif
+
+    <!-- Filtros -->
+    <div class="card mb-3">
+        <div class="card-header py-2">
+            <h3 class="card-title mb-0"><i class="fas fa-filter mr-2"></i>Filtrar lotes</h3>
+        </div>
+        <div class="card-body py-3">
+            <form method="GET" action="{{ route('lotes.index') }}" class="row align-items-end">
+                <div class="col-md-3 col-sm-6 mb-2">
+                    <label class="small text-muted mb-1">Buscar</label>
+                    <input type="text" name="q" class="form-control form-control-sm"
+                           value="{{ $filtros['q'] ?? '' }}"
+                           placeholder="Nombre, ubicación o código TRAZ">
+                </div>
+                <div class="col-md-2 col-sm-6 mb-2">
+                    <label class="small text-muted mb-1">Cultivo</label>
+                    <select name="cultivoid" class="form-control form-control-sm">
+                        <option value="">Todos</option>
+                        @foreach($cultivos as $c)
+                            <option value="{{ $c->cultivoid }}" @selected(($filtros['cultivoid'] ?? '') == $c->cultivoid)>{{ $c->nombre }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2 col-sm-6 mb-2">
+                    <label class="small text-muted mb-1">Estado</label>
+                    <select name="estadolotetipoid" class="form-control form-control-sm">
+                        <option value="">Todos</option>
+                        @foreach($estados as $e)
+                            <option value="{{ $e->estadolotetipoid }}" @selected(($filtros['estadolotetipoid'] ?? '') == $e->estadolotetipoid)>{{ ucfirst($e->nombre) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2 col-sm-6 mb-2">
+                    <label class="small text-muted mb-1">Propietario</label>
+                    <select name="usuarioid" class="form-control form-control-sm">
+                        <option value="">Todos</option>
+                        @foreach($usuarios as $u)
+                            <option value="{{ $u->usuarioid }}" @selected(($filtros['usuarioid'] ?? '') == $u->usuarioid)>{{ $u->nombre }} {{ $u->apellido }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2 col-sm-6 mb-2">
+                    <label class="small text-muted mb-1">Ubicación GPS</label>
+                    <select name="con_mapa" class="form-control form-control-sm">
+                        <option value="">Todas</option>
+                        <option value="1" @selected(($filtros['con_mapa'] ?? '') === '1')>Con mapa</option>
+                        <option value="0" @selected(($filtros['con_mapa'] ?? '') === '0')>Sin coordenadas</option>
+                    </select>
+                </div>
+                <div class="col-md-1 col-sm-6 mb-2 d-flex">
+                    <button type="submit" class="btn btn-success btn-sm btn-block mr-1" title="Aplicar filtros">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <a href="{{ route('lotes.index') }}" class="btn btn-outline-secondary btn-sm" title="Limpiar">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </form>
+            @if(collect($filtros ?? [])->filter(fn($v) => $v !== null && $v !== '')->isNotEmpty())
+                <div class="small text-muted mt-2">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Mostrando {{ $lotes->total() }} resultado(s) con filtros activos.
+                </div>
+            @endif
+        </div>
+    </div>
+
+    <!-- Acciones -->
     <div class="card mb-4">
         <div class="card-body py-3">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <div class="d-flex align-items-center">
-                        @can('lotes.create')
-                            <a href="{{ route('lotes.create') }}" class="btn btn-success mr-3">
-                                <i class="fas fa-plus mr-1"></i> Nuevo Lote
-                            </a>
-                        @endcan
-                        @can('lotes.update')
-                            <form action="{{ route('lotes.sincronizar-operacion') }}" method="POST" class="d-inline mr-3">
-                                @csrf
-                                <button type="submit" class="btn btn-info" title="Clima por lote, actividades desde insumos/cosechas y riegos programados">
-                                    <i class="fas fa-sync mr-1"></i> Sincronizar operación
-                                </button>
-                            </form>
-                        @endcan
-                        <a href="{{ route('lotes.mapa') }}" class="btn btn-outline-success">
-                            <i class="fas fa-map-marked-alt mr-1"></i> Ver Mapa
+            <div class="lotes-toolbar">
+                <div class="lotes-toolbar-actions">
+                    @can('lotes.create')
+                        <a href="{{ route('lotes.create') }}" class="btn btn-success">
+                            <i class="fas fa-plus mr-1"></i> Nuevo Lote
                         </a>
-                    </div>
+                    @endcan
+                    @can('lotes.update')
+                        <form action="{{ route('lotes.sincronizar-operacion') }}" method="POST" class="d-inline mb-0">
+                            @csrf
+                            <button type="submit" class="btn btn-info">
+                                <i class="fas fa-sync mr-1"></i> Sincronizar operación
+                            </button>
+                        </form>
+                    @endcan
+                    <a href="{{ route('lotes.mapa') }}" class="btn btn-outline-success">
+                        <i class="fas fa-map-marked-alt mr-1"></i> Ver Mapa
+                    </a>
                 </div>
-                <div class="col-md-6 text-md-right mt-3 mt-md-0">
-                    <div class="btn-group view-toggle">
-                        <button type="button" class="btn btn-outline-secondary active" id="btnCardView">
+                <div class="lotes-vista-toggle">
+                    <span class="small text-muted mr-2 d-none d-sm-inline">Vista:</span>
+                    <div class="btn-group view-toggle" role="group" aria-label="Cambiar vista de lotes">
+                        <button type="button" class="btn btn-outline-secondary active" id="btnCardView" title="Tarjetas">
                             <i class="fas fa-th-large"></i>
                         </button>
-                        <button type="button" class="btn btn-outline-secondary" id="btnTableView">
+                        <button type="button" class="btn btn-outline-secondary" id="btnTableView" title="Lista">
                             <i class="fas fa-list"></i>
                         </button>
                     </div>
                 </div>
             </div>
+            @can('lotes.update')
+                <p class="small text-muted mb-0 mt-2 sync-ayuda">
+                    <i class="fas fa-magic mr-1 text-info"></i>
+                    <strong>Sincronizar operación:</strong> actualiza el clima de cada lote, crea actividades desde insumos y cosechas registrados, y programa riegos pendientes.
+                </p>
+            @endcan
         </div>
     </div>
 

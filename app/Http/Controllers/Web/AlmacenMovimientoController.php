@@ -44,6 +44,18 @@ class AlmacenMovimientoController extends Controller
         $totalSalidas = (clone $statsBase)->whereHas('tipo', fn ($t) => $t->where('naturaleza', 'salida'))->count();
         $totalMovimientos = (clone $statsBase)->count();
 
+        $almacenesFiltro = (clone $statsBase)
+            ->join('almacen', 'almacen_movimiento.almacenid', '=', 'almacen.almacenid')
+            ->distinct()
+            ->orderBy('almacen.nombre')
+            ->pluck('almacen.nombre');
+
+        $tiposFiltro = (clone $statsBase)
+            ->join('tipo_movimiento_almacen', 'almacen_movimiento.tipo_movimiento_almacenid', '=', 'tipo_movimiento_almacen.tipo_movimiento_almacenid')
+            ->distinct()
+            ->orderBy('tipo_movimiento_almacen.nombre')
+            ->pluck('tipo_movimiento_almacen.nombre');
+
         $movimientos = $q->paginate(20)->withQueryString();
 
         return view('almacen_movimientos.index', compact(
@@ -51,7 +63,9 @@ class AlmacenMovimientoController extends Controller
             'filtroNaturaleza',
             'totalIngresos',
             'totalSalidas',
-            'totalMovimientos'
+            'totalMovimientos',
+            'almacenesFiltro',
+            'tiposFiltro'
         ));
     }
 

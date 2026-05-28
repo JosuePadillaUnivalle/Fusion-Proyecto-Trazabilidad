@@ -14,11 +14,28 @@ class AlmacenController extends Controller
 {
     public function index()
     {
+        $q = Almacen::query();
+
+        $stats = [
+            'total' => (clone $q)->count(),
+            'capacidad_total' => (float) (clone $q)->sum('capacidad'),
+            'activos' => (clone $q)->where('activo', true)->count(),
+            'inactivos' => (clone $q)->where('activo', false)->count(),
+            'tipos' => (clone $q)->distinct()->count('tipoalmacenid'),
+        ];
+
+        $tiposFiltro = (clone $q)
+            ->join('tipoalmacen', 'almacen.tipoalmacenid', '=', 'tipoalmacen.tipoalmacenid')
+            ->whereNotNull('almacen.tipoalmacenid')
+            ->distinct()
+            ->orderBy('tipoalmacen.nombre')
+            ->pluck('tipoalmacen.nombre');
+
         $almacenes = Almacen::with(['tipoAlmacen', 'unidadMedida'])
             ->orderBy('almacenid', 'desc')
             ->paginate(15);
 
-        return view('almacenes.index', compact('almacenes'));
+        return view('almacenes.index', compact('almacenes', 'stats', 'tiposFiltro'));
     }
 
     public function create()

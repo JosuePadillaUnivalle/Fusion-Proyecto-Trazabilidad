@@ -54,4 +54,9 @@ return [
         'units' => env('WEATHER_UNITS', 'metric'),
     ],
 
+    // Alias para compatibilidad con código legado que usa services.openweather.key
+    'openweather' => [
+        'key' => env('OPENWEATHER_API_KEY', env('WEATHER_API_KEY')),
+    ],
+
 ];

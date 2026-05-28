@@ -15,11 +15,35 @@ class LoteInsumoController extends Controller
 {
     public function index()
     {
+        $q = LoteInsumo::query();
+
+        $stats = [
+            'total' => (clone $q)->count(),
+            'lotes' => (clone $q)->distinct()->count('loteid'),
+            'insumos' => (clone $q)->distinct()->count('insumoid'),
+            'cantidad_total' => (float) (clone $q)->sum('cantidadusada'),
+            'costo_total' => (float) (clone $q)->sum('costototal'),
+        ];
+
+        $estadosFiltro = (clone $q)
+            ->join('estadoloteinsumo', 'loteinsumo.estadoloteinsumoid', '=', 'estadoloteinsumo.estadoloteinsumoid')
+            ->whereNotNull('loteinsumo.estadoloteinsumoid')
+            ->distinct()
+            ->orderBy('estadoloteinsumo.nombre')
+            ->pluck('estadoloteinsumo.nombre');
+
+        $encargadosFiltro = (clone $q)
+            ->join('usuario', 'loteinsumo.usuarioid', '=', 'usuario.usuarioid')
+            ->whereNotNull('loteinsumo.usuarioid')
+            ->distinct()
+            ->orderBy('usuario.nombre')
+            ->pluck('usuario.nombre');
+
         $loteInsumos = LoteInsumo::with(['lote', 'insumo', 'usuario', 'estado'])
             ->orderBy('loteinsumoid', 'desc')
             ->paginate(15);
 
-        return view('lote_insumos.index', compact('loteInsumos'));
+        return view('lote_insumos.index', compact('loteInsumos', 'stats', 'estadosFiltro', 'encargadosFiltro'));
     }
 
     public function create()

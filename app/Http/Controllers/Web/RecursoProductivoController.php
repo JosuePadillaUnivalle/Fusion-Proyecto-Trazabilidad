@@ -16,7 +16,24 @@ class RecursoProductivoController extends Controller
             ->orderBy('nombre')
             ->get();
 
-        return view('recursos_productivos.index', compact('cultivos', 'insumos'));
+        $stats = [
+            'cultivos' => $cultivos->count(),
+            'insumos' => $insumos->count(),
+            'stock_bajo' => $insumos->filter(
+                fn ($i) => (float) $i->stock <= (float) $i->stockminimo
+            )->count(),
+            'stock_normal' => $insumos->filter(
+                fn ($i) => (float) $i->stock > (float) $i->stockminimo
+            )->count(),
+            'tipos' => $insumos->pluck('tipo.nombre')->filter()->unique()->count(),
+            'valor_total' => $insumos->sum(
+                fn ($i) => (float) $i->stock * (float) ($i->preciounitario ?? 0)
+            ),
+        ];
+
+        $tiposFiltro = $insumos->pluck('tipo.nombre')->filter()->unique()->sort()->values();
+
+        return view('recursos_productivos.index', compact('cultivos', 'insumos', 'stats', 'tiposFiltro'));
     }
 }
 

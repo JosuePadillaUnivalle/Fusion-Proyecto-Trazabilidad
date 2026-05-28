@@ -77,6 +77,26 @@ class ReporteController extends Controller
         return view('reportes.index', compact('stats'));
     }
 
+    private function aplicarFiltrosVentas($query, ?string $cultivoId, ?string $usuarioId): void
+    {
+        if ($cultivoId) {
+            $query->whereHas('produccion.lote', fn ($q) => $q->where('cultivoid', $cultivoId));
+        }
+        if ($usuarioId) {
+            $query->whereHas('produccion.lote', fn ($q) => $q->where('usuarioid', $usuarioId));
+        }
+    }
+
+    private function aplicarFiltrosVentasJoin($query, ?string $cultivoId, ?string $usuarioId): void
+    {
+        if ($cultivoId) {
+            $query->where('lote.cultivoid', $cultivoId);
+        }
+        if ($usuarioId) {
+            $query->where('lote.usuarioid', $usuarioId);
+        }
+    }
+
     /**
      * Reporte de Ventas
      */
@@ -89,13 +109,7 @@ class ReporteController extends Controller
 
         $query = Venta::with(['produccion.lote.cultivo', 'produccion.lote.usuario', 'unidadMedida'])
             ->whereBetween('fechaventa', [$fechaDesde, $fechaHasta]);
-
-        if ($cultivoId) {
-            $query->whereHas('produccion.lote', fn($q) => $q->where('cultivoid', $cultivoId));
-        }
-        if ($usuarioId) {
-            $query->whereHas('produccion.lote', fn($q) => $q->where('usuarioid', $usuarioId));
-        }
+        $this->aplicarFiltrosVentas($query, $cultivoId, $usuarioId);
 
         $ventas = $query->orderBy('fechaventa', 'desc')->get();
 
@@ -103,36 +117,46 @@ class ReporteController extends Controller
             $venta->total = $venta->cantidad * $venta->preciounitario;
         });
 
+        $numTransacciones = $ventas->count();
+        $totalVentas = $ventas->sum('total');
+
         $stats = [
-            'total_ventas' => $ventas->sum('total'),
+            'total_ventas' => $totalVentas,
             'cantidad_kg' => $ventas->sum('cantidad'),
-            'num_transacciones' => $ventas->count(),
-            'precio_promedio' => $ventas->count() > 0 ? $ventas->avg('preciounitario') : 0,
+            'num_transacciones' => $numTransacciones,
+            'precio_promedio' => $numTransacciones > 0 ? $ventas->avg('preciounitario') : 0,
+            'ticket_promedio' => $numTransacciones > 0 ? $totalVentas / $numTransacciones : 0,
         ];
 
         $exprMes = $this->dateExpr('fechaventa', 'month');
         $exprAnio = $this->dateExpr('fechaventa', 'year');
-        $ventasPorMes = Venta::selectRaw("{$exprMes} as mes, {$exprAnio} as anio, SUM(cantidad * preciounitario) as total, SUM(cantidad) as cantidad")
-            ->where('fechaventa', '>=', now()->subMonths(6)->startOfMonth())
+        $ventasPorMesQuery = Venta::selectRaw("{$exprMes} as mes, {$exprAnio} as anio, SUM(cantidad * preciounitario) as total, SUM(cantidad) as cantidad")
+            ->whereBetween('fechaventa', [$fechaDesde, $fechaHasta]);
+        $this->aplicarFiltrosVentas($ventasPorMesQuery, $cultivoId, $usuarioId);
+        $ventasPorMes = $ventasPorMesQuery
             ->groupBy('mes', 'anio')
             ->orderBy('anio')
             ->orderBy('mes')
             ->get();
 
-        $ventasPorCultivo = DB::table('venta')
+        $ventasPorCultivoQuery = DB::table('venta')
             ->join('produccion', 'venta.produccionid', '=', 'produccion.produccionid')
             ->join('lote', 'produccion.loteid', '=', 'lote.loteid')
             ->join('cultivo', 'lote.cultivoid', '=', 'cultivo.cultivoid')
             ->select('cultivo.nombre', DB::raw('SUM(venta.cantidad * venta.preciounitario) as total'), DB::raw('SUM(venta.cantidad) as cantidad'))
-            ->whereBetween('venta.fechaventa', [$fechaDesde, $fechaHasta])
+            ->whereBetween('venta.fechaventa', [$fechaDesde, $fechaHasta]);
+        $this->aplicarFiltrosVentasJoin($ventasPorCultivoQuery, $cultivoId, $usuarioId);
+        $ventasPorCultivo = $ventasPorCultivoQuery
             ->groupBy('cultivo.nombre')
             ->orderByDesc('total')
             ->get();
 
-        $topClientes = Venta::select('cliente', DB::raw('SUM(cantidad * preciounitario) as total'), DB::raw('COUNT(*) as transacciones'))
+        $topClientesQuery = Venta::select('cliente', DB::raw('SUM(cantidad * preciounitario) as total'), DB::raw('COUNT(*) as transacciones'))
             ->whereBetween('fechaventa', [$fechaDesde, $fechaHasta])
             ->whereNotNull('cliente')
-            ->where('cliente', '!=', '')
+            ->where('cliente', '!=', '');
+        $this->aplicarFiltrosVentas($topClientesQuery, $cultivoId, $usuarioId);
+        $topClientes = $topClientesQuery
             ->groupBy('cliente')
             ->orderByDesc('total')
             ->limit(5)
@@ -237,11 +261,17 @@ class ReporteController extends Controller
             ->orderByRaw($exprOrdenDia)
             ->get();
 
+        // Datos en vivo con fallback local (no rompe si no hay API key)
+        $climaActual = $this->obtenerClimaActual();
+        $pronostico = $this->obtenerPronostico();
+
         return view('reportes.climatico', compact(
             'historialClima',
             'promedios',
             'datosGrafico',
-            'dias'
+            'dias',
+            'climaActual',
+            'pronostico'
         ));
     }
 
@@ -274,30 +304,49 @@ class ReporteController extends Controller
             'promedio_cosecha' => $producciones->count() > 0 ? $producciones->avg('cantidad') : 0,
         ];
 
-        $produccionPorCultivo = DB::table('produccion')
+        $produccionPorCultivoQuery = DB::table('produccion')
             ->join('lote', 'produccion.loteid', '=', 'lote.loteid')
             ->join('cultivo', 'lote.cultivoid', '=', 'cultivo.cultivoid')
             ->select('cultivo.nombre', DB::raw('SUM(produccion.cantidad) as total'))
-            ->whereBetween('produccion.fechacosecha', [$fechaDesde, $fechaHasta])
+            ->whereBetween('produccion.fechacosecha', [$fechaDesde, $fechaHasta]);
+        $this->aplicarFiltrosVentasJoin($produccionPorCultivoQuery, $cultivoId, null);
+        if ($loteId) {
+            $produccionPorCultivoQuery->where('lote.loteid', $loteId);
+        }
+        $produccionPorCultivo = $produccionPorCultivoQuery
             ->groupBy('cultivo.nombre')
             ->orderByDesc('total')
             ->get();
 
         $exprMes = $this->dateExpr('fechacosecha', 'month');
-        $produccionPorMes = Produccion::selectRaw("{$exprMes} as mes, SUM(cantidad) as total")
-            ->whereBetween('fechacosecha', [$fechaDesde, $fechaHasta])
-            ->groupBy('mes')
+        $exprAnio = $this->dateExpr('fechacosecha', 'year');
+        $produccionPorMesQuery = Produccion::selectRaw("{$exprMes} as mes, {$exprAnio} as anio, SUM(cantidad) as total")
+            ->whereBetween('fechacosecha', [$fechaDesde, $fechaHasta]);
+        if ($cultivoId) {
+            $produccionPorMesQuery->whereHas('lote', fn ($q) => $q->where('cultivoid', $cultivoId));
+        }
+        if ($loteId) {
+            $produccionPorMesQuery->where('loteid', $loteId);
+        }
+        $produccionPorMes = $produccionPorMesQuery
+            ->groupBy('mes', 'anio')
+            ->orderBy('anio')
             ->orderBy('mes')
             ->get();
 
-        $topLotes = DB::table('produccion')
+        $topLotesQuery = DB::table('produccion')
             ->join('lote', 'produccion.loteid', '=', 'lote.loteid')
             ->leftJoin('cultivo', 'lote.cultivoid', '=', 'cultivo.cultivoid')
             ->select('lote.nombre', 'cultivo.nombre as cultivo', DB::raw('SUM(produccion.cantidad) as total'), DB::raw('COUNT(*) as cosechas'))
-            ->whereBetween('produccion.fechacosecha', [$fechaDesde, $fechaHasta])
+            ->whereBetween('produccion.fechacosecha', [$fechaDesde, $fechaHasta]);
+        $this->aplicarFiltrosVentasJoin($topLotesQuery, $cultivoId, null);
+        if ($loteId) {
+            $topLotesQuery->where('lote.loteid', $loteId);
+        }
+        $topLotes = $topLotesQuery
             ->groupBy('lote.nombre', 'cultivo.nombre')
             ->orderByDesc('total')
-            ->limit(10)
+            ->limit(5)
             ->get();
 
         $cultivos = Cultivo::orderBy('nombre')->get();
@@ -365,6 +414,9 @@ class ReporteController extends Controller
         $actividadesPorTipo = DB::table('actividad')
             ->join('tipoactividad', 'actividad.tipoactividadid', '=', 'tipoactividad.tipoactividadid')
             ->select('tipoactividad.nombre', DB::raw('COUNT(*) as total'))
+            ->whereBetween('actividad.fechainicio', [$fechaDesde, $fechaHasta])
+            ->when($tipoId, fn($q) => $q->where('actividad.tipoactividadid', $tipoId))
+            ->when($loteId, fn($q) => $q->where('actividad.loteid', $loteId))
             ->groupBy('tipoactividad.nombre')
             ->orderByDesc('total')
             ->get();
@@ -411,17 +463,22 @@ class ReporteController extends Controller
 
         switch ($tipo) {
             case 'ventas':
-                $datos = Venta::with(['produccion.lote.cultivo', 'unidadMedida'])
-                    ->whereBetween('fechaventa', [$fechaDesde, $fechaHasta])
-                    ->orderBy('fechaventa', 'desc')
-                    ->get();
+                $ventasExport = Venta::with(['produccion.lote.cultivo', 'unidadMedida'])
+                    ->whereBetween('fechaventa', [$fechaDesde, $fechaHasta]);
+                $this->aplicarFiltrosVentas($ventasExport, $request->get('cultivo_id'), $request->get('usuario_id'));
+                $datos = $ventasExport->orderBy('fechaventa', 'desc')->get();
                 break;
 
             case 'produccion':
-                $datos = Produccion::with(['lote.cultivo', 'unidadMedida'])
-                    ->whereBetween('fechacosecha', [$fechaDesde, $fechaHasta])
-                    ->orderBy('fechacosecha', 'desc')
-                    ->get();
+                $produccionExport = Produccion::with(['lote.cultivo', 'unidadMedida'])
+                    ->whereBetween('fechacosecha', [$fechaDesde, $fechaHasta]);
+                if ($request->get('cultivo_id')) {
+                    $produccionExport->whereHas('lote', fn ($q) => $q->where('cultivoid', $request->get('cultivo_id')));
+                }
+                if ($request->get('lote_id')) {
+                    $produccionExport->where('loteid', $request->get('lote_id'));
+                }
+                $datos = $produccionExport->orderBy('fechacosecha', 'desc')->get();
                 break;
 
             case 'inventario':
@@ -431,10 +488,15 @@ class ReporteController extends Controller
                 break;
 
             case 'actividades':
-                $datos = Actividad::with(['lote', 'tipoActividad', 'usuario'])
-                    ->whereBetween('fechainicio', [$fechaDesde, $fechaHasta])
-                    ->orderBy('fechainicio', 'desc')
-                    ->get();
+                $actividadesExport = Actividad::with(['lote', 'tipoActividad', 'usuario'])
+                    ->whereBetween('fechainicio', [$fechaDesde, $fechaHasta]);
+                if ($request->get('tipo_id')) {
+                    $actividadesExport->where('tipoactividadid', $request->get('tipo_id'));
+                }
+                if ($request->get('lote_id')) {
+                    $actividadesExport->where('loteid', $request->get('lote_id'));
+                }
+                $datos = $actividadesExport->orderBy('fechainicio', 'desc')->get();
                 break;
 
             default:

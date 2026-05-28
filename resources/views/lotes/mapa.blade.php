@@ -168,17 +168,72 @@
     .lot-action-btn { width: 100%; margin-bottom: 6px; border-radius: 6px; font-weight: 500; font-size: 13px; }
     .lot-action-btn:last-child { margin-bottom: 0; }
 
-    .statistics-panel {
-        background: white;
-        border-radius: 10px;
-        padding: 15px 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    .map-kpi {
+        border-radius: 12px;
+        padding: 16px 18px;
+        color: #fff;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,.12);
     }
-    .stat-item { text-align: center; padding: 10px; }
-    .stat-number { font-size: 24px; font-weight: 700; color: var(--primary-color); margin-bottom: 3px; }
-    .stat-label { font-size: 12px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-divider { border-left: 2px solid #f1f3f4; height: 50px; margin: auto; }
+    .map-kpi h3 { margin: 0; font-size: 1.75rem; font-weight: 700; }
+    .map-kpi p { margin: 0; font-size: .8rem; opacity: .92; text-transform: uppercase; letter-spacing: .04em; }
+    .map-kpi-total { background: linear-gradient(135deg, #2c5530, #4a7c59); }
+    .map-kpi-prod { background: linear-gradient(135deg, #28a745, #20c997); }
+    .map-kpi-cosecha { background: linear-gradient(135deg, #f39c12, #e67e22); }
+    .map-kpi-ha { background: linear-gradient(135deg, #17a2b8, #6f42c1); }
+
+    .map-sidebar {
+        max-height: 580px;
+        overflow-y: auto;
+    }
+
+    .rank-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid #f1f3f4;
+    }
+    .rank-item:last-child { border-bottom: none; }
+    .rank-pos {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #e9ecef;
+        color: #495057;
+        font-weight: 700;
+        font-size: .8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .rank-pos.gold { background: #ffc107; color: #1a252f; }
+    .rank-pos.silver { background: #ced4da; color: #1a252f; }
+    .rank-pos.bronze { background: #cd7f32; color: #fff; }
+    .rank-bar {
+        height: 6px;
+        border-radius: 3px;
+        background: #e9ecef;
+        margin-top: 6px;
+        overflow: hidden;
+    }
+    .rank-bar > span {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, #28a745, #20c997);
+        border-radius: 3px;
+    }
+
+    .map-toolbar .btn { border-radius: 8px; }
+    .map-badge-count {
+        background: rgba(44, 85, 48, .1);
+        color: var(--primary-color);
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: .8rem;
+    }
 
     .btn-primary { background: var(--primary-color); border-color: var(--primary-color); }
     .btn-primary:hover { background: var(--secondary-color); border-color: var(--secondary-color); }
@@ -207,56 +262,67 @@
 @endpush
 
 @section('content')
-<!-- Panel de Estadísticas -->
-<div class="statistics-panel">
-    <div class="row align-items-center">
-        <div class="col-md-2 stat-item">
-            <div class="stat-number">{{ $stats['total'] }}</div>
-            <div class="stat-label">Total Lotes</div>
+@php
+    $maxProd = $topLotes->max('total_produccion') ?: 1;
+    $lotesEnMapa = $lotesConCoordenadas->count();
+@endphp
+
+<div class="row mb-2">
+    <div class="col-6 col-md-3">
+        <div class="map-kpi map-kpi-total">
+            <h3>{{ $stats['total'] }}</h3>
+            <p><i class="fas fa-map mr-1"></i> Lotes totales</p>
         </div>
-        <div class="col-md-1 d-none d-md-flex align-items-center">
-            <div class="stat-divider"></div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="map-kpi map-kpi-prod">
+            <h3>{{ $stats['en_produccion'] }}</h3>
+            <p><i class="fas fa-leaf mr-1"></i> En producción</p>
         </div>
-        <div class="col-md-2 stat-item">
-            <div class="stat-number text-success">{{ $stats['en_produccion'] }}</div>
-            <div class="stat-label">En Produccion</div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="map-kpi map-kpi-cosecha">
+            <h3>{{ $stats['cosechados'] }}</h3>
+            <p><i class="fas fa-tractor mr-1"></i> Cosechados</p>
         </div>
-        <div class="col-md-1 d-none d-md-flex align-items-center">
-            <div class="stat-divider"></div>
-        </div>
-        <div class="col-md-2 stat-item">
-            <div class="stat-number text-warning">{{ $stats['cosechados'] }}</div>
-            <div class="stat-label">Cosechados</div>
-        </div>
-        <div class="col-md-1 d-none d-md-flex align-items-center">
-            <div class="stat-divider"></div>
-        </div>
-        <div class="col-md-2 stat-item">
-            <div class="stat-number">{{ number_format($stats['hectareas'], 1) }}</div>
-            <div class="stat-label">Hectareas Total</div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="map-kpi map-kpi-ha">
+            <h3>{{ number_format($stats['hectareas'], 1) }}</h3>
+            <p><i class="fas fa-ruler-combined mr-1"></i> Hectáreas</p>
         </div>
     </div>
 </div>
 
-<!-- Mapa Principal -->
 <div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="card-title mb-0">
-                    <i class="fas fa-map mr-2"></i>
-                    Visualizacion Geografica de Lotes
-                </h3>
-                <div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleFilters()">
-                        <i class="fas fa-filter"></i> Filtros
+    <div class="col-xl-9 mb-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center py-2">
+                <div class="d-flex align-items-center flex-wrap">
+                    <h3 class="card-title mb-0 mr-3">
+                        <i class="fas fa-globe-americas text-success mr-2"></i>Mapa de parcelas
+                    </h3>
+                    <span class="map-badge-count" id="badgeLotesVisibles">{{ $lotesEnMapa }} en mapa</span>
+                </div>
+                <div class="map-toolbar btn-group btn-group-sm mt-2 mt-md-0">
+                    <button type="button" class="btn btn-outline-secondary" onclick="toggleFilters()" title="Filtros">
+                        <i class="fas fa-filter"></i>
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="centerMap()">
-                        <i class="fas fa-crosshairs"></i> Centrar
+                    <button type="button" class="btn btn-outline-secondary" onclick="centerMap()" title="Centrar vista">
+                        <i class="fas fa-crosshairs"></i>
                     </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="toggleCapaSatelite()" title="Vista satélite">
+                        <i class="fas fa-satellite"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="toggleFullscreen()" title="Pantalla completa">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                    <a href="{{ route('lotes.index') }}" class="btn btn-outline-success" title="Listado de lotes">
+                        <i class="fas fa-list"></i>
+                    </a>
                     @can('lotes.create')
-                    <a href="{{ route('lotes.create') }}" class="btn btn-sm btn-primary">
-                        <i class="fas fa-plus"></i> Nuevo Lote
+                    <a href="{{ route('lotes.create') }}" class="btn btn-success" title="Nuevo lote">
+                        <i class="fas fa-plus"></i>
                     </a>
                     @endcan
                 </div>
@@ -385,58 +451,38 @@
             </div>
         </div>
     </div>
-</div>
 
-<!-- Fila de Ranking y Alertas -->
-<div class="row mt-3">
-    <!-- Top Lotes por Producción -->
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-trophy mr-2 text-warning"></i>
-                    Top Lotes por Produccion
-                </h3>
+    <div class="col-xl-3 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-2">
+                <strong><i class="fas fa-trophy text-warning mr-2"></i>Top producción</strong>
             </div>
-            <div class="card-body">
-                @forelse($topLotes as $lote)
-                    <div class="lot-ranking-item">
-                        <div>
-                            <strong style="color: var(--text-dark);">{{ $lote->nombre }}</strong>
-                            <br>
-                            <small style="color: var(--text-light);">
-                                {{ $lote->usuario->nombre ?? '' }} {{ $lote->usuario->apellido ?? '' }} 
-                                • {{ $lote->cultivo->nombre ?? 'Sin cultivo' }}
-                            </small>
-                        </div>
-                        <div class="text-right">
-                            <span style="color: var(--success-color); font-weight: 600;">
-                                {{ number_format($lote->total_produccion, 0) }} kg
-                            </span>
-                            <br>
-                            <small style="color: var(--text-light);">{{ $lote->superficie }} Ha</small>
+            <div class="card-body map-sidebar py-2">
+                @forelse($topLotes as $i => $lote)
+                    @php
+                        $posClass = match($i) { 0 => 'gold', 1 => 'silver', 2 => 'bronze', default => '' };
+                        $pct = min(100, ($lote->total_produccion / $maxProd) * 100);
+                    @endphp
+                    <div class="rank-item">
+                        <div class="rank-pos {{ $posClass }}">{{ $i + 1 }}</div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between">
+                                <strong class="small">{{ $lote->nombre }}</strong>
+                                <span class="text-success font-weight-bold small">{{ number_format($lote->total_produccion, 0) }} kg</span>
+                            </div>
+                            <small class="text-muted">{{ $lote->cultivo->nombre ?? '—' }} · {{ $lote->superficie }} ha</small>
+                            <div class="rank-bar"><span style="width: {{ $pct }}%"></span></div>
                         </div>
                     </div>
                 @empty
-                    <div class="text-center text-muted py-3">
-                        <i class="fas fa-chart-bar fa-2x mb-2"></i>
-                        <p class="mb-0">No hay datos de produccion</p>
-                    </div>
+                    <p class="text-muted small text-center py-3 mb-0">Sin datos de producción.</p>
                 @endforelse
-            </div>
-        </div>
-    </div>
 
-    <!-- Alertas Geográficas -->
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-exclamation-triangle mr-2 text-danger"></i>
-                    Alertas Geograficas
-                </h3>
-            </div>
-            <div class="card-body">
+                <hr class="my-2">
+
+                <strong class="small text-uppercase text-muted d-block mb-2">
+                    <i class="fas fa-exclamation-circle mr-1"></i>Alertas en campo
+                </strong>
                 @forelse($lotesSinCoordenadas as $lote)
                     <div class="alert-geo-item" style="background: rgba(255, 193, 7, 0.1); border-left: 4px solid var(--warning-color);">
                         <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--warning-color); color: white; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px;">
@@ -507,58 +553,14 @@
     </div>
 </div>
 
-<!-- Herramientas del Mapa -->
-<div class="row mt-3">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-tools mr-2"></i>
-                    Herramientas del Mapa
-                </h3>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-2 col-sm-4 col-6 mb-2">
-                        <button class="btn btn-outline-primary btn-block" onclick="exportarMapa()">
-                            <i class="fas fa-download mr-2"></i>
-                            Exportar Mapa
-                        </button>
-                    </div>
-                    <div class="col-md-2 col-sm-4 col-6 mb-2">
-                        <button class="btn btn-outline-success btn-block" onclick="window.print()">
-                            <i class="fas fa-print mr-2"></i>
-                            Imprimir Mapa
-                        </button>
-                    </div>
-                    <div class="col-md-2 col-sm-4 col-6 mb-2">
-                        <button class="btn btn-outline-info btn-block" onclick="compartirMapa()">
-                            <i class="fas fa-share mr-2"></i>
-                            Compartir
-                        </button>
-                    </div>
-                    <div class="col-md-2 col-sm-4 col-6 mb-2">
-                        <a href="{{ route('producciones.index') }}" class="btn btn-outline-warning btn-block">
-                            <i class="fas fa-chart-bar mr-2"></i>
-                            Ver Reportes
-                        </a>
-                    </div>
-                    <div class="col-md-2 col-sm-4 col-6 mb-2">
-                        <button class="btn btn-outline-secondary btn-block" onclick="toggleCapaSatelite()">
-                            <i class="fas fa-satellite mr-2"></i>
-                            Vista Satelite
-                        </button>
-                    </div>
-                    <div class="col-md-2 col-sm-4 col-6 mb-2">
-                        <button class="btn btn-outline-dark btn-block" onclick="toggleFullscreen()">
-                            <i class="fas fa-expand mr-2"></i>
-                            Pantalla Completa
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="alert alert-light border small mb-0">
+    <i class="fas fa-mouse-pointer text-success mr-1"></i>
+    Haz clic en un círculo del mapa para ver detalle. Los colores indican el estado del lote (leyenda abajo a la izquierda).
+    <span class="float-md-right">
+        <button type="button" class="btn btn-link btn-sm p-0" onclick="compartirMapa()">Compartir enlace</button>
+        ·
+        <button type="button" class="btn btn-link btn-sm p-0" onclick="window.print()">Imprimir</button>
+    </span>
 </div>
 @endsection
 
@@ -639,7 +641,8 @@ function cargarLotes(lotes) {
         });
     });
 
-    // Ajustar vista si hay lotes
+    actualizarContador(lotes.length);
+
     if (lotes.length > 0) {
         var group = new L.featureGroup(markers);
         map.fitBounds(group.getBounds().pad(0.1));
@@ -697,6 +700,12 @@ function aplicarFiltros() {
     });
 
     cargarLotes(lotesFiltrados);
+    actualizarContador(lotesFiltrados.length);
+}
+
+function actualizarContador(n) {
+    var el = document.getElementById('badgeLotesVisibles');
+    if (el) el.textContent = n + ' en mapa';
 }
 
 function limpiarFiltros() {

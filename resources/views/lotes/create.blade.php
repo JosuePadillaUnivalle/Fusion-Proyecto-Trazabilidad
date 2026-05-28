@@ -1,49 +1,31 @@
 @extends('layouts.app')
 
 @section('title', 'Crear lote | Fusion-Proyectos')
+@section('page_title', 'Nuevo lote')
+
+@section('breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('lotes.index') }}">Lotes</a></li>
+    <li class="breadcrumb-item active">Nuevo</li>
+@endsection
 
 @push('styles')
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        #map {
-            height: 300px;
-            width: 100%;
-            border-radius: 5px;
-            border: 2px solid #ddd;
-        }
-
-        .image-preview {
-            max-width: 200px;
-            max-height: 150px;
-            border-radius: 5px;
-            border: 2px solid #ddd;
-        }
-
-        .image-upload-container {
-            border: 2px dashed #ccc;
-            border-radius: 5px;
-            padding: 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
-        }
-
-        .image-upload-container:hover {
-            border-color: #28a745;
-            background-color: #f8fff8;
-        }
+        #map { height: 320px; width: 100%; border-radius: 8px; border: 2px solid #dee2e6; }
+        .campo-guia { font-size: .85rem; color: #6c757d; margin-top: 4px; }
+        .auto-badge { font-size: .75rem; }
     </style>
 @endpush
 
 @section('content')
     <div class="card">
         <div class="card-header bg-success text-white">
-            <h3 class="card-title"><i class="fas fa-map-marked-alt mr-2"></i>Crear Lote</h3>
+            <h3 class="card-title mb-0"><i class="fas fa-map-marked-alt mr-2"></i>Registrar parcela nueva</h3>
         </div>
 
         @if($errors->any())
-            <div class="alert alert-danger m-3">
+            <div class="alert alert-danger m-3 mb-0">
                 <ul class="mb-0">
                     @foreach($errors->all() as $error)
                         <li>{{ $error }}</li>
@@ -52,174 +34,119 @@
             </div>
         @endif
 
-        <div class="alert alert-info m-3 mb-0">
-            <i class="fas fa-robot mr-1"></i>
-            <strong>Operación automática:</strong> en producción las actividades se generan al registrar
-            <a href="{{ route('lote-insumos.create') }}">aplicación de insumos</a> o
-            <a href="{{ route('producciones.create') }}">cosechas</a>.
-            Use este formulario solo para dar de alta una parcela nueva (excepción).
+        <div class="alert alert-light border m-3 mb-0">
+            <strong><i class="fas fa-magic text-success mr-1"></i> Se completa automáticamente:</strong>
+            código de trazabilidad, fecha de siembra (hoy), estado «Disponible» y unidad en hectáreas.
+            Las actividades de campo se generan al registrar insumos o cosechas; no hace falta cargarlas aquí.
         </div>
 
-        <form action="{{ route('lotes.store') }}" method="POST" enctype="multipart/form-data">
+        <form action="{{ route('lotes.store') }}" method="POST" id="formNuevoLote">
             @csrf
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label><i class="fas fa-user mr-1"></i> Usuario Propietario <span
-                                    class="text-danger">*</span></label>
-                            <select name="usuarioid" class="form-control" required>
-                                <option value="">-- Seleccione --</option>
-                                @foreach($usuarios as $u)
-                                    <option value="{{ $u->usuarioid }}">{{ $u->nombre }} {{ $u->apellido }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <div class="col-lg-5">
+                        @if($mostrarSelectorPropietario)
+                            <div class="form-group">
+                                <label><i class="fas fa-user mr-1"></i> Responsable del lote</label>
+                                <select name="usuarioid" class="form-control">
+                                    @foreach($usuarios as $u)
+                                        <option value="{{ $u->usuarioid }}" @selected(old('usuarioid', $propietarioPorDefecto) == $u->usuarioid)>
+                                            {{ $u->nombre }} {{ $u->apellido }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="campo-guia">Agricultor u operador que administra esta parcela.</p>
+                            </div>
+                        @else
+                            <input type="hidden" name="usuarioid" value="{{ $propietarioPorDefecto }}">
+                        @endif
 
                         <div class="form-group">
-                            <label><i class="fas fa-tag mr-1"></i> Nombre del Lote <span
-                                    class="text-danger">*</span></label>
+                            <label><i class="fas fa-tag mr-1"></i> Nombre del lote <span class="text-danger">*</span></label>
                             <input type="text" name="nombre" class="form-control" maxlength="100" required
-                                placeholder="Ej: Lote Norte" value="{{ old('nombre') }}">
+                                   placeholder="Ej: Lote Norte A1" value="{{ old('nombre') }}">
+                            <p class="campo-guia">Un nombre corto que identifique la parcela en listados y reportes.</p>
                         </div>
 
                         <div class="form-group">
-                            <label><i class="fas fa-map-marker-alt mr-1"></i> Ubicacion (texto)</label>
-                            <input type="text" name="ubicacion" class="form-control" maxlength="200"
-                                placeholder="Ej: Km 5 Carretera Norte" value="{{ old('ubicacion') }}">
+                            <label><i class="fas fa-ruler-combined mr-1"></i> Superficie (hectáreas) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" name="superficie" id="superficie" class="form-control" min="0.01" required
+                                   placeholder="Ej: 12.5" value="{{ old('superficie') }}">
+                            <p class="campo-guia">Área cultivable. En el mapa se dibuja un círculo aproximado según este valor.</p>
                         </div>
 
                         <div class="form-group">
-                            <label><i class="fas fa-ruler-combined mr-1"></i> Superficie (hectareas) <span
-                                    class="text-danger">*</span></label>
-                            <input type="number" step="0.01" name="superficie" id="superficie" class="form-control" min="0"
-                                required placeholder="Ej: 15.5" value="{{ old('superficie') }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-seedling mr-1"></i> Cultivo</label>
+                            <label><i class="fas fa-seedling mr-1"></i> Cultivo principal</label>
                             <div class="input-group">
                                 <select name="cultivoid" id="cultivoid" class="form-control">
-                                    <option value="">-- Sin cultivo --</option>
+                                    <option value="">— Definir después —</option>
                                     @foreach($cultivos as $c)
-                                        <option value="{{ $c->cultivoid }}">{{ $c->nombre }}</option>
+                                        <option value="{{ $c->cultivoid }}" @selected(old('cultivoid') == $c->cultivoid)>{{ $c->nombre }}</option>
                                     @endforeach
                                 </select>
                                 <div class="input-group-append">
-                                    <button type="button" class="btn btn-success" data-toggle="modal"
-                                        data-target="#modalCultivo">
+                                    <button type="button" class="btn btn-outline-success" data-toggle="modal" data-target="#modalCultivo" title="Agregar cultivo">
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
                             </div>
+                            <p class="campo-guia">Opcional al crear; puedes asignarlo luego desde editar lote.</p>
                         </div>
 
                         <div class="form-group">
-                            <label><i class="fas fa-id-badge mr-1"></i> Código de trazabilidad <small class="text-muted">(opcional, se genera solo)</small></label>
-                            <input type="text" name="codigo_trazabilidad" class="form-control" maxlength="80"
-                                value="{{ old('codigo_trazabilidad') }}" placeholder="Vacío = TRAZ-20260519-XXXXXX">
+                            <label><i class="fas fa-map-marker-alt mr-1"></i> Referencia de ubicación</label>
+                            <input type="text" name="ubicacion" id="ubicacion" class="form-control" maxlength="200"
+                                   placeholder="Se completa al marcar el mapa" value="{{ old('ubicacion') }}" readonly>
+                            <p class="campo-guia">Se genera al hacer clic en el mapa. Puedes editarla después si necesitas una descripción más clara.</p>
                         </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-truck-loading mr-1"></i> Actor de abastecimiento</label>
-                            <select name="actorid" class="form-control">
-                                <option value="">-- Sin actor --</option>
-                                @foreach($actores as $actor)
-                                    <option value="{{ $actor->actorid }}" {{ (string) old('actorid') === (string) $actor->actorid ? 'selected' : '' }}>
-                                        {{ $actor->nombre }} ({{ ucfirst($actor->tipo_actor) }})
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-image mr-1"></i> Imagen del Lote</label>
-                            <div class="custom-file">
-                                <input type="file" class="custom-file-input" id="imagen" name="imagen" accept="image/*">
-                                <label class="custom-file-label" for="imagen">Seleccionar archivo...</label>
-                            </div>
-                            <small class="form-text text-muted">Formatos: JPG, PNG. Máx: 2MB.</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-calendar mr-1"></i> Fecha de Siembra</label>
-                            <input type="date" name="fechasiembra" class="form-control" value="{{ old('fechasiembra') }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-flag mr-1"></i> Estado del Lote</label>
-                            <select name="estadolotetipoid" class="form-control">
-                                <option value="">-- Seleccione estado --</option>
-                                @foreach($estados as $e)
-                                    <option value="{{ $e->estadolotetipoid }}" {{ $e->nombre == 'disponible' ? 'selected' : '' }}>
-                                        {{ ucfirst($e->nombre) }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-
                     </div>
 
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label><i class="fas fa-map mr-1"></i> Ubicacion en el Mapa</label>
-                            <small class="text-muted d-block mb-2">Haz clic en el mapa para seleccionar la ubicacion</small>
+                    <div class="col-lg-7">
+                        <div class="form-group mb-2">
+                            <label><i class="fas fa-map mr-1"></i> Marca la parcela en el mapa <span class="text-danger">*</span></label>
+                            <p class="campo-guia mb-2">Haz clic donde está el lote (Santa Cruz por defecto). Es obligatorio para trazabilidad y el mapa general.</p>
                             <div id="map"></div>
                         </div>
-
                         <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label>Latitud</label>
-                                <input type="number" step="0.0000001" name="latitud" id="latitud" class="form-control"
-                                    min="-90" max="90" value="{{ old('latitud') }}" placeholder="-17.7833">
+                            <div class="form-group col-6 mb-0">
+                                <label class="small text-muted">Latitud</label>
+                                <input type="number" step="0.0000001" name="latitud" id="latitud" class="form-control form-control-sm"
+                                       value="{{ old('latitud', '-17.7833') }}" readonly>
                             </div>
-                            <div class="form-group col-md-6">
-                                <label>Longitud</label>
-                                <input type="number" step="0.0000001" name="longitud" id="longitud" class="form-control"
-                                    min="-180" max="180" value="{{ old('longitud') }}" placeholder="-63.1821">
+                            <div class="form-group col-6 mb-0">
+                                <label class="small text-muted">Longitud</label>
+                                <input type="number" step="0.0000001" name="longitud" id="longitud" class="form-control form-control-sm"
+                                       value="{{ old('longitud', '-63.1821') }}" readonly>
                             </div>
-                        </div>
-
-                        <div class="alert alert-info small">
-                            <i class="fas fa-info-circle mr-1"></i> El mapa esta centrado en Santa Cruz, Bolivia. Haz clic
-                            para marcar la ubicacion.
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="card-footer">
-                <div class="d-flex justify-content-between">
-                    <a href="{{ route('lotes.index') }}" class="btn btn-secondary"><i class="fas fa-arrow-left mr-1"></i>
-                        Cancelar</a>
-                    <button type="submit" class="btn btn-success"><i class="fas fa-save mr-1"></i> Guardar Lote</button>
-                </div>
+            <div class="card-footer d-flex justify-content-between">
+                <a href="{{ route('lotes.index') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left mr-1"></i> Cancelar
+                </a>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-save mr-1"></i> Guardar lote
+                </button>
             </div>
         </form>
     </div>
 
-    <!-- Modal Cultivo -->
     <div class="modal fade" id="modalCultivo" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-sm">
             <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title"><i class="fas fa-seedling mr-2"></i>Nuevo Cultivo</h5>
+                <div class="modal-header bg-success text-white py-2">
+                    <h5 class="modal-title">Nuevo cultivo</h5>
                     <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label>Nombre del Cultivo <span class="text-danger">*</span></label>
-                        <input type="text" id="nuevoCultivoNombre" class="form-control" placeholder="Ej: Quinua"
-                            maxlength="100">
-                    </div>
-                    <div id="cultivoError" class="alert alert-danger" style="display: none;"></div>
-                    <div id="cultivoExito" class="alert alert-success" style="display: none;"></div>
+                    <input type="text" id="nuevoCultivoNombre" class="form-control" placeholder="Ej: Quinua" maxlength="100">
+                    <div id="cultivoError" class="alert alert-danger mt-2 py-1 small" style="display:none;"></div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-success" id="btnGuardarCultivo"><i class="fas fa-save mr-1"></i>
-                        Guardar</button>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-success btn-sm" id="btnGuardarCultivo">Guardar</button>
                 </div>
             </div>
         </div>
@@ -229,100 +156,107 @@
 @push('scripts')
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Preview imagen
-        function previewImage(input) {
-            if (input.files && input.files[0]) {
-                var reader = new FileReader();
-                reader.onload = function (e) {
-                    document.getElementById('imagePreview').src = e.target.result;
-                    document.getElementById('previewContainer').style.display = 'block';
-                    document.querySelector('.image-upload-container').style.display = 'none';
-                };
-                reader.readAsDataURL(input.files[0]);
+        (function () {
+            const latInput = document.getElementById('latitud');
+            const lngInput = document.getElementById('longitud');
+            const ubicInput = document.getElementById('ubicacion');
+            const supInput = document.getElementById('superficie');
+
+            const map = L.map('map').setView([-17.7833, -63.1821], 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+
+            let marker = null;
+            let circle = null;
+
+            function calcularRadio(ha) {
+                return Math.sqrt(ha * 10000 / Math.PI);
             }
-        }
 
-        function removeImage() {
-            document.getElementById('imagen').value = '';
-            document.getElementById('previewContainer').style.display = 'none';
-            document.querySelector('.image-upload-container').style.display = 'block';
-        }
+            function colocarMarcador(lat, lng) {
+                latInput.value = Number(lat).toFixed(7);
+                lngInput.value = Number(lng).toFixed(7);
+                ubicInput.removeAttribute('readonly');
+                if (!ubicInput.value || ubicInput.value.startsWith('Parcela GPS')) {
+                    ubicInput.value = 'Parcela GPS ' + Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5);
+                }
 
-        // Mapa
-        var map = L.map('map').setView([-17.7833, -63.1821], 10);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
-
-        var marker = null;
-        var circle = null;
-
-        function calcularRadio(ha) { return Math.sqrt(ha * 10000 / Math.PI); }
-
-        map.on('click', function (e) {
-            var lat = e.latlng.lat.toFixed(7);
-            var lng = e.latlng.lng.toFixed(7);
-            document.getElementById('latitud').value = lat;
-            document.getElementById('longitud').value = lng;
-
-            if (marker) map.removeLayer(marker);
-            if (circle) map.removeLayer(circle);
-
-            marker = L.marker([lat, lng]).addTo(map).bindPopup('Lat: ' + lat + '<br>Lng: ' + lng).openPopup();
-
-            var sup = parseFloat(document.getElementById('superficie').value);
-            if (sup > 0) {
-                circle = L.circle([lat, lng], { color: 'green', fillColor: '#28a745', fillOpacity: 0.3, radius: calcularRadio(sup) }).addTo(map);
-            }
-        });
-
-        document.getElementById('superficie').addEventListener('input', function () {
-            var lat = document.getElementById('latitud').value;
-            var lng = document.getElementById('longitud').value;
-            var sup = parseFloat(this.value);
-            if (lat && lng && sup > 0) {
+                if (marker) map.removeLayer(marker);
                 if (circle) map.removeLayer(circle);
-                circle = L.circle([lat, lng], { color: 'green', fillColor: '#28a745', fillOpacity: 0.3, radius: calcularRadio(sup) }).addTo(map);
-            }
-        });
 
-        // Modal cultivo
-        document.getElementById('btnGuardarCultivo').addEventListener('click', function () {
-            var nombre = document.getElementById('nuevoCultivoNombre').value.trim();
-            if (!nombre) {
-                document.getElementById('cultivoError').textContent = 'El nombre es obligatorio';
-                document.getElementById('cultivoError').style.display = 'block';
-                return;
+                marker = L.marker([lat, lng]).addTo(map);
+                const sup = parseFloat(supInput.value);
+                if (sup > 0) {
+                    circle = L.circle([lat, lng], {
+                        color: '#28a745', fillColor: '#28a745', fillOpacity: 0.25,
+                        radius: calcularRadio(sup)
+                    }).addTo(map);
+                }
             }
 
-            fetch('{{ route("cultivos.store") }}', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-                body: JSON.stringify({ nombre: nombre })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.cultivoid) {
-                        document.getElementById('cultivoError').style.display = 'none';
-                        document.getElementById('cultivoExito').textContent = 'Cultivo creado';
-                        document.getElementById('cultivoExito').style.display = 'block';
+            map.on('click', function (e) {
+                colocarMarcador(e.latlng.lat, e.latlng.lng);
+            });
 
-                        var select = document.getElementById('cultivoid');
-                        var option = document.createElement('option');
-                        option.value = data.cultivoid;
-                        option.text = data.nombre;
-                        option.selected = true;
-                        select.appendChild(option);
+            supInput.addEventListener('input', function () {
+                const lat = latInput.value;
+                const lng = lngInput.value;
+                const sup = parseFloat(this.value);
+                if (lat && lng && sup > 0) {
+                    if (circle) map.removeLayer(circle);
+                    circle = L.circle([lat, lng], {
+                        color: '#28a745', fillColor: '#28a745', fillOpacity: 0.25,
+                        radius: calcularRadio(sup)
+                    }).addTo(map);
+                }
+            });
 
-                        setTimeout(function () {
-                            document.getElementById('nuevoCultivoNombre').value = '';
-                            document.getElementById('cultivoExito').style.display = 'none';
-                            $('#modalCultivo').modal('hide');
-                        }, 1000);
-                    }
+            if (latInput.value && lngInput.value) {
+                colocarMarcador(parseFloat(latInput.value), parseFloat(lngInput.value));
+            }
+
+            document.getElementById('formNuevoLote').addEventListener('submit', function (e) {
+                if (!latInput.value || !lngInput.value) {
+                    e.preventDefault();
+                    alert('Marca la ubicación del lote haciendo clic en el mapa.');
+                }
+            });
+
+            document.getElementById('btnGuardarCultivo').addEventListener('click', function () {
+                const nombre = document.getElementById('nuevoCultivoNombre').value.trim();
+                const err = document.getElementById('cultivoError');
+                if (!nombre) {
+                    err.textContent = 'Escribe el nombre del cultivo.';
+                    err.style.display = 'block';
+                    return;
+                }
+                fetch('{{ route("cultivos.store") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ nombre: nombre })
                 })
-                .catch(error => {
-                    document.getElementById('cultivoError').textContent = 'Error al crear';
-                    document.getElementById('cultivoError').style.display = 'block';
-                });
-        });
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.cultivoid) {
+                            const sel = document.getElementById('cultivoid');
+                            const opt = document.createElement('option');
+                            opt.value = data.cultivoid;
+                            opt.text = data.nombre;
+                            opt.selected = true;
+                            sel.appendChild(opt);
+                            $('#modalCultivo').modal('hide');
+                            document.getElementById('nuevoCultivoNombre').value = '';
+                            err.style.display = 'none';
+                        }
+                    })
+                    .catch(() => {
+                        err.textContent = 'No se pudo crear el cultivo.';
+                        err.style.display = 'block';
+                    });
+            });
+        })();
     </script>
 @endpush
