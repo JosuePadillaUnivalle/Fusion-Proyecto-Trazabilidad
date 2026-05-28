@@ -59,6 +59,10 @@ class LoteController extends Controller
             'en_produccion' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en producción']))->count(),
             'sembrados' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['sembrado']))->count(),
             'hectareas' => round((float) (Lote::sum('superficie') ?? 0), 2),
+            'con_mapa' => Lote::whereNotNull('latitud')->whereNotNull('longitud')->count(),
+            'sin_gps' => Lote::where(function ($q) {
+                $q->whereNull('latitud')->orWhereNull('longitud');
+            })->count(),
         ];
 
         $lotes = $query->orderByDesc('loteid')->paginate(15)->withQueryString();
@@ -85,7 +89,11 @@ class LoteController extends Controller
             'total' => Lote::count(),
             'en_produccion' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en producción']))->count(),
             'cosechados' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['cosechado']))->count(),
-            'hectareas' => Lote::sum('superficie') ?? 0,
+            'hectareas' => (float) (Lote::sum('superficie') ?? 0),
+            'en_mapa' => Lote::whereNotNull('latitud')->whereNotNull('longitud')->count(),
+            'sin_coordenadas' => Lote::where(function ($q) {
+                $q->whereNull('latitud')->orWhereNull('longitud');
+            })->count(),
         ];
 
         // Lotes con coordenadas para el mapa

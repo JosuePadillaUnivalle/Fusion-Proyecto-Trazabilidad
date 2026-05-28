@@ -10,18 +10,57 @@ use App\Models\Prioridad;
 use App\Models\Usuario;
 use App\Models\EstadoLoteTipo;
 use App\Models\HistorialEstadoLote;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ActividadController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $actividades = Actividad::with(['lote', 'usuario', 'tipoActividad', 'prioridad'])
-            ->orderBy('actividadid', 'desc')
-            ->paginate(15);
+        $query = Actividad::query()->with(['lote.cultivo', 'usuario', 'tipoActividad', 'prioridad']);
 
-        return view('actividades.index', compact('actividades'));
+        if ($request->filled('q')) {
+            $term = '%'.trim((string) $request->q).'%';
+            $query->where(function ($sub) use ($term) {
+                $sub->where('descripcion', 'like', $term)
+                    ->orWhereHas('lote', fn ($l) => $l->where('nombre', 'like', $term))
+                    ->orWhereHas('tipoActividad', fn ($t) => $t->where('nombre', 'like', $term))
+                    ->orWhereHas('usuario', fn ($u) => $u->where('nombre', 'like', $term));
+            });
+        }
+
+        if ($request->filled('estado')) {
+            if ($request->estado === 'pendiente') {
+                $query->whereNull('fechafin');
+            } elseif ($request->estado === 'completada') {
+                $query->whereNotNull('fechafin');
+            }
+        }
+
+        if ($request->filled('loteid')) {
+            $query->where('loteid', (int) $request->loteid);
+        }
+
+        if ($request->filled('tipoactividadid')) {
+            $query->where('tipoactividadid', (int) $request->tipoactividadid);
+        }
+
+        $stats = [
+            'total' => Actividad::count(),
+            'pendientes' => Actividad::whereNull('fechafin')->count(),
+            'completadas' => Actividad::whereNotNull('fechafin')->count(),
+            'hoy' => Actividad::whereDate('fechainicio', now()->toDateString())->count(),
+        ];
+
+        $actividades = $query->orderByDesc('actividadid')->paginate(15)->withQueryString();
+
+        $filtros = $request->only(['q', 'estado', 'loteid', 'tipoactividadid']);
+        $lotes = Lote::orderBy('nombre')->get(['loteid', 'nombre']);
+        $tiposActividad = TipoActividad::orderBy('nombre')->get();
+
+        return view('actividades.index', compact('actividades', 'stats', 'filtros', 'lotes', 'tiposActividad'));
     }
 
     /**
@@ -31,6 +70,7 @@ class ActividadController extends Controller
     {
         // Estadísticas
         $stats = [
+            'total' => Actividad::whereNotNull('fechainicio')->count(),
             'mes' => Actividad::whereMonth('fechainicio', now()->month)
                 ->whereYear('fechainicio', now()->year)
                 ->count(),
@@ -39,32 +79,12 @@ class ActividadController extends Controller
             'completadas' => Actividad::whereNotNull('fechafin')->count(),
         ];
 
-        // Eventos para el calendario
         $actividades = Actividad::with(['lote', 'usuario', 'tipoActividad'])
             ->whereNotNull('fechainicio')
+            ->orderBy('fechainicio')
             ->get();
 
-        $eventos = $actividades->map(function($act) {
-            $tipo = $act->tipoActividad->nombre ?? 'Actividad';
-            $lote = $act->lote->nombre ?? 'Sin lote';
-            
-            return [
-                'id' => $act->actividadid,
-                'title' => $tipo . ' - ' . $lote,
-                'start' => $act->fechainicio,
-                'end' => $act->fechafin,
-                'extendedProps' => [
-                    'id' => $act->actividadid,
-                    'tipo' => $tipo,
-                    'lote' => $lote,
-                    'loteid' => $act->loteid,
-                    'responsable' => ($act->usuario->nombre ?? '') . ' ' . ($act->usuario->apellido ?? ''),
-                    'usuarioid' => $act->usuarioid,
-                    'fechafin' => $act->fechafin,
-                    'observaciones' => $act->observaciones,
-                ]
-            ];
-        });
+        $eventos = $actividades->map(fn ($act) => $this->formatEventoCalendario($act))->values();
 
         // Datos para filtros y formulario
         $lotes = Lote::with('cultivo')->orderBy('nombre')->get();
@@ -237,8 +257,45 @@ class ActividadController extends Controller
     }
 
     /**
+     * Formato de evento para FullCalendar: un día por actividad salvo rangos reales multi-día.
+     * Sin fechafin = pendiente (normal); no se envía "end" para evitar barras infinitas en el mes.
+     */
+    private function formatEventoCalendario(Actividad $act): array
+    {
+        $tipo = $act->tipoActividad->nombre ?? 'Actividad';
+        $lote = $act->lote->nombre ?? 'Sin lote';
+        $pendiente = $act->fechafin === null;
+        $inicio = Carbon::parse($act->fechainicio);
+
+        $evento = [
+            'id' => (string) $act->actividadid,
+            'title' => $tipo,
+            'start' => $inicio->format('Y-m-d'),
+            'allDay' => true,
+            'extendedProps' => [
+                'id' => $act->actividadid,
+                'tipo' => $tipo,
+                'tipoSlug' => Str::slug($tipo),
+                'lote' => $lote,
+                'loteid' => $act->loteid,
+                'responsable' => trim(($act->usuario->nombre ?? '').' '.($act->usuario->apellido ?? '')),
+                'usuarioid' => $act->usuarioid,
+                'fechainicioFmt' => $inicio->format('d/m/Y H:i'),
+                'fechafin' => $pendiente ? null : Carbon::parse($act->fechafin)->format('d/m/Y H:i'),
+                'pendiente' => $pendiente,
+                'observaciones' => $act->observaciones ?: $act->descripcion,
+            ],
+            'classNames' => $pendiente ? ['event-pendiente'] : ['event-completada'],
+        ];
+
+        // En calendario siempre un solo día (fechainicio); el rango real se ve en detalle/lista.
+
+        return $evento;
+    }
+
+    /**
      * Obtener el nuevo estado del lote según el tipo de actividad
-     * 
+     *
      * Tipos de actividad: siembra, riego, fumigación, cosecha, labranza
      * Estados disponibles: disponible, en preparación, sembrado, en producción, cosechado, en descanso
      */
