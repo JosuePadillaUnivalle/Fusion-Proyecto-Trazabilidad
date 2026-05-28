@@ -5,48 +5,12 @@
 
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="{{ route('insumos.index') }}">Insumos</a></li>
     <li class="breadcrumb-item active">Actores</li>
 @endsection
 
-@php
-    $pctActivos = $stats['total'] > 0
-        ? round(($stats['activos'] / $stats['total']) * 100)
-        : 0;
-@endphp
-
 @push('styles')
+@include('partials.modulo-inventario-styles')
 <style>
-.page-actores .small-box {
-    border-radius: 10px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.page-actores .small-box:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-}
-.page-actores .small-box .icon { font-size: 70px; }
-.page-actores .small-box-green {
-    background: linear-gradient(135deg, #2c5530, #4a7c59) !important;
-    color: #fff;
-}
-.page-actores .small-box-blue {
-    background: linear-gradient(135deg, #17a2b8, #20c997) !important;
-    color: #fff;
-}
-.page-actores .small-box-red {
-    background: linear-gradient(135deg, #dc3545, #e74a3b) !important;
-    color: #fff;
-}
-.page-actores .small-box-purple {
-    background: linear-gradient(135deg, #6f42c1, #8e64e8) !important;
-    color: #fff;
-}
-.page-actores .card {
-    border-radius: 10px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-}
 .page-actores .tipo-badge-productor { background: #d4edda; color: #155724; }
 .page-actores .tipo-badge-proveedor { background: #cce5ff; color: #004085; }
 .page-actores .tipo-badge-mixto { background: #e2d5f5; color: #4a235a; }
@@ -54,13 +18,21 @@
 @endpush
 
 @section('content')
-<div class="page-actores">
+<div class="modulo-inv page-actores">
+
+    @if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show shadow-sm">
+        <button type="button" class="close" data-dismiss="alert">&times;</button>
+        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
+    </div>
+    @endif
 
     @if($errors->any())
-    <div class="alert alert-danger alert-dismissible shadow-sm">
+    <div class="alert alert-danger alert-dismissible fade show shadow-sm">
         <button type="button" class="close" data-dismiss="alert">&times;</button>
-        <h5 class="mb-1"><i class="icon fas fa-exclamation-triangle"></i> No se pudo guardar el actor</h5>
-        <ul class="mb-0 pl-3">
+        <i class="fas fa-exclamation-triangle mr-1"></i>
+        <strong>No se pudo guardar el actor.</strong>
+        <ul class="mb-0 pl-3 mt-1">
             @foreach($errors->all() as $error)
                 <li>{{ $error }}</li>
             @endforeach
@@ -68,27 +40,7 @@
     </div>
     @endif
 
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="alert alert-info alert-dismissible shadow-sm mb-0">
-                <button type="button" class="close" data-dismiss="alert">&times;</button>
-                <h5 class="mb-1"><i class="icon fas fa-handshake"></i> Red de abastecimiento</h5>
-                Centraliza productores y proveedores en una sola ficha para evitar duplicados y mantener trazabilidad de abastecimiento.
-                <div class="mt-2">
-                    <a href="{{ route('insumos.index') }}" class="btn btn-sm btn-outline-info">
-                        <i class="fas fa-boxes mr-1"></i> Insumos
-                    </a>
-                    @canany(['inventario.view', 'inventario.create', 'inventario.update', 'inventario.delete'])
-                    <a href="{{ route('recursos-productivos.index') }}" class="btn btn-sm btn-info ml-1">
-                        <i class="fas fa-layer-group mr-1"></i> Vista consolidada
-                    </a>
-                    @endcanany
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
+    <div class="row mb-2">
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-green">
                 <div class="inner">
@@ -106,7 +58,7 @@
                     <p>Actores activos</p>
                 </div>
                 <div class="icon"><i class="fas fa-user-check"></i></div>
-                <a href="#filtros-actores" class="small-box-footer" id="linkActivos">
+                <a href="#" class="small-box-footer" id="linkActivos">
                     Ver activos <i class="fas fa-arrow-circle-right"></i>
                 </a>
             </div>
@@ -118,7 +70,7 @@
                     <p>Inactivos</p>
                 </div>
                 <div class="icon"><i class="fas fa-user-slash"></i></div>
-                <a href="#filtros-actores" class="small-box-footer" id="linkInactivos">
+                <a href="#" class="small-box-footer" id="linkInactivos">
                     Ver inactivos <i class="fas fa-arrow-circle-right"></i>
                 </a>
             </div>
@@ -135,73 +87,11 @@
         </div>
     </div>
 
-    @if ($stats['total'] > 0)
-    <div class="row mb-3">
-        <div class="col-md-4">
-            <div class="info-box shadow-sm mb-0">
-                <span class="info-box-icon bg-success elevation-1"><i class="fas fa-seedling"></i></span>
-                <div class="info-box-content">
-                    <span class="info-box-text">Productores</span>
-                    <span class="info-box-number">{{ $stats['productores'] }}</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="info-box shadow-sm mb-0">
-                <span class="info-box-icon bg-info elevation-1"><i class="fas fa-truck"></i></span>
-                <div class="info-box-content">
-                    <span class="info-box-text">Proveedores</span>
-                    <span class="info-box-number">{{ $stats['proveedores'] }}</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="info-box shadow-sm mb-0">
-                <span class="info-box-icon bg-purple elevation-1"><i class="fas fa-random"></i></span>
-                <div class="info-box-content">
-                    <span class="info-box-text">Mixtos</span>
-                    <span class="info-box-number">{{ $stats['mixtos'] }}</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="card card-outline card-secondary mb-0">
-                <div class="card-body py-2">
-                    <div class="row text-center">
-                        <div class="col-sm-4 border-right">
-                            <div class="description-block mb-0">
-                                <h5 class="description-header">{{ $stats['total'] }}</h5>
-                                <span class="description-text text-muted">REGISTROS</span>
-                            </div>
-                        </div>
-                        <div class="col-sm-4 border-right">
-                            <div class="description-block mb-0">
-                                <span class="description-percentage text-success">
-                                    <i class="fas fa-caret-up"></i> {{ $pctActivos }}%
-                                </span>
-                                <h5 class="description-header">{{ $stats['activos'] }}</h5>
-                                <span class="description-text text-muted">ACTIVOS</span>
-                            </div>
-                        </div>
-                        <div class="col-sm-4">
-                            <div class="description-block mb-0">
-                                <h5 class="description-header">{{ $stats['inactivos'] }}</h5>
-                                <span class="description-text text-muted">INACTIVOS</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
-
-    <div class="card card-success card-outline elevation-2 mb-3">
+    <div class="card card-outline card-success elevation-1 mb-3">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-user-plus mr-1 text-success"></i> Nuevo actor de abastecimiento</h3>
+            <h3 class="card-title mb-0">
+                <i class="fas fa-user-plus text-success mr-1"></i> Nuevo actor de abastecimiento
+            </h3>
             <div class="card-tools">
                 <button type="button" class="btn btn-tool" data-card-widget="collapse">
                     <i class="fas fa-minus"></i>
@@ -245,23 +135,34 @@
         </div>
     </div>
 
-    <div class="card card-primary card-outline elevation-2" id="filtros-actores">
+    <div class="card card-outline card-success card-modulo-main elevation-1">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-address-book mr-1 text-primary"></i> Actores consolidados</h3>
-            <span class="badge badge-secondary ml-2">{{ $actores->total() }} registros</span>
+            <h3 class="card-title mb-0">
+                <i class="fas fa-handshake text-success mr-1"></i>
+                Actores de abastecimiento
+                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $actores->total() }} registros</span>
+            </h3>
+            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
+                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosActoresPanel" title="Filtros">
+                    <i class="fas fa-filter"></i>
+                </button>
+            </div>
         </div>
-        <div class="card-body border-bottom pb-2">
+
+        <div id="filtrosActoresPanel" class="filtros-panel collapse">
             <div class="row">
                 <div class="col-lg-5 col-md-6 mb-2">
+                    <label class="small text-muted mb-1">Buscar</label>
                     <div class="input-group input-group-sm">
                         <div class="input-group-prepend">
-                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
                         </div>
                         <input type="text" id="actorSearch" class="form-control"
-                            placeholder="Buscar por nombre, teléfono o email...">
+                            placeholder="Nombre, teléfono o email...">
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-3 mb-2">
+                    <label class="small text-muted mb-1">Tipo</label>
                     <select id="actorTipo" class="form-control form-control-sm">
                         <option value="">Todos los tipos</option>
                         @foreach($tiposFiltro as $tipo)
@@ -270,28 +171,30 @@
                     </select>
                 </div>
                 <div class="col-lg-2 col-md-3 mb-2">
+                    <label class="small text-muted mb-1">Estado</label>
                     <select id="actorEstado" class="form-control form-control-sm">
                         <option value="">Todos los estados</option>
                         <option value="activo">Activo</option>
                         <option value="inactivo">Inactivo</option>
                     </select>
                 </div>
-                <div class="col-lg-2 col-md-12 mb-2">
+                <div class="col-lg-2 col-md-12 mb-2 d-flex align-items-end">
                     <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btnLimpiarFiltros">
-                        <i class="fas fa-eraser mr-1"></i> Limpiar
+                        <i class="fas fa-times mr-1"></i> Limpiar
                     </button>
                 </div>
             </div>
         </div>
-        <div class="card-body table-responsive p-0">
-            <table class="table table-hover table-striped mb-0">
+
+        <div class="table-responsive">
+            <table class="table table-modulo table-hover mb-0">
                 <thead>
                     <tr>
                         <th>Actor</th>
                         <th>Tipo</th>
                         <th>Contacto</th>
                         <th>Estado</th>
-                        <th class="text-right">Acciones</th>
+                        <th class="text-center" style="width: 110px;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -318,9 +221,7 @@
                             data-email="{{ $actor->email }}"
                             data-tipo-texto="{{ ucfirst($actor->tipo_actor) }}"
                             data-activo="{{ $actor->activo ? '1' : '0' }}">
-                            <td>
-                                <strong class="text-success">{{ $actor->nombre }}</strong>
-                            </td>
+                            <td><strong class="text-success">{{ $actor->nombre }}</strong></td>
                             <td>
                                 <span class="badge {{ $tipoClass }}">
                                     <i class="fas fa-{{ $tipoIcon }} mr-1"></i>{{ ucfirst($actor->tipo_actor) }}
@@ -343,27 +244,23 @@
                                     <span class="badge badge-secondary"><i class="fas fa-ban mr-1"></i>Inactivo</span>
                                 @endif
                             </td>
-                            <td class="text-right text-nowrap">
-                                <button type="button" class="btn btn-xs btn-info actor-detalle-btn" title="Ver detalle">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button type="button" class="btn btn-xs btn-warning actor-editar-btn" title="Editar">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <form method="POST" action="{{ route('actores-abastecimiento.destroy', $actor) }}"
-                                    class="d-inline on-submit-confirm">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-xs btn-danger" title="Eliminar">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </form>
+                            <td class="text-center">
+                                <div class="btn-group btn-group-sm btn-actions">
+                                    <button type="button" class="btn btn-default actor-detalle-btn" title="Ver"><i class="fas fa-eye text-info"></i></button>
+                                    <button type="button" class="btn btn-default actor-editar-btn" title="Editar"><i class="fas fa-edit text-warning"></i></button>
+                                    <form method="POST" action="{{ route('actores-abastecimiento.destroy', $actor) }}"
+                                        class="d-inline on-submit-confirm">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-default" title="Eliminar"><i class="fas fa-trash text-danger"></i></button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
                             <td colspan="5" class="text-center text-muted py-5">
-                                <i class="fas fa-handshake fa-3x mb-3 text-light d-block"></i>
+                                <i class="fas fa-handshake fa-2x mb-2 text-light d-block"></i>
                                 No hay actores registrados. Crea el primero con el formulario superior.
                             </td>
                         </tr>
@@ -371,8 +268,9 @@
                 </tbody>
             </table>
         </div>
+
         @if($actores->hasPages())
-        <div class="card-footer">
+        <div class="card-footer bg-white d-flex justify-content-end py-2">
             {{ $actores->links() }}
         </div>
         @endif
@@ -498,14 +396,14 @@ document.addEventListener('DOMContentLoaded', function () {
         ev.preventDefault();
         if (e) e.value = 'activo';
         filtrar();
-        document.getElementById('filtros-actores')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        $('#filtrosActoresPanel').collapse('show');
     });
 
     document.getElementById('linkInactivos')?.addEventListener('click', function (ev) {
         ev.preventDefault();
         if (e) e.value = 'inactivo';
         filtrar();
-        document.getElementById('filtros-actores')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        $('#filtrosActoresPanel').collapse('show');
     });
 
     document.querySelectorAll('.actor-detalle-btn').forEach((btn) => {
@@ -556,17 +454,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     });
-
-    @if(session('success'))
-    Swal.fire({
-        icon: 'success',
-        title: '¡Hecho!',
-        text: @json(session('success')),
-        confirmButtonColor: '#2c5530',
-        timer: 3000,
-        showConfirmButton: false
-    });
-    @endif
 });
 </script>
 @endpush

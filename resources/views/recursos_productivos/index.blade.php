@@ -5,81 +5,30 @@
 
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="{{ route('insumos.index') }}">Inventario</a></li>
     <li class="breadcrumb-item active">Recursos productivos</li>
 @endsection
 
-@php
-    $pctCritico = $stats['insumos'] > 0
-        ? round(($stats['stock_bajo'] / $stats['insumos']) * 100)
-        : 0;
-@endphp
-
 @push('styles')
+@include('partials.modulo-inventario-styles')
 <style>
-.page-recursos .small-box {
-    border-radius: 10px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.page-recursos .small-box:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-}
-.page-recursos .small-box .icon { font-size: 70px; }
-.page-recursos .small-box-green {
-    background: linear-gradient(135deg, #2c5530, #4a7c59) !important;
-    color: #fff;
-}
-.page-recursos .small-box-blue {
-    background: linear-gradient(135deg, #17a2b8, #20c997) !important;
-    color: #fff;
-}
-.page-recursos .small-box-red {
-    background: linear-gradient(135deg, #dc3545, #e74a3b) !important;
-    color: #fff;
-}
-.page-recursos .small-box-yellow {
-    background: linear-gradient(135deg, #fd7e14, #ffc107) !important;
-    color: #1a252f;
-}
-.page-recursos .card {
-    border-radius: 10px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-}
 .page-recursos .cultivo-item {
     border-left: 3px solid #28a745;
+}
+.page-recursos .cultivos-panel {
+    max-height: 520px;
+    overflow-y: auto;
+}
+.page-recursos .insumos-panel {
+    max-height: 520px;
+    overflow-y: auto;
 }
 </style>
 @endpush
 
 @section('content')
-<div class="page-recursos">
+<div class="modulo-inv page-recursos">
 
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="alert alert-info alert-dismissible shadow-sm mb-0">
-                <button type="button" class="close" data-dismiss="alert">&times;</button>
-                <h5 class="mb-1"><i class="icon fas fa-layer-group"></i> Vista consolidada</h5>
-                Cultivos de la operación e insumos disponibles en un solo panel. Detecta niveles críticos y planifica compras o reabastecimiento.
-                <div class="mt-2">
-                    <a href="{{ route('insumos.index') }}" class="btn btn-sm btn-outline-info">
-                        <i class="fas fa-boxes mr-1"></i> Insumos
-                    </a>
-                    <a href="{{ route('actores-abastecimiento.index') }}" class="btn btn-sm btn-info ml-1">
-                        <i class="fas fa-handshake mr-1"></i> Actores
-                    </a>
-                    @can('reportes.view')
-                    <a href="{{ route('reportes.inventario') }}" class="btn btn-sm btn-success ml-1">
-                        <i class="fas fa-chart-pie mr-1"></i> Reporte inventario
-                    </a>
-                    @endcan
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
+    <div class="row mb-2">
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-green">
                 <div class="inner">
@@ -87,9 +36,7 @@
                     <p>Cultivos registrados</p>
                 </div>
                 <div class="icon"><i class="fas fa-seedling"></i></div>
-                <a href="#panel-cultivos" class="small-box-footer">
-                    Ver cultivos <i class="fas fa-arrow-circle-right"></i>
-                </a>
+                <span class="small-box-footer">En la operación</span>
             </div>
         </div>
         <div class="col-lg-3 col-6">
@@ -99,9 +46,7 @@
                     <p>Insumos registrados</p>
                 </div>
                 <div class="icon"><i class="fas fa-boxes"></i></div>
-                <a href="{{ route('insumos.index') }}" class="small-box-footer">
-                    Gestionar <i class="fas fa-arrow-circle-right"></i>
-                </a>
+                <span class="small-box-footer">Catálogo disponible</span>
             </div>
         </div>
         <div class="col-lg-3 col-6">
@@ -111,7 +56,7 @@
                     <p>En nivel crítico</p>
                 </div>
                 <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
-                <a href="#filtros-recursos" class="small-box-footer" id="linkStockBajo">
+                <a href="#" class="small-box-footer" id="linkStockBajo">
                     Filtrar críticos <i class="fas fa-arrow-circle-right"></i>
                 </a>
             </div>
@@ -128,62 +73,34 @@
         </div>
     </div>
 
-    @if ($stats['insumos'] > 0)
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="card card-outline card-secondary mb-0">
-                <div class="card-body py-2">
-                    <div class="row text-center">
-                        <div class="col-sm-3 border-right">
-                            <div class="description-block mb-0">
-                                <h5 class="description-header">{{ $stats['insumos'] }}</h5>
-                                <span class="description-text text-muted">INSUMOS</span>
-                            </div>
-                        </div>
-                        <div class="col-sm-3 border-right">
-                            <div class="description-block mb-0">
-                                <span class="description-percentage text-danger">
-                                    <i class="fas fa-caret-down"></i> {{ $pctCritico }}%
-                                </span>
-                                <h5 class="description-header">{{ $stats['stock_bajo'] }}</h5>
-                                <span class="description-text text-muted">CRÍTICOS</span>
-                            </div>
-                        </div>
-                        <div class="col-sm-3 border-right">
-                            <div class="description-block mb-0">
-                                <h5 class="description-header">{{ $stats['stock_normal'] }}</h5>
-                                <span class="description-text text-muted">NORMALES</span>
-                            </div>
-                        </div>
-                        <div class="col-sm-3">
-                            <div class="description-block mb-0">
-                                <h5 class="description-header">{{ $stats['tipos'] }}</h5>
-                                <span class="description-text text-muted">TIPOS</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <div class="card card-outline card-success card-modulo-main elevation-1">
+        <div class="card-header">
+            <h3 class="card-title mb-0">
+                <i class="fas fa-layer-group text-success mr-1"></i>
+                Recursos productivos
+                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $insumos->count() }} insumos</span>
+            </h3>
+            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
+                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosRecursosPanel" title="Filtros">
+                    <i class="fas fa-filter"></i>
+                </button>
             </div>
         </div>
-    </div>
-    @endif
 
-    <div class="card card-primary card-outline elevation-2 mb-3" id="filtros-recursos">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-filter mr-1"></i> Buscar insumos</h3>
-        </div>
-        <div class="card-body pb-2">
+        <div id="filtrosRecursosPanel" class="filtros-panel collapse">
             <div class="row">
                 <div class="col-lg-5 col-md-6 mb-2">
+                    <label class="small text-muted mb-1">Buscar insumos</label>
                     <div class="input-group input-group-sm">
                         <div class="input-group-prepend">
-                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
                         </div>
                         <input type="text" id="rpSearch" class="form-control"
                             placeholder="Nombre de insumo o proveedor...">
                     </div>
                 </div>
                 <div class="col-lg-4 col-md-4 mb-2">
+                    <label class="small text-muted mb-1">Tipo</label>
                     <select id="rpTipo" class="form-control form-control-sm">
                         <option value="">Todos los tipos</option>
                         @foreach($tiposFiltro as $tipo)
@@ -192,114 +109,101 @@
                     </select>
                 </div>
                 <div class="col-lg-2 col-md-4 mb-2">
+                    <label class="small text-muted mb-1">Nivel</label>
                     <select id="rpStock" class="form-control form-control-sm">
                         <option value="">Todos los niveles</option>
                         <option value="bajo">Stock bajo</option>
                         <option value="normal">Stock normal</option>
                     </select>
                 </div>
-                <div class="col-lg-1 col-md-12 mb-2">
-                    <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btnLimpiarFiltros">
-                        <i class="fas fa-eraser"></i>
+                <div class="col-lg-1 col-md-12 mb-2 d-flex align-items-end">
+                    <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btnLimpiarFiltros" title="Limpiar">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="row">
-        <div class="col-lg-4" id="panel-cultivos">
-            <div class="card card-success card-outline elevation-2">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-seedling mr-1 text-success"></i> Cultivos</h3>
-                    <span class="badge badge-success ml-2">{{ $stats['cultivos'] }}</span>
-                    <div class="card-tools">
-                        <a href="{{ route('cultivos.index') }}" class="btn btn-tool" title="Catálogo de cultivos">
-                            <i class="fas fa-external-link-alt"></i>
-                        </a>
-                        <button type="button" class="btn btn-tool" data-card-widget="collapse">
-                            <i class="fas fa-minus"></i>
-                        </button>
+        <div class="card-body pb-0">
+            <div class="row">
+                <div class="col-lg-4 mb-3">
+                    <h6 class="text-muted text-uppercase small mb-2">
+                        <i class="fas fa-seedling text-success mr-1"></i> Cultivos
+                        <span class="badge badge-success ml-1">{{ $stats['cultivos'] }}</span>
+                    </h6>
+                    <div class="cultivos-panel border rounded">
+                        <ul class="list-group list-group-flush mb-0">
+                            @forelse($cultivos as $cultivo)
+                                <li class="list-group-item cultivo-item d-flex justify-content-between align-items-center py-2">
+                                    <span><i class="fas fa-leaf text-success mr-2"></i>{{ $cultivo->nombre }}</span>
+                                    <span class="badge badge-success">Cultivo</span>
+                                </li>
+                            @empty
+                                <li class="list-group-item text-center text-muted py-4">
+                                    <i class="fas fa-seedling fa-2x mb-2 text-light d-block"></i>
+                                    Sin cultivos registrados.
+                                </li>
+                            @endforelse
+                        </ul>
                     </div>
                 </div>
-                <div class="card-body p-0" style="max-height: 520px; overflow-y: auto;">
-                    <ul class="list-group list-group-flush">
-                        @forelse($cultivos as $cultivo)
-                            <li class="list-group-item cultivo-item d-flex justify-content-between align-items-center">
-                                <span><i class="fas fa-leaf text-success mr-2"></i>{{ $cultivo->nombre }}</span>
-                                <span class="badge badge-success">Cultivo</span>
-                            </li>
-                        @empty
-                            <li class="list-group-item text-center text-muted py-4">
-                                <i class="fas fa-seedling fa-2x mb-2 text-light d-block"></i>
-                                Sin cultivos registrados.
-                                <a href="{{ route('cultivos.index') }}" class="d-block mt-2 small">Ir a Catálogos &gt; Cultivos</a>
-                            </li>
-                        @endforelse
-                    </ul>
-                </div>
-            </div>
-        </div>
 
-        <div class="col-lg-8">
-            <div class="card card-info card-outline elevation-2">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-cubes mr-1 text-info"></i> Insumos para abastecimiento</h3>
-                    <span class="badge badge-info ml-2" id="rpContadorVisible">{{ $insumos->count() }} ítems</span>
-                </div>
-                <div class="card-body table-responsive p-0" style="max-height: 520px; overflow-y: auto;">
-                    <table class="table table-hover table-striped mb-0">
-                        <thead class="thead-light" style="position: sticky; top: 0; z-index: 1;">
-                            <tr>
-                                <th>Insumo</th>
-                                <th>Tipo</th>
-                                <th>Nivel</th>
-                                <th>Stock</th>
-                                <th>Mínimo</th>
-                                <th>Actor / proveedor</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($insumos as $insumo)
-                                @php
-                                    $esBajo = (float) $insumo->stock <= (float) $insumo->stockminimo;
-                                    $actor = $insumo->actorAbastecimiento->nombre ?? $insumo->proveedor ?? '—';
-                                @endphp
-                                <tr class="rp-row"
-                                    data-search="{{ strtolower($insumo->nombre.' '.$actor) }}"
-                                    data-tipo="{{ strtolower($insumo->tipo->nombre ?? '') }}"
-                                    data-stock="{{ $esBajo ? 'bajo' : 'normal' }}">
-                                    <td>
-                                        <strong class="text-success">{{ $insumo->nombre }}</strong>
-                                    </td>
-                                    <td>{{ $insumo->tipo->nombre ?? '—' }}</td>
-                                    <td>
-                                        @if($esBajo)
-                                            <span class="badge badge-danger"><i class="fas fa-exclamation-triangle mr-1"></i>Crítico</span>
-                                        @else
-                                            <span class="badge badge-success"><i class="fas fa-check mr-1"></i>Normal</span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        {{ number_format((float) $insumo->stock, 2) }}
-                                        <small class="text-muted">{{ $insumo->unidadMedida->abreviatura ?? '' }}</small>
-                                    </td>
-                                    <td>{{ number_format((float) $insumo->stockminimo, 2) }}</td>
-                                    <td>
-                                        <i class="fas fa-handshake text-muted mr-1"></i>{{ $actor }}
-                                    </td>
-                                </tr>
-                            @empty
+                <div class="col-lg-8 mb-3">
+                    <h6 class="text-muted text-uppercase small mb-2">
+                        <i class="fas fa-cubes text-info mr-1"></i> Insumos para abastecimiento
+                        <span class="badge badge-light border text-muted ml-1" id="rpContadorVisible">{{ $insumos->count() }} ítems</span>
+                    </h6>
+                    <div class="insumos-panel table-responsive border rounded">
+                        <table class="table table-modulo table-hover mb-0">
+                            <thead>
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-5">
-                                        <i class="fas fa-boxes fa-3x mb-3 text-light d-block"></i>
-                                        Sin insumos registrados.
-                                        <a href="{{ route('insumos.index') }}" class="d-block mt-2">Ir a Inventario &gt; Insumos</a>
-                                    </td>
+                                    <th>Insumo</th>
+                                    <th>Tipo</th>
+                                    <th>Nivel</th>
+                                    <th>Stock</th>
+                                    <th>Mínimo</th>
+                                    <th>Actor / proveedor</th>
                                 </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                @forelse($insumos as $insumo)
+                                    @php
+                                        $esBajo = (float) $insumo->stock <= (float) $insumo->stockminimo;
+                                        $actor = $insumo->actorAbastecimiento->nombre ?? $insumo->proveedor ?? '—';
+                                    @endphp
+                                    <tr class="rp-row"
+                                        data-search="{{ strtolower($insumo->nombre.' '.$actor) }}"
+                                        data-tipo="{{ strtolower($insumo->tipo->nombre ?? '') }}"
+                                        data-stock="{{ $esBajo ? 'bajo' : 'normal' }}">
+                                        <td><strong class="text-success">{{ $insumo->nombre }}</strong></td>
+                                        <td>{{ $insumo->tipo->nombre ?? '—' }}</td>
+                                        <td>
+                                            @if($esBajo)
+                                                <span class="badge badge-danger"><i class="fas fa-exclamation-triangle mr-1"></i>Crítico</span>
+                                            @else
+                                                <span class="badge badge-success"><i class="fas fa-check mr-1"></i>Normal</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            {{ number_format((float) $insumo->stock, 2) }}
+                                            <small class="text-muted">{{ $insumo->unidadMedida->abreviatura ?? '' }}</small>
+                                        </td>
+                                        <td>{{ number_format((float) $insumo->stockminimo, 2) }}</td>
+                                        <td>
+                                            <i class="fas fa-handshake text-muted mr-1"></i>{{ $actor }}
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-5">
+                                            <i class="fas fa-boxes fa-2x mb-2 text-light d-block"></i>
+                                            Sin insumos registrados.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -350,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function () {
         ev.preventDefault();
         if (s) s.value = 'bajo';
         filtrar();
-        document.getElementById('filtros-recursos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        $('#filtrosRecursosPanel').collapse('show');
     });
 });
 </script>

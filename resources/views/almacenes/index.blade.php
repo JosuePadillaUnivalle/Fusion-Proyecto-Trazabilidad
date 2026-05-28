@@ -5,48 +5,12 @@
 
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="{{ route('insumos.index') }}">Inventario</a></li>
     <li class="breadcrumb-item active">Almacenes</li>
 @endsection
 
-@php
-    $pctActivos = $stats['total'] > 0
-        ? round(($stats['activos'] / $stats['total']) * 100)
-        : 0;
-@endphp
-
 @push('styles')
+@include('partials.modulo-inventario-styles')
 <style>
-.page-almacenes .small-box {
-    border-radius: 10px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.page-almacenes .small-box:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-}
-.page-almacenes .small-box .icon { font-size: 70px; }
-.page-almacenes .small-box-green {
-    background: linear-gradient(135deg, #2c5530, #4a7c59) !important;
-    color: #fff;
-}
-.page-almacenes .small-box-orange {
-    background: linear-gradient(135deg, #fd7e14, #ffc107) !important;
-    color: #1a252f;
-}
-.page-almacenes .small-box-blue {
-    background: linear-gradient(135deg, #17a2b8, #20c997) !important;
-    color: #fff;
-}
-.page-almacenes .small-box-red {
-    background: linear-gradient(135deg, #dc3545, #e74a3b) !important;
-    color: #fff;
-}
-.page-almacenes .card {
-    border-radius: 10px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-}
 .page-almacenes .products-list .product-img {
     width: 50px;
     height: 50px;
@@ -54,43 +18,20 @@
     align-items: center;
     justify-content: center;
 }
-.page-almacenes .view-toggle .btn.active {
-    background-color: #2c5530;
-    border-color: #2c5530;
-    color: #fff;
-}
 </style>
 @endpush
 
 @section('content')
-<div class="page-almacenes">
+<div class="modulo-inv page-almacenes">
 
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="alert alert-info alert-dismissible shadow-sm mb-0">
-                <button type="button" class="close" data-dismiss="alert">&times;</button>
-                <h5 class="mb-1"><i class="icon fas fa-warehouse"></i> Almacenes y capacidad</h5>
-                Administra depósitos, tipos, capacidad y estado operativo. Consulta movimientos y almacenamiento de producción.
-                <div class="mt-2">
-                    @can('almacen.movimientos.view')
-                    <a href="{{ route('almacen-movimientos.index') }}" class="btn btn-sm btn-outline-info">
-                        <i class="fas fa-dolly mr-1"></i> Movimientos
-                    </a>
-                    @endcan
-                    <a href="{{ route('producciones_almacenamiento.index') }}" class="btn btn-sm btn-info ml-1">
-                        <i class="fas fa-pallet mr-1"></i> Almacenamiento producción
-                    </a>
-                    @can('inventario.create')
-                    <a href="{{ route('almacenes.create') }}" class="btn btn-sm btn-success ml-1">
-                        <i class="fas fa-plus mr-1"></i> Nuevo almacén
-                    </a>
-                    @endcan
-                </div>
-            </div>
-        </div>
+    @if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show shadow-sm">
+        <button type="button" class="close" data-dismiss="alert">&times;</button>
+        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
     </div>
+    @endif
 
-    <div class="row">
+    <div class="row mb-2">
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-green">
                 <div class="inner">
@@ -118,7 +59,7 @@
                     <p>Almacenes activos</p>
                 </div>
                 <div class="icon"><i class="fas fa-check-circle"></i></div>
-                <a href="#filtros-almacenes" class="small-box-footer" id="linkActivos">
+                <a href="#" class="small-box-footer" id="linkActivos">
                     Ver activos <i class="fas fa-arrow-circle-right"></i>
                 </a>
             </div>
@@ -130,65 +71,32 @@
                     <p>Inactivos</p>
                 </div>
                 <div class="icon"><i class="fas fa-ban"></i></div>
-                <a href="#filtros-almacenes" class="small-box-footer" id="linkInactivos">
+                <a href="#" class="small-box-footer" id="linkInactivos">
                     Ver inactivos <i class="fas fa-arrow-circle-right"></i>
                 </a>
             </div>
         </div>
     </div>
 
-    @if ($stats['total'] > 0)
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="card card-outline card-secondary mb-0">
-                <div class="card-body py-2">
-                    <div class="row text-center">
-                        <div class="col-sm-3 border-right">
-                            <div class="description-block mb-0">
-                                <h5 class="description-header">{{ $stats['total'] }}</h5>
-                                <span class="description-text text-muted">ALMACENES</span>
-                            </div>
-                        </div>
-                        <div class="col-sm-3 border-right">
-                            <div class="description-block mb-0">
-                                <span class="description-percentage text-success">
-                                    <i class="fas fa-caret-up"></i> {{ $pctActivos }}%
-                                </span>
-                                <h5 class="description-header">{{ $stats['activos'] }}</h5>
-                                <span class="description-text text-muted">ACTIVOS</span>
-                            </div>
-                        </div>
-                        <div class="col-sm-3 border-right">
-                            <div class="description-block mb-0">
-                                <h5 class="description-header">{{ number_format($stats['capacidad_total'], 0) }}</h5>
-                                <span class="description-text text-muted">CAPACIDAD</span>
-                            </div>
-                        </div>
-                        <div class="col-sm-3">
-                            <div class="description-block mb-0">
-                                <h5 class="description-header">{{ $stats['tipos'] }}</h5>
-                                <span class="description-text text-muted">TIPOS</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
-
-    <div class="card card-primary card-outline elevation-2" id="filtros-almacenes">
+    <div class="card card-outline card-success card-modulo-main elevation-1">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-filter mr-1"></i> Buscar y filtrar</h3>
-            <div class="card-tools">
-                <div class="btn-group btn-group-sm view-toggle mr-2">
-                    <button type="button" class="btn btn-default active" id="btnCardView" title="Vista tarjetas">
+            <h3 class="card-title mb-0">
+                <i class="fas fa-warehouse text-success mr-1"></i>
+                Almacenes
+                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $almacenes->total() }} registros</span>
+            </h3>
+            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
+                <div class="btn-group btn-group-sm view-toggle mr-1">
+                    <button type="button" class="btn btn-default" id="btnCardView" title="Tarjetas">
                         <i class="fas fa-th-large"></i>
                     </button>
-                    <button type="button" class="btn btn-default" id="btnTableView" title="Vista tabla">
+                    <button type="button" class="btn btn-default active" id="btnTableView" title="Tabla">
                         <i class="fas fa-list"></i>
                     </button>
                 </div>
+                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosAlmacenesPanel" title="Filtros">
+                    <i class="fas fa-filter"></i>
+                </button>
                 @can('inventario.create')
                 <a href="{{ route('almacenes.create') }}" class="btn btn-success btn-sm">
                     <i class="fas fa-plus mr-1"></i> Nuevo
@@ -196,17 +104,20 @@
                 @endcan
             </div>
         </div>
-        <div class="card-body pb-2">
+
+        <div id="filtrosAlmacenesPanel" class="filtros-panel collapse">
             <div class="row">
                 <div class="col-lg-5 col-md-6 mb-2">
+                    <label class="small text-muted mb-1">Buscar</label>
                     <div class="input-group input-group-sm">
                         <div class="input-group-prepend">
-                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
                         </div>
                         <input type="text" id="searchInput" class="form-control" placeholder="Buscar almacén...">
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-3 mb-2">
+                    <label class="small text-muted mb-1">Tipo</label>
                     <select id="filterTipo" class="form-control form-control-sm">
                         <option value="">Todos los tipos</option>
                         @foreach($tiposFiltro as $tipoNombre)
@@ -215,27 +126,91 @@
                     </select>
                 </div>
                 <div class="col-lg-3 col-md-3 mb-2">
+                    <label class="small text-muted mb-1">Estado</label>
                     <select id="filterEstado" class="form-control form-control-sm">
                         <option value="">Todos los estados</option>
                         <option value="active">Activos</option>
                         <option value="inactive">Inactivos</option>
                     </select>
                 </div>
-                <div class="col-lg-1 col-md-12 mb-2">
+                <div class="col-lg-1 col-md-12 mb-2 d-flex align-items-end">
                     <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btnLimpiarFiltros" title="Limpiar">
-                        <i class="fas fa-eraser"></i>
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div id="cardView" class="card card-outline card-success elevation-1">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-warehouse mr-1 text-success"></i> Listado de almacenes</h3>
-            <span class="badge badge-secondary ml-2">{{ $almacenes->total() }} registros</span>
+        <div id="tableView" class="table-responsive">
+            <table class="table table-modulo table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Tipo</th>
+                        <th>Capacidad</th>
+                        <th>Unidad</th>
+                        <th>Estado</th>
+                        <th class="text-center" style="width: 110px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($almacenes as $a)
+                        @php
+                            $searchText = strtolower(trim(
+                                ($a->nombre ?? '') . ' ' . ($a->tipoAlmacen->nombre ?? '')
+                            ));
+                        @endphp
+                        <tr class="search-item-row"
+                            data-nombre="{{ $searchText }}"
+                            data-tipo="{{ strtolower($a->tipoAlmacen->nombre ?? '') }}"
+                            data-estado="{{ $a->activo ? 'active' : 'inactive' }}">
+                            <td>
+                                <strong class="text-success">{{ $a->nombre }}</strong>
+                                @if($a->codigo)
+                                <br><small class="text-muted">{{ $a->codigo }}</small>
+                                @endif
+                            </td>
+                            <td>{{ $a->tipoAlmacen->nombre ?? '—' }}</td>
+                            <td>{{ number_format((float) $a->capacidad, 2) }}</td>
+                            <td>{{ $a->unidadMedida->nombre ?? '—' }}</td>
+                            <td>
+                                @if($a->activo)
+                                    <span class="badge badge-success">Activo</span>
+                                @else
+                                    <span class="badge badge-secondary">Inactivo</span>
+                                @endif
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group btn-group-sm btn-actions">
+                                    <a href="{{ route('almacenes.show', $a) }}" class="btn btn-default" title="Ver"><i class="fas fa-eye text-info"></i></a>
+                                    @can('inventario.update')
+                                    <a href="{{ route('almacenes.edit', $a) }}" class="btn btn-default" title="Editar"><i class="fas fa-edit text-warning"></i></a>
+                                    @endcan
+                                    @can('inventario.delete')
+                                    <form action="{{ route('almacenes.destroy', $a) }}" method="POST" class="d-inline on-submit-confirm">
+                                        @csrf @method('DELETE')
+                                        <button type="submit" class="btn btn-default" title="Eliminar"><i class="fas fa-trash text-danger"></i></button>
+                                    </form>
+                                    @endcan
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-5">
+                                <i class="fas fa-warehouse fa-2x mb-2 text-light d-block"></i>
+                                No hay almacenes registrados.
+                                @can('inventario.create')
+                                <a href="{{ route('almacenes.create') }}" class="d-block mt-2">Crear primer almacén</a>
+                                @endcan
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
-        <div class="card-body p-0">
+
+        <div id="cardView" style="display: none;">
             @forelse($almacenes as $a)
                 @php
                     $searchText = strtolower(trim(
@@ -274,20 +249,14 @@
                                 </span>
                             </div>
                             <div class="ml-2 text-nowrap">
-                                <a href="{{ route('almacenes.show', $a) }}" class="btn btn-xs btn-info" title="Ver">
-                                    <i class="fas fa-eye"></i>
-                                </a>
+                                <a href="{{ route('almacenes.show', $a) }}" class="btn btn-xs btn-info" title="Ver"><i class="fas fa-eye"></i></a>
                                 @can('inventario.update')
-                                <a href="{{ route('almacenes.edit', $a) }}" class="btn btn-xs btn-warning" title="Editar">
-                                    <i class="fas fa-edit"></i>
-                                </a>
+                                <a href="{{ route('almacenes.edit', $a) }}" class="btn btn-xs btn-warning" title="Editar"><i class="fas fa-edit"></i></a>
                                 @endcan
                                 @can('inventario.delete')
                                 <form action="{{ route('almacenes.destroy', $a) }}" method="POST" class="d-inline on-submit-confirm">
                                     @csrf @method('DELETE')
-                                    <button type="submit" class="btn btn-xs btn-danger" title="Eliminar">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                    <button type="submit" class="btn btn-xs btn-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
                                 </form>
                                 @endcan
                             </div>
@@ -295,90 +264,12 @@
                     </ul>
                 </div>
             @empty
-                <div class="text-center text-muted py-5">
-                    <i class="fas fa-warehouse fa-3x mb-3 text-light d-block"></i>
-                    <p class="mb-2">No hay almacenes registrados.</p>
-                    @can('inventario.create')
-                    <a href="{{ route('almacenes.create') }}" class="btn btn-success btn-sm">
-                        <i class="fas fa-plus mr-1"></i> Crear primer almacén
-                    </a>
-                    @endcan
-                </div>
+                <div class="text-center text-muted py-5">No hay almacenes registrados.</div>
             @endforelse
         </div>
-        @if($almacenes->hasPages())
-        <div class="card-footer">
-            {{ $almacenes->links() }}
-        </div>
-        @endif
-    </div>
 
-    <div id="tableView" class="card card-outline card-primary elevation-1" style="display: none;">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-table mr-1 text-primary"></i> Tabla de almacenes</h3>
-        </div>
-        <div class="card-body table-responsive p-0">
-            <table class="table table-hover table-striped mb-0">
-                <thead>
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Tipo</th>
-                        <th>Capacidad</th>
-                        <th>Unidad</th>
-                        <th>Estado</th>
-                        <th class="text-right">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($almacenes as $a)
-                        @php
-                            $searchText = strtolower(trim(
-                                ($a->nombre ?? '') . ' ' . ($a->tipoAlmacen->nombre ?? '')
-                            ));
-                        @endphp
-                        <tr class="search-item-row"
-                            data-nombre="{{ $searchText }}"
-                            data-tipo="{{ strtolower($a->tipoAlmacen->nombre ?? '') }}"
-                            data-estado="{{ $a->activo ? 'active' : 'inactive' }}">
-                            <td>
-                                <strong class="text-success">{{ $a->nombre }}</strong>
-                                @if($a->codigo)
-                                <br><small class="text-muted">{{ $a->codigo }}</small>
-                                @endif
-                            </td>
-                            <td>{{ $a->tipoAlmacen->nombre ?? '—' }}</td>
-                            <td>{{ number_format((float) $a->capacidad, 2) }}</td>
-                            <td>{{ $a->unidadMedida->nombre ?? '—' }}</td>
-                            <td>
-                                @if($a->activo)
-                                    <span class="badge badge-success">Activo</span>
-                                @else
-                                    <span class="badge badge-secondary">Inactivo</span>
-                                @endif
-                            </td>
-                            <td class="text-right text-nowrap">
-                                <a href="{{ route('almacenes.show', $a) }}" class="btn btn-xs btn-info" title="Ver">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                @can('inventario.update')
-                                <a href="{{ route('almacenes.edit', $a) }}" class="btn btn-xs btn-warning" title="Editar">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                @endcan
-                                @can('inventario.delete')
-                                <form action="{{ route('almacenes.destroy', $a) }}" method="POST" class="d-inline on-submit-confirm">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="btn btn-xs btn-danger"><i class="fas fa-trash"></i></button>
-                                </form>
-                                @endcan
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
         @if($almacenes->hasPages())
-        <div class="card-footer">
+        <div class="card-footer bg-white d-flex justify-content-end py-2">
             {{ $almacenes->links() }}
         </div>
         @endif
@@ -434,14 +325,14 @@ $(function () {
         e.preventDefault();
         $('#filterEstado').val('active');
         aplicarFiltros();
-        $('html, body').animate({ scrollTop: $('#filtros-almacenes').offset().top - 80 }, 300);
+        $('#filtrosAlmacenesPanel').collapse('show');
     });
 
     $('#linkInactivos').on('click', function (e) {
         e.preventDefault();
         $('#filterEstado').val('inactive');
         aplicarFiltros();
-        $('html, body').animate({ scrollTop: $('#filtros-almacenes').offset().top - 80 }, 300);
+        $('#filtrosAlmacenesPanel').collapse('show');
     });
 
     $('.on-submit-confirm').on('submit', function (e) {
@@ -461,17 +352,6 @@ $(function () {
             }
         });
     });
-
-    @if(session('success'))
-    Swal.fire({
-        icon: 'success',
-        title: '¡Hecho!',
-        text: @json(session('success')),
-        confirmButtonColor: '#2c5530',
-        timer: 3000,
-        showConfirmButton: false
-    });
-    @endif
 });
 </script>
 @endpush
