@@ -201,6 +201,18 @@ class ExternalApiProxyController extends Controller
         return $this->proxyGet('/api/catalogo-tamano-conteo');
     }
 
+    /**
+     * Comprobación rápida de disponibilidad del proxy (siempre responde 200 en la app Fusion).
+     */
+    public function ping()
+    {
+        return response()->json([
+            'ok' => true,
+            'fuente' => 'fusion',
+            'servidor' => now()->toIso8601String(),
+        ]);
+    }
+
     public function getTiposTransporte()
     {
         return $this->proxyGetWithLocalFallback(
@@ -234,7 +246,10 @@ class ExternalApiProxyController extends Controller
 
     public function getEnvioDetalle($id)
     {
-        return $this->proxyGet('/api/public/envios/' . $id . '/seguimiento');
+        return $this->proxyGetWithLocalFallback(
+            '/api/public/envios/'.$id.'/seguimiento',
+            fn () => LocalOrgTrackFallback::envioDetallePayload($id)
+        );
     }
 
     public function getTransportistas()

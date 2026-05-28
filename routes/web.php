@@ -193,7 +193,9 @@ Route::middleware('auth')->group(function () {
         ->name('almacen-movimientos.reportes')
         ->middleware('action.permission:almacen_reportes,read');
     Route::get('/certificaciones', [CertificacionController::class, 'index'])->name('certificaciones.index')->middleware('action.permission:certificaciones,read');
+    Route::post('/certificaciones/masivo', [CertificacionController::class, 'storeBulk'])->name('certificaciones.store-bulk')->middleware('action.permission:certificaciones,create');
     Route::post('/certificaciones', [CertificacionController::class, 'store'])->name('certificaciones.store')->middleware('action.permission:certificaciones,create');
+    Route::get('/certificaciones/{certificacion}', [CertificacionController::class, 'show'])->name('certificaciones.show')->middleware('action.permission:certificaciones,read');
     // ==============================
     // PEDIDOS (CLIENTES EXTERNOS)
     // ==============================
@@ -268,6 +270,7 @@ Route::middleware('auth')->group(function () {
         // PROXY API EXTERNA (evita CORS)
         // ==============================
         Route::prefix('api')->name('api.')->group(function () {
+            Route::get('/ping', [ExternalApiProxyController::class, 'ping'])->name('ping')->middleware('action.permission:envios,read');
             // Catálogos
             Route::get('/catalogo-categorias', [ExternalApiProxyController::class, 'getCategorias'])->name('categorias')->middleware('action.permission:envios,read');
             Route::get('/catalogo-productos', [ExternalApiProxyController::class, 'getProductos'])->name('productos')->middleware('action.permission:envios,read');

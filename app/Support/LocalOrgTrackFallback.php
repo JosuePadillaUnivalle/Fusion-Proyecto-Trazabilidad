@@ -84,17 +84,26 @@ final class LocalOrgTrackFallback
         $data = $rows->map(function (EnvioAsignacionMultiple $a) {
             $p = $a->pedido;
             $alm = $a->almacen;
-            $origen = $alm ? trim(($alm->nombre ?? '').' · '.($alm->ubicacion ?? '')) : 'Origen almacén';
+            $origen = $alm
+                ? trim(($alm->nombre ?? '').' · '.($alm->ubicacion ?? ''))
+                : 'Origen almacén';
+            $destino = $p?->direccion_texto ?: ($p?->nombre_planta ?? 'Sin destino');
+            $fecha = $a->fecha_asignacion ?? $a->created_at;
+            $detalles = is_array($a->detalles_productos) ? $a->detalles_productos : [];
+            $remitente = $detalles['remitente'] ?? $alm?->nombre ?? 'Operación logística Fusion';
 
             return [
-                'id' => $a->externo_envio_id,
+                'id' => (int) $a->envioasignacionmultipleid,
                 'externo_envio_id' => $a->externo_envio_id,
+                'numero_solicitud' => $p?->numero_solicitud,
                 'estado' => $a->estado,
                 'estado_actual' => $a->estado,
                 'nombre_estado' => $a->estado,
-                'destino' => $p->nombre_planta ?? '',
-                'direccion_destino' => $p->direccion_texto ?? '',
-                'destino_direccion' => $p->direccion_texto ?? '',
+                'fecha_creacion' => $fecha?->toIso8601String(),
+                'nombre_remitente' => $remitente,
+                'destino' => $p?->nombre_planta ?? '',
+                'direccion_destino' => $destino,
+                'destino_direccion' => $destino,
                 'direccion_origen' => $origen,
                 'origen_direccion' => $origen,
                 'origen' => $origen,
@@ -262,6 +271,157 @@ final class LocalOrgTrackFallback
             'rutas_activas' => $rutasActivas,
             'incidentes_abiertos' => $incidentesAbiertos,
         ];
+    }
+
+    /**
+     * Detalle compatible con envios/detalle.blade.php (particiones, mapa, transportista).
+     *
+     * @param  int|string  $id  envioasignacionmultipleid o externo_envio_id
+     */
+    public static function envioDetallePayload(int|string $id): array
+    {
+        if (! Schema::hasTable('envio_asignacion_multiple')) {
+            return ['particiones' => [], '_meta' => ['fuente' => 'fusion_local', 'error' => 'Sin tabla de envíos.']];
+        }
+
+        $query = EnvioAsignacionMultiple::query()
+            ->with(['pedido.detalles', 'transportista', 'almacen', 'tipoTransporte', 'recogidaEntrega']);
+
+        $asig = is_numeric($id)
+            ? $query->where('envioasignacionmultipleid', (int) $id)->first()
+            : $query->where('externo_envio_id', (string) $id)->first();
+
+        if (! $asig) {
+            return ['particiones' => [], '_meta' => ['fuente' => 'fusion_local', 'error' => 'Envío no encontrado.']];
+        }
+
+        $pedido = $asig->pedido;
+        $alm = $asig->almacen;
+        $detalles = is_array($asig->detalles_productos) ? $asig->detalles_productos : [];
+
+        $origenNombre = $detalles['origen'] ?? ($alm
+            ? trim(($alm->nombre ?? '').' · '.($alm->ubicacion ?? ''))
+            : 'Origen logístico');
+        $destinoNombre = $pedido?->nombre_planta ?? ($detalles['destino'] ?? 'Destino');
+        $destinoDir = $pedido?->direccion_texto ?? ($detalles['destino'] ?? '');
+
+        $destLat = $pedido?->latitud;
+        $destLng = $pedido?->longitud;
+        $origLat = $destLat ? (float) $destLat + 0.04 : -17.7833;
+        $origLng = $destLng ? (float) $destLng + 0.03 : -63.1821;
+
+        $transportista = $asig->transportista;
+        $placa = $asig->vehiculo_ref;
+        if (is_string($placa) && str_contains($placa, '/')) {
+            $parts = explode('/', $placa);
+            $placa = trim(end($parts));
+        }
+
+        $fechaAsig = $asig->fecha_asignacion ?? $asig->created_at;
+        $recogida = $asig->recogidaEntrega;
+
+        $particion = [
+            'estado' => self::etiquetaEstadoEnvio($asig->estado),
+            'transportista' => [
+                'nombre' => $transportista?->nombre ?? '—',
+                'apellido' => $transportista?->apellido ?? '',
+                'telefono' => $transportista?->telefono ?? '—',
+                'ci' => '—',
+            ],
+            'vehiculo' => ['placa' => $placa ?: '—'],
+            'tipoTransporte' => [
+                'nombre' => $asig->tipoTransporte?->nombre ?? 'Transporte terrestre',
+                'descripcion' => $asig->externo_envio_id ?? 'Asignación Fusion',
+            ],
+            'recogidaEntrega' => [
+                'fecha_recogida' => $recogida?->fecha_recogida?->format('d/m/Y')
+                    ?? $fechaAsig?->format('d/m/Y')
+                    ?? now()->format('d/m/Y'),
+                'hora_recogida' => $recogida?->hora_recogida ?? '08:00',
+                'hora_entrega' => $recogida?->hora_entrega ?? '14:00',
+                'instrucciones_recogida' => $recogida?->instrucciones_recogida
+                    ?? 'Recoger en punto de origen confirmado.',
+                'instrucciones_entrega' => $recogida?->instrucciones_entrega
+                    ?? 'Entregar en destino con acta de recepción.',
+            ],
+            'cargas' => self::cargasDesdeAsignacion($asig, $detalles),
+            'codigo_acceso' => strtoupper(substr(md5((string) $asig->envioasignacionmultipleid), 0, 8)),
+            'id_transportista' => $asig->transportista_usuarioid,
+            'id_vehiculo' => $placa ? 1 : null,
+        ];
+
+        return [
+            'id' => $asig->envioasignacionmultipleid,
+            'externo_envio_id' => $asig->externo_envio_id,
+            'numero_solicitud' => $pedido?->numero_solicitud,
+            'estado' => $asig->estado,
+            'nombre_origen' => $origenNombre,
+            'nombre_destino' => $destinoNombre,
+            'direccion_destino' => $destinoDir,
+            'coordenadas_origen' => ['lat' => $origLat, 'lng' => $origLng],
+            'coordenadas_destino' => ['lat' => $destLat, 'lng' => $destLng],
+            'particiones' => [$particion],
+            '_meta' => [
+                'fuente' => 'fusion_local',
+                'mensaje' => 'Detalle generado desde la base local de Fusion-Proyectos.',
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $detalles
+     * @return list<array<string, mixed>>
+     */
+    private static function cargasDesdeAsignacion(EnvioAsignacionMultiple $asig, array $detalles): array
+    {
+        $cargas = [];
+
+        if (isset($detalles[0]) && is_array($detalles[0])) {
+            foreach ($detalles as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+                $cargas[] = [
+                    'tipo' => (string) ($item['producto'] ?? 'Producto'),
+                    'variedad' => (string) ($item['codigo_producto'] ?? ''),
+                    'cantidad' => (float) ($item['cantidad'] ?? 0),
+                    'peso' => (float) ($item['cantidad'] ?? 0),
+                ];
+            }
+        }
+
+        if ($cargas === [] && $asig->pedido) {
+            foreach ($asig->pedido->detalles ?? [] as $det) {
+                $cargas[] = [
+                    'tipo' => (string) ($det->cultivo_personalizado ?? 'Producto'),
+                    'variedad' => '',
+                    'cantidad' => (float) ($det->cantidad ?? 0),
+                    'peso' => (float) ($det->cantidad ?? 0),
+                ];
+            }
+        }
+
+        if ($cargas === []) {
+            $cargas[] = [
+                'tipo' => 'Carga general',
+                'variedad' => '',
+                'cantidad' => 0,
+                'peso' => 0,
+            ];
+        }
+
+        return $cargas;
+    }
+
+    private static function etiquetaEstadoEnvio(?string $estado): string
+    {
+        return match (strtolower((string) $estado)) {
+            'en_ruta', 'en ruta' => 'En curso',
+            'entregado' => 'Entregado',
+            'asignado' => 'Asignado',
+            'pendiente' => 'Pendiente',
+            default => ucfirst((string) ($estado ?: 'Pendiente')),
+        };
     }
 
     private static function emptyEnvios(string $mensaje): array

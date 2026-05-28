@@ -117,17 +117,24 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
         (function () {
-            // URLs de las APIs
-            const API_URL = '{{ config("external_api.orgtrack_url") }}';
             const LOCAL_API_URL = '/envios/api';
             const envioId = {{ $id ?? 0 }};
             const CACHE_KEY = `agronexus_envio_${envioId}`;
+            const FETCH_OPTS = { credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } };
 
             const cont = document.getElementById('detalleEnvio');
             let conectado = true;
             let state = { envio: null };
 
             const loaderHtml = '<div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando información del envío...</div>';
+
+            function normalizarDetalleEnvio(payload) {
+                if (!payload || typeof payload !== 'object') return null;
+                if (payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) {
+                    return payload.data;
+                }
+                return payload;
+            }
 
             // ========================================
             // TOLERANCIA A FALLOS
@@ -136,14 +143,21 @@
             async function verificarConexion() {
                 try {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+                    const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-                    const res = await fetch(`${LOCAL_API_URL}/tipo-transporte`, {
-                        signal: controller.signal
+                    const res = await fetch(`${LOCAL_API_URL}/ping`, {
+                        ...FETCH_OPTS,
+                        signal: controller.signal,
+                        cache: 'no-store',
                     });
 
                     clearTimeout(timeoutId);
-                    conectado = res.ok;
+                    if (res.ok) {
+                        const body = await res.json().catch(() => ({}));
+                        conectado = body?.ok === true || res.ok;
+                    } else {
+                        conectado = false;
+                    }
                 } catch (e) {
                     conectado = false;
                 }
@@ -195,9 +209,13 @@
             function badgeFor(estado) {
                 const map = {
                     'En curso': 'badge-info',
+                    'en_ruta': 'badge-info',
                     'Pendiente': 'badge-warning',
+                    'pendiente': 'badge-warning',
                     'Asignado': 'badge-primary',
+                    'asignado': 'badge-primary',
                     'Entregado': 'badge-success',
+                    'entregado': 'badge-success',
                     'Completado': 'badge-success',
                     'Finalizado': 'badge-secondary',
                     'Completada': 'badge-success'
@@ -210,18 +228,10 @@
                 state.envio = envio;
                 const particiones = Array.isArray(envio.particiones) ? envio.particiones : [];
 
-                let cacheNotice = '';
-                if (fromCache) {
-                    cacheNotice = `
-                    <div class="alert alert-warning mb-3">
-                        <i class="fas fa-info-circle mr-2"></i>
-                        <strong>Datos offline:</strong> Esta información puede no estar actualizada.
-                    </div>
-                `;
-                }
-
                 if (particiones.length === 0) {
-                    cont.innerHTML = cacheNotice + '<div class="alert alert-info"><i class="fas fa-info-circle mr-2"></i>Este envío no tiene particiones.</div>';
+                    const msg = envio._meta?.error || 'Este envío no tiene particiones o no se encontró en el sistema.';
+                    cont.innerHTML = (fromCache ? '<div class="alert alert-warning mb-3"><strong>Datos offline</strong></div>' : '')
+                        + `<div class="alert alert-info"><i class="fas fa-info-circle mr-2"></i>${msg}</div>`;
                     return;
                 }
 
@@ -233,6 +243,18 @@
                     notice.innerHTML = '<i class="fas fa-info-circle mr-2"></i><strong>Datos offline:</strong> Esta información puede no estar actualizada.';
                     wrapper.appendChild(notice);
                 }
+
+                const header = document.createElement('div');
+                header.className = 'mb-4';
+                header.innerHTML = `
+                    <h4 class="mb-2">
+                        ${envio.externo_envio_id || ('Envío #' + (envio.id || envioId))}
+                        ${badgeFor(envio.estado || particiones[0]?.estado)}
+                    </h4>
+                    ${envio.numero_solicitud ? `<p class="text-muted mb-1"><strong>Solicitud:</strong> ${envio.numero_solicitud}</p>` : ''}
+                    <p class="text-muted mb-0 small">${envio._meta?.mensaje || ''}</p>
+                `;
+                wrapper.appendChild(header);
 
                 particiones.forEach((p, idx) => {
                     const card = document.createElement('div');
@@ -407,41 +429,38 @@
                 if (conectado) {
                     try {
                         const res = await fetch(`${LOCAL_API_URL}/envios/${envioId}`, {
-                            method: 'GET',
-                            headers: { 'Content-Type': 'application/json' }
+                            ...FETCH_OPTS,
+                            cache: 'no-store',
                         });
 
                         if (!res.ok) throw new Error('No se pudo cargar el envío');
 
-                        const envio = await res.json();
+                        const raw = await res.json();
+                        const envio = normalizarDetalleEnvio(raw);
+                        if (!envio) throw new Error('Respuesta vacía');
+
                         guardarEnCache(envio);
                         renderEnvio(envio, false);
 
                     } catch (error) {
                         console.error('Error cargando envío:', error);
-                        conectado = false;
-                        actualizarIndicador();
-
-                        // Intentar desde cache
                         const cached = obtenerDeCache();
                         if (cached) {
                             renderEnvio(cached, true);
                         } else {
-                            cont.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle mr-2"></i>Sin conexión y sin datos guardados para este envío.</div>`;
+                            cont.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle mr-2"></i>No se pudo cargar el envío. <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="reintentarConexion()">Reintentar</button></div>`;
                         }
                     }
                 } else {
-                    // Modo offline
                     const cached = obtenerDeCache();
                     if (cached) {
                         renderEnvio(cached, true);
                     } else {
-                        cont.innerHTML = `<div class="alert alert-warning"><i class="fas fa-wifi-slash mr-2"></i>Sin conexión. No hay datos guardados para este envío.</div>`;
+                        cont.innerHTML = `<div class="alert alert-warning"><i class="fas fa-wifi-slash mr-2"></i>Sin conexión. No hay datos guardados para este envío. <button type="button" class="btn btn-sm btn-warning mt-2" onclick="reintentarConexion()">Reintentar</button></div>`;
                     }
                 }
             }
 
-            // Función global para reintentar
             window.reintentarConexion = async function () {
                 await verificarConexion();
                 if (conectado) {
@@ -449,17 +468,19 @@
                 }
             };
 
-            // Verificar conexión periódicamente
             setInterval(async () => {
                 const wasOffline = !conectado;
                 await verificarConexion();
                 if (wasOffline && conectado) {
                     cargarEnvio();
                 }
-            }, 30000);
+            }, 15000);
 
-            // Iniciar
-            cargarEnvio();
+            window.addEventListener('online', () => {
+                verificarConexion().then((ok) => { if (ok) cargarEnvio(); });
+            });
+
+            verificarConexion().then(() => cargarEnvio());
         })();
     </script>
 @endpush

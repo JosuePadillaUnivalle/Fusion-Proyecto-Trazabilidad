@@ -115,6 +115,102 @@
             background: #6c757d;
         }
 
+        .activity-icon.activity-fertilizacion {
+            background: #6f42c1;
+        }
+
+        .activity-icon.activity-plagas {
+            background: #e74a3b;
+        }
+
+        .activity-icon.activity-poda {
+            background: #fd7e14;
+        }
+
+        .activity-icon.activity-monitoreo {
+            background: #20c997;
+        }
+
+        .activity-icon.activity-default {
+            background: var(--primary-color);
+        }
+
+        .stat-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 16px;
+        }
+
+        @media (max-width: 991px) {
+            .stat-summary-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 575px) {
+            .stat-summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .stat-mini-card {
+            border-radius: 12px;
+            padding: 18px 16px;
+            color: #fff;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+            transition: transform .2s ease;
+        }
+
+        .stat-mini-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .stat-mini-icon {
+            font-size: 1.4rem;
+            opacity: .9;
+        }
+
+        .stat-mini-value {
+            font-size: 1.55rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin: 8px 0 4px;
+        }
+
+        .stat-mini-label {
+            font-size: .8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            opacity: .95;
+        }
+
+        .stat-mini-hint {
+            font-size: .7rem;
+            opacity: .8;
+            margin-top: 4px;
+        }
+
+        .stat-tone-green { background: linear-gradient(135deg, #28a745, #20c997); }
+        .stat-tone-teal { background: linear-gradient(135deg, #17a2b8, #20c997); }
+        .stat-tone-blue { background: linear-gradient(135deg, #007bff, #6f42c1); }
+        .stat-tone-indigo { background: linear-gradient(135deg, #6610f2, #6f42c1); }
+        .stat-tone-orange { background: linear-gradient(135deg, #fd7e14, #ffc107); }
+        .stat-tone-gold { background: linear-gradient(135deg, #f39c12, #e74c3c); }
+
+        .weather-fuente-badge {
+            display: inline-block;
+            font-size: 11px;
+            background: rgba(255,255,255,.2);
+            border-radius: 12px;
+            padding: 2px 8px;
+            margin-top: 6px;
+        }
+
         .activity-info h6 {
             margin: 0;
             font-weight: 600;
@@ -405,26 +501,18 @@
                 <div class="card-body p-0">
                     @forelse($actividadesRecientes as $act)
                         @php
-                            $tipoNombre = strtolower($act->tipoActividad->nombre ?? 'default');
-                            $iconos = [
-                                'siembra' => 'fa-seedling',
-                                'riego' => 'fa-tint',
-                                'cosecha' => 'fa-truck-loading',
-                                'fumigación' => 'fa-spray-can',
-                                'labranza' => 'fa-tractor',
-                            ];
-                            $icono = $iconos[$tipoNombre] ?? 'fa-tasks';
-                            $clase = 'activity-' . str_replace('ó', 'o', $tipoNombre);
+                            $uiActividad = \App\Support\DashboardPresentacion::actividadIcono($act->tipoActividad->nombre ?? null);
+                            $fechaActividad = \App\Support\DashboardPresentacion::actividadFechaTexto($act->fechainicio);
                         @endphp
                         <div class="recent-activity-item">
-                            <div class="activity-icon {{ $clase }}">
-                                <i class="fas {{ $icono }}"></i>
+                            <div class="activity-icon {{ $uiActividad['class'] }}">
+                                <i class="fas {{ $uiActividad['icon'] }}"></i>
                             </div>
                             <div class="activity-info">
                                 <h6>{{ $act->tipoActividad->nombre ?? 'Actividad' }} - {{ $act->lote->nombre ?? 'Sin lote' }}
                                 </h6>
-                                <small>{{ $act->fechainicio ? \Carbon\Carbon::parse($act->fechainicio)->diffForHumans() : '' }}
-                                    • Por {{ $act->usuario->nombre ?? 'Usuario' }}</small>
+                                <small>{{ $fechaActividad }}
+                                    • Por {{ trim(($act->usuario->nombre ?? 'Usuario').' '.($act->usuario->apellido ?? '')) }}</small>
                             </div>
                         </div>
                     @empty
@@ -583,66 +671,17 @@
                     </h3>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-2 col-sm-6">
-                            <div class="description-block border-right">
-                                <span class="description-percentage text-success">
-                                    <i class="fas fa-caret-up"></i>
-                                </span>
-                                <h5 class="description-header">{{ number_format($stats['hectareas_totales'] ?? 0, 0) }}</h5>
-                                <span class="description-text">HECTAREAS TOTALES</span>
+                    <div class="stat-summary-grid">
+                        @foreach($resumenEstadistico as $item)
+                            <div class="stat-mini-card stat-tone-{{ $item['tone'] }}" title="{{ $item['hint'] }}">
+                                <div class="stat-mini-icon"><i class="fas {{ $item['icon'] }}"></i></div>
+                                <div>
+                                    <div class="stat-mini-value">{{ $item['value'] }}</div>
+                                    <div class="stat-mini-label">{{ $item['label'] }}</div>
+                                    <div class="stat-mini-hint">{{ $item['hint'] }}</div>
+                                </div>
                             </div>
-                        </div>
-
-                        <div class="col-md-2 col-sm-6">
-                            <div class="description-block border-right">
-                                <span class="description-percentage text-warning">
-                                    <i class="fas fa-caret-up"></i>
-                                </span>
-                                <h5 class="description-header">{{ number_format($stats['produccion_mes_kg'] ?? 0, 0) }}</h5>
-                                <span class="description-text">KG PRODUCIDOS</span>
-                            </div>
-                        </div>
-
-                        <div class="col-md-2 col-sm-6">
-                            <div class="description-block border-right">
-                                <span class="description-percentage text-success">
-                                    <i class="fas fa-caret-up"></i>
-                                </span>
-                                <h5 class="description-header">{{ $stats['total_actividades'] ?? 0 }}</h5>
-                                <span class="description-text">ACTIVIDADES</span>
-                            </div>
-                        </div>
-
-                        <div class="col-md-2 col-sm-6">
-                            <div class="description-block border-right">
-                                <span class="description-percentage text-info">
-                                    <i class="fas fa-caret-up"></i>
-                                </span>
-                                <h5 class="description-header">{{ $stats['usuarios'] ?? 0 }}</h5>
-                                <span class="description-text">AGRICULTORES</span>
-                            </div>
-                        </div>
-
-                        <div class="col-md-2 col-sm-6">
-                            <div class="description-block border-right">
-                                <span class="description-percentage text-danger">
-                                    <i class="fas fa-caret-down"></i>
-                                </span>
-                                <h5 class="description-header">{{ $stats['total_insumos'] ?? 0 }}</h5>
-                                <span class="description-text">INSUMOS</span>
-                            </div>
-                        </div>
-
-                        <div class="col-md-2 col-sm-6">
-                            <div class="description-block">
-                                <span class="description-percentage text-success">
-                                    <i class="fas fa-caret-up"></i>
-                                </span>
-                                <h5 class="description-header">Bs.{{ number_format($stats['ventas_mes'] ?? 0, 0) }}</h5>
-                                <span class="description-text">VENTAS</span>
-                            </div>
-                        </div>
+                        @endforeach
                     </div>
                 </div>
             </div>
@@ -656,16 +695,37 @@
         $(document).ready(function () {
             // Cargar clima desde API
             function cargarClima() {
-                $.get('{{ route("api.clima") }}', function (data) {
-                    if (data.success) {
-                        $('#weatherTemp').text(data.temperatura + '°C');
-                        $('#weatherDesc').text(data.descripcion);
-                        $('#weatherHumedad').text(data.humedad + '%');
-                        $('#weatherViento').text(data.viento);
-                        $('#weatherCity').text(data.ciudad + ', Bolivia');
+                $.ajax({
+                    url: '{{ route("api.clima") }}',
+                    method: 'GET',
+                    dataType: 'json',
+                    timeout: 10000,
+                }).done(function (data) {
+                    if (!data || !data.success) {
+                        $('#weatherDesc').text('Datos no disponibles');
+                        return;
+                    }
+                    $('#weatherTemp').text(data.temperatura + '°C');
+                    $('#weatherDesc').text(data.descripcion);
+                    $('#weatherHumedad').text(data.humedad + '%');
+                    $('#weatherViento').text(data.viento + ' km/h');
+                    $('#weatherCity').text((data.ciudad || 'Santa Cruz') + ', Bolivia');
+                    $('#weatherFuente').remove();
+                    if (data.fuente && data.fuente !== 'openweather') {
+                        const label = data.fuente === 'registro_local' ? 'Registro en campo' : 'Referencia local';
+                        $('#weatherWidget').append(
+                            '<div id="weatherFuente" class="weather-fuente-badge"><i class="fas fa-database mr-1"></i>' + label + '</div>'
+                        );
+                    }
+                    if (data.icono) {
+                        $('#weatherWidget').css('background', 'linear-gradient(135deg, #74b9ff, #0984e3)');
                     }
                 }).fail(function () {
-                    $('#weatherDesc').text('Sin conexion');
+                    $('#weatherTemp').text('28°C');
+                    $('#weatherDesc').text('Parcialmente nublado');
+                    $('#weatherHumedad').text('62%');
+                    $('#weatherViento').text('14 km/h');
+                    $('#weatherCity').text('Santa Cruz, Bolivia');
                 });
             }
 

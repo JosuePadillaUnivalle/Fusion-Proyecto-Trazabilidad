@@ -9,24 +9,57 @@ use App\Models\HistorialEstadoLote;
 use App\Models\Lote;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class CertificacionController extends Controller
 {
     public function index(): View
     {
-        $lotes = Lote::query()
+        $certificadosIds = CertificacionLote::query()->pluck('loteid');
+
+        $lotesPendientes = Lote::query()
             ->with(['cultivo', 'estadoTipo', 'usuario'])
+            ->whereNotIn('loteid', $certificadosIds)
             ->orderByDesc('loteid')
             ->get();
 
         $certificados = CertificacionLote::query()
-            ->with(['lote', 'usuario'])
+            ->with([
+                'lote.cultivo',
+                'lote.estadoTipo',
+                'lote.unidadSuperficie',
+                'lote.actorAbastecimiento',
+                'usuario',
+            ])
             ->orderByDesc('fecha_certificacion')
             ->limit(50)
             ->get();
 
-        return view('certificaciones.index', compact('lotes', 'certificados'));
+        $stats = [
+            'pendientes' => $lotesPendientes->count(),
+            'certificados' => $certificados->count(),
+            'total_lotes' => Lote::count(),
+        ];
+
+        return view('certificaciones.index', compact(
+            'lotesPendientes',
+            'certificados',
+            'stats'
+        ));
+    }
+
+    public function show(CertificacionLote $certificacion): View
+    {
+        $certificacion->load([
+            'lote.cultivo',
+            'lote.estadoTipo',
+            'lote.unidadSuperficie',
+            'lote.actorAbastecimiento',
+            'usuario',
+        ]);
+
+        return view('certificaciones.show', ['cert' => $certificacion]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -36,7 +69,63 @@ class CertificacionController extends Controller
             'observaciones' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $lote = Lote::query()->findOrFail($validated['loteid']);
+        $this->certificarLote(
+            (int) $validated['loteid'],
+            $validated['observaciones'] ?? null
+        );
+
+        return redirect()
+            ->route('certificaciones.index')
+            ->with('success', 'Lote certificado correctamente.');
+    }
+
+    public function storeBulk(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'modo' => ['required', 'in:seleccion,todos'],
+            'loteids' => ['required_if:modo,seleccion', 'array'],
+            'loteids.*' => ['integer', 'exists:lote,loteid'],
+            'observaciones' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $observaciones = $validated['observaciones'] ?? null;
+
+        if ($validated['modo'] === 'todos') {
+            $yaCertificados = CertificacionLote::query()->pluck('loteid');
+            $loteIds = Lote::query()
+                ->whereNotIn('loteid', $yaCertificados)
+                ->pluck('loteid')
+                ->all();
+        } else {
+            $loteIds = array_map('intval', $validated['loteids'] ?? []);
+        }
+
+        if ($loteIds === []) {
+            return redirect()
+                ->route('certificaciones.index')
+                ->with('success', 'No hay lotes pendientes por certificar.');
+        }
+
+        $certificados = 0;
+
+        DB::transaction(function () use ($loteIds, $observaciones, &$certificados) {
+            foreach ($loteIds as $loteId) {
+                if (CertificacionLote::where('loteid', $loteId)->exists()) {
+                    continue;
+                }
+                $this->certificarLote($loteId, $observaciones);
+                $certificados++;
+            }
+        });
+
+        return redirect()
+            ->route('certificaciones.index')
+            ->with('success', "Se certificaron {$certificados} lote(s) correctamente.");
+    }
+
+    private function certificarLote(int $loteId, ?string $observaciones): CertificacionLote
+    {
+        $lote = Lote::query()->findOrFail($loteId);
         $estadoCertificado = EstadoLoteTipo::firstOrCreate(
             ['nombre' => 'Certificado'],
             ['descripcion' => 'Lote validado para despacho y trazabilidad']
@@ -50,7 +139,7 @@ class CertificacionController extends Controller
             [
                 'usuarioid' => $usuarioId,
                 'codigo_certificado' => $codigo,
-                'observaciones' => $validated['observaciones'] ?? null,
+                'observaciones' => $observaciones,
                 'fecha_certificacion' => now(),
             ]
         );
@@ -65,9 +154,6 @@ class CertificacionController extends Controller
             'usuarioid' => $usuarioId,
         ]);
 
-        return redirect()
-            ->route('certificaciones.index')
-            ->with('success', 'Lote certificado correctamente.');
+        return $certificacion;
     }
 }
-

@@ -240,11 +240,13 @@
             const searchInput = document.getElementById('inputBuscarEnvio');
             const filterCards = document.querySelectorAll('.filter-card');
 
+            const FETCH_OPTS = { credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } };
+
             const STATUS_GROUPS = {
                 pendientes: (estado) => ['pendiente', 'sin estado', 'sin asignar'].includes(estado),
                 asignados: (estado) => ['asignado'].includes(estado),
-                curso: (estado) => ['en curso'].includes(estado),
-                parcial: (estado) => ['parcialmente entregado'].includes(estado),
+                curso: (estado) => ['en curso', 'en_ruta', 'en ruta'].includes(estado),
+                parcial: (estado) => ['parcialmente entregado', 'parcial'].includes(estado),
                 completados: (estado) => ['entregado', 'finalizado', 'completado'].includes(estado),
                 todos: () => true
             };
@@ -255,11 +257,20 @@
                 'sin asignar': { label: 'Pendiente', badge: 'badge-warning' },
                 'asignado': { label: 'Asignado', badge: 'badge-info' },
                 'en curso': { label: 'En curso', badge: 'badge-primary' },
+                'en_ruta': { label: 'En curso', badge: 'badge-primary' },
+                'en ruta': { label: 'En curso', badge: 'badge-primary' },
                 'parcialmente entregado': { label: 'Parcial', badge: 'badge-orange' },
+                'parcial': { label: 'Parcial', badge: 'badge-orange' },
                 'entregado': { label: 'Completado', badge: 'badge-success' },
                 'finalizado': { label: 'Completado', badge: 'badge-success' },
                 'completado': { label: 'Completado', badge: 'badge-success' },
             };
+
+            function normalizarListaEnvios(payload) {
+                if (Array.isArray(payload)) return payload;
+                if (payload && Array.isArray(payload.data)) return payload.data;
+                return [];
+            }
 
             // Event listeners
             filterCards.forEach(card => {
@@ -284,14 +295,21 @@
             async function verificarConexion() {
                 try {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+                    const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-                    const res = await fetch(`${LOCAL_API_URL}/tipo-transporte`, {
-                        signal: controller.signal
+                    const res = await fetch(`${LOCAL_API_URL}/ping`, {
+                        ...FETCH_OPTS,
+                        signal: controller.signal,
+                        cache: 'no-store',
                     });
 
                     clearTimeout(timeoutId);
-                    conectado = res.ok;
+                    if (res.ok) {
+                        const body = await res.json().catch(() => ({}));
+                        conectado = body?.ok === true || res.ok;
+                    } else {
+                        conectado = false;
+                    }
                 } catch (e) {
                     conectado = false;
                 }
@@ -397,38 +415,32 @@
             async function fetchEnvios() {
                 grid.innerHTML = '<div class="col-12 text-center text-muted py-5"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando envíos...</div>';
 
-                // Verificar conexión primero
                 await verificarConexion();
 
                 if (conectado) {
                     try {
-                        const res = await fetch(`${LOCAL_API_URL}/envios`);
+                        const res = await fetch(`${LOCAL_API_URL}/envios`, { ...FETCH_OPTS, cache: 'no-store' });
                         if (!res.ok) throw new Error('No se pudieron cargar los envíos');
 
                         const data = await res.json();
-                        envios = Array.isArray(data) ? data : [];
+                        envios = normalizarListaEnvios(data);
 
-                        // Guardar en cache
-                        guardarEnCache(envios);
-
+                        if (envios.length) {
+                            guardarEnCache(envios);
+                        }
                     } catch (error) {
                         console.error('Error cargando envíos:', error);
-                        conectado = false;
-                        actualizarIndicador();
-
-                        // Intentar cargar desde cache
                         const cached = obtenerDeCache();
-                        if (cached) {
+                        if (cached?.length) {
                             envios = cached;
                         } else {
-                    grid.innerHTML = `<div class="col-12 text-center text-danger py-5"><i class="fas fa-exclamation-triangle mr-2"></i>Sin conexión y sin datos en caché local.</div>`;
+                            grid.innerHTML = `<div class="col-12 text-center text-danger py-5"><i class="fas fa-exclamation-triangle mr-2"></i>No se pudieron cargar los envíos. <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="verificarConexion()">Reintentar</button></div>`;
                             return;
                         }
                     }
                 } else {
-                    // Modo offline - cargar desde cache
                     const cached = obtenerDeCache();
-                    if (cached) {
+                    if (cached?.length) {
                         envios = cached;
                     } else {
                         grid.innerHTML = `<div class="col-12 text-center text-warning py-5"><i class="fas fa-wifi-slash mr-2"></i>Sin conexión. No hay envíos guardados en caché local.</div>`;
@@ -491,7 +503,7 @@
                             <div class="card-header">
                                 <h5 class="card-title mb-0" style="width: 100%;">
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <strong>#${envio.id}</strong>
+                                        <strong>${envio.externo_envio_id || ('#' + envio.id)}</strong>
                                         ${envio.numero_solicitud ? `<span class="badge badge-light border ml-2">${envio.numero_solicitud}</span>` : ''}
                                         <span class="badge ${meta.badge} ml-auto">${meta.label}</span>
                                     </div>
@@ -561,19 +573,22 @@
                 }
             };
 
-            // Verificar conexión cada 30 segundos
+            // Reconexión automática cada 15 s
             setInterval(async () => {
                 const wasOffline = !conectado;
                 await verificarConexion();
                 if (wasOffline && conectado) {
-                    // Si recuperamos conexión, recargar datos
                     fetchEnvios();
                 }
-            }, 30000);
+            }, 15000);
+
+            window.addEventListener('online', () => {
+                verificarConexion().then((ok) => { if (ok) fetchEnvios(); });
+            });
 
             // Inicializar
             cargarEnviosLocales();
-            fetchEnvios();
+            verificarConexion().then(() => fetchEnvios());
         })();
     </script>
 @endpush
