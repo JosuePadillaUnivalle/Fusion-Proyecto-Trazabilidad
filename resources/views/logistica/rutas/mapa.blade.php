@@ -1,10 +1,10 @@
 @extends('layouts.app')
 @push('styles')
 @include('logistica.partials.ayuda-logistica-styles')
-@include('logistica.partials.mapa-ruta-scripts')
+@include('logistica.partials.mapa-ruta-styles')
 <style>
 .x-card{border:0;border-radius:14px;box-shadow:0 8px 24px rgba(18,38,63,.08)}
-#mapaRutaEntrega { height: 520px; }
+#mapaRutaEntrega { height: 520px; min-height: 520px; }
 .envio-mapa-item { cursor: pointer; }
 .envio-mapa-item.active { background: #e8f5e9; }
 </style>
@@ -75,11 +75,15 @@
 </section>
 
 @push('scripts')
+@include('logistica.partials.mapa-ruta-libs')
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+function iniciarMapaEnvios() {
     const envios = @json($enviosMapa->values());
     const conCoords = envios.filter(e => e.lat && e.lng);
-    const map = L.map('mapaRutaEntrega').setView([-16.5, -68.15], 11);
+    const el = document.getElementById('mapaRutaEntrega');
+    if (!el || !window.L) return;
+    const map = L.map(el).setView([-16.5, -68.15], 11);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OSM' }).addTo(map);
     const markers = {};
     const bounds = [];
@@ -152,6 +156,16 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionStorage.setItem('ruta_desde_mapa', JSON.stringify(seleccion));
         window.location.href = @json(route('logistica.rutas.create'));
     });
+    setTimeout(() => map.invalidateSize(), 150);
+}
+if (window.L) iniciarMapaEnvios();
+else {
+    let n = 0;
+    const t = setInterval(() => {
+        if (window.L) { clearInterval(t); iniciarMapaEnvios(); }
+        else if (++n > 80) clearInterval(t);
+    }, 50);
+}
 });
 </script>
 @endpush

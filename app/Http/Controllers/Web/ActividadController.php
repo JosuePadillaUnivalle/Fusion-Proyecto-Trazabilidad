@@ -15,13 +15,50 @@ use Illuminate\Support\Facades\DB;
 
 class ActividadController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $actividades = Actividad::with(['lote', 'usuario', 'tipoActividad', 'prioridad'])
-            ->orderBy('actividadid', 'desc')
-            ->paginate(15);
+        $query = Actividad::query()->with(['lote.cultivo', 'usuario', 'tipoActividad', 'prioridad']);
 
-        return view('actividades.index', compact('actividades'));
+        if ($request->filled('q')) {
+            $term = '%'.trim((string) $request->q).'%';
+            $query->where(function ($sub) use ($term) {
+                $sub->where('descripcion', 'like', $term)
+                    ->orWhereHas('lote', fn ($l) => $l->where('nombre', 'like', $term))
+                    ->orWhereHas('tipoActividad', fn ($t) => $t->where('nombre', 'like', $term))
+                    ->orWhereHas('usuario', fn ($u) => $u->where('nombre', 'like', $term));
+            });
+        }
+
+        if ($request->filled('estado')) {
+            if ($request->estado === 'pendiente') {
+                $query->whereNull('fechafin');
+            } elseif ($request->estado === 'completada') {
+                $query->whereNotNull('fechafin');
+            }
+        }
+
+        if ($request->filled('loteid')) {
+            $query->where('loteid', (int) $request->loteid);
+        }
+
+        if ($request->filled('tipoactividadid')) {
+            $query->where('tipoactividadid', (int) $request->tipoactividadid);
+        }
+
+        $stats = [
+            'total' => Actividad::count(),
+            'pendientes' => Actividad::whereNull('fechafin')->count(),
+            'completadas' => Actividad::whereNotNull('fechafin')->count(),
+            'hoy' => Actividad::whereDate('fechainicio', now()->toDateString())->count(),
+        ];
+
+        $actividades = $query->orderByDesc('actividadid')->paginate(15)->withQueryString();
+
+        $filtros = $request->only(['q', 'estado', 'loteid', 'tipoactividadid']);
+        $lotes = Lote::orderBy('nombre')->get(['loteid', 'nombre']);
+        $tiposActividad = TipoActividad::orderBy('nombre')->get();
+
+        return view('actividades.index', compact('actividades', 'stats', 'filtros', 'lotes', 'tiposActividad'));
     }
 
     /**

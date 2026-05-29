@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @push('styles')
 @include('logistica.partials.ayuda-logistica-styles')
-@include('logistica.partials.mapa-ruta-scripts')
+@include('logistica.partials.mapa-ruta-styles')
 <style>.x-card{border:0;border-radius:14px;box-shadow:0 8px 24px rgba(18,38,63,.08)}</style>
 @endpush
 
@@ -72,11 +72,16 @@
 </section>
 
 @push('scripts')
+@include('logistica.partials.mapa-ruta-libs')
 <script>
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
+function iniciarPreview() {
+(async () => {
     const paradas = @json($puntos->filter(fn($p) => $p['lat'] && $p['lng'])->values());
     const geoGuardado = @json($geo);
-    const map = L.map('mapaRutaEntrega').setView([-16.5, -68.15], 11);
+    const el = document.getElementById('mapaRutaEntrega');
+    if (!el || !window.L) return;
+    const map = L.map(el).setView([-16.5, -68.15], 11);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OSM' }).addTo(map);
     const capas = L.layerGroup().addTo(map);
     let routeResult = geoGuardado ? { geojson: geoGuardado, straight: geoGuardado?.features?.[0]?.properties?.provider === 'straight' } : null;
@@ -84,6 +89,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         routeResult = await RutaPorCalles.fetchRoute(paradas);
     }
     RutaPorCalles.drawOnMap(map, capas, paradas, routeResult);
+    setTimeout(() => map.invalidateSize(), 150);
+})();
+}
+if (window.L && window.RutaPorCalles) iniciarPreview();
+else {
+    let n = 0;
+    const t = setInterval(() => {
+        if (window.L && window.RutaPorCalles) { clearInterval(t); iniciarPreview(); }
+        else if (++n > 80) clearInterval(t);
+    }, 50);
+}
 });
 </script>
 @endpush

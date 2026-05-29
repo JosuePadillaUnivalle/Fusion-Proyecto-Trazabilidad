@@ -35,7 +35,7 @@ class CertificacionController extends Controller
         $stats = [
             'pendientes'   => $lotesPendientes->count(),
             'certificados' => count($lotesCertificadosIds),
-            'total'        => $todosLotes->count(),
+            'total_lotes'  => $todosLotes->count(),
         ];
 
         return view('certificaciones.index', compact('lotesPendientes', 'certificados', 'stats'));

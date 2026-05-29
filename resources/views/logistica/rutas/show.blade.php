@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @push('styles')
 @include('logistica.partials.ayuda-logistica-styles')
-@include('logistica.partials.mapa-ruta-scripts')
+@include('logistica.partials.mapa-ruta-styles')
 <style>
 .x-card{border:0;border-radius:14px;box-shadow:0 8px 24px rgba(18,38,63,.08)}
 .x-table thead th{background:#f2f7f3;border-bottom:0}
@@ -123,11 +123,16 @@
 </section>
 @if(count($paradasMapa) >= 1)
 @push('scripts')
+@include('logistica.partials.mapa-ruta-libs')
 <script>
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
+function iniciarMapaRuta() {
+(async () => {
     const paradas = @json($paradasMapa);
     const urlTrazado = @json(route('logistica.rutas.trazado', $ruta));
-    const map = L.map('mapaRutaEntrega').setView([paradas[0].lat, paradas[0].lng], 12);
+    const el = document.getElementById('mapaRutaEntrega');
+    if (!el || !window.L) return;
+    const map = L.map(el).setView([paradas[0].lat, paradas[0].lng], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OSM' }).addTo(map);
     const capas = L.layerGroup().addTo(map);
     let routeResult = null;
@@ -147,6 +152,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         routeResult = await RutaPorCalles.fetchRoute(paradas);
     }
     RutaPorCalles.drawOnMap(map, capas, paradas, routeResult);
+    setTimeout(() => map.invalidateSize(), 150);
+})();
+}
+if (window.L && window.RutaPorCalles) iniciarMapaRuta();
+else {
+    let n = 0;
+    const t = setInterval(() => {
+        if (window.L && window.RutaPorCalles) { clearInterval(t); iniciarMapaRuta(); }
+        else if (++n > 80) clearInterval(t);
+    }, 50);
+}
 });
 </script>
 @endpush

@@ -13,11 +13,40 @@ class ProduccionAlmacenamientoController extends Controller
 {
     public function index()
     {
-        $registros = ProduccionAlmacenamiento::with(['produccion', 'almacen', 'unidadMedida'])
-            ->orderBy('produccionalmacenamientoid', 'desc')
+        $q = ProduccionAlmacenamiento::query();
+
+        $stats = [
+            'total' => (clone $q)->count(),
+            'almacenes' => (clone $q)->distinct()->count('almacenid'),
+            'producciones' => (clone $q)->distinct()->count('produccionid'),
+            'cantidad_total' => (float) (clone $q)->sum('cantidad'),
+            'temp_alta' => (clone $q)->where('temperatura', '>', 25)->count(),
+        ];
+
+        $almacenesFiltro = (clone $q)
+            ->join('almacen', 'produccionalmacenamiento.almacenid', '=', 'almacen.almacenid')
+            ->distinct()
+            ->orderBy('almacen.nombre')
+            ->pluck('almacen.nombre');
+
+        $unidadesFiltro = (clone $q)
+            ->join('unidadmedida', 'produccionalmacenamiento.unidadmedidaid', '=', 'unidadmedida.unidadmedidaid')
+            ->whereNotNull('produccionalmacenamiento.unidadmedidaid')
+            ->distinct()
+            ->orderBy('unidadmedida.nombre')
+            ->pluck('unidadmedida.nombre');
+
+        $registros = ProduccionAlmacenamiento::with(['produccion.lote', 'almacen', 'unidadMedida'])
+            ->orderByDesc('fechaentrada')
+            ->orderByDesc('produccionalmacenamientoid')
             ->paginate(15);
 
-        return view('producciones_almacenamiento.index', compact('registros'));
+        return view('producciones_almacenamiento.index', compact(
+            'registros',
+            'stats',
+            'almacenesFiltro',
+            'unidadesFiltro'
+        ));
     }
 
     public function create()

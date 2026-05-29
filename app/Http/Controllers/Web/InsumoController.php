@@ -22,9 +22,18 @@ class InsumoController extends Controller
                 $q->whereRaw('0 = 1');
             }
         }
+        $stats = [
+            'total' => (clone $q)->count(),
+            'stock_bajo' => (clone $q)->whereColumn('stock', '<=', 'stockminimo')->count(),
+            'categorias' => (clone $q)->distinct()->count('tipoinsumoid'),
+            'valor_total' => (float) (clone $q)->selectRaw(
+                'COALESCE(SUM(stock * COALESCE(preciounitario, 0)), 0) as valor'
+            )->value('valor'),
+        ];
+
         $insumos = $q->paginate(15);
 
-        return view('insumos.index', compact('insumos'));
+        return view('insumos.index', compact('insumos', 'stats'));
     }
 
     public function create()

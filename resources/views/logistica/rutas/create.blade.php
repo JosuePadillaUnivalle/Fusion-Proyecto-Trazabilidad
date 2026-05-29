@@ -1,14 +1,24 @@
 @extends('layouts.app')
 @push('styles')
 @include('logistica.partials.ayuda-logistica-styles')
-@include('logistica.partials.mapa-ruta-scripts')
+@include('logistica.partials.mapa-ruta-styles')
 <style>
 .x-card{border:0;border-radius:14px;box-shadow:0 8px 24px rgba(18,38,63,.08)}
 .section-title{font-weight:700;color:#2c5530}
 .envio-pick-row:hover{background:#f8fafc}
-#mapaRutaEntrega { height: 360px; }
 </style>
 @endpush
+
+@php
+    $enviosMapaJson = $enviosParaRuta->map(function ($env) {
+        return [
+            'codigo' => $env->externo_envio_id,
+            'destino' => $env->pedido?->nombre_planta ?: $env->pedido?->direccion_texto,
+            'lat' => $env->pedido?->latitud ? (float) $env->pedido->latitud : null,
+            'lng' => $env->pedido?->longitud ? (float) $env->pedido->longitud : null,
+        ];
+    })->values();
+@endphp
 
 @section('content')
 <div class="content-header">
@@ -118,7 +128,7 @@
                     <hr>
                     <h5 class="section-title"><i class="fas fa-map mr-1"></i> Vista previa del recorrido</h5>
                     <div id="mapaRutaEntrega" class="mb-3"></div>
-                    <p class="ruta-mapa-leyenda mb-3">Seleccione envíos o agregue paradas para ver la ruta por calles.</p>
+                    <p class="ruta-mapa-leyenda mb-3">El mapa muestra los envíos con ubicación (puntos grises). Marque envíos arriba para trazar la ruta por calles.</p>
 
                     <h5 class="section-title"><i class="fas fa-map-pin mr-1"></i> Paradas del recorrido</h5>
                     <p class="text-muted small mb-2">
@@ -168,30 +178,95 @@
 </section>
 
 @push('scripts')
+@include('logistica.partials.mapa-ruta-libs')
 <script>
+document.addEventListener('DOMContentLoaded', () => {
 (() => {
+    const enviosCatalogo = @json($enviosMapaJson);
+    const hub = { lat: -16.5, lng: -68.15 };
     let mapaRuta = null;
     let capasRuta = null;
-    function initMapaRuta() {
-        if (mapaRuta || !document.getElementById('mapaRutaEntrega')) return;
-        mapaRuta = L.map('mapaRutaEntrega').setView([-16.5, -68.15], 11);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OSM' }).addTo(mapaRuta);
-        capasRuta = L.layerGroup().addTo(mapaRuta);
-    }
-    async function actualizarMapaDesdeParadas() {
-        initMapaRuta();
-        if (!capasRuta) return;
-        const puntos = [];
-        document.querySelectorAll('.envio-ruta-check:checked').forEach(c => {
-            const lat = parseFloat(c.dataset.lat), lng = parseFloat(c.dataset.lng);
-            if (!isNaN(lat) && !isNaN(lng)) {
-                puntos.push({ lat, lng, orden: puntos.length + 1, label: c.dataset.destino || c.dataset.codigo });
-            }
-        });
-        if (puntos.length < 2) {
-            capasRuta.clearLayers();
+
+    function esperarMapaLibs(cb, intentos = 0) {
+        if (window.L && window.RutaPorCalles) {
+            cb();
             return;
         }
+        if (intentos > 80) {
+            console.error('No se pudo cargar Leaflet / RutaPorCalles');
+            return;
+        }
+        setTimeout(() => esperarMapaLibs(cb, intentos + 1), 50);
+    }
+
+    function initMapaRuta() {
+        const el = document.getElementById('mapaRutaEntrega');
+        if (!el || mapaRuta) return mapaRuta;
+        mapaRuta = L.map(el, { scrollWheelZoom: true }).setView([hub.lat, hub.lng], 11);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap',
+        }).addTo(mapaRuta);
+        capasRuta = L.layerGroup().addTo(mapaRuta);
+        setTimeout(() => mapaRuta.invalidateSize(), 150);
+        return mapaRuta;
+    }
+
+    function puntosSeleccionados() {
+        const puntos = [];
+        const vistos = new Set();
+        document.querySelectorAll('.envio-ruta-check:checked').forEach(c => {
+            const lat = parseFloat(c.dataset.lat);
+            const lng = parseFloat(c.dataset.lng);
+            const codigo = c.dataset.codigo || '';
+            if (!isNaN(lat) && !isNaN(lng) && !vistos.has(codigo)) {
+                vistos.add(codigo);
+                puntos.push({
+                    lat,
+                    lng,
+                    orden: puntos.length + 1,
+                    label: c.dataset.destino || codigo,
+                });
+            }
+        });
+        return puntos;
+    }
+
+    async function actualizarMapaDesdeParadas() {
+        initMapaRuta();
+        if (!capasRuta || !mapaRuta) return;
+
+        const puntos = puntosSeleccionados();
+
+        if (puntos.length === 0) {
+            capasRuta.clearLayers();
+            enviosCatalogo.filter(e => e.lat && e.lng).forEach(e => {
+                L.circleMarker([e.lat, e.lng], {
+                    radius: 6,
+                    color: '#94a3b8',
+                    fillColor: '#cbd5e1',
+                    fillOpacity: 0.85,
+                    weight: 2,
+                }).bindPopup(`<strong>${e.codigo}</strong><br>${e.destino || ''}<br><em>Seleccione para incluir en la ruta</em>`)
+                    .addTo(capasRuta);
+            });
+            const conUbicacion = enviosCatalogo.filter(e => e.lat && e.lng);
+            if (conUbicacion.length) {
+                const bounds = L.latLngBounds(conUbicacion.map(e => [e.lat, e.lng]));
+                mapaRuta.fitBounds(bounds.pad(0.15));
+            } else {
+                mapaRuta.setView([hub.lat, hub.lng], 11);
+            }
+            return;
+        }
+
+        if (puntos.length === 1) {
+            capasRuta.clearLayers();
+            RutaPorCalles.drawOnMap(mapaRuta, capasRuta, puntos, null);
+            mapaRuta.setView([puntos[0].lat, puntos[0].lng], 14);
+            return;
+        }
+
         const routeResult = await RutaPorCalles.fetchRoute(puntos);
         RutaPorCalles.drawOnMap(mapaRuta, capasRuta, puntos, routeResult);
     }
@@ -312,7 +387,13 @@
             }
         });
     });
+
+    esperarMapaLibs(() => {
+        initMapaRuta();
+        actualizarMapaDesdeParadas();
+    });
 })();
+});
 </script>
 @endpush
 @endsection
