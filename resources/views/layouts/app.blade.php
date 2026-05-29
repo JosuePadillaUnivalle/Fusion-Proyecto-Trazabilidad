@@ -351,7 +351,7 @@
                                 <li class="nav-item">
                                     <a href="{{ route('producciones.index') }}"
                                         class="nav-link {{ request()->routeIs('producciones.*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
+                                        <i class="nav-icon fas fa-tractor"></i>
                                         <p>Registro de producción</p>
                                     </a>
                                 </li>
@@ -359,7 +359,7 @@
                                 <li class="nav-item">
                                     <a href="{{ route('climas.index') }}"
                                         class="nav-link {{ request()->routeIs('climas.*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
+                                        <i class="nav-icon fas fa-cloud-sun"></i>
                                         <p>Clima</p>
                                     </a>
                                 </li>
@@ -367,14 +367,14 @@
                                 <li class="nav-item">
                                     <a href="{{ route('procesos-planta.index') }}"
                                         class="nav-link {{ request()->routeIs('procesos-planta.*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
+                                        <i class="nav-icon fas fa-industry"></i>
                                         <p>Procesos de planta</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">
                                     <a href="{{ route('maquinas-planta.index') }}"
                                         class="nav-link {{ request()->routeIs('maquinas-planta.*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
+                                        <i class="nav-icon fas fa-cogs"></i>
                                         <p>Máquinas de planta</p>
                                     </a>
                                 </li>

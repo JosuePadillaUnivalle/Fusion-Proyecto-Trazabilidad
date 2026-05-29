@@ -1,509 +1,424 @@
 @extends('layouts.app')
 
 @section('title', 'Clima | Fusion-Proyectos')
-@section('page_title', 'Información Climática')
+@section('page_title', 'Información climática')
 
 @section('breadcrumbs')
-    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}" style="color: #2c5530;">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
     <li class="breadcrumb-item active">Clima</li>
 @endsection
 
 @push('styles')
-    <style>
-        :root {
-            --primary-color: #2c5530;
-            --secondary-color: #4a7c59;
-        }
-
-        /* Cards estilo dashboard */
-        .small-box {
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(0, 0, 0, 0.05);
-            transition: transform 0.3s ease;
-        }
-
-        .small-box:hover {
-            transform: translateY(-2px);
-        }
-
-        .small-box .icon {
-            font-size: 70px !important;
-        }
-
-        .small-box-green {
-            background: linear-gradient(135deg, #28a745, #34ce57) !important;
-        }
-
-        .small-box-blue {
-            background: linear-gradient(135deg, #17a2b8, #20c997) !important;
-        }
-
-        .small-box-yellow {
-            background: linear-gradient(135deg, #ffc107, #ffca2c) !important;
-        }
-
-        .small-box-red {
-            background: linear-gradient(135deg, #dc3545, #e74a3b) !important;
-        }
-
-        /* Widget clima principal */
-        .weather-widget {
-            background: linear-gradient(135deg, #74b9ff, #0984e3);
-            color: white;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            margin-bottom: 20px;
-        }
-
-        .weather-widget.night {
-            background: linear-gradient(135deg, #2d3436, #636e72);
-        }
-
-        .weather-temp {
-            font-size: 72px;
-            font-weight: 300;
-            line-height: 1;
-        }
-
-        .weather-icon img {
-            width: 120px;
-            height: 120px;
-            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-        }
-
-        .weather-desc {
-            font-size: 1.3rem;
-            text-transform: capitalize;
-            opacity: 0.95;
-        }
-
-        .weather-details {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .weather-detail-item {
-            text-align: center;
-        }
-
-        .weather-detail-item i {
-            font-size: 1.5rem;
-            margin-bottom: 5px;
-            opacity: 0.9;
-        }
-
-        .weather-detail-item .value {
-            font-size: 1.2rem;
-            font-weight: 600;
-        }
-
-        .weather-detail-item .label {
-            font-size: 0.8rem;
-            opacity: 0.8;
-        }
-
-        /* Pronóstico */
-        .forecast-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .forecast-card h5 {
-            color: var(--primary-color);
-            font-weight: 600;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #f1f3f4;
-        }
-
-        .forecast-day {
-            text-align: center;
-            padding: 15px 10px;
-            border-radius: 10px;
-            transition: all 0.3s ease;
-        }
-
-        .forecast-day:hover {
-            background: #f8f9fc;
-        }
-
-        .forecast-day .day-name {
-            font-weight: 600;
-            color: #1a252f;
-            margin-bottom: 5px;
-        }
-
-        .forecast-day .day-date {
-            font-size: 0.8rem;
-            color: #6c757d;
-            margin-bottom: 10px;
-        }
-
-        .forecast-day .day-icon img {
-            width: 50px;
-            height: 50px;
-        }
-
-        .forecast-day .day-temp {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--primary-color);
-        }
-
-        .forecast-day .day-desc {
-            font-size: 0.75rem;
-            color: #6c757d;
-            text-transform: capitalize;
-        }
-
-        /* Historial */
-        .historial-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-        }
-
-        .historial-card .card-header {
-            background: white;
-            border-bottom: 2px solid #f1f3f4;
-            font-weight: 600;
-            padding: 15px 20px;
-        }
-
-        .historial-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 20px;
-            border-bottom: 1px solid #f1f3f4;
-            transition: background 0.2s;
-        }
-
-        .historial-item:hover {
-            background: #f8f9fc;
-        }
-
-        .historial-item:last-child {
-            border-bottom: none;
-        }
-
-        .historial-item .fecha {
-            font-weight: 600;
-            color: #1a252f;
-        }
-
-        .historial-item .descripcion {
-            color: #6c757d;
-            font-size: 0.9rem;
-            text-transform: capitalize;
-        }
-
-        .historial-item .datos {
-            display: flex;
-            gap: 10px;
-        }
-
-        .dato-badge {
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-
-        .dato-badge.temp {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .dato-badge.hum {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-
-        .dato-badge.viento {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .sun-card {
-            background: linear-gradient(135deg, #f39c12, #f1c40f);
-            color: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .sun-times {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 15px;
-        }
-
-        .sun-time {
-            text-align: center;
-        }
-
-        .sun-time i {
-            font-size: 2rem;
-            margin-bottom: 8px;
-        }
-
-        .loading-spinner {
-            text-align: center;
-            padding: 40px;
-        }
-
-        .empty-historial {
-            text-align: center;
-            padding: 40px;
-            color: #6c757d;
-        }
-    </style>
+@include('partials.modulo-produccion-styles')
 @endpush
 
 @section('content')
-    @if(!empty($weatherData['error']))
-        <div class="alert alert-warning">
-            {{ $weatherData['error'] }}
-        </div>
+<div class="modulo-prod">
+
+    @if(!empty($weatherData['error']) && empty($weatherData['actual']))
+    <div class="alert alert-warning alert-dismissible fade show">
+        <i class="fas fa-exclamation-triangle mr-1"></i> {{ $weatherData['error'] }}
+        <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
+    </div>
     @endif
 
-    <!-- Cards de resumen -->
-    <div class="row">
+    @if(!empty($weatherData['aviso']))
+    <div class="alert alert-info alert-dismissible fade show py-2" id="avisoClimaFuente">
+        <i class="fas fa-info-circle mr-1"></i> {{ $weatherData['aviso'] }}
+        <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
+    </div>
+    @endif
+
+    <div id="avisoClimaDinamico"></div>
+
+    <div class="row mb-2">
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-yellow">
                 <div class="inner">
-                    <h3 id="card-temp"><i class="fas fa-spinner fa-spin"></i></h3>
+                    <h3 id="card-temp">
+                        @if(!empty($weatherData['actual']))
+                            {{ round($weatherData['actual']['temperatura']) }}°C
+                        @else
+                            <i class="fas fa-spinner fa-spin"></i>
+                        @endif
+                    </h3>
                     <p>Temperatura</p>
                 </div>
                 <div class="icon"><i class="fas fa-thermometer-half"></i></div>
-                <span class="small-box-footer">&nbsp;</span>
+                <span class="small-box-footer">Condición actual</span>
             </div>
         </div>
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-blue">
                 <div class="inner">
-                    <h3 id="card-humidity"><i class="fas fa-spinner fa-spin"></i></h3>
+                    <h3 id="card-humidity">
+                        @if(!empty($weatherData['actual']))
+                            {{ $weatherData['actual']['humedad'] ?? '--' }}%
+                        @else
+                            <i class="fas fa-spinner fa-spin"></i>
+                        @endif
+                    </h3>
                     <p>Humedad</p>
                 </div>
                 <div class="icon"><i class="fas fa-tint"></i></div>
-                <span class="small-box-footer">&nbsp;</span>
+                <span class="small-box-footer">Relativa</span>
             </div>
         </div>
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-green">
                 <div class="inner">
-                    <h3 id="card-wind"><i class="fas fa-spinner fa-spin"></i></h3>
+                    <h3 id="card-wind">
+                        @if(!empty($weatherData['actual']))
+                            {{ $weatherData['actual']['viento_kmh'] ?? '--' }} km/h
+                        @else
+                            <i class="fas fa-spinner fa-spin"></i>
+                        @endif
+                    </h3>
                     <p>Viento</p>
                 </div>
                 <div class="icon"><i class="fas fa-wind"></i></div>
-                <span class="small-box-footer">&nbsp;</span>
+                <span class="small-box-footer">Velocidad</span>
             </div>
         </div>
         <div class="col-lg-3 col-6">
-            <div class="small-box small-box-red">
+            <div class="small-box small-box-purple">
                 <div class="inner">
-                    <h3 id="card-pressure"><i class="fas fa-spinner fa-spin"></i></h3>
+                    <h3 id="card-pressure">
+                        @if(!empty($weatherData['actual']))
+                            {{ $weatherData['actual']['presion'] ?? '--' }} hPa
+                        @else
+                            <i class="fas fa-spinner fa-spin"></i>
+                        @endif
+                    </h3>
                     <p>Presión</p>
                 </div>
                 <div class="icon"><i class="fas fa-tachometer-alt"></i></div>
-                <span class="small-box-footer">&nbsp;</span>
+                <span class="small-box-footer">Atmosférica</span>
             </div>
         </div>
     </div>
 
     <div class="row">
-        <!-- Widget principal y pronóstico -->
         <div class="col-lg-5">
-            <div class="weather-widget" id="weather-widget">
-                <div class="loading-spinner" id="weather-loading">
-                    <i class="fas fa-spinner fa-spin fa-3x"></i>
-                    <p class="mt-3">Cargando datos del clima...</p>
+            <div class="card card-outline card-success card-modulo-main elevation-1 mb-3">
+                <div class="card-header py-2 d-flex align-items-center">
+                    <h3 class="card-title mb-0 text-sm flex-grow-1">
+                        <i class="fas fa-cloud-sun text-success mr-1"></i> Condiciones actuales
+                    </h3>
+                    @if(!blank(config('services.weather.key')))
+                    <button type="button" class="btn btn-tool" id="btnRefreshClima" title="Actualizar desde OpenWeather">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    @endif
                 </div>
-                <div id="weather-content" style="display: none;">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="weather-temp" id="weather-temp">--°C</div>
-                            <div class="weather-desc" id="weather-desc">--</div>
+                <div class="card-body p-0">
+                    <div class="weather-widget m-3" id="weather-widget">
+                        @if(empty($weatherData['actual']))
+                        <div class="text-center py-4" id="weather-loading">
+                            <i class="fas fa-spinner fa-spin fa-3x"></i>
+                            <p class="mt-3 mb-0">Cargando datos del clima…</p>
                         </div>
-                        <div class="weather-icon">
-                            <img id="weather-icon" src="" alt="Clima">
-                        </div>
-                    </div>
-                    <div class="mt-3">
-                        <i class="fas fa-map-marker-alt mr-1"></i>
-                        <span id="weather-location">Santa Cruz de la Sierra, Bolivia</span>
-                    </div>
-                    <div class="weather-details">
-                        <div class="weather-detail-item">
-                            <i class="fas fa-tint"></i>
-                            <div class="value" id="detail-humidity">--%</div>
-                            <div class="label">Humedad</div>
-                        </div>
-                        <div class="weather-detail-item">
-                            <i class="fas fa-wind"></i>
-                            <div class="value" id="detail-wind">-- km/h</div>
-                            <div class="label">Viento</div>
-                        </div>
-                        <div class="weather-detail-item">
-                            <i class="fas fa-compress-arrows-alt"></i>
-                            <div class="value" id="detail-pressure">-- hPa</div>
-                            <div class="label">Presión</div>
+                        @else
+                        <div id="weather-loading" style="display:none;"></div>
+                        @endif
+                        <div id="weather-content" style="{{ empty($weatherData['actual']) ? 'display: none;' : '' }}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="weather-temp" id="weather-temp">--°C</div>
+                                    <div class="weather-desc" id="weather-desc">--</div>
+                                    <small class="d-block mt-1 opacity-75" id="weather-fuente"></small>
+                                </div>
+                                <div class="weather-icon">
+                                    <img id="weather-icon" src="" alt="Clima">
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <i class="fas fa-map-marker-alt mr-1"></i>
+                                <span id="weather-location">Santa Cruz de la Sierra, Bolivia</span>
+                            </div>
+                            <div class="weather-details">
+                                <div class="weather-detail-item">
+                                    <i class="fas fa-tint d-block mb-1"></i>
+                                    <div class="value" id="detail-humidity">--%</div>
+                                    <div class="label">Humedad</div>
+                                </div>
+                                <div class="weather-detail-item">
+                                    <i class="fas fa-wind d-block mb-1"></i>
+                                    <div class="value" id="detail-wind">-- km/h</div>
+                                    <div class="label">Viento</div>
+                                </div>
+                                <div class="weather-detail-item">
+                                    <i class="fas fa-compress-arrows-alt d-block mb-1"></i>
+                                    <div class="value" id="detail-pressure">-- hPa</div>
+                                    <div class="label">Presión</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Sol -->
             <div class="sun-card">
-                <h6 class="mb-0"><i class="fas fa-sun mr-2"></i>Amanecer y Atardecer</h6>
+                <h6 class="mb-0 font-weight-bold"><i class="fas fa-sun mr-2"></i>Amanecer y atardecer</h6>
                 <div class="sun-times">
                     <div class="sun-time">
-                        <i class="fas fa-sunrise"></i>
-                        <div id="sunrise">--:--</div>
+                        <i class="fas fa-sunrise d-block"></i>
+                        <div class="font-weight-bold" id="sunrise">--:--</div>
                         <small>Amanecer</small>
                     </div>
                     <div class="sun-time">
-                        <i class="fas fa-moon"></i>
-                        <div id="sunset">--:--</div>
+                        <i class="fas fa-moon d-block"></i>
+                        <div class="font-weight-bold" id="sunset">--:--</div>
                         <small>Atardecer</small>
                     </div>
                 </div>
             </div>
 
-            <!-- Pronóstico 5 días -->
-            <div class="forecast-card">
-                <h5><i class="fas fa-calendar-alt mr-2"></i>Pronóstico 5 Días</h5>
-                <div class="row" id="forecast-container">
-                    <div class="col text-center">
-                        <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
+            <div class="card card-outline card-success card-modulo-main elevation-1">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-calendar-alt text-success mr-1"></i> Pronóstico 5 días
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="forecast-container">
+                        <div class="col text-center text-muted py-3">
+                            <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Historial -->
         <div class="col-lg-7">
-            <div class="historial-card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span><i class="fas fa-history mr-2"></i>Historial Climático (Últimos 30 días)</span>
-                    <span class="badge badge-info">{{ $historial->count() }} registros</span>
+            <div class="card card-outline card-success card-modulo-main elevation-1">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-history text-success mr-1"></i>
+                        Historial climático
+                        <span class="badge badge-light border text-muted badge-registros ml-2">Últimos 30 días · {{ $historial->total() }} registros</span>
+                    </h3>
+                    <div class="card-tools">
+                        <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosClimaPanel" title="Filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="card-body p-0" style="max-height: 600px; overflow-y: auto;">
+
+                <div id="filtrosClimaPanel" class="filtros-panel collapse {{ request()->hasAny(['buscar','loteid','fecha_desde','fecha_hasta','temp_min','temp_max']) ? 'show' : '' }}">
+                    <form method="GET" action="{{ route('climas.index') }}">
+                        <div class="row">
+                            <div class="col-md-4 mb-2">
+                                <label class="small text-muted mb-1">Buscar</label>
+                                <input type="text" name="buscar" class="form-control form-control-sm" value="{{ request('buscar') }}" placeholder="Observación, lote…">
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <label class="small text-muted mb-1">Lote</label>
+                                <select name="loteid" class="form-control form-control-sm">
+                                    <option value="">Todos</option>
+                                    @foreach($lotesFiltro ?? [] as $l)
+                                        <option value="{{ $l->loteid }}" @selected(request('loteid') == $l->loteid)>{{ $l->nombre }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-2 mb-2">
+                                <label class="small text-muted mb-1">Temp. mín.</label>
+                                <input type="number" step="0.1" name="temp_min" class="form-control form-control-sm" value="{{ request('temp_min') }}" placeholder="°C">
+                            </div>
+                            <div class="col-md-2 mb-2">
+                                <label class="small text-muted mb-1">Temp. máx.</label>
+                                <input type="number" step="0.1" name="temp_max" class="form-control form-control-sm" value="{{ request('temp_max') }}" placeholder="°C">
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <label class="small text-muted mb-1">Desde</label>
+                                <input type="date" name="fecha_desde" class="form-control form-control-sm" value="{{ request('fecha_desde') }}">
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <label class="small text-muted mb-1">Hasta</label>
+                                <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="{{ request('fecha_hasta') }}">
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end mb-2" style="gap: 8px;">
+                                <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-search mr-1"></i> Filtrar</button>
+                                <a href="{{ route('climas.index') }}" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card-body p-0" style="max-height: 520px; overflow-y: auto;">
                     @forelse($historial as $registro)
-                        <div class="historial-item">
-                            <div>
-                                <div class="fecha">
-                                    <i class="fas fa-cloud text-muted mr-2"></i>
-                                    {{ $registro->fecha->format('d/m/Y') }}
-                                    <small class="text-muted">({{ $registro->fecha->diffForHumans() }})</small>
-                                </div>
-                                <div class="descripcion">{{ $registro->observaciones ?? 'Sin descripción' }}</div>
+                    <div class="historial-item">
+                        <div>
+                            <div class="font-weight-bold text-dark">
+                                <i class="fas fa-cloud text-muted mr-1"></i>
+                                {{ $registro->fecha->format('d/m/Y') }}
+                                <small class="text-muted font-weight-normal">({{ $registro->fecha->diffForHumans() }})</small>
                             </div>
-                            <div class="datos">
-                                <span class="dato-badge temp">
-                                    <i class="fas fa-thermometer-half mr-1"></i>{{ $registro->temperatura }}°C
-                                </span>
-                                <span class="dato-badge hum">
-                                    <i class="fas fa-tint mr-1"></i>{{ $registro->humedad }}%
-                                </span>
+                            <div class="text-muted small">
+                                @if($registro->lote)
+                                    <i class="fas fa-map-marker-alt mr-1"></i>{{ $registro->lote->nombre }} ·
+                                @endif
+                                {{ $registro->observaciones ?? 'Sin descripción' }}
                             </div>
                         </div>
+                        <div class="d-flex flex-wrap" style="gap: 6px;">
+                            <span class="dato-badge temp">
+                                <i class="fas fa-thermometer-half mr-1"></i>{{ $registro->temperatura }}°C
+                            </span>
+                            <span class="dato-badge hum">
+                                <i class="fas fa-tint mr-1"></i>{{ $registro->humedad }}%
+                            </span>
+                        </div>
+                    </div>
                     @empty
-                        <div class="empty-historial">
-                            <i class="fas fa-cloud-sun fa-4x mb-3 text-muted"></i>
-                            <h5>Sin registros históricos</h5>
-                            <p class="text-muted">El historial se irá llenando automáticamente cada día.</p>
-                        </div>
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-cloud-sun fa-4x mb-3"></i>
+                        <h5>Sin registros históricos</h5>
+                        <p class="mb-0">El historial se irá llenando automáticamente cada día.</p>
+                    </div>
                     @endforelse
                 </div>
+                @if($historial->hasPages())
+                <div class="card-footer py-2">{{ $historial->links() }}</div>
+                @endif
             </div>
         </div>
     </div>
+</div>
 @endsection
 
 @push('scripts')
-    <script>
-        const WEATHER_DATA = @json($weatherData ?? ['actual' => null, 'pronostico' => [], 'error' => null]);
+<script>
+    const WEATHER_DATA = @json($weatherData ?? ['actual' => null, 'pronostico' => [], 'error' => null]);
+    const CARGAR_CLIMA_ASYNC = @json($cargarClimaAsync ?? false);
+    const CLIMA_API_URL = @json(route('climas.datos-tiempo'));
 
-        $(document).ready(function () {
-            if (WEATHER_DATA.error) {
-                $('#weather-loading').html(`<i class="fas fa-exclamation-triangle fa-3x text-warning"></i><p class="mt-3">${WEATHER_DATA.error}</p>`);
-                $('#card-temp, #card-humidity, #card-wind, #card-pressure').text('--');
-                $('#forecast-container').html('<div class="col text-center text-muted">Sin datos de pronóstico.</div>');
-                return;
-            }
-
-            if (!WEATHER_DATA.actual) {
-                $('#weather-loading').html('<i class="fas fa-exclamation-triangle fa-3x text-danger"></i><p class="mt-3">No se pudo obtener la información climática en este momento.</p>');
-                $('#card-temp, #card-humidity, #card-wind, #card-pressure').text('--');
-                $('#forecast-container').html('<div class="col text-center text-muted">Sin datos de pronóstico.</div>');
-                return;
-            }
-
-            mostrarClimaActual(WEATHER_DATA.actual);
-            mostrarPronostico(WEATHER_DATA.pronostico || []);
-        });
-
-        function mostrarClimaActual(data) {
-            $('#weather-loading').hide();
-            $('#weather-content').show();
-
-            const temp = Math.round(data.temperatura);
-            $('#weather-temp').text(temp + '°C');
-            $('#weather-desc').text(data.descripcion || '--');
-            $('#weather-icon').attr('src', `https://openweathermap.org/img/wn/${data.icono || '01d'}@4x.png`);
-            $('#weather-location').text(`${data.ciudad || 'Santa Cruz'}, ${data.pais || 'BO'}`);
-
-            $('#detail-humidity').text((data.humedad ?? '--') + '%');
-            $('#detail-wind').text((data.viento_kmh ?? '--') + ' km/h');
-            $('#detail-pressure').text((data.presion ?? '--') + ' hPa');
-
-            $('#card-temp').text(temp + '°C');
-            $('#card-humidity').text((data.humedad ?? '--') + '%');
-            $('#card-wind').text((data.viento_kmh ?? '--') + ' km/h');
-            $('#card-pressure').text((data.presion ?? '--') + ' hPa');
-
-            $('#sunrise').text(data.amanecer || '--:--');
-            $('#sunset').text(data.atardecer || '--:--');
-
-            if (data.es_noche) {
-                $('#weather-widget').addClass('night');
-            } else {
-                $('#weather-widget').removeClass('night');
-            }
+    $(document).ready(function () {
+        if (WEATHER_DATA.error && !WEATHER_DATA.actual) {
+            mostrarErrorClima(WEATHER_DATA.error);
+            return;
         }
 
-        function mostrarPronostico(data) {
-            if (!data.length) {
-                $('#forecast-container').html('<div class="col text-center text-muted">No se pudo obtener la información climática en este momento.</div>');
-                return;
+        if (WEATHER_DATA.actual) {
+            renderClima(WEATHER_DATA);
+            if (CARGAR_CLIMA_ASYNC) {
+                cargarClimaDesdeApi(false);
             }
+            return;
+        }
 
-            let html = '';
-            data.forEach(item => {
-                html += `
+        if (CARGAR_CLIMA_ASYNC) {
+            cargarClimaDesdeApi(false);
+        } else {
+            mostrarErrorClima('No hay datos climáticos disponibles.');
+        }
+
+        $('#btnRefreshClima').on('click', function () {
+            const $icon = $(this).find('i');
+            $icon.addClass('fa-spin');
+            cargarClimaDesdeApi(true).finally(() => $icon.removeClass('fa-spin'));
+        });
+    });
+
+    function renderClima(data) {
+        mostrarClimaActual(data.actual);
+        mostrarPronostico(data.pronostico || []);
+        if (data.aviso) {
+            $('#avisoClimaDinamico').html(
+                `<div class="alert alert-info alert-dismissible fade show py-2 mb-3">
+                    <i class="fas fa-info-circle mr-1"></i> ${data.aviso}
+                    <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
+                </div>`
+            );
+        }
+    }
+
+    function mostrarErrorClima(msg) {
+        $('#weather-loading').show().html(`<i class="fas fa-exclamation-triangle fa-3x text-warning"></i><p class="mt-3 mb-0">${msg}</p>`);
+        $('#weather-content').hide();
+        $('#card-temp, #card-humidity, #card-wind, #card-pressure').text('--');
+        $('#forecast-container').html('<div class="col text-center text-muted py-3">Sin datos de pronóstico.</div>');
+    }
+
+    function cargarClimaDesdeApi(refresh) {
+        const url = CLIMA_API_URL + (refresh ? '?refresh=1' : '');
+        return fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error && !data.actual) {
+                    mostrarErrorClima(data.error);
+                    return;
+                }
+                if (!data.actual) {
+                    mostrarErrorClima('No hay datos climáticos disponibles.');
+                    return;
+                }
+                $('#avisoClimaDinamico').empty();
+                renderClima(data);
+            })
+            .catch(() => {
+                if (!WEATHER_DATA.actual) {
+                    mostrarErrorClima('Error de conexión al cargar el clima.');
+                }
+            });
+    }
+
+    function mostrarClimaActual(data) {
+        $('#weather-loading').hide();
+        $('#weather-content').show();
+
+        const temp = Math.round(data.temperatura);
+        $('#weather-temp').text(temp + '°C');
+        $('#weather-desc').text(data.descripcion || '--');
+        $('#weather-icon').attr('src', `https://openweathermap.org/img/wn/${data.icono || '01d'}@4x.png`);
+        $('#weather-location').text(`${data.ciudad || 'Santa Cruz de la Sierra'}, ${data.pais || 'BO'}`);
+
+        const fuente = data.fuente === 'registro_local'
+            ? (data.registrado_el ? `Último registro: ${data.registrado_el}` : 'Datos del historial Fusion')
+            : (data.fuente === 'openweather' ? 'OpenWeather · tiempo real' : '');
+        $('#weather-fuente').text(fuente);
+
+        $('#detail-humidity').text((data.humedad ?? '--') + '%');
+        $('#detail-wind').text((data.viento_kmh ?? '--') + ' km/h');
+        $('#detail-pressure').text((data.presion ?? '--') + ' hPa');
+
+        $('#card-temp').text(temp + '°C');
+        $('#card-humidity').text((data.humedad ?? '--') + '%');
+        $('#card-wind').text((data.viento_kmh ?? '--') + ' km/h');
+        $('#card-pressure').text((data.presion ?? '--') + ' hPa');
+
+        $('#sunrise').text(data.amanecer || '--:--');
+        $('#sunset').text(data.atardecer || '--:--');
+
+        if (data.es_noche) {
+            $('#weather-widget').addClass('night');
+        } else {
+            $('#weather-widget').removeClass('night');
+        }
+    }
+
+    function mostrarPronostico(data) {
+        if (!data.length) {
+            $('#forecast-container').html('<div class="col text-center text-muted py-3">Sin pronóstico disponible por ahora.</div>');
+            return;
+        }
+
+        let html = '';
+        data.forEach(item => {
+            html += `
                 <div class="col forecast-day">
-                    <div class="day-name">${item.dia || '--'}</div>
-                    <div class="day-date">${item.fecha || '--/--'}</div>
-                    <div class="day-icon">
-                        <img src="https://openweathermap.org/img/wn/${item.icono || '01d'}@2x.png" alt="">
+                    <div class="font-weight-bold text-dark">${item.dia || '--'}</div>
+                    <div class="small text-muted mb-1">${item.fecha || '--/--'}</div>
+                    <div class="mb-1">
+                        <img src="https://openweathermap.org/img/wn/${item.icono || '01d'}@2x.png" alt="" width="50" height="50">
                     </div>
                     <div class="day-temp">${item.temperatura ?? '--'}°C</div>
-                    <div class="day-desc">${item.descripcion || '--'}</div>
+                    <div class="small text-muted text-capitalize">${item.descripcion || '--'}</div>
                 </div>
             `;
-            });
+        });
 
-            $('#forecast-container').html(html);
-        }
-    </script>
+        $('#forecast-container').html(html);
+    }
+</script>
 @endpush

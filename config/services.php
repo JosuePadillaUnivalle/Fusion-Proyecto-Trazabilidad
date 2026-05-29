@@ -49,9 +49,10 @@ return [
 
     'weather' => [
         'key' => env('WEATHER_API_KEY', env('OPENWEATHER_API_KEY')),
-        'city' => env('WEATHER_CITY', 'Santa Cruz'),
+        'city' => env('WEATHER_CITY', 'Santa Cruz de la Sierra'),
         'country' => env('WEATHER_COUNTRY', 'BO'),
         'units' => env('WEATHER_UNITS', 'metric'),
+        'cache_ttl' => (int) env('WEATHER_CACHE_TTL', 1200),
     ],
 
     // Alias para compatibilidad con código legado que usa services.openweather.key

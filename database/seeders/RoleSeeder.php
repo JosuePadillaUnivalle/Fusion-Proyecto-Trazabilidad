@@ -19,11 +19,7 @@ class RoleSeeder extends Seeder
         Role::firstOrCreate(['name' => 'planta', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'transportista', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'almacen', 'guard_name' => 'web']);
-
-        // Compatibilidad con roles historicos ya usados en el proyecto
-        Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'agricultor', 'guard_name' => 'web']);
-        Role::firstOrCreate(['name' => 'Agricultor', 'guard_name' => 'web']);
 
         // Asignacion estandar de roles a usuarios existentes sin duplicidad
         $adminUser = Usuario::where('email', 'admin@agronexus.com')->first();

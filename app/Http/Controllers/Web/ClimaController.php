@@ -5,130 +5,84 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Clima;
 use App\Models\Lote;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Http;
+use App\Services\WeatherOpenWeatherService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class ClimaController extends Controller
 {
-    /**
-     * Mostrar vista de clima con datos actuales, pronóstico e historial.
-     */
-    public function index()
+    public function __construct(
+        private readonly WeatherOpenWeatherService $weather
+    ) {}
+
+    public function index(Request $request): View
     {
-        $historial = Clima::where('fecha', '>=', now()->subDays(30))
-            ->orderBy('fecha', 'desc')
-            ->get();
+        $historial = $this->historialQuery($request)->paginate(15)->withQueryString();
 
-        $weatherData = [
-            'actual' => null,
-            'pronostico' => [],
-            'error' => null,
-        ];
+        $weatherData = $this->weather->resolveForDisplay();
+        $cargarClimaAsync = (bool) ($weatherData['needs_api_refresh'] ?? false);
+        unset($weatherData['needs_api_refresh']);
 
-        if (blank(config('services.weather.key'))) {
-            $weatherData['error'] = 'API Key no configurada. Agrega WEATHER_API_KEY en el archivo .env.';
-            return view('climas.index', compact('historial', 'weatherData'));
-        }
+        $lotesFiltro = Lote::query()->orderBy('nombre')->get(['loteid', 'nombre']);
 
-        $weatherData = $this->obtenerDatosClima();
-        $this->guardarClimaDesdeActual($weatherData['actual'] ?? null);
-
-        return view('climas.index', compact('historial', 'weatherData'));
+        return view('climas.index', compact(
+            'historial',
+            'weatherData',
+            'cargarClimaAsync',
+            'lotesFiltro'
+        ));
     }
 
-    private function obtenerDatosClima(): array
+    public function datosTiempo(Request $request): JsonResponse
     {
-        $city = config('services.weather.city', 'Santa Cruz');
-        $country = config('services.weather.country', 'BO');
-        $units = config('services.weather.units', 'metric');
-        $apiKey = config('services.weather.key');
+        $data = $this->weather->resolveWithApi($request->boolean('refresh'));
+        unset($data['needs_api_refresh']);
 
-        $params = [
-            'q' => "{$city},{$country}",
-            'appid' => $apiKey,
-            'units' => $units,
-            'lang' => 'es',
-        ];
-
-        try {
-            $currentResponse = Http::timeout(12)->get('https://api.openweathermap.org/data/2.5/weather', $params);
-            $forecastResponse = Http::timeout(12)->get('https://api.openweathermap.org/data/2.5/forecast', $params);
-
-            if ($currentResponse->status() === 401) {
-                return [
-                    'actual' => null,
-                    'pronostico' => [],
-                    'error' => 'La API Key de clima no es válida o aún no está activa en OpenWeather.',
-                ];
-            }
-
-            if (! $currentResponse->successful()) {
-                return [
-                    'actual' => null,
-                    'pronostico' => [],
-                    'error' => 'No se pudo obtener la información climática en este momento.',
-                ];
-            }
-
-            $actualJson = $currentResponse->json();
-            $actual = [
-                'ciudad' => $actualJson['name'] ?? $city,
-                'pais' => $actualJson['sys']['country'] ?? $country,
-                'temperatura' => round((float) ($actualJson['main']['temp'] ?? 0), 1),
-                'humedad' => (int) ($actualJson['main']['humidity'] ?? 0),
-                'viento_kmh' => round((float) ($actualJson['wind']['speed'] ?? 0) * 3.6, 1),
-                'presion' => (int) ($actualJson['main']['pressure'] ?? 0),
-                'descripcion' => (string) ($actualJson['weather'][0]['description'] ?? 'Sin datos'),
-                'icono' => (string) ($actualJson['weather'][0]['icon'] ?? '01d'),
-                'amanecer' => isset($actualJson['sys']['sunrise']) ? Carbon::createFromTimestamp($actualJson['sys']['sunrise'])->format('H:i') : '--:--',
-                'atardecer' => isset($actualJson['sys']['sunset']) ? Carbon::createFromTimestamp($actualJson['sys']['sunset'])->format('H:i') : '--:--',
-                'es_noche' => isset($actualJson['weather'][0]['icon']) && str_ends_with($actualJson['weather'][0]['icon'], 'n'),
-                'lluvia' => (float) ($actualJson['rain']['1h'] ?? $actualJson['rain']['3h'] ?? 0),
-            ];
-
-            $pronostico = [];
-            if ($forecastResponse->successful()) {
-                $forecastJson = $forecastResponse->json();
-                $daily = [];
-
-                foreach (($forecastJson['list'] ?? []) as $item) {
-                    $timestamp = (int) ($item['dt'] ?? 0);
-                    if ($timestamp <= 0) {
-                        continue;
-                    }
-                    $key = date('Y-m-d', $timestamp);
-                    $hour = (int) date('G', $timestamp);
-                    if (! isset($daily[$key]) || ($hour >= 11 && $hour <= 14)) {
-                        $daily[$key] = $item;
-                    }
-                }
-
-                foreach (array_slice(array_values($daily), 0, 5) as $item) {
-                    $timestamp = (int) $item['dt'];
-                    $pronostico[] = [
-                        'dia' => mb_substr(Carbon::createFromTimestamp($timestamp)->locale('es')->dayName, 0, 3),
-                        'fecha' => Carbon::createFromTimestamp($timestamp)->format('d/m'),
-                        'temperatura' => round((float) ($item['main']['temp'] ?? 0)),
-                        'descripcion' => (string) ($item['weather'][0]['description'] ?? 'Sin datos'),
-                        'icono' => (string) ($item['weather'][0]['icon'] ?? '01d'),
-                    ];
-                }
-            }
-
-            return [
-                'actual' => $actual,
-                'pronostico' => $pronostico,
-                'error' => null,
-            ];
-        } catch (\Throwable $e) {
-            Log::warning('Clima no disponible: ' . $e->getMessage());
-            return [
-                'actual' => null,
-                'pronostico' => [],
-                'error' => 'No se pudo obtener la información climática en este momento.',
-            ];
+        if (! empty($data['actual']) && ($data['fuente'] ?? '') === 'openweather') {
+            $this->guardarClimaDesdeActual($data['actual']);
         }
+
+        return response()->json($data);
+    }
+
+    private function historialQuery(Request $request)
+    {
+        $query = Clima::query()
+            ->with('lote:loteid,nombre')
+            ->where('fecha', '>=', now()->subDays(30))
+            ->orderByDesc('fecha');
+
+        if ($request->filled('loteid')) {
+            $query->where('loteid', (int) $request->loteid);
+        }
+
+        if ($request->filled('fecha_desde')) {
+            $query->whereDate('fecha', '>=', $request->fecha_desde);
+        }
+
+        if ($request->filled('fecha_hasta')) {
+            $query->whereDate('fecha', '<=', $request->fecha_hasta);
+        }
+
+        if ($request->filled('temp_min')) {
+            $query->where('temperatura', '>=', (float) $request->temp_min);
+        }
+
+        if ($request->filled('temp_max')) {
+            $query->where('temperatura', '<=', (float) $request->temp_max);
+        }
+
+        if ($request->filled('buscar')) {
+            $buscar = '%'.trim((string) $request->buscar).'%';
+            $query->where(function ($q) use ($buscar) {
+                $q->where('observaciones', 'like', $buscar)
+                    ->orWhere('descripcion', 'like', $buscar)
+                    ->orWhereHas('lote', fn ($l) => $l->where('nombre', 'like', $buscar));
+            });
+        }
+
+        return $query;
     }
 
     private function guardarClimaDesdeActual(?array $actual): void
@@ -137,8 +91,7 @@ class ClimaController extends Controller
             return;
         }
 
-        $existeReciente = Clima::where('fecha', '>=', now()->subHours(4))->exists();
-        if ($existeReciente) {
+        if (Clima::where('fecha', '>=', now()->subHours(4))->exists()) {
             return;
         }
 

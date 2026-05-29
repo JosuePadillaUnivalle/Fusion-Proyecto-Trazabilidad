@@ -56,9 +56,7 @@ class LoteInsumoController extends Controller
             ->where('stock', '>', 0)
             ->get();
 
-        $estados = EstadoLoteInsumo::all();
-
-        return view('lote_insumos.create', compact('lotes', 'insumos', 'estados'));
+        return view('lote_insumos.create', compact('lotes', 'insumos'));
     }
 
     public function store(Request $request)
@@ -67,7 +65,6 @@ class LoteInsumoController extends Controller
             'loteid' => 'required|exists:lote,loteid',
             'insumoid' => 'required|exists:insumo,insumoid',
             'cantidadusada' => 'required|numeric|gt:0',
-            'estadoloteinsumoid' => 'nullable|exists:estadoloteinsumo,estadoloteinsumoid',
             'observaciones' => 'nullable|string|max:200',
         ]);
 
@@ -102,7 +99,7 @@ class LoteInsumoController extends Controller
                 'cantidadusada' => $data['cantidadusada'],
                 'fechauo' => now(), // Fecha actual automática
                 'costototal' => $costoTotal,
-                'estadoloteinsumoid' => $data['estadoloteinsumoid'] ?? 1, // Por defecto "aplicado"
+                'estadoloteinsumoid' => $this->idEstadoAplicado(),
                 'observaciones' => $data['observaciones'],
             ]);
 
@@ -235,5 +232,11 @@ class LoteInsumoController extends Controller
             DB::rollBack();
             return back()->withErrors(['error' => 'Error al eliminar: ' . $e->getMessage()]);
         }
+    }
+
+    private function idEstadoAplicado(): int
+    {
+        return (int) (EstadoLoteInsumo::whereRaw('LOWER(nombre) = ?', ['aplicado'])->value('estadoloteinsumoid')
+            ?? EstadoLoteInsumo::firstOrCreate(['nombre' => 'Aplicado'], ['nombre' => 'Aplicado'])->estadoloteinsumoid);
     }
 }

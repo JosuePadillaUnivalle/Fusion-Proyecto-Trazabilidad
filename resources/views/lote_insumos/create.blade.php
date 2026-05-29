@@ -82,18 +82,6 @@
                         </small>
                     </div>
 
-                    {{-- Estado --}}
-                    <div class="form-group">
-                        <label><i class="fas fa-tag mr-1"></i> Estado</label>
-                        <select name="estadoloteinsumoid" class="form-control">
-                            @foreach($estados as $e)
-                                <option value="{{ $e->estadoloteinsumoid }}" {{ $e->nombre == 'aplicado' ? 'selected' : '' }}>
-                                    {{ ucfirst($e->nombre) }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
                     {{-- Observaciones --}}
                     <div class="form-group">
                         <label><i class="fas fa-comment mr-1"></i> Observaciones</label>
@@ -115,6 +103,9 @@
                             </p>
                             <p class="small text-muted mb-2">
                                 <i class="fas fa-calculator mr-1"></i> <strong>Costo:</strong> Se calcula automáticamente
+                            </p>
+                            <p class="small text-muted mb-2">
+                                <i class="fas fa-tag mr-1"></i> <strong>Estado:</strong> Se registra como <span class="badge badge-success">Aplicado</span>
                             </p>
                             <hr>
                             <p class="small mb-0">

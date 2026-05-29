@@ -110,6 +110,7 @@ Route::middleware('auth')->group(function () {
     Route::put('actividades/{actividad}', [ActividadController::class, 'update'])->name('actividades.update')->middleware('action.permission:lotes,update');
     Route::delete('actividades/{actividad}', [ActividadController::class, 'destroy'])->name('actividades.destroy')->middleware('action.permission:lotes,update');
     Route::post('actividades/{actividad}/marcar-realizada', [ActividadController::class, 'marcarRealizada'])->name('actividades.marcar-realizada')->middleware('action.permission:lotes,update');
+    Route::get('climas/datos-tiempo', [ClimaController::class, 'datosTiempo'])->name('climas.datos-tiempo');
     Route::get('climas', [ClimaController::class, 'index'])->name('climas.index');
     Route::get('clima', [ClimaController::class, 'index'])->name('clima.index');
     Route::resource('cultivos', CultivoController::class);
@@ -149,8 +150,8 @@ Route::middleware('auth')->group(function () {
         ->parameters(['prioridades' => 'prioridad']);
     Route::resource('producciones', ProduccionController::class)
         ->parameters(['producciones' => 'produccion']);
-    Route::resource('procesos-planta', ProcesoPlantaController::class)->only(['index', 'store', 'update', 'destroy']);
-    Route::resource('maquinas-planta', MaquinaPlantaController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('procesos-planta', ProcesoPlantaController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+    Route::resource('maquinas-planta', MaquinaPlantaController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::resource('tipo-actividad', TipoActividadController::class);
     Route::resource('tipo-insumos', TipoInsumoController::class);
     Route::resource('unidades-medida', UnidadMedidaController::class)
@@ -217,6 +218,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/gestion-usuarios', [GestionUsuariosController::class, 'index'])
         ->middleware('action.permission:usuarios,read')
         ->name('gestion.index');
+
+    Route::get('/gestion-usuarios/crear', [GestionUsuariosController::class, 'create'])
+        ->middleware('action.permission:usuarios,create')
+        ->name('gestion.create');
+
+    Route::get('/gestion-usuarios/{usuario}/editar', [GestionUsuariosController::class, 'edit'])
+        ->middleware('action.permission:usuarios,update')
+        ->name('gestion.edit');
+
+    Route::get('/gestion-usuarios/{usuario}', [GestionUsuariosController::class, 'show'])
+        ->middleware('action.permission:usuarios,read')
+        ->name('gestion.show');
 
     // CRUD Usuarios
     Route::post('/gestion-usuarios/usuario', [GestionUsuariosController::class, 'storeUsuario'])

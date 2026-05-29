@@ -1,274 +1,227 @@
 @extends('layouts.app')
 
 @section('title', 'Producción | Fusion-Proyectos')
-@section('page_title', 'Gestión de Producción')
+@section('page_title', 'Registro de producción')
 
 @section('breadcrumbs')
-    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}" style="color: #2c5530;">Inicio</a></li>
-    <li class="breadcrumb-item active">Producción</li>
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
+    <li class="breadcrumb-item active">Registro de producción</li>
 @endsection
 
 @push('styles')
-    <style>
-        .small-box {
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(0, 0, 0, 0.05);
-            transition: transform 0.3s ease;
-        }
-
-        .small-box:hover {
-            transform: translateY(-2px);
-        }
-
-        .small-box .icon {
-            font-size: 70px !important;
-        }
-
-        .small-box-green {
-            background: linear-gradient(135deg, #28a745, #34ce57) !important;
-        }
-
-        .small-box-blue {
-            background: linear-gradient(135deg, #17a2b8, #20c997) !important;
-        }
-
-        .small-box-yellow {
-            background: linear-gradient(135deg, #ffc107, #ffca2c) !important;
-        }
-
-        .small-box-red {
-            background: linear-gradient(135deg, #dc3545, #e74a3b) !important;
-        }
-
-        .produccion-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            margin-bottom: 15px;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            border-left: 4px solid #28a745;
-        }
-
-        .produccion-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.12);
-        }
-
-        .produccion-header {
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #f1f3f4;
-        }
-
-        .produccion-header h5 {
-            margin: 0;
-            font-weight: 600;
-            color: #1a252f;
-            font-size: 1rem;
-        }
-
-        .produccion-cantidad {
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: #28a745;
-        }
-
-        .produccion-body {
-            padding: 15px 20px;
-        }
-
-        .produccion-info {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-
-        .produccion-info-item {
-            flex: 1;
-            min-width: 120px;
-        }
-
-        .produccion-info-item label {
-            display: block;
-            font-size: 0.75rem;
-            color: #6c757d;
-            text-transform: uppercase;
-            margin-bottom: 3px;
-        }
-
-        .produccion-info-item span {
-            font-weight: 600;
-            color: #1a252f;
-        }
-
-        .produccion-footer {
-            padding: 12px 20px;
-            background: #f8f9fc;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .view-toggle .btn.active {
-            background: #2c5530;
-            color: white;
-        }
-    </style>
+@include('partials.modulo-produccion-styles')
 @endpush
 
 @section('content')
-    <div class="row">
+<div class="modulo-prod">
+
+    <div class="row mb-2">
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-green">
                 <div class="inner">
-                    <h3>{{ $producciones->total() }}</h3>
-                    <p>Total Cosechas</p>
+                    <h3>{{ $stats['total'] ?? $producciones->total() }}</h3>
+                    <p>Total cosechas</p>
                 </div>
                 <div class="icon"><i class="fas fa-tractor"></i></div>
-                <span class="small-box-footer">&nbsp;</span>
+                <span class="small-box-footer">Registros en el sistema</span>
             </div>
         </div>
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-blue">
                 <div class="inner">
-                    <h3>{{ number_format($producciones->sum('cantidad'), 0) }}<span style="font-size: 18px;">kg</span></h3>
-                    <p>Kg Totales</p>
+                    <h3>{{ number_format($stats['kg_total'] ?? 0, 0) }}<span style="font-size: 1rem;"> kg</span></h3>
+                    <p>Kg totales</p>
                 </div>
                 <div class="icon"><i class="fas fa-weight-hanging"></i></div>
-                <span class="small-box-footer">&nbsp;</span>
+                <span class="small-box-footer">Volumen acumulado</span>
             </div>
         </div>
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-yellow">
                 <div class="inner">
-                    <h3>{{ $producciones->unique('loteid')->count() }}</h3>
-                    <p>Lotes Productivos</p>
+                    <h3>{{ $stats['lotes'] ?? 0 }}</h3>
+                    <p>Lotes productivos</p>
                 </div>
                 <div class="icon"><i class="fas fa-map-marked-alt"></i></div>
-                <span class="small-box-footer">&nbsp;</span>
+                <span class="small-box-footer">Lotes con cosecha</span>
             </div>
         </div>
         <div class="col-lg-3 col-6">
-            <div class="small-box small-box-red">
+            <div class="small-box small-box-purple">
                 <div class="inner">
-                    @php
-                        $promedio = $producciones->count() > 0 ? $producciones->sum('cantidad') / $producciones->count() : 0;
-                    @endphp
-                    <h3>{{ number_format($promedio, 0) }}<span style="font-size: 18px;">kg</span></h3>
-                    <p>Promedio/Cosecha</p>
+                    <h3>{{ number_format($stats['promedio'] ?? 0, 0) }}<span style="font-size: 1rem;"> kg</span></h3>
+                    <p>Promedio / cosecha</p>
                 </div>
                 <div class="icon"><i class="fas fa-chart-line"></i></div>
-                <span class="small-box-footer">&nbsp;</span>
+                <span class="small-box-footer">Rendimiento medio</span>
             </div>
         </div>
     </div>
 
-    <div class="card mb-4">
-        <div class="card-body py-3">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <a href="{{ route('producciones.create') }}" class="btn btn-success">
-                        <i class="fas fa-plus mr-1"></i> Nueva Producción
-                    </a>
+    <div class="card card-outline card-success card-modulo-main elevation-1">
+        <div class="card-header">
+            <h3 class="card-title mb-0">
+                <i class="fas fa-tractor text-success mr-1"></i>
+                Registro de producción
+                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $producciones->total() }} registros</span>
+            </h3>
+            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
+                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosProduccionPanel" title="Filtros">
+                    <i class="fas fa-filter"></i>
+                </button>
+                <div class="btn-group btn-group-sm view-toggle mr-1">
+                    <button type="button" class="btn btn-default active" id="btnCardView" title="Tarjetas">
+                        <i class="fas fa-th-large"></i>
+                    </button>
+                    <button type="button" class="btn btn-default" id="btnTableView" title="Tabla">
+                        <i class="fas fa-list"></i>
+                    </button>
                 </div>
-                <div class="col-md-6 text-md-right mt-3 mt-md-0">
-                    <div class="btn-group view-toggle">
-                        <button type="button" class="btn btn-outline-secondary active" id="btnCardView">
-                            <i class="fas fa-th-large"></i>
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" id="btnTableView">
-                            <i class="fas fa-list"></i>
-                        </button>
+                <a href="{{ route('producciones.create') }}" class="btn btn-success btn-sm">
+                    <i class="fas fa-plus mr-1"></i> Nueva cosecha
+                </a>
+            </div>
+        </div>
+
+        <div id="filtrosProduccionPanel" class="filtros-panel collapse {{ request()->hasAny(['buscar','loteid','destinoid','procesoid','maquinaid','fecha_desde','fecha_hasta']) ? 'show' : '' }}">
+            <form method="GET" action="{{ route('producciones.index') }}">
+                <div class="row">
+                    <div class="col-lg-4 col-md-6 mb-2">
+                        <label class="small text-muted mb-1">Buscar</label>
+                        <input type="text" name="buscar" class="form-control form-control-sm" value="{{ request('buscar') }}" placeholder="Lote, cultivo, destino…">
+                    </div>
+                    <div class="col-lg-2 col-md-6 mb-2">
+                        <label class="small text-muted mb-1">Lote</label>
+                        <select name="loteid" class="form-control form-control-sm">
+                            <option value="">Todos</option>
+                            @foreach($lotesFiltro ?? [] as $l)
+                                <option value="{{ $l->loteid }}" @selected(request('loteid') == $l->loteid)>{{ $l->nombre }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-lg-2 col-md-6 mb-2">
+                        <label class="small text-muted mb-1">Destino</label>
+                        <select name="destinoid" class="form-control form-control-sm">
+                            <option value="">Todos</option>
+                            @foreach($destinosFiltro ?? [] as $d)
+                                <option value="{{ $d->destinoproduccionid }}" @selected(request('destinoid') == $d->destinoproduccionid)>{{ $d->nombre }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-lg-2 col-md-6 mb-2">
+                        <label class="small text-muted mb-1">Desde</label>
+                        <input type="date" name="fecha_desde" class="form-control form-control-sm" value="{{ request('fecha_desde') }}">
+                    </div>
+                    <div class="col-lg-2 col-md-6 mb-2">
+                        <label class="small text-muted mb-1">Hasta</label>
+                        <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="{{ request('fecha_hasta') }}">
+                    </div>
+                    @if(($procesosFiltro ?? collect())->isNotEmpty())
+                    <div class="col-lg-3 col-md-6 mb-2">
+                        <label class="small text-muted mb-1">Proceso</label>
+                        <select name="procesoid" class="form-control form-control-sm">
+                            <option value="">Todos</option>
+                            @foreach($procesosFiltro as $pr)
+                                <option value="{{ $pr->procesoplantaid }}" @selected(request('procesoid') == $pr->procesoplantaid)>{{ $pr->nombre }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
+                    @if(($maquinasFiltro ?? collect())->isNotEmpty())
+                    <div class="col-lg-3 col-md-6 mb-2">
+                        <label class="small text-muted mb-1">Máquina</label>
+                        <select name="maquinaid" class="form-control form-control-sm">
+                            <option value="">Todas</option>
+                            @foreach($maquinasFiltro as $mq)
+                                <option value="{{ $mq->maquinaplantaid }}" @selected(request('maquinaid') == $mq->maquinaplantaid)>{{ $mq->nombre }}{{ $mq->codigo ? ' ('.$mq->codigo.')' : '' }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
+                    <div class="col-lg-12 d-flex align-items-end" style="gap: 8px;">
+                        <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-search mr-1"></i> Filtrar</button>
+                        <a href="{{ route('producciones.index') }}" class="btn btn-outline-secondary btn-sm">Limpiar</a>
                     </div>
                 </div>
-            </div>
+            </form>
         </div>
-    </div>
 
-    <div id="cardView">
-        @forelse($producciones as $p)
-            <div class="produccion-card">
-                <div class="produccion-header">
+        <div id="cardView" class="card-body">
+            @forelse($producciones as $p)
+            <div class="item-card-prod">
+                <div class="item-header">
                     <div>
-                        <h5><i class="fas fa-map-marker-alt mr-2 text-success"></i>{{ $p->lote->nombre ?? 'Sin lote' }}</h5>
+                        <h5 class="mb-0 font-weight-bold">
+                            <i class="fas fa-map-marker-alt text-success mr-1"></i>{{ $p->lote->nombre ?? 'Sin lote' }}
+                        </h5>
                         <small class="text-muted">
                             <i class="fas fa-calendar mr-1"></i>
                             {{ $p->fechacosecha ? \Carbon\Carbon::parse($p->fechacosecha)->format('d/m/Y') : '-' }}
                         </small>
                     </div>
-                    <span class="produccion-cantidad">
+                    <span class="cantidad-destacada">
                         {{ number_format($p->cantidad ?? 0, 2) }} {{ $p->unidadMedida->abreviatura ?? 'kg' }}
                     </span>
                 </div>
-                <div class="produccion-body">
-                    <div class="produccion-info">
-                        <div class="produccion-info-item">
-                            <label><i class="fas fa-seedling mr-1"></i> Cultivo</label>
-                            <span>
-                                @if($p->lote && $p->lote->cultivo)
-                                    <span class="badge badge-success">{{ $p->lote->cultivo->nombre }}</span>
-                                @else
-                                    -
-                                @endif
-                            </span>
+                <div class="item-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-2 mb-md-0">
+                            <span class="info-label"><i class="fas fa-seedling mr-1"></i> Cultivo</span>
+                            @if($p->lote && $p->lote->cultivo)
+                                <span class="badge badge-success">{{ $p->lote->cultivo->nombre }}</span>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
                         </div>
-                        <div class="produccion-info-item">
-                            <label><i class="fas fa-warehouse mr-1"></i> Destino</label>
-                            <span>
-                                <span class="badge badge-info">{{ $p->destino->nombre ?? 'No especificado' }}</span>
-                            </span>
+                        <div class="col-md-4 mb-2 mb-md-0">
+                            <span class="info-label"><i class="fas fa-warehouse mr-1"></i> Destino</span>
+                            <span class="badge badge-info">{{ $p->destino->nombre ?? 'No especificado' }}</span>
                         </div>
-                        <div class="produccion-info-item">
-                            <label><i class="fas fa-balance-scale mr-1"></i> Unidad</label>
-                            <span>{{ $p->unidadMedida->nombre ?? '-' }}</span>
+                        <div class="col-md-4">
+                            <span class="info-label"><i class="fas fa-balance-scale mr-1"></i> Unidad</span>
+                            <span>{{ $p->unidadMedida->nombre ?? '—' }}</span>
                         </div>
-
                     </div>
                 </div>
-                <div class="produccion-footer">
+                <div class="item-footer">
                     <small class="text-muted">
                         @if($p->lote)
                             <i class="fas fa-ruler-combined mr-1"></i> {{ $p->lote->superficie ?? 0 }} ha
                         @endif
                     </small>
-                    <div>
-                        <a href="{{ route('producciones.show', $p) }}" class="btn btn-sm btn-info">
+                    <div class="btn-actions">
+                        <a href="{{ route('producciones.show', $p) }}" class="btn btn-sm btn-outline-info" title="Ver">
                             <i class="fas fa-eye"></i>
                         </a>
-                        <a href="{{ route('producciones.edit', $p) }}" class="btn btn-sm btn-warning">
+                        <a href="{{ route('producciones.edit', $p) }}" class="btn btn-sm btn-outline-warning" title="Editar">
                             <i class="fas fa-edit"></i>
                         </a>
                         <form action="{{ route('producciones.destroy', $p) }}" method="POST" class="d-inline"
-                            onsubmit="return confirm('¿Eliminar?')">
+                            onsubmit="return confirm('¿Eliminar este registro de producción?')">
                             @csrf
                             @method('DELETE')
-                            <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </form>
                     </div>
                 </div>
             </div>
-        @empty
-            <div class="card">
-                <div class="card-body text-center py-5">
-                    <i class="fas fa-tractor fa-4x text-muted mb-3"></i>
-                    <h4>No hay producciones</h4>
-                    <a href="{{ route('producciones.create') }}" class="btn btn-success">
-                        <i class="fas fa-plus mr-1"></i> Nueva Producción
-                    </a>
-                </div>
+            @empty
+            <div class="text-center py-5">
+                <i class="fas fa-tractor fa-4x text-muted mb-3"></i>
+                <h5 class="text-muted">No hay producciones registradas</h5>
+                <a href="{{ route('producciones.create') }}" class="btn btn-success mt-2">
+                    <i class="fas fa-plus mr-1"></i> Registrar primera cosecha
+                </a>
             </div>
-        @endforelse
-    </div>
+            @endforelse
+        </div>
 
-    <div id="tableView" style="display: none;">
-        <div class="card">
-            <div class="card-body p-0">
-                <table class="table table-hover mb-0">
-                    <thead class="bg-light">
+        <div id="tableView" class="card-body p-0" style="display: none;">
+            <div class="table-responsive">
+                <table class="table table-modulo table-hover mb-0">
+                    <thead>
                         <tr>
                             <th>Lote</th>
                             <th>Cultivo</th>
@@ -280,71 +233,65 @@
                     </thead>
                     <tbody>
                         @forelse($producciones as $p)
-                            <tr>
-                                <td><strong>{{ $p->lote->nombre ?? '-' }}</strong></td>
-                                <td>
-                                    @if($p->lote && $p->lote->cultivo)
-                                        <span class="badge badge-success">{{ $p->lote->cultivo->nombre }}</span>
-                                    @else
-                                        -
-                                    @endif
-                                </td>
-                                <td>
-                                    <strong class="text-success">
-                                        {{ number_format($p->cantidad ?? 0, 2) }} {{ $p->unidadMedida->abreviatura ?? 'kg' }}
-                                    </strong>
-                                </td>
-                                <td>{{ $p->fechacosecha ? \Carbon\Carbon::parse($p->fechacosecha)->format('d/m/Y') : '-' }}</td>
-                                <td><span class="badge badge-info">{{ $p->destino->nombre ?? '-' }}</span></td>
-                                <td>
-                                    <a href="{{ route('producciones.show', $p) }}" class="btn btn-sm btn-info">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="{{ route('producciones.edit', $p) }}" class="btn btn-sm btn-warning">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <form action="{{ route('producciones.destroy', $p) }}" method="POST" class="d-inline"
-                                        onsubmit="return confirm('¿Eliminar?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
-                                    </form>
-                                </td>
-                            </tr>
+                        <tr>
+                            <td><strong>{{ $p->lote->nombre ?? '—' }}</strong></td>
+                            <td>
+                                @if($p->lote && $p->lote->cultivo)
+                                    <span class="badge badge-success">{{ $p->lote->cultivo->nombre }}</span>
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td>
+                                <strong class="text-success">
+                                    {{ number_format($p->cantidad ?? 0, 2) }} {{ $p->unidadMedida->abreviatura ?? 'kg' }}
+                                </strong>
+                            </td>
+                            <td>{{ $p->fechacosecha ? \Carbon\Carbon::parse($p->fechacosecha)->format('d/m/Y') : '—' }}</td>
+                            <td><span class="badge badge-info">{{ $p->destino->nombre ?? '—' }}</span></td>
+                            <td class="btn-actions">
+                                <a href="{{ route('producciones.show', $p) }}" class="btn btn-sm btn-outline-info"><i class="fas fa-eye"></i></a>
+                                <a href="{{ route('producciones.edit', $p) }}" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i></a>
+                                <form action="{{ route('producciones.destroy', $p) }}" method="POST" class="d-inline"
+                                    onsubmit="return confirm('¿Eliminar este registro de producción?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
                         @empty
-                            <tr>
-                                <td colspan="6" class="text-center py-4">No hay producciones</td>
-                            </tr>
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">No hay producciones registradas</td>
+                        </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
         </div>
-    </div>
 
-    @if($producciones->hasPages())
-        <div class="card mt-4">
-            <div class="card-body d-flex justify-content-center">
-                {{ $producciones->links() }}
-            </div>
+        @if($producciones->hasPages())
+        <div class="card-footer d-flex justify-content-center">
+            {{ $producciones->links() }}
         </div>
-    @endif
+        @endif
+    </div>
+</div>
 @endsection
 
 @push('scripts')
-    <script>
-        $(function () {
-            $('#btnCardView').on('click', function () {
-                $(this).addClass('active').siblings().removeClass('active');
-                $('#cardView').show();
-                $('#tableView').hide();
-            });
-
-            $('#btnTableView').on('click', function () {
-                $(this).addClass('active').siblings().removeClass('active');
-                $('#tableView').show();
-                $('#cardView').hide();
-            });
-        });
-    </script>
+<script>
+$(function () {
+    $('#btnCardView').on('click', function () {
+        $(this).addClass('active').siblings().removeClass('active');
+        $('#cardView').show();
+        $('#tableView').hide();
+    });
+    $('#btnTableView').on('click', function () {
+        $(this).addClass('active').siblings().removeClass('active');
+        $('#tableView').show();
+        $('#cardView').hide();
+    });
+});
+</script>
 @endpush

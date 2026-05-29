@@ -66,35 +66,112 @@ class ProduccionController extends Controller
         return $cantidad * $factor;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $producciones = Produccion::with(['lote.usuario', 'lote.cultivo', 'destino', 'unidadMedida', 'procesoPlanta', 'maquinaPlanta', 'almacenamientos.almacen'])
-            ->orderBy('produccionid', 'desc')
-            ->paginate(15);
+        $query = $this->produccionesFilteredQuery($request);
 
-        return view('producciones.index', compact('producciones'));
+        $stats = [
+            'total' => (clone $query)->count(),
+            'kg_total' => (float) (clone $query)->sum('cantidad'),
+            'lotes' => (clone $query)->distinct('loteid')->count('loteid'),
+            'promedio' => 0,
+        ];
+        if ($stats['total'] > 0) {
+            $stats['promedio'] = $stats['kg_total'] / $stats['total'];
+        }
+
+        $producciones = $query
+            ->with(['lote.usuario', 'lote.cultivo', 'destino', 'unidadMedida', 'procesoPlanta', 'maquinaPlanta', 'almacenamientos.almacen'])
+            ->orderBy('produccionid', 'desc')
+            ->paginate(15)
+            ->withQueryString();
+
+        $lotesFiltro = Lote::query()->orderBy('nombre')->get(['loteid', 'nombre']);
+        $destinosFiltro = DestinoProduccion::query()->orderBy('nombre')->get(['destinoproduccionid', 'nombre']);
+        $procesosFiltro = ProcesoPlanta::query()->where('activo', true)->orderBy('nombre')->get(['procesoplantaid', 'nombre']);
+        $maquinasFiltro = MaquinaPlanta::query()->where('activo', true)->orderBy('nombre')->get(['maquinaplantaid', 'nombre', 'codigo']);
+
+        return view('producciones.index', compact(
+            'producciones',
+            'stats',
+            'lotesFiltro',
+            'destinosFiltro',
+            'procesosFiltro',
+            'maquinasFiltro'
+        ));
+    }
+
+    private function produccionesFilteredQuery(Request $request)
+    {
+        $query = Produccion::query();
+
+        if ($request->filled('loteid')) {
+            $query->where('loteid', (int) $request->loteid);
+        }
+
+        if ($request->filled('destinoid')) {
+            $query->where('destinoproduccionid', (int) $request->destinoid);
+        }
+
+        if ($request->filled('procesoid')) {
+            $query->where('procesoplantaid', (int) $request->procesoid);
+        }
+
+        if ($request->filled('maquinaid')) {
+            $query->where('maquinaplantaid', (int) $request->maquinaid);
+        }
+
+        if ($request->filled('fecha_desde')) {
+            $query->whereDate('fechacosecha', '>=', $request->fecha_desde);
+        }
+
+        if ($request->filled('fecha_hasta')) {
+            $query->whereDate('fechacosecha', '<=', $request->fecha_hasta);
+        }
+
+        if ($request->filled('buscar')) {
+            $buscar = '%'.trim((string) $request->buscar).'%';
+            $query->where(function ($q) use ($buscar) {
+                $q->whereHas('lote', fn ($l) => $l->where('nombre', 'like', $buscar))
+                    ->orWhereHas('lote.cultivo', fn ($c) => $c->where('nombre', 'like', $buscar))
+                    ->orWhereHas('destino', fn ($d) => $d->where('nombre', 'like', $buscar))
+                    ->orWhere('observaciones', 'like', $buscar);
+            });
+        }
+
+        return $query;
     }
 
     public function create()
     {
-        // Solo lotes en estado "en producción" pueden ser cosechados
-        $lotes = Lote::with(['usuario', 'cultivo', 'estadoTipo'])
+        $lotesQuery = Lote::with(['usuario', 'cultivo', 'estadoTipo'])
             ->whereHas('estadoTipo', function ($q) {
-                $q->where('nombre', 'en producción');
-            })
-            ->get();
+                $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en producción']);
+            });
 
-        // Solo unidades de peso para la cosecha
+        if (auth()->user()?->hasRole('agricultor')) {
+            $lotesQuery->where('usuarioid', auth()->id());
+        }
+
+        $lotes = $lotesQuery->orderBy('nombre')->get();
+
         $unidades = UnidadMedida::where('categoria', 'peso')->get();
-
-        // Almacenes activos con su ocupación actual
         $almacenes = Almacen::with(['tipoAlmacen', 'unidadMedida', 'almacenamientos'])
             ->where('activo', true)
             ->get();
         $procesos = ProcesoPlanta::where('activo', true)->orderBy('nombre')->get();
         $maquinas = MaquinaPlanta::where('activo', true)->orderBy('nombre')->get();
 
-        return view('producciones.create', compact('lotes', 'unidades', 'almacenes', 'procesos', 'maquinas'));
+        $lotePreseleccionado = $lotes->count() === 1 ? $lotes->first()->loteid : old('loteid');
+
+        return view('producciones.create', compact(
+            'lotes',
+            'unidades',
+            'almacenes',
+            'procesos',
+            'maquinas',
+            'lotePreseleccionado'
+        ));
     }
 
     public function store(Request $request)
@@ -116,20 +193,21 @@ class ProduccionController extends Controller
             $lote = Lote::with(['estadoTipo', 'cultivo'])->findOrFail($data['loteid']);
 
             // Validar que el lote esté en producción
-            if ($lote->estadoTipo->nombre !== 'en producción') {
+            if (strtolower(trim($lote->estadoTipo->nombre ?? '')) !== 'en producción') {
                 return back()->withErrors([
-                    'loteid' => "El lote debe estar 'en producción' para registrar cosecha. Estado actual: {$lote->estadoTipo->nombre}"
+                    'loteid' => "El lote debe estar 'en producción' para registrar cosecha. Estado actual: {$lote->estadoTipo->nombre}",
                 ])->withInput();
             }
 
-            // Obtener destino "almacenamiento" por defecto
             $destinoAlmacenamiento = DestinoProduccion::where('nombre', 'almacenamiento')->first();
+            $unidadProduccion = UnidadMedida::find($data['unidadmedidaid']);
+            $cantidadBaseKg = $this->convertirAKg((float) $data['cantidad'], $unidadProduccion);
 
-            // Crear la producción con fecha actual
             $produccion = Produccion::create([
                 'loteid' => $data['loteid'],
                 'cantidad' => $data['cantidad'],
                 'unidadmedidaid' => $data['unidadmedidaid'],
+                'cantidad_base' => $cantidadBaseKg,
                 'fechacosecha' => now()->toDateString(),
                 'destinoproduccionid' => $destinoAlmacenamiento->destinoproduccionid ?? null,
                 'procesoplantaid' => $data['procesoplantaid'] ?? null,
@@ -171,7 +249,7 @@ class ProduccionController extends Controller
                 // 3) Nueva cantidad a ingresar en KG
                 // =====================================
                 $unidadProduccion = UnidadMedida::find($data['unidadmedidaid']);
-                $nuevaCantidadKg = $this->convertirAKg((float) $data['cantidad'], $unidadProduccion);
+                $nuevaCantidadKg = $cantidadBaseKg;
 
                 $disponibleKg = $capacidadKg - $ocupadoKg;
 

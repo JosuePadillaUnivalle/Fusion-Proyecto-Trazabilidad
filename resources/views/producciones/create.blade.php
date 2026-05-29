@@ -10,6 +10,7 @@
 @endsection
 
 @push('styles')
+@include('partials.modulo-produccion-styles')
 <style>
     .form-card {
         border: none;
@@ -108,13 +109,35 @@
         padding: 15px;
         border-left: 4px solid #2c5530;
     }
+    .form-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .form-card .card-header {
+        background: linear-gradient(135deg, #2c5530, #4a7c59);
+        color: white;
+        border-radius: 12px 12px 0 0 !important;
+        padding: 1.25rem;
+    }
+    .guia-campo {
+        background: #f8fbf8;
+        border-left: 3px solid #2c5530;
+        border-radius: 0 8px 8px 0;
+        padding: 0.65rem 0.85rem;
+        margin-bottom: 0.75rem;
+        font-size: 0.85rem;
+        color: #495057;
+    }
+    .guia-campo strong { color: #2c5530; }
 </style>
 @endpush
 
 @section('content')
-<div class="row">
-    <div class="col-lg-8">
-        <div class="card form-card">
+<div class="modulo-prod">
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card form-card card-modulo-main">
             <div class="card-header">
                 <h3 class="card-title mb-0"><i class="fas fa-tractor mr-2"></i>Registrar Cosecha</h3>
             </div>
@@ -135,12 +158,17 @@
                     
                     {{-- Lote --}}
                     <div class="form-group">
-                        <label><i class="fas fa-map-marked-alt mr-1 text-success"></i> Lote a Cosechar <span class="text-danger">*</span></label>
+                        <label><i class="fas fa-map-marked-alt mr-1 text-success"></i> Lote a cosechar <span class="text-danger">*</span></label>
+                        <div class="guia-campo mb-2">
+                            <strong>¿Para qué sirve?</strong> Identifica el campo parcelado que ya está en etapa productiva.
+                            Solo aparecen lotes en estado <em>en producción</em> (listos para cosechar).
+                        </div>
                         <select name="loteid" id="loteid" class="form-control" required>
                             <option value="">-- Seleccione un lote en producción --</option>
                             @foreach($lotes as $l)
                                 <option value="{{ $l->loteid }}"
-                                        data-responsable="{{ $l->usuario->nombre ?? '' }} {{ $l->usuario->apellido ?? '' }}"
+                                        @selected((string) ($lotePreseleccionado ?? '') === (string) $l->loteid)
+                                        data-responsable="{{ trim(($l->usuario->nombre ?? '').' '.($l->usuario->apellido ?? '')) }}"
                                         data-cultivo="{{ $l->cultivo->nombre ?? 'Sin cultivo' }}"
                                         data-superficie="{{ $l->superficie }}">
                                     {{ $l->nombre }} - {{ $l->cultivo->nombre ?? 'Sin cultivo' }} ({{ $l->superficie }} ha)
@@ -149,14 +177,17 @@
                         </select>
                         @if($lotes->isEmpty())
                             <small class="form-text text-warning">
-                                <i class="fas fa-exclamation-triangle"></i> No hay lotes en estado "en producción"
+                                <i class="fas fa-exclamation-triangle"></i> No hay lotes en estado «en producción».
+                                Cambia el estado del lote en <a href="{{ route('lotes.index') }}">Gestión de lotes</a> antes de registrar la cosecha.
                             </small>
                         @else
-                            <small class="form-text text-muted">Solo lotes en estado "en producción"</small>
+                            <small class="form-text text-muted">
+                                {{ $lotes->count() === 1 ? 'Un solo lote disponible — ya está preseleccionado.' : 'Solo lotes en estado «en producción».' }}
+                            </small>
                         @endif
                     </div>
 
-                    <div id="loteInfo" class="info-panel mb-3" style="display: none;">
+                    <div id="loteInfo" class="info-panel mb-3" style="{{ ($lotePreseleccionado ?? null) ? '' : 'display: none;' }}">
                         <strong><i class="fas fa-leaf mr-1 text-success"></i> Cultivo:</strong> <span id="infoCultivo"></span>
                         <span class="mx-2">|</span>
                         <strong><i class="fas fa-user mr-1"></i> Responsable:</strong> <span id="infoResponsable"></span>
@@ -166,6 +197,10 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label><i class="fas fa-cogs mr-1 text-success"></i> Proceso de planta</label>
+                                <div class="guia-campo mb-2">
+                                    <strong>Opcional.</strong> Indica qué tratamiento industrial aplicó la cosecha (lavado, secado, empaque, etc.).
+                                    Catálogo en <a href="{{ route('procesos-planta.index') }}">Procesos de planta</a>.
+                                </div>
                                 <select name="procesoplantaid" class="form-control">
                                     <option value="">-- Sin proceso específico --</option>
                                     @foreach($procesos as $proceso)
@@ -177,6 +212,10 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label><i class="fas fa-industry mr-1 text-success"></i> Máquina usada</label>
+                                <div class="guia-campo mb-2">
+                                    <strong>Opcional.</strong> Registra el equipo utilizado (cosechadora, secadora, embolsadora).
+                                    Catálogo en <a href="{{ route('maquinas-planta.index') }}">Máquinas de planta</a>.
+                                </div>
                                 <select name="maquinaplantaid" class="form-control">
                                     <option value="">-- Sin máquina específica --</option>
                                     @foreach($maquinas as $maquina)
@@ -191,7 +230,10 @@
                     <div class="row">
                         <div class="col-md-8">
                             <div class="form-group">
-                                <label><i class="fas fa-balance-scale mr-1 text-success"></i> Cantidad Cosechada <span class="text-danger">*</span></label>
+                                <label><i class="fas fa-balance-scale mr-1 text-success"></i> Cantidad cosechada <span class="text-danger">*</span></label>
+                                <div class="guia-campo mb-2">
+                                    <strong>Peso o volumen</strong> obtenido en esta cosecha. El sistema convierte automáticamente a kilogramos para inventario y almacén.
+                                </div>
                                 <input type="number" step="0.01" name="cantidad" id="cantidad"
                                        class="form-control" min="0.01" required value="{{ old('cantidad') }}"
                                        placeholder="Ej: 500">
@@ -215,13 +257,20 @@
 
                     {{-- Sección de Almacenamiento --}}
                     <div class="almacen-section" id="almacenSection">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0"><i class="fas fa-warehouse mr-2"></i>Enviar a Almacén</h6>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0"><i class="fas fa-warehouse mr-2"></i>Enviar a almacén</h6>
                             <div class="custom-control custom-switch">
                                 <input type="checkbox" class="custom-control-input" id="enviarAlmacen" name="enviar_almacen" value="1">
                                 <label class="custom-control-label" for="enviarAlmacen">Almacenar cosecha</label>
                             </div>
                         </div>
+                        <div class="guia-campo mb-3">
+                            <strong>Opcional pero recomendado.</strong> Si activas el interruptor, la cosecha ingresa al inventario del almacén elegido.
+                            El sistema valida capacidad disponible y sugiere el almacén según el cultivo.
+                        </div>
+                        <p class="small text-muted mb-2" id="almacen-seleccionado">
+                            <i class="fas fa-warehouse mr-1"></i> <strong>Almacén:</strong> ninguno seleccionado
+                        </p>
 
                         <div id="almacenOptions" style="display: none;">
                             <p class="text-muted small mb-3">
@@ -297,7 +346,10 @@
                     {{-- Observaciones --}}
                     <div class="form-group mt-4">
                         <label><i class="fas fa-comment mr-1"></i> Observaciones</label>
-                        <textarea name="observaciones" class="form-control" rows="2" 
+                        <div class="guia-campo mb-2">
+                            <strong>Notas libres:</strong> calidad del producto, humedad, daños, clima del día o cualquier detalle para trazabilidad.
+                        </div>
+                        <textarea name="observaciones" class="form-control" rows="2"
                                   placeholder="Calidad, condiciones de la cosecha, etc...">{{ old('observaciones') }}</textarea>
                     </div>
 
@@ -316,64 +368,7 @@
             </form>
         </div>
     </div>
-
-    {{-- Panel lateral --}}
-    <div class="col-lg-4">
-        <div class="card mb-3">
-            <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="fas fa-info-circle mr-1 text-success"></i> Información</h6>
-            </div>
-            <div class="card-body">
-                <p class="small text-muted mb-2">
-                    <i class="fas fa-calendar mr-1"></i> <strong>Fecha:</strong> Se registra automáticamente (hoy)
-                </p>
-                <p class="small text-muted mb-0" id="infoAlmacenSelected">
-                    <i class="fas fa-warehouse mr-1"></i> <strong>Almacén:</strong> No seleccionado
-                </p>
-            </div>
-        </div>
-
-        <div class="card border-success">
-            <div class="card-header bg-success text-white">
-                <h6 class="mb-0"><i class="fas fa-check-circle mr-1"></i> Acciones Automáticas</h6>
-            </div>
-            <div class="card-body">
-                <ul class="list-unstyled mb-0 small">
-                    <li class="mb-2">
-                        <i class="fas fa-check text-success mr-1"></i>
-                        Registrar producción
-                    </li>
-                    <li class="mb-2" id="actionAlmacen" style="display: none;">
-                        <i class="fas fa-check text-success mr-1"></i>
-                        Enviar al almacén seleccionado
-                    </li>
-                    <li class="mb-2">
-                        <i class="fas fa-check text-success mr-1"></i>
-                        Cambiar estado del lote a "cosechado"
-                    </li>
-                    <li>
-                        <i class="fas fa-check text-success mr-1"></i>
-                        Guardar en historial de estados
-                    </li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="card mt-3 border-info">
-            <div class="card-header bg-info text-white">
-                <h6 class="mb-0"><i class="fas fa-sitemap mr-1"></i> Flujo de Producción</h6>
-            </div>
-            <div class="card-body small text-center">
-                <div class="mb-1"><i class="fas fa-seedling text-success"></i> Siembra</div>
-                <div class="mb-1"><i class="fas fa-arrow-down text-muted"></i></div>
-                <div class="mb-1 font-weight-bold text-success"><i class="fas fa-tractor"></i> <strong>Cosecha</strong></div>
-                <div class="mb-1"><i class="fas fa-arrow-down text-muted"></i></div>
-                <div class="mb-1"><i class="fas fa-warehouse text-info"></i> Almacenamiento</div>
-                <div class="mb-1"><i class="fas fa-arrow-down text-muted"></i></div>
-                <div><i class="fas fa-dollar-sign text-warning"></i> Venta</div>
-            </div>
-        </div>
-    </div>
+</div>
 </div>
 @endsection
 
@@ -406,6 +401,14 @@
 }
 
     $(document).ready(function() {
+
+        if ($('#loteid').val()) {
+            $('#loteid').trigger('change');
+        }
+
+        if ($('.almacen-card').length === 1 && $('#enviarAlmacen').is(':checked')) {
+            $('.almacen-card').first().trigger('click');
+        }
         
         // Función de recomendación inteligente
         function recomendarAlmacen(cultivo) {
@@ -498,7 +501,7 @@
 
                 $('#almacenOptions').prepend(`
                     <div class="alert alert-info alert-dismissible fade show p-2 small mb-2 alert-suggestion" role="alert">
-                        <i class="fas fa-magic mr-1"></i> Sugerencia Inteligente: <strong>${nombre}</strong> (Mejor coincidencia para ${cultivo})
+                        <i class="fas fa-lightbulb mr-1"></i> Sugerencia: <strong>${nombre}</strong> (adecuado para ${cultivo})
                         <button type="button" class="close p-2" data-dismiss="alert" aria-label="Close">
                             <span aria-hidden="true">&times;</span>
                         </button>
@@ -533,16 +536,14 @@
             if ($(this).is(':checked')) {
                 $('#almacenOptions').slideDown();
                 $('#almacenSection').addClass('active');
-                $('#actionAlmacen').show();
             } else {
                 $('#almacenOptions').slideUp();
                 $('#almacenSection').removeClass('active');
-                $('#actionAlmacen').hide();
                 $('.almacen-card').removeClass('selected').css('background', 'white').css('border-color', '#dee2e6');
                 $('.almacen-card .fa-check-circle').hide();
                 $('#almacenid').val('');
-                $('.alert-dismissible').remove(); // Quitar alertas de sugerencia
-                $('#infoAlmacenSelected').html('<i class="fas fa-warehouse mr-1"></i> <strong>Almacén:</strong> No seleccionado');
+                $('.alert-dismissible').remove();
+                $('#almacen-seleccionado').html('<i class="fas fa-warehouse mr-1"></i> <strong>Almacén:</strong> ninguno seleccionado');
             }
         });
 
@@ -561,7 +562,7 @@
             $(this).find('.fa-check-circle').show();
 
             $('#almacenid').val(id);
-            $('#infoAlmacenSelected').html('<i class="fas fa-warehouse mr-1"></i> <strong>Almacén:</strong> ' + nombre);
+            $('#almacen-seleccionado').html('<i class="fas fa-warehouse mr-1"></i> <strong>Almacén:</strong> ' + nombre);
 
             // Verificar capacidad
             const cantidad = parseFloat($('#cantidad').val()) || 0;
