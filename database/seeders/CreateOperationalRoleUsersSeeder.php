@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Almacen;
 use App\Models\Usuario;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -34,15 +33,6 @@ class CreateOperationalRoleUsersSeeder extends Seeder
                 'password' => self::DEMO_PASSWORD,
             ],
             [
-                'email' => 'operador@agrofusion.com',
-                'nombre' => 'Usuario',
-                'apellido' => 'Operador',
-                'nombreusuario' => 'operador',
-                'telefono' => '700000002',
-                'role' => 'operador',
-                'password' => self::DEMO_PASSWORD,
-            ],
-            [
                 'email' => 'planta@agrofusion.com',
                 'nombre' => 'Usuario',
                 'apellido' => 'Planta',
@@ -58,15 +48,6 @@ class CreateOperationalRoleUsersSeeder extends Seeder
                 'nombreusuario' => 'transportista',
                 'telefono' => '700000004',
                 'role' => 'transportista',
-                'password' => self::DEMO_PASSWORD,
-            ],
-            [
-                'email' => 'almacen@agrofusion.com',
-                'nombre' => 'Usuario',
-                'apellido' => 'Almacen',
-                'nombreusuario' => 'almacen',
-                'telefono' => '700000005',
-                'role' => 'almacen',
                 'password' => self::DEMO_PASSWORD,
             ],
         ];
@@ -91,14 +72,6 @@ class CreateOperationalRoleUsersSeeder extends Seeder
             );
 
             $usuario->syncRoles([$roleName]);
-
-            if ($roleName === 'almacen') {
-                $almacen = Almacen::query()->orderBy('almacenid')->first();
-                if ($almacen) {
-                    $usuario->almacenid = $almacen->almacenid;
-                    $usuario->save();
-                }
-            }
         }
     }
 }

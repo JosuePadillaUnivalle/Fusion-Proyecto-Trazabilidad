@@ -8,38 +8,57 @@ use Spatie\Permission\Models\Role;
 
 class RoleSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
+    public const ROLES_CANONICOS = ['admin', 'agricultor', 'planta', 'transportista'];
+
+    public const ROLES_LEGACY = ['operador', 'almacen', 'Operador', 'Almacen', 'Admin', 'Agricultor'];
+
     public function run(): void
     {
-        // Roles estandar para Fusion + OrgTrack (idempotente)
-        $adminRole = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
-        $operadorRole = Role::firstOrCreate(['name' => 'operador', 'guard_name' => 'web']);
-        Role::firstOrCreate(['name' => 'planta', 'guard_name' => 'web']);
-        Role::firstOrCreate(['name' => 'transportista', 'guard_name' => 'web']);
-        Role::firstOrCreate(['name' => 'almacen', 'guard_name' => 'web']);
+        foreach (self::ROLES_CANONICOS as $nombre) {
+            Role::firstOrCreate(['name' => $nombre, 'guard_name' => 'web']);
+        }
 
-        // Compatibilidad con roles historicos ya usados en el proyecto
         Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'web']);
-        Role::firstOrCreate(['name' => 'agricultor', 'guard_name' => 'web']);
-        Role::firstOrCreate(['name' => 'Agricultor', 'guard_name' => 'web']);
 
-        // Asignacion estandar de roles a usuarios existentes sin duplicidad
+        $agricultorRole = Role::findByName('agricultor', 'web');
+
+        Usuario::query()
+            ->where(function ($q) {
+                $q->whereIn('role', ['operador', 'almacen'])
+                    ->orWhereHas('roles', fn ($r) => $r->whereIn('name', ['operador', 'almacen']));
+            })
+            ->each(function (Usuario $usuario) use ($agricultorRole) {
+                $usuario->syncRoles([$agricultorRole->name]);
+                $usuario->role = 'agricultor';
+                $usuario->fechamodificacion = now();
+                $usuario->save();
+            });
+
+        $adminRole = Role::findByName('admin', 'web');
         $adminUser = Usuario::where('email', 'admin@agrofusion.com')->first();
         if ($adminUser) {
             $adminUser->syncRoles([$adminRole->name]);
-            $adminUser->role = $adminRole->name;
+            $adminUser->role = 'admin';
             $adminUser->fechamodificacion = now();
             $adminUser->save();
         }
 
-        $operadorUser = Usuario::where('email', 'operador@agrofusion.com')->first();
-        if ($operadorUser) {
-            $operadorUser->syncRoles([$operadorRole->name]);
-            $operadorUser->role = $operadorRole->name;
-            $operadorUser->fechamodificacion = now();
-            $operadorUser->save();
+        $agricultorUser = Usuario::where('email', 'agricultor@agrofusion.com')->first();
+        if ($agricultorUser) {
+            $agricultorUser->syncRoles([$agricultorRole->name]);
+            $agricultorUser->role = 'agricultor';
+            $agricultorUser->fechamodificacion = now();
+            $agricultorUser->save();
+        }
+
+        foreach (['operador@agrofusion.com', 'almacen@agrofusion.com'] as $email) {
+            $legacy = Usuario::where('email', $email)->first();
+            if ($legacy) {
+                $legacy->syncRoles([$agricultorRole->name]);
+                $legacy->role = 'agricultor';
+                $legacy->fechamodificacion = now();
+                $legacy->save();
+            }
         }
     }
 }

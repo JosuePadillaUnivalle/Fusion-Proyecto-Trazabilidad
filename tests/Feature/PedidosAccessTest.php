@@ -43,21 +43,13 @@ class PedidosAccessTest extends TestCase
         $this->get(route('pedidos.create'))->assertOk();
     }
 
-    public function test_operador_ve_y_actualiza_pero_no_crea_pedidos(): void
-    {
-        $operador = $this->createUser('operador');
-        $this->actingAs($operador);
-
-        $this->get(route('pedidos.index'))->assertOk();
-        $this->get(route('pedidos.create'))->assertForbidden();
-    }
-
-    public function test_agricultor_no_accede_a_pedidos(): void
+    public function test_agricultor_ve_pedidos_sin_crear(): void
     {
         $agricultor = $this->createUser('agricultor');
         $this->actingAs($agricultor);
 
-        $this->get(route('pedidos.index'))->assertForbidden();
+        $this->get(route('pedidos.index'))->assertOk();
+        $this->get(route('pedidos.create'))->assertForbidden();
     }
 }
 

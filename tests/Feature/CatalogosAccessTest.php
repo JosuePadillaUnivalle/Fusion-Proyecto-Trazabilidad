@@ -35,19 +35,12 @@ class CatalogosAccessTest extends TestCase
         return $user;
     }
 
-    public function test_operador_puede_ver_catalogos_api(): void
-    {
-        $operador = $this->createUser('operador');
-        Sanctum::actingAs($operador);
-
-        $this->getJson('/api/cultivos')->assertOk();
-    }
-
     public function test_agricultor_puede_ver_catalogos_api(): void
     {
         $agricultor = $this->createUser('agricultor');
         Sanctum::actingAs($agricultor);
 
+        $this->getJson('/api/cultivos')->assertOk();
         $this->getJson('/api/tipoinsumos')->assertOk();
     }
 }

@@ -20,6 +20,7 @@ use App\Models\ProductoDistribucion;
 use App\Models\RutaMultiEntrega;
 use App\Models\RutaParada;
 use App\Models\SeguimientoEnvioGps;
+use App\Models\TipoVehiculo;
 use App\Models\Usuario;
 use App\Models\Vehiculo;
 use Illuminate\Database\Seeder;
@@ -150,6 +151,16 @@ class EnviosDistribucionModuloSeeder extends Seeder
             return;
         }
 
+        $tipoPorPlaca = [
+            'SCZ-MOD-01' => 'CAMION_GR',
+            'SCZ-MOD-02' => 'CAMIONETA',
+            'SCZ-MOD-03' => 'CAMION_PQ',
+        ];
+
+        $tipoIds = TipoVehiculo::query()
+            ->whereIn('codigo', array_values($tipoPorPlaca))
+            ->pluck('tipovehiculoid', 'codigo');
+
         $defs = [
             ['placa' => 'SCZ-MOD-01', 'marca' => 'Volvo', 'modelo' => 'FH', 'anio' => 2022],
             ['placa' => 'SCZ-MOD-02', 'marca' => 'Toyota', 'modelo' => 'Hilux', 'anio' => 2021],
@@ -157,6 +168,8 @@ class EnviosDistribucionModuloSeeder extends Seeder
         ];
 
         foreach ($defs as $v) {
+            $tipoCodigo = $tipoPorPlaca[$v['placa']] ?? null;
+
             Vehiculo::updateOrCreate(
                 ['placa' => $v['placa']],
                 [
@@ -165,6 +178,7 @@ class EnviosDistribucionModuloSeeder extends Seeder
                     'anio' => $v['anio'],
                     'color' => 'Blanco',
                     'activo' => true,
+                    'tipovehiculoid' => $tipoCodigo ? ($tipoIds[$tipoCodigo] ?? null) : null,
                 ]
             );
         }

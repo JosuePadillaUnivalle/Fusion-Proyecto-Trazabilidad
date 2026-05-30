@@ -44,13 +44,13 @@ class AlmacenMovimientosAccessTest extends TestCase
         $this->get(route('almacen-movimientos.create', ['naturaleza' => 'ingreso']))->assertOk();
     }
 
-    public function test_operador_solo_tiene_lectura_movimientos(): void
+    public function test_agricultor_puede_ver_y_crear_movimientos(): void
     {
-        $operador = $this->createUser('operador');
-        $this->actingAs($operador);
+        $agricultor = $this->createUser('agricultor');
+        $this->actingAs($agricultor);
 
         $this->get(route('almacen-movimientos.index'))->assertOk();
-        $this->get(route('almacen-movimientos.create', ['naturaleza' => 'salida']))->assertForbidden();
+        $this->get(route('almacen-movimientos.create', ['naturaleza' => 'salida']))->assertOk();
     }
 
     public function test_transportista_no_accede_a_movimientos_internos(): void

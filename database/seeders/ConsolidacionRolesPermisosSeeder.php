@@ -6,6 +6,10 @@ use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
+/**
+ * Permisos legacy de módulos internos (compatibilidad con código antiguo).
+ * Los roles canónicos se sincronizan en RolePermissionSeeder desde permission_matrix.
+ */
 class ConsolidacionRolesPermisosSeeder extends Seeder
 {
     public function run(): void
@@ -27,21 +31,15 @@ class ConsolidacionRolesPermisosSeeder extends Seeder
 
         $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
         $agricultor = Role::firstOrCreate(['name' => 'agricultor', 'guard_name' => 'web']);
-        $operador = Role::firstOrCreate(['name' => 'operador', 'guard_name' => 'web']);
 
-        $admin->syncPermissions($permisos);
-        $agricultor->syncPermissions([
-            'dashboard.ver',
-            'lotes.gestionar',
-            'produccion.gestionar',
-        ]);
-        $operador->syncPermissions([
+        $admin->givePermissionTo($permisos);
+        $agricultor->givePermissionTo([
             'dashboard.ver',
             'lotes.gestionar',
             'produccion.gestionar',
             'pedidos.gestionar',
             'certificaciones.gestionar',
+            'inventario.gestionar',
         ]);
     }
 }
-

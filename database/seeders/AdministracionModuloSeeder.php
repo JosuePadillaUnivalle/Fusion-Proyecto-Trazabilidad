@@ -114,15 +114,7 @@ class AdministracionModuloSeeder extends Seeder
         }
 
         if (Schema::hasTable('estadolote_tipo')) {
-            $hasDesc = Schema::hasColumn('estadolote_tipo', 'descripcion');
-            $estados = ['En certificación', 'Suspendido', 'Archivado'];
-            foreach ($estados as $nombre) {
-                $data = ['nombre' => $nombre];
-                if ($hasDesc) {
-                    $data['descripcion'] = self::MARK.' Estado administrativo demo.';
-                }
-                EstadoLoteTipo::updateOrCreate(['nombre' => $nombre], $data);
-            }
+            // Estados canónicos definidos en EstadoLoteCatalogo / migración consolidate_estado_lote_catalogo.
         }
 
         if (Schema::hasTable('estadoloteinsumo')) {

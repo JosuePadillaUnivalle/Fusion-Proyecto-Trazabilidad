@@ -34,9 +34,10 @@ class DatosPruebaSeeder extends Seeder
         DB::table('cultivo')->updateOrInsert(['nombre' => 'Papa'], []);
         DB::table('cultivo')->updateOrInsert(['nombre' => 'Lechuga'], []);
 
-        DB::table('estadolote_tipo')->updateOrInsert(['nombre' => 'disponible'], []);
-        DB::table('estadolote_tipo')->updateOrInsert(['nombre' => 'en producción'], []);
-        DB::table('estadolote_tipo')->updateOrInsert(['nombre' => 'cosechado'], []);
+        DB::table('estadolote_tipo')->updateOrInsert(['nombre' => 'planificado'], ['nombre' => 'Planificado']);
+        DB::table('estadolote_tipo')->updateOrInsert(['nombre' => 'sembrado'], ['nombre' => 'Sembrado']);
+        DB::table('estadolote_tipo')->updateOrInsert(['nombre' => 'en crecimiento'], ['nombre' => 'En crecimiento']);
+        DB::table('estadolote_tipo')->updateOrInsert(['nombre' => 'cosechado'], ['nombre' => 'Cosechado']);
 
         DB::table('destinoproduccion')->updateOrInsert(['nombre' => 'almacenamiento'], []);
         DB::table('destinoproduccion')->updateOrInsert(['nombre' => 'venta'], []);
@@ -77,7 +78,7 @@ class DatosPruebaSeeder extends Seeder
 
         $kgId = DB::table('unidadmedida')->where('nombre', 'Kilogramo')->value('unidadmedidaid');
         $haId = DB::table('unidadmedida')->where('nombre', 'Hectárea')->value('unidadmedidaid');
-        $estadoProdId = DB::table('estadolote_tipo')->where('nombre', 'en producción')->value('estadolotetipoid');
+        $estadoProdId = DB::table('estadolote_tipo')->whereRaw('LOWER(TRIM(nombre)) = ?', ['en crecimiento'])->value('estadolotetipoid');
         $estadoCosechadoId = DB::table('estadolote_tipo')->where('nombre', 'cosechado')->value('estadolotetipoid');
         $destinoAlmacenId = DB::table('destinoproduccion')->where('nombre', 'almacenamiento')->value('destinoproduccionid');
 
