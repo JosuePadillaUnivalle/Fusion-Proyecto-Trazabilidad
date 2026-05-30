@@ -20,6 +20,8 @@ class EnvioAsignacionMultiple extends Model
         'estado',
         'fecha_asignacion',
         'almacenid',
+        'tipotransporteid',
+        'recogidaentregaid',
     ];
 
     protected $casts = [
@@ -29,6 +31,8 @@ class EnvioAsignacionMultiple extends Model
         'asignadopor_usuarioid' => 'integer',
         'rutamultientregaid' => 'integer',
         'almacenid' => 'integer',
+        'tipotransporteid' => 'integer',
+        'recogidaentregaid' => 'integer',
         'fecha_asignacion' => 'datetime',
         'detalles_productos' => 'array',
     ];
@@ -56,6 +60,16 @@ class EnvioAsignacionMultiple extends Model
     public function almacen(): BelongsTo
     {
         return $this->belongsTo(Almacen::class, 'almacenid', 'almacenid');
+    }
+
+    public function tipoTransporte(): BelongsTo
+    {
+        return $this->belongsTo(TipoTransporte::class, 'tipotransporteid', 'tipotransporteid');
+    }
+
+    public function recogidaEntrega(): BelongsTo
+    {
+        return $this->belongsTo(RecogidaEntrega::class, 'recogidaentregaid', 'recogidaentregaid');
     }
 }
 

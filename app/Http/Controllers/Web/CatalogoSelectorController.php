@@ -75,10 +75,15 @@ class CatalogoSelectorController extends Controller
             $query->where('usuarioid', (int) $request->usuarioid);
         }
 
-        if ($request->boolean('solo_produccion')) {
-            $query->whereHas('estadoTipo', function ($q) {
-                $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en producción']);
-            });
+        if ($request->boolean('solo_produccion') || $request->boolean('solo_cosecha')) {
+            $ids = \App\Support\EstadoLoteCatalogo::idsPorSlugs(['listo_para_cosecha']);
+            if ($ids !== []) {
+                $query->whereIn('estadolotetipoid', $ids);
+            } else {
+                $query->whereHas('estadoTipo', function ($q) {
+                    $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['listo para cosecha']);
+                });
+            }
         }
 
         $this->aplicarBusqueda($query, (string) $request->q, ['nombre', 'codigo_trazabilidad', 'ubicacion']);

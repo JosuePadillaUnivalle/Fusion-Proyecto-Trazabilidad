@@ -21,12 +21,6 @@ class DocumentoEntregaController extends Controller
         $user = auth()->user();
         if ($user && $user->hasRole('transportista')) {
             DocumentoEntregaTransportista::restringirConsultaTransportista($q, $user->usuarioid);
-        } elseif ($user && $user->hasRole('almacen')) {
-            if ($user->almacenid) {
-                $q->where('almacenid', $user->almacenid);
-            } else {
-                $q->whereRaw('0 = 1');
-            }
         }
 
         $documentos = $q->paginate(20);
@@ -59,12 +53,7 @@ class DocumentoEntregaController extends Controller
 
         $path = $request->file('archivo')->store('documentos_entrega', 'public');
 
-        $almacenDoc = null;
-        if ($user->hasRole('almacen')) {
-            $almacenDoc = $user->almacenid;
-        } else {
-            $almacenDoc = $validated['almacenid'] ?? null;
-        }
+        $almacenDoc = $validated['almacenid'] ?? null;
 
         $documento = DocumentoEntrega::create([
             'titulo' => $validated['titulo'],
@@ -93,13 +82,6 @@ class DocumentoEntregaController extends Controller
                 403
             );
         }
-        if ($user && $user->hasRole('almacen')) {
-            abort_unless(
-                $user->almacenid && (int) $documento->almacenid === (int) $user->almacenid,
-                403
-            );
-        }
-
         abort_unless(Storage::disk('public')->exists($documento->archivo_path), 404, 'Documento no encontrado.');
 
         return Storage::disk('public')->download(

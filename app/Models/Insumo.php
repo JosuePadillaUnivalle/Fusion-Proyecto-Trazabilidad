@@ -119,6 +119,6 @@ class Insumo extends Model
      */
     public function stockBajo(): bool
     {
-        return $this->stock <= $this->stockminimo;
+        return \App\Support\InsumoCatalogo::stockCritico((float) $this->stock);
     }
 }

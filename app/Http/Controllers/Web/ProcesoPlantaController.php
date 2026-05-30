@@ -13,7 +13,7 @@ class ProcesoPlantaController extends Controller
     public function __construct()
     {
         $this->middleware(function ($request, $next) {
-            if ($request->user()?->hasRole('agricultor') || $request->user()?->hasRole('transportista') || $request->user()?->hasRole('almacen')) {
+            if ($request->user()?->hasRole('agricultor') || $request->user()?->hasRole('transportista')) {
                 abort(403);
             }
 

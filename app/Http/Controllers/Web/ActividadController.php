@@ -8,8 +8,7 @@ use App\Models\Lote;
 use App\Models\TipoActividad;
 use App\Models\Prioridad;
 use App\Models\Usuario;
-use App\Models\EstadoLoteTipo;
-use App\Models\HistorialEstadoLote;
+use App\Support\LoteEstadoPorActividad;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +16,10 @@ use Illuminate\Support\Str;
 
 class ActividadController extends Controller
 {
+    public function __construct(
+        private LoteEstadoPorActividad $loteEstadoPorActividad
+    ) {}
+
     public function index(Request $request)
     {
         $query = Actividad::query()->with(['lote.cultivo', 'usuario', 'tipoActividad', 'prioridad']);
@@ -98,13 +101,36 @@ class ActividadController extends Controller
         ));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $tipos = TipoActividad::all();
         $prioridades = Prioridad::all();
-        $loteLabel = old('loteid') ? Lote::with('usuario')->find(old('loteid'))?->nombre : null;
 
-        return view('actividades.create', compact('tipos', 'prioridades', 'loteLabel'));
+        $loteid = $request->integer('loteid') ?: old('loteid');
+        $loteLabel = $loteid ? Lote::with('usuario')->find($loteid)?->nombre : null;
+
+        $tipoPreselect = null;
+        if ($request->filled('tipo')) {
+            $tipoBusqueda = mb_strtolower(trim((string) $request->tipo));
+            $tipoPreselect = $tipos->first(function ($t) use ($tipoBusqueda) {
+                $nombre = mb_strtolower(trim($t->nombre ?? ''));
+
+                return $nombre === $tipoBusqueda || str_contains($nombre, $tipoBusqueda);
+            });
+        }
+
+        $returnUrl = $this->validReturnUrl($request->input('return'));
+        $desdeTrazabilidad = $returnUrl !== null;
+
+        return view('actividades.create', compact(
+            'tipos',
+            'prioridades',
+            'loteLabel',
+            'loteid',
+            'tipoPreselect',
+            'returnUrl',
+            'desdeTrazabilidad'
+        ));
     }
 
     public function store(Request $request)
@@ -134,7 +160,11 @@ class ActividadController extends Controller
             $data['prioridadid'] = $prioridadDefault ? $prioridadDefault->prioridadid : null;
         }
 
-        Actividad::create([
+        if ($request->boolean('completar')) {
+            $data['fechafin'] = now();
+        }
+
+        $actividad = Actividad::create([
             'loteid' => $data['loteid'],
             'usuarioid' => $lote->usuarioid,
             'descripcion' => $data['descripcion'],
@@ -145,14 +175,36 @@ class ActividadController extends Controller
             'observaciones' => $data['observaciones'] ?? null,
         ]);
 
+        $msgEstado = '';
+        if (! empty($data['fechafin'])) {
+            $estadoAplicado = $this->loteEstadoPorActividad->aplicarDesdeActividad($actividad);
+            if ($estadoAplicado) {
+                $msgEstado = " El lote pasó a estado «{$estadoAplicado}».";
+            }
+        }
+
+        $tipoNombre = mb_strtolower(trim($tipo->nombre ?? ''));
+        if (str_contains($tipoNombre, 'siembra') && ! $lote->fechasiembra) {
+            $lote->fechasiembra = $data['fechainicio'] ?? now();
+            $lote->fechamodificacion = now();
+            $lote->save();
+        }
+
+        $mensaje = "Actividad de {$tipo->nombre} registrada para el lote {$lote->nombre}.{$msgEstado}";
+
+        $returnUrl = $this->validReturnUrl($request->input('return'));
+        if ($returnUrl) {
+            return redirect($returnUrl)->with('success', $mensaje);
+        }
+
         // Detectar si viene del calendario
         if ($request->has('from_calendar') || $request->header('referer') && str_contains($request->header('referer'), 'calendario')) {
             return redirect()->route('actividades.calendario')
-                ->with('success', "Actividad de {$tipo->nombre} registrada para el lote {$lote->nombre}.");
+                ->with('success', $mensaje);
         }
 
         return redirect()->route('actividades.index')
-            ->with('success', "Actividad de {$tipo->nombre} registrada para el lote {$lote->nombre}.");
+            ->with('success', $mensaje);
     }
 
     public function show(Actividad $actividad)
@@ -188,8 +240,17 @@ class ActividadController extends Controller
         $data['usuarioid'] = $lote->usuarioid;
 
         $actividad->update($data);
+        $actividad->refresh();
 
-        return redirect()->route('actividades.index')->with('success', 'Actividad actualizada.');
+        $msg = 'Actividad actualizada.';
+        if (! empty($data['fechafin'])) {
+            $estadoAplicado = $this->loteEstadoPorActividad->aplicarDesdeActividad($actividad);
+            if ($estadoAplicado) {
+                $msg .= " El lote pasó a estado «{$estadoAplicado}».";
+            }
+        }
+
+        return redirect()->route('actividades.index')->with('success', $msg);
     }
 
     public function destroy(Actividad $actividad)
@@ -207,42 +268,13 @@ class ActividadController extends Controller
         DB::beginTransaction();
 
         try {
-            $actividad->load(['lote', 'tipoActividad']);
-            $lote = $actividad->lote;
-            $tipoActividad = strtolower(trim($actividad->tipoActividad->nombre ?? ''));
-
-            // Marcar la actividad como realizada (fecha fin = hoy)
             $actividad->fechafin = now();
             $actividad->save();
 
-            // Mapeo de tipo de actividad -> nuevo estado del lote
-            $nombreEstado = $this->obtenerNuevoEstado($tipoActividad);
-            $mensajeEstado = '';
-
-            if ($nombreEstado && $lote) {
-                // Buscar estado exacto (case insensitive)
-                $nuevoEstado = EstadoLoteTipo::whereRaw('LOWER(nombre) = ?', [strtolower($nombreEstado)])->first();
-
-                if ($nuevoEstado) {
-                    // Actualizar estado del lote
-                    $lote->estadolotetipoid = $nuevoEstado->estadolotetipoid;
-                    $lote->fechamodificacion = now();
-                    $lote->save();
-
-                    // Registrar en historial
-                    HistorialEstadoLote::create([
-                        'loteid' => $lote->loteid,
-                        'estadolotetipoid' => $nuevoEstado->estadolotetipoid,
-                        'fecha_cambio' => now(),
-                        'observaciones' => "Actividad '{$actividad->tipoActividad->nombre}' completada",
-                        'usuarioid' => $lote->usuarioid,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-
-                    $mensajeEstado = " El lote '{$lote->nombre}' cambió a estado '{$nuevoEstado->nombre}'.";
-                }
-            }
+            $estadoAplicado = $this->loteEstadoPorActividad->aplicarDesdeActividad($actividad);
+            $mensajeEstado = $estadoAplicado
+                ? " El lote «{$actividad->lote->nombre}» cambió a «{$estadoAplicado}»."
+                : '';
 
             DB::commit();
 
@@ -250,7 +282,7 @@ class ActividadController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Error: ' . $e->getMessage());
+            return back()->with('error', 'Error: '.$e->getMessage());
         }
     }
 
@@ -283,26 +315,19 @@ class ActividadController extends Controller
         ];
     }
 
-    /**
-     * Obtener el nuevo estado del lote según el tipo de actividad
-     *
-     * Tipos de actividad: siembra, riego, fumigación, cosecha, labranza
-     * Estados disponibles: disponible, en preparación, sembrado, en producción, cosechado, en descanso
-     */
-    private function obtenerNuevoEstado($tipoActividad)
+    private function validReturnUrl(mixed $return): ?string
     {
-        $tipoActividad = strtolower(trim($tipoActividad));
+        if (! is_string($return) || trim($return) === '') {
+            return null;
+        }
 
-        // Mapeo EXACTO de actividades a estados
-        $mapeo = [
-            'labranza' => 'en preparación',
-            'siembra' => 'sembrado',
-            'riego' => 'en producción',
-            'fumigación' => 'en producción',
-            'fumigacion' => 'en producción',
-            'cosecha' => 'cosechado',
-        ];
+        $return = trim($return);
+        $appUrl = rtrim((string) config('app.url'), '/');
+        if (! str_starts_with($return, '/') && ! str_starts_with($return, $appUrl)) {
+            return null;
+        }
 
-        return $mapeo[$tipoActividad] ?? null;
+        return $return;
     }
+
 }

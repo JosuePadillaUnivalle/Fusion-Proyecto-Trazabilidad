@@ -18,15 +18,6 @@ class IncidenteEnvioController extends Controller
             ->when($estado !== '', fn($query) => $query->where('estado', $estado))
             ->orderByDesc('created_at');
 
-        $user = $request->user();
-        if ($user && $user->hasRole('almacen')) {
-            if ($user->almacenid) {
-                $q->where('almacenid', $user->almacenid);
-            } else {
-                $q->whereRaw('0 = 1');
-            }
-        }
-
         $incidentes = $q->paginate(15);
 
         return view('logistica.incidentes.index', compact('incidentes', 'estado'));
@@ -48,9 +39,6 @@ class IncidenteEnvioController extends Controller
 
         $validated['reportadopor_usuarioid'] = auth()->id();
         $validated['estado'] = 'abierto';
-        if ($request->user()?->hasRole('almacen')) {
-            $validated['almacenid'] = $request->user()->almacenid;
-        }
 
         IncidenteEnvio::create($validated);
 

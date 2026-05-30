@@ -14,14 +14,6 @@ class AsignacionMultipleController extends Controller
         $q = EnvioAsignacionMultiple::query()
             ->with(['transportista', 'asignadoPor', 'ruta'])
             ->orderByDesc('created_at');
-        $user = auth()->user();
-        if ($user?->hasRole('almacen')) {
-            if ($user->almacenid) {
-                $q->where('almacenid', $user->almacenid);
-            } else {
-                $q->whereRaw('0 = 1');
-            }
-        }
         $asignaciones = $q->paginate(30);
 
         return response()->json($asignaciones);

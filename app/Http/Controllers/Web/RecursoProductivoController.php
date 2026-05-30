@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Cultivo;
 use App\Models\Insumo;
+use App\Support\InsumoCatalogo;
 use Illuminate\View\View;
 
 class RecursoProductivoController extends Controller
@@ -13,18 +14,19 @@ class RecursoProductivoController extends Controller
     {
         $cultivos = Cultivo::orderBy('nombre')->get();
 
-        $insumos = Insumo::with(['tipo', 'unidadMedida', 'actorAbastecimiento'])
+        $insumos = Insumo::with(['tipo', 'unidadMedida'])
             ->orderBy('nombre')
             ->get();
 
-        $criticos  = $insumos->filter(fn ($i) => $i->stockBajo())->count();
-        $valorTotal = $insumos->sum(fn ($i) => ($i->stock ?? 0) * ($i->preciounitario ?? 0));
+        $criticos = $insumos->filter(fn ($i) => $i->stockBajo())->count();
+        $enAtencion = $insumos->filter(fn ($i) => InsumoCatalogo::stockMedio((float) $i->stock))->count();
 
         $stats = [
             'cultivos'    => $cultivos->count(),
             'insumos'     => $insumos->count(),
             'criticos'    => $criticos,
-            'valor_total' => $valorTotal,
+            'en_atencion' => $enAtencion,
+            'umbral'      => InsumoCatalogo::UMBRAL_ALERTA_STOCK,
         ];
 
         return view('recursos_productivos.index', compact('cultivos', 'insumos', 'stats'));

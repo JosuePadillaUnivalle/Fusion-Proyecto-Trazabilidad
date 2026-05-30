@@ -49,13 +49,29 @@ class ProduccionAlmacenamientoController extends Controller
         ));
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        $producciones = Produccion::with('lote')->orderBy('produccionid', 'desc')->get();
+        $loteidParam = $request->integer('loteid') ?: null;
+
+        $produccionesQuery = Produccion::with('lote')->orderBy('produccionid', 'desc');
+        if ($loteidParam) {
+            $produccionesQuery->where('loteid', $loteidParam);
+        }
+        $producciones = $produccionesQuery->get();
+
         $almacenes    = Almacen::orderBy('nombre')->get();
         $unidades     = UnidadMedida::all();
 
-        return view('producciones_almacenamiento.create', compact('producciones', 'almacenes', 'unidades'));
+        $produccionPreseleccionada = $producciones->first()?->produccionid;
+        $returnUrl = $this->validReturnUrl($request->input('return'));
+
+        return view('producciones_almacenamiento.create', compact(
+            'producciones',
+            'almacenes',
+            'unidades',
+            'produccionPreseleccionada',
+            'returnUrl'
+        ));
     }
 
     public function store(Request $request)
@@ -79,6 +95,11 @@ class ProduccionAlmacenamientoController extends Controller
         ]);
 
         ProduccionAlmacenamiento::create($data);
+
+        $returnUrl = $this->validReturnUrl($request->input('return'));
+        if ($returnUrl) {
+            return redirect($returnUrl)->with('success', 'Registro de almacenamiento creado.');
+        }
 
         return redirect()
             ->route('producciones_almacenamiento.index')
@@ -139,5 +160,20 @@ class ProduccionAlmacenamientoController extends Controller
         return redirect()
             ->route('producciones_almacenamiento.index')
             ->with('success', 'Registro de almacenamiento eliminado.');
+    }
+
+    private function validReturnUrl(mixed $return): ?string
+    {
+        if (! is_string($return) || trim($return) === '') {
+            return null;
+        }
+
+        $return = trim($return);
+        $appUrl = rtrim((string) config('app.url'), '/');
+        if (! str_starts_with($return, '/') && ! str_starts_with($return, $appUrl)) {
+            return null;
+        }
+
+        return $return;
     }
 }

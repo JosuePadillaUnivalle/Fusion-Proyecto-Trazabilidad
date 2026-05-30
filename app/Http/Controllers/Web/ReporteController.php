@@ -15,6 +15,7 @@ use App\Models\Clima;
 use App\Models\Almacen;
 use App\Models\Actividad;
 use App\Models\ProduccionAlmacenamiento;
+use App\Support\InsumoCatalogo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -71,7 +72,7 @@ class ReporteController extends Controller
             'produccion_mes' => Produccion::whereMonth('fechacosecha', now()->month)
                 ->whereYear('fechacosecha', now()->year)
                 ->sum('cantidad'),
-            'insumos_criticos' => Insumo::whereRaw('stock <= COALESCE(stockminimo, 10)')->count(),
+            'insumos_criticos' => Insumo::where('stock', '<=', InsumoCatalogo::UMBRAL_ALERTA_STOCK)->count(),
             'actividades_pendientes' => Actividad::whereNull('fechafin')->count(),
         ];
 
@@ -197,13 +198,16 @@ class ReporteController extends Controller
             $query->where('tipoinsumoid', (int) $request->tipo_id);
         }
 
+        $umbral = InsumoCatalogo::UMBRAL_ALERTA_STOCK;
+        $atencionMax = $umbral * 2;
+
         if ($request->filled('estado')) {
             if ($request->estado === 'critico') {
-                $query->whereRaw('stock <= COALESCE(stockminimo, 10) * 0.5');
+                $query->where('stock', '<=', $umbral);
             } elseif ($request->estado === 'bajo') {
-                $query->whereRaw('stock <= COALESCE(stockminimo, 10) AND stock > COALESCE(stockminimo, 10) * 0.5');
+                $query->where('stock', '>', $umbral)->where('stock', '<=', $atencionMax);
             } elseif ($request->estado === 'ok') {
-                $query->whereRaw('stock > COALESCE(stockminimo, 10)');
+                $query->where('stock', '>', $atencionMax);
             }
         }
 
@@ -211,9 +215,9 @@ class ReporteController extends Controller
 
         $stats = [
             'total_insumos' => $insumos->count(),
-            'stock_critico' => $insumos->filter(fn($i) => $i->stock <= ($i->stockminimo ?? 10))->count(),
-            'stock_disponible' => $insumos->filter(fn($i) => $i->stock > ($i->stockminimo ?? 10))->count(),
-            'valor_total' => $insumos->sum(fn($i) => $i->stock * ($i->preciounitario ?? 0)),
+            'stock_critico' => $insumos->filter(fn ($i) => InsumoCatalogo::stockCritico((float) $i->stock))->count(),
+            'stock_disponible' => $insumos->filter(fn ($i) => ! InsumoCatalogo::stockCritico((float) $i->stock))->count(),
+            'stock_atencion' => $insumos->filter(fn ($i) => InsumoCatalogo::stockMedio((float) $i->stock))->count(),
         ];
 
         $insumosPorTipo = DB::table('insumo')
@@ -223,7 +227,7 @@ class ReporteController extends Controller
             ->get();
 
         $alertasStock = Insumo::with(['tipo', 'unidadMedida'])
-            ->whereRaw('stock <= COALESCE(stockminimo, 10)')
+            ->where('stock', '<=', $umbral)
             ->orderBy('stock')
             ->limit(10)
             ->get();
@@ -254,7 +258,8 @@ class ReporteController extends Controller
             'alertasStock',
             'consumoReciente',
             'stockAlmacenes',
-            'tiposInsumo'
+            'tiposInsumo',
+            'umbral'
         ));
     }
 
@@ -572,16 +577,22 @@ class ReporteController extends Controller
                 break;
 
             case 'inventario':
-                $headers = ['ID', 'Nombre', 'Tipo', 'Unidad', 'Stock Actual', 'Stock Mínimo', 'Precio Unit.'];
-                $rows = $datos->map(fn($i) => [
-                    $i->insumoid,
-                    $i->nombre,
-                    $i->tipo->nombre ?? '-',
-                    $i->unidadMedida->abreviatura ?? '-',
-                    $i->stock,
-                    $i->stockminimo ?? '-',
-                    $i->preciounitario ?? '-'
-                ]);
+                $headers = ['ID', 'Nombre', 'Tipo', 'Unidad', 'Stock Actual', 'Estado'];
+                $rows = $datos->map(function ($i) {
+                    $stock = (float) $i->stock;
+                    $estado = InsumoCatalogo::stockCritico($stock)
+                        ? 'Crítico'
+                        : (InsumoCatalogo::stockMedio($stock) ? 'Atención' : 'Normal');
+
+                    return [
+                        $i->insumoid,
+                        $i->nombre,
+                        $i->tipo->nombre ?? '-',
+                        $i->unidadMedida->abreviatura ?? '-',
+                        $i->stock,
+                        $estado,
+                    ];
+                });
                 break;
 
             case 'actividades':

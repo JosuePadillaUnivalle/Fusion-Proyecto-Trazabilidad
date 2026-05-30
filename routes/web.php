@@ -38,7 +38,6 @@ use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\ReporteController;
 
 // 🔹 Catálogos Controller
-use App\Http\Controllers\Web\CatalogoController;
 use App\Http\Controllers\Web\CatalogoSelectorController;
 
 // 🔹 External API Proxy Controller
@@ -95,11 +94,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/panel-transportista', [DashboardController::class, 'panelTransportista'])->name('dashboard.panel-transportista');
     Route::get('/dashboard/panel-almacen', [DashboardController::class, 'panelAlmacen'])->name('dashboard.panel-almacen');
 
-    // Catálogos centralizados
-    Route::get('/catalogos', [CatalogoController::class, 'index'])
-        ->name('catalogos.index')
-        ->middleware('action.permission:catalogos,read');
-
     Route::prefix('catalogo-selector')->name('catalogo-selector.')->group(function () {
         Route::get('/usuarios', [CatalogoSelectorController::class, 'usuarios'])->name('usuarios');
         Route::get('/cultivos', [CatalogoSelectorController::class, 'cultivos'])->name('cultivos');
@@ -151,6 +145,10 @@ Route::middleware('auth')->group(function () {
     Route::get('lotes/create', [LoteController::class, 'create'])->name('lotes.create')->middleware('action.permission:lotes,create');
     Route::post('lotes/sincronizar-operacion', [LoteController::class, 'sincronizarOperacion'])->name('lotes.sincronizar-operacion')->middleware('action.permission:lotes,update');
     Route::post('lotes', [LoteController::class, 'store'])->name('lotes.store')->middleware('action.permission:lotes,create');
+    Route::get('lotes/{lote}/trazabilidad', [LoteController::class, 'trazabilidad'])->name('lotes.trazabilidad')->middleware('action.permission:lotes,read');
+    Route::get('lotes/{lote}/cambiar-estado', [LoteController::class, 'cambiarEstadoForm'])->name('lotes.cambiar-estado')->middleware('action.permission:lotes,update');
+    Route::post('lotes/{lote}/cambiar-estado', [LoteController::class, 'cambiarEstadoStore'])->name('lotes.cambiar-estado.store')->middleware('action.permission:lotes,update');
+    Route::get('lotes/{lote}/ubicacion', [LoteController::class, 'ubicacion'])->name('lotes.ubicacion')->middleware('action.permission:lotes,read');
     Route::get('lotes/{lote}', [LoteController::class, 'show'])->name('lotes.show')->middleware('action.permission:lotes,read');
     Route::get('lotes/{lote}/edit', [LoteController::class, 'edit'])->name('lotes.edit')->middleware('action.permission:lotes,update');
     Route::put('lotes/{lote}', [LoteController::class, 'update'])->name('lotes.update')->middleware('action.permission:lotes,update');

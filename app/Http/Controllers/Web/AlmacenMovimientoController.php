@@ -23,14 +23,6 @@ class AlmacenMovimientoController extends Controller
             ->orderByDesc('fecha')
             ->orderByDesc('almacen_movimientoid');
 
-        if ($user?->hasRole('almacen')) {
-            if ($user->almacenid) {
-                $q->where('almacenid', $user->almacenid);
-            } else {
-                $q->whereRaw('0 = 1');
-            }
-        }
-
         $statsBase = clone $q;
 
         $filtroNaturaleza = $request->string('naturaleza')->toString();
@@ -78,14 +70,6 @@ class AlmacenMovimientoController extends Controller
         $user = $request->user();
         $almacenes = Almacen::query()->orderBy('nombre');
         $insumos = Insumo::query()->with('unidadMedida')->orderBy('nombre');
-
-        if ($user?->hasRole('almacen')) {
-            if (! $user->almacenid) {
-                abort(403);
-            }
-            $almacenes->where('almacenid', $user->almacenid);
-            $insumos->where('almacenid', $user->almacenid);
-        }
 
         $insumosList = $insumos->get();
         $guias = config('almacen_movimientos', []);
@@ -161,10 +145,6 @@ class AlmacenMovimientoController extends Controller
         $tipoId = $request->integer('tipo_movimiento_almacenid') ?: null;
         $referencia = $request->string('referencia')->toString();
 
-        if ($user?->hasRole('almacen') && $user->almacenid) {
-            $almacenId = (int) $user->almacenid;
-        }
-
         $destinos = $destinosService->listar($naturaleza, $almacenId, $insumoId, $tipoId, $referencia ?: null);
         $destinoSugerido = $destinos[0]['items'][0]['valor'] ?? null;
 
@@ -184,13 +164,6 @@ class AlmacenMovimientoController extends Controller
 
     public function show(Request $request, AlmacenMovimiento $almacenMovimiento)
     {
-        $user = $request->user();
-        if ($user?->hasRole('almacen')) {
-            if (! $user->almacenid || (int) $user->almacenid !== (int) $almacenMovimiento->almacenid) {
-                abort(403);
-            }
-        }
-
         $almacenMovimiento->load(['almacen', 'insumo.unidadMedida', 'tipo', 'usuario']);
 
         return view('almacen_movimientos.show', [
@@ -217,11 +190,6 @@ class AlmacenMovimientoController extends Controller
         ]);
 
         $user = $request->user();
-        if ($user?->hasRole('almacen')) {
-            if (! $user->almacenid || (int) $user->almacenid !== (int) $data['almacenid']) {
-                abort(403);
-            }
-        }
 
         $tipo = TipoMovimientoAlmacen::query()
             ->whereKey($data['tipo_movimiento_almacenid'])
@@ -272,10 +240,6 @@ class AlmacenMovimientoController extends Controller
         $almacenId = $request->integer('almacenid') ?: null;
         [$fechaDesde, $fechaHasta, $periodoActivo] = $this->resolverPeriodoReportes($request);
 
-        if ($user?->hasRole('almacen')) {
-            $almacenId = $user->almacenid ?: 0;
-        }
-
         $base = AlmacenMovimiento::query()
             ->with(['almacen', 'insumo', 'tipo'])
             ->when($almacenId, fn($q) => $q->where('almacenid', $almacenId))
@@ -304,7 +268,6 @@ class AlmacenMovimientoController extends Controller
             ->get();
 
         $almacenes = Almacen::query()
-            ->when($user?->hasRole('almacen'), fn($q) => $q->where('almacenid', $user->almacenid ?: 0))
             ->orderBy('nombre')
             ->get();
 

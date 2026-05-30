@@ -111,7 +111,7 @@ class EnvioVehiculoController extends Controller
             'modelo' => 'nullable|string|max:100',
             'anio' => 'nullable|integer|min:1980|max:2100',
             'color' => 'nullable|string|max:50',
-            'tipovehiculoid' => 'nullable|integer|exists:tipo_vehiculo,tipovehiculoid',
+            'tipovehiculoid' => 'required|integer|exists:tipo_vehiculo,tipovehiculoid',
             'estadovehiculoid' => 'nullable|integer|exists:estado_vehiculo,estadovehiculoid',
             'activo' => 'nullable|boolean',
         ]);

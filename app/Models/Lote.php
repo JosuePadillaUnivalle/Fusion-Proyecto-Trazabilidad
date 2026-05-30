@@ -113,4 +113,9 @@ class Lote extends Model
     {
         return $this->hasMany(HistorialEstadoLote::class, 'loteid', 'loteid');
     }
+
+    public function certificaciones()
+    {
+        return $this->hasMany(CertificacionLote::class, 'loteid', 'loteid');
+    }
 }

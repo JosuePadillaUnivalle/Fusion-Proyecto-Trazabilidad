@@ -106,7 +106,7 @@ class LoteInsumoController extends Controller
             $mensaje = "Aplicación registrada. Se descontaron {$data['cantidadusada']} {$insumo->unidadMedida->abreviatura} de {$insumo->nombre}.";
 
             // Alerta si el stock quedó bajo
-            if ($insumo->stock <= $insumo->stockminimo) {
+            if ($insumo->stockBajo()) {
                 $mensaje .= " ⚠️ ALERTA: Stock bajo ({$insumo->stock} {$insumo->unidadMedida->abreviatura})";
             }
 

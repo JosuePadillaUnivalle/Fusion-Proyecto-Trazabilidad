@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Lote;
 use App\Models\Usuario;
 use App\Models\Cultivo;
-use App\Models\ActorAbastecimiento;
 use App\Models\EstadoLoteTipo;
 use App\Models\Produccion;
+use App\Support\EstadoLoteCatalogo;
 use App\Support\LoteDefaults;
+use App\Support\LoteEstadoPorActividad;
+use App\Support\LoteTrazabilidadService;
 use App\Services\OperacionAgricolaAutomaticaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,12 +22,17 @@ use Illuminate\Validation\ValidationException;
 class LoteController extends Controller
 {
     /** Roles que pueden ser responsables de un lote (nunca admin). */
-    private const ROLES_RESPONSABLE_LOTE = ['agricultor', 'operador'];
+    private const ROLES_RESPONSABLE_LOTE = ['agricultor'];
+
+    public function __construct(
+        private LoteTrazabilidadService $trazabilidadService,
+        private LoteEstadoPorActividad $loteEstadoPorActividad,
+    ) {}
 
     public function index(Request $request)
     {
         $query = Lote::query()
-            ->with(['usuario', 'cultivo', 'estadoTipo', 'actorAbastecimiento']);
+            ->with(['usuario', 'cultivo', 'estadoTipo']);
 
         if ($request->filled('q')) {
             $term = '%'.trim((string) $request->q).'%';
@@ -60,7 +67,7 @@ class LoteController extends Controller
 
         $stats = [
             'total' => Lote::count(),
-            'en_produccion' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en producción']))->count(),
+            'en_produccion' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en crecimiento']))->count(),
             'sembrados' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['sembrado']))->count(),
             'hectareas' => round((float) (Lote::sum('superficie') ?? 0), 2),
             'con_mapa' => Lote::whereNotNull('latitud')->whereNotNull('longitud')->count(),
@@ -73,10 +80,10 @@ class LoteController extends Controller
 
         $filtros = $request->only(['q', 'cultivoid', 'estadolotetipoid', 'usuarioid', 'con_mapa']);
         $cultivos = Cultivo::orderBy('nombre')->get();
-        $estados = EstadoLoteTipo::orderBy('nombre')->get();
+        $estados = EstadoLoteCatalogo::paraSelect();
         $usuarios = Usuario::query()
             ->where('activo', true)
-            ->whereIn('role', ['agricultor', 'operador', 'admin'])
+            ->whereIn('role', ['agricultor', 'admin'])
             ->orderBy('nombre')
             ->get();
 
@@ -91,7 +98,7 @@ class LoteController extends Controller
         // Estadísticas
         $stats = [
             'total' => Lote::count(),
-            'en_produccion' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en producción']))->count(),
+            'en_produccion' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en crecimiento']))->count(),
             'cosechados' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['cosechado']))->count(),
             'hectareas' => (float) (Lote::sum('superficie') ?? 0),
             'en_mapa' => Lote::whereNotNull('latitud')->whereNotNull('longitud')->count(),
@@ -156,7 +163,7 @@ class LoteController extends Controller
         // Datos para filtros
         $usuarios = Usuario::orderBy('nombre')->get();
         $cultivos = Cultivo::orderBy('nombre')->get();
-        $estados = EstadoLoteTipo::orderBy('nombre')->get();
+        $estados = EstadoLoteCatalogo::paraSelect();
 
         return view('lotes.mapa', compact(
             'stats',
@@ -175,7 +182,7 @@ class LoteController extends Controller
     {
         $user = auth()->user();
         $mostrarSelectorPropietario = $user && (
-            $user->hasRole('admin') || $user->hasRole('operador') || $user->hasRole('Admin')
+            $user->hasRole('admin') || $user->hasRole('Admin')
         );
 
         $propietarioPorDefecto = $this->responsableLotePorDefecto($user);
@@ -211,6 +218,7 @@ class LoteController extends Controller
             'cultivoid' => 'nullable|exists:cultivo,cultivoid',
             'latitud' => 'nullable|numeric|between:-90,90',
             'longitud' => 'nullable|numeric|between:-180,180',
+            'imagen' => 'nullable|image|max:2048',
         ]);
 
         $data['usuarioid'] = $this->resolverUsuarioidLote($request, $data['usuarioid'] ?? null);
@@ -257,7 +265,7 @@ class LoteController extends Controller
     public function sincronizarOperacion(Request $request, OperacionAgricolaAutomaticaService $service)
     {
         abort_unless(
-            $request->user()?->hasRole('admin') || $request->user()?->hasRole('operador'),
+            $request->user()?->hasRole('admin') || $request->user()?->hasRole('agricultor'),
             403
         );
 
@@ -277,135 +285,80 @@ class LoteController extends Controller
 
     public function show(Lote $lote)
     {
-        $lote->load([
-            'usuario',
-            'cultivo',
-            'estadoTipo',
-            'historialEstados.estadoTipo',
-            'historialEstados.usuario',
-            'loteInsumos.insumo',
-            'loteInsumos.usuario',
-            'actividades.tipoActividad',
-            'actividades.usuario',
-            'producciones.unidadMedida',
-            'producciones.destino',
-            'clima'
+        return view('lotes.show', $this->trazabilidadService->buildLoteDetalleBase($lote));
+    }
+
+    public function cambiarEstadoForm(Lote $lote, Request $request)
+    {
+        $slug = (string) $request->query('estado', '');
+        if (! isset(EstadoLoteCatalogo::ESTADOS[$slug])) {
+            abort(404);
+        }
+
+        if ($slug === 'sembrado') {
+            return redirect(EstadoLoteCatalogo::urlCambioEstado($lote, 'sembrado'));
+        }
+
+        return view('lotes.cambiar-estado', [
+            'lote' => $lote,
+            'slug' => $slug,
+        ]);
+    }
+
+    public function cambiarEstadoStore(Request $request, Lote $lote)
+    {
+        $data = $request->validate([
+            'estado' => 'required|string',
+            'motivo' => 'required|string|max:500',
         ]);
 
-        // Construir línea de tiempo/trazabilidad
-        $trazabilidad = collect();
-
-        // 1. Fecha de creación/siembra
-        if ($lote->fechasiembra) {
-            $trazabilidad->push([
-                'fecha' => $lote->fechasiembra,
-                'tipo' => 'siembra',
-                'titulo' => 'Siembra Iniciada',
-                'descripcion' => 'Cultivo: ' . ($lote->cultivo->nombre ?? 'No especificado'),
-                'icono' => 'seedling',
-                'color' => 'success'
-            ]);
+        $slug = $data['estado'];
+        if (! isset(EstadoLoteCatalogo::ESTADOS[$slug]) || $slug === 'sembrado') {
+            abort(422);
         }
 
-        // 2. Historial de estados
-        foreach ($lote->historialEstados as $historial) {
-            $trazabilidad->push([
-                'fecha' => $historial->fecha_cambio,
-                'tipo' => 'estado',
-                'titulo' => 'Cambio de Estado: ' . ($historial->estadoTipo->nombre ?? ''),
-                'descripcion' => $historial->observaciones ?? 'Sin observaciones',
-                'usuario' => $historial->usuario->nombre ?? null,
-                'icono' => 'exchange-alt',
-                'color' => 'info'
-            ]);
+        $estadoAplicado = $this->loteEstadoPorActividad->aplicarCambioManual(
+            $lote,
+            $slug,
+            $data['motivo'],
+            $request->user()
+        );
+
+        if (! $estadoAplicado) {
+            return back()->with('warning', 'El lote ya se encuentra en ese estado.');
         }
 
-        // 3. Aplicación de insumos
-        foreach ($lote->loteInsumos as $insumo) {
-            $trazabilidad->push([
-                'fecha' => $insumo->fechauo,
-                'tipo' => 'insumo',
-                'titulo' => 'Aplicación: ' . ($insumo->insumo->nombre ?? 'Insumo'),
-                'descripcion' => 'Cantidad: ' . $insumo->cantidadusada . ' - ' . ($insumo->observaciones ?? ''),
-                'usuario' => $insumo->usuario->nombre ?? null,
-                'icono' => 'flask',
-                'color' => 'warning'
-            ]);
-        }
+        return redirect()
+            ->route('lotes.trazabilidad', $lote)
+            ->with('success', "Estado actualizado a «{$estadoAplicado}».")
+            ->withFragment('historial-eventos');
+    }
 
-        // 4. Actividades realizadas
-        foreach ($lote->actividades as $actividad) {
-            $trazabilidad->push([
-                'fecha' => $actividad->fechainicio,
-                'tipo' => 'actividad',
-                'titulo' => $actividad->tipoActividad->nombre ?? 'Actividad',
-                'descripcion' => $actividad->descripcion ?? 'Sin descripción',
-                'usuario' => $actividad->usuario->nombre ?? null,
-                'icono' => 'tasks',
-                'color' => 'primary',
-                'completada' => $actividad->fechafin !== null
-            ]);
-        }
+    public function trazabilidad(Lote $lote, Request $request)
+    {
+        return view('lotes.trazabilidad', $this->trazabilidadService->dashboardLote($lote, $request));
+    }
 
-        // 5. Producciones/Cosechas
-        foreach ($lote->producciones as $produccion) {
-            $trazabilidad->push([
-                'fecha' => $produccion->fechacosecha,
-                'tipo' => 'cosecha',
-                'titulo' => 'Cosecha Registrada',
-                'descripcion' => 'Cantidad: ' . number_format($produccion->cantidad, 2) . ' ' . ($produccion->unidadMedida->abreviatura ?? 'kg') . ' - Destino: ' . ($produccion->destino->nombre ?? 'No especificado'),
-                'icono' => 'tractor',
-                'color' => 'success'
-            ]);
-        }
-
-        // Ordenar por fecha descendente
-        $trazabilidad = $trazabilidad->sortByDesc('fecha')->values();
-
-        // Estadísticas del lote
-        $diasDesdeSiembra = null;
-        if ($lote->fechasiembra) {
-            $fechaSiembra = \Carbon\Carbon::parse($lote->fechasiembra);
-            // Si la fecha de siembra es futura, mostrar 0; si es pasada, mostrar días transcurridos
-            if ($fechaSiembra->isFuture()) {
-                $diasDesdeSiembra = 0;
-            } else {
-                $diasDesdeSiembra = (int) $fechaSiembra->diffInDays(now());
-            }
-        }
-
-        $estadisticas = [
-            'total_insumos' => $lote->loteInsumos->count(),
-            'total_actividades' => $lote->actividades->count(),
-            'actividades_completadas' => $lote->actividades->whereNotNull('fechafin')->count(),
-            'actividades_pendientes' => $lote->actividades->whereNull('fechafin')->count(),
-            'total_aplicaciones' => $lote->loteInsumos->count(),
-            'total_cosechas' => $lote->producciones->count(),
-            'produccion_total' => $lote->producciones->sum('cantidad'),
-            'dias_desde_siembra' => $diasDesdeSiembra,
-        ];
-
-        return view('lotes.show', compact('lote', 'trazabilidad', 'estadisticas'));
+    public function ubicacion(Lote $lote)
+    {
+        return view('lotes.ubicacion', $this->trazabilidadService->buildLoteDetalleBase($lote));
     }
 
     public function edit(Lote $lote)
     {
-        $lote->load(['usuario', 'cultivo', 'actorAbastecimiento']);
-
-        $estados = EstadoLoteTipo::all();
+        $lote->load(['usuario', 'cultivo', 'estadoTipo']);
 
         $responsableLabel = ($lote->usuario && $this->puedeSerResponsableDeLote((int) $lote->usuarioid))
             ? trim($lote->usuario->nombre.' '.($lote->usuario->apellido ?? ''))
             : null;
         $cultivoLabel = $lote->cultivo?->nombre;
-        $actorLabel = $lote->actorAbastecimiento?->nombre;
+        $mostrarFechaSiembra = (bool) $lote->fechasiembra;
 
         return view('lotes.edit', compact(
             'lote',
-            'estados',
             'responsableLabel',
             'cultivoLabel',
-            'actorLabel'
+            'mostrarFechaSiembra'
         ));
     }
 
@@ -417,27 +370,9 @@ class LoteController extends Controller
             'ubicacion' => 'nullable|string|max:200',
             'superficie' => 'required|numeric|min:0',
             'cultivoid' => 'nullable|exists:cultivo,cultivoid',
-            'actorid' => 'nullable|exists:actor_abastecimiento,actorid',
-            'codigo_trazabilidad' => 'nullable|string|max:80',
-            'fechasiembra' => 'nullable|date',
-            'estadolotetipoid' => 'nullable|exists:estadolote_tipo,estadolotetipoid',
             'latitud' => 'nullable|numeric|between:-90,90',
             'longitud' => 'nullable|numeric|between:-180,180',
-            'imagen' => 'nullable|image|max:2048',
         ]);
-
-        if ($request->hasFile('imagen')) {
-            try {
-                $file = $request->file('imagen');
-                $mime = $file->getMimeType();
-                $base64 = base64_encode(file_get_contents($file->getRealPath()));
-                $data['imagenurl'] = "data:$mime;base64,$base64";
-            } catch (\Exception $e) {
-                // Log error
-            }
-        }
-
-        unset($data['imagen']);
 
         $lote->update(LoteDefaults::enrich($data, false));
 
@@ -464,7 +399,7 @@ class LoteController extends Controller
                 return;
             }
             if (! $this->puedeSerResponsableDeLote((int) $value)) {
-                $fail('El administrador no puede ser responsable de un lote. Elija un agricultor u operador.');
+                $fail('El administrador no puede ser responsable de un lote. Elija un agricultor.');
             }
         };
     }
@@ -519,7 +454,7 @@ class LoteController extends Controller
         }
 
         throw ValidationException::withMessages([
-            'usuarioid' => 'Debe asignar un agricultor u operador como responsable del lote. El administrador solo supervisa.',
+            'usuarioid' => 'Debe asignar un agricultor como responsable del lote. El administrador solo supervisa.',
         ]);
     }
 }

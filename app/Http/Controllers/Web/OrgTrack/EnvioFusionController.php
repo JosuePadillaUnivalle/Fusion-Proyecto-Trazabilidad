@@ -9,11 +9,26 @@ use Illuminate\Http\Request;
 
 class EnvioFusionController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $envios = EnvioAsignacionMultiple::with(['pedido', 'transportista', 'ruta', 'almacen'])
-            ->orderByDesc('envioasignacionmultipleid')
-            ->paginate(20);
+        $query = EnvioAsignacionMultiple::with(['pedido', 'transportista', 'ruta', 'almacen'])
+            ->orderByDesc('envioasignacionmultipleid');
+
+        if ($request->filled('buscar')) {
+            $term = '%' . $request->string('buscar')->trim() . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('vehiculo_ref', 'like', $term)
+                    ->orWhere('externo_envio_id', 'like', $term)
+                    ->orWhereHas('pedido', fn ($p) => $p->where('nombre_planta', 'like', $term))
+                    ->orWhereHas('transportista', fn ($t) => $t->where('nombre', 'like', $term)->orWhere('apellido', 'like', $term));
+            });
+        }
+
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->string('estado'));
+        }
+
+        $envios = $query->paginate(20)->withQueryString();
 
         return view('orgtrack.envios.index', compact('envios'));
     }

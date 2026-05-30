@@ -26,6 +26,11 @@ class Usuario extends Authenticatable
         return trim($this->nombre.' '.($this->apellido ?? '')) ?: ($this->nombreusuario ?? 'Sin nombre');
     }
 
+    public function avatarUrl(): string
+    {
+        return \App\Support\UsuarioAvatar::resolve($this);
+    }
+
     protected $fillable = [
         'nombre',
         'apellido',

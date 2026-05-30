@@ -20,13 +20,7 @@ class AsignacionMultipleController extends Controller
         $q = EnvioAsignacionMultiple::query()
             ->with(['transportista', 'asignadoPor', 'ruta']);
         $user = auth()->user();
-        if ($user?->hasRole('almacen')) {
-            if ($user->almacenid) {
-                $q->where('almacenid', $user->almacenid);
-            } else {
-                $q->whereRaw('0 = 1');
-            }
-        } elseif (auth()->user()->can('asignaciones.create') === false) {
+        if (auth()->user()->can('asignaciones.create') === false) {
             $q->where('transportista_usuarioid', auth()->id());
         }
         $asignaciones = $q->orderByDesc('created_at')->paginate(20);
