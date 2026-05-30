@@ -1,17 +1,12 @@
 @extends('layouts.app')
 
-@section('title', 'Registrar Actividad | AgroNexus')
+@section('title', 'Registrar Actividad | AgroFusion')
+@section('page_title', 'Registrar Actividad')
 
 @section('content')
 <div class="card">
     <div class="card-header bg-info text-white">
-        <h3 class="card-title"><i class="fas fa-tasks mr-2"></i>Registrar Actividad (excepción manual)</h3>
-    </div>
-
-    <div class="alert alert-warning m-3 mb-0">
-        <i class="fas fa-robot mr-1"></i>
-        Las actividades se crean <strong>automáticamente</strong> al aplicar insumos en un lote o al registrar una cosecha.
-        Solo use este formulario si debe corregir o agregar una actividad puntual.
+        <h3 class="card-title"><i class="fas fa-tasks mr-2"></i>Registrar Actividad</h3>
     </div>
 
     @if($errors->any())
@@ -26,22 +21,26 @@
 
     <form action="{{ route('actividades.store') }}" method="POST">
         @csrf
+        @if(!empty($returnUrl))
+            <input type="hidden" name="return" value="{{ $returnUrl }}">
+            <input type="hidden" name="completar" value="1">
+        @endif
         <div class="card-body">
             <div class="row">
                 <div class="col-md-8">
 
-                    <div class="form-group">
-                        <label><i class="fas fa-map-marked-alt mr-1"></i> Lote <span class="text-danger">*</span></label>
-                        <select name="loteid" id="loteid" class="form-control" required>
-                            <option value="">-- Seleccione un lote --</option>
-                            @foreach($lotes as $l)
-                                <option value="{{ $l->loteid }}"
-                                        data-responsable="{{ $l->usuario->nombre ?? '' }} {{ $l->usuario->apellido ?? '' }}">
-                                    {{ $l->nombre }} - {{ $l->ubicacion ?? 'Sin ubicacion' }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                    @include('partials.selector-catalogo', [
+                        'id' => 'actividad_lote',
+                        'name' => 'loteid',
+                        'label' => 'Lote',
+                        'icon' => 'fa-map-marked-alt',
+                        'value' => old('loteid', $loteid ?? null),
+                        'labelSelected' => $loteLabel ?? '',
+                        'endpoint' => route('catalogo-selector.lotes'),
+                        'title' => 'Seleccionar lote',
+                        'searchPlaceholder' => 'Nombre, código o ubicación…',
+                        'required' => true,
+                    ])
 
                     <div class="form-group">
                         <label><i class="fas fa-user mr-1"></i> Responsable</label>
@@ -57,7 +56,10 @@
                         <select name="tipoactividadid" class="form-control" required>
                             <option value="">-- Seleccione tipo --</option>
                             @foreach($tipos as $t)
-                                <option value="{{ $t->tipoactividadid }}">{{ ucfirst($t->nombre) }}</option>
+                                <option value="{{ $t->tipoactividadid }}"
+                                    @selected(old('tipoactividadid', $tipoPreselect?->tipoactividadid) == $t->tipoactividadid)>
+                                    {{ ucfirst($t->nombre) }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
@@ -65,7 +67,7 @@
                     <div class="form-group">
                         <label><i class="fas fa-align-left mr-1"></i> Descripcion <span class="text-danger">*</span></label>
                         <input type="text" name="descripcion" class="form-control" required maxlength="200"
-                               placeholder="Describa brevemente la actividad" value="{{ old('descripcion') }}">
+                               placeholder="Describa brevemente la actividad" value="{{ old('descripcion', $tipoPreselect?->nombre ?? '') }}">
                     </div>
 
                     <div class="form-group">
@@ -120,7 +122,7 @@
 
         <div class="card-footer">
             <div class="d-flex justify-content-between">
-                <a href="{{ route('actividades.index') }}" class="btn btn-secondary">
+                <a href="{{ $returnUrl ?? route('actividades.index') }}" class="btn btn-secondary">
                     <i class="fas fa-arrow-left mr-1"></i> Cancelar
                 </a>
                 <button type="submit" class="btn btn-info">
@@ -134,11 +136,9 @@
 
 @push('scripts')
 <script>
-$(document).ready(function() {
-    $('#loteid').on('change', function() {
-        const responsable = $(this).find(':selected').data('responsable');
-        $('#responsable_display').val(responsable || 'Sin responsable asignado');
-    });
+document.getElementById('selector_wrap_actividad_lote')?.addEventListener('selector-catalogo:change', function (e) {
+    const extra = e.detail.extra || {};
+    document.getElementById('responsable_display').value = extra.responsable || 'Sin responsable asignado';
 });
 </script>
 @endpush

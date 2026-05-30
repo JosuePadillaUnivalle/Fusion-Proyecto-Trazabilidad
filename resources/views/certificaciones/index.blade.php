@@ -33,14 +33,7 @@
 </style>
 
 <div class="container-fluid">
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show">
-            {{ session('success') }}
-            <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
-        </div>
-    @endif
-
-    <div class="row mb-4">
+<div class="row mb-4">
         <div class="col-md-4 mb-3">
             <div class="card cert-kpi bg-warning">
                 <div class="card-body">
@@ -89,22 +82,25 @@
 
     <div class="row">
         <div class="col-lg-7 mb-4">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center">
-                    <strong><i class="fas fa-clipboard-check text-success mr-2"></i>Lotes por certificar</strong>
-                    @can('certificaciones.create')
-                        @if($lotesPendientes->isNotEmpty())
-                            <div class="btn-group btn-group-sm mt-2 mt-md-0">
-                                <button type="button" class="btn btn-outline-secondary" id="btnSeleccionarTodos">
+            <div class="card card-outline card-success card-modulo-main elevation-1 shadow-sm">
+                <x-modulo-index-header
+                    titulo="Lotes por certificar"
+                    icono="fa-clipboard-check"
+                    :registros="$lotesPendientes->count()"
+                >
+                    <x-slot:tools>
+                        @can('certificaciones.create')
+                            @if($lotesPendientes->isNotEmpty())
+                                <button type="button" class="btn btn-outline-secondary btn-sm ml-1" id="btnSeleccionarTodos">
                                     <i class="far fa-check-square mr-1"></i>Seleccionar todos
                                 </button>
-                                <button type="button" class="btn btn-success" id="btnCertificarSeleccion" disabled>
+                                <button type="button" class="btn btn-success btn-sm ml-1" id="btnCertificarSeleccion" disabled>
                                     <i class="fas fa-certificate mr-1"></i>Certificar selección
                                 </button>
-                            </div>
-                        @endif
-                    @endcan
-                </div>
+                            @endif
+                        @endcan
+                    </x-slot:tools>
+                </x-modulo-index-header>
                 <div class="card-body">
                     @can('certificaciones.create')
                         @if($lotesPendientes->isNotEmpty())
@@ -177,10 +173,13 @@
         </div>
 
         <div class="col-lg-5 mb-4">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-white">
-                    <strong><i class="fas fa-history text-primary mr-2"></i>Certificados emitidos</strong>
-                </div>
+            <div class="card card-outline card-success card-modulo-main elevation-1 shadow-sm h-100">
+                <x-modulo-index-header
+                    titulo="Certificados emitidos"
+                    icono="fa-history"
+                    icon-class="text-primary"
+                    :registros="$certificados->count()"
+                />
                 <div class="card-body cert-timeline p-0">
                     @forelse($certificados as $cert)
                         <div class="border-bottom px-3 py-3 cert-item"

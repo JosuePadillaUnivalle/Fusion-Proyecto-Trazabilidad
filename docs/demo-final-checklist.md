@@ -4,9 +4,12 @@
 Demostrar integracion completa de modulos con control granular de permisos en Web y API.
 
 ## Credenciales de demo
-- admin: `admin@agronexus.com` / `123456`
-- operador: `operador@agronexus.com` / `123456`
-- agricultor: `agricultor@agronexus.com` / `123456`
+- admin: `admin@agrofusion.com` / `12345`
+- agricultor: `agricultor@agrofusion.com` / `12345`
+- operador: `operador@agrofusion.com` / `12345`
+- planta: `planta@agrofusion.com` / `12345`
+- transportista: `transportista@agrofusion.com` / `12345`
+- almacen: `almacen@agrofusion.com` / `12345`
 
 ## Flujo recomendado (8-10 min)
 1. Ingresar como `admin`.
@@ -28,25 +31,3 @@ Demostrar integracion completa de modulos con control granular de permisos en We
 ```bash
 php artisan optimize:clear
 php artisan db:seed --class=RolePermissionSeeder --force
-php artisan route:list --path=envios -vv
-php artisan route:list --path=pedidos -vv
-php artisan route:list --path=api -vv
-php artisan test
-```
-
-## Evidencia tecnica disponible
-- Matriz: `config/permission_matrix.php`
-- Seeder granular: `database/seeders/RolePermissionSeeder.php`
-- Middleware custom: `app/Http/Middleware/ActionPermissionMiddleware.php`
-- Rutas web: `routes/web.php`
-- Rutas API: `routes/api.php`
-- Pruebas:
-  - `ApiAccessTest`
-  - `CatalogosAccessTest`
-  - `LotesAccessTest`
-  - `InsumosAccessTest`
-  - `PedidosAccessTest`
-  - `VentasAccessTest`
-  - `CertificacionesAccessTest`
-  - `OrgTrackAccessTest`
-

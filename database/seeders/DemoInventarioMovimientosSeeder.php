@@ -18,7 +18,7 @@ class DemoInventarioMovimientosSeeder extends Seeder
 {
     private const ALMACEN_NOMBRE = 'Almacén Central Santa Cruz';
 
-    private const USUARIO_ALMACEN_EMAIL = 'almacen@agronexus.com';
+    private const USUARIO_ALMACEN_EMAIL = 'almacen@agrofusion.com';
 
     public function run(): void
     {

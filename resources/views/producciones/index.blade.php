@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Producción | Fusion-Proyectos')
-@section('page_title', 'Registro de producción')
+@section('title', 'Cosechas | AgroFusion')
+@section('page_title', 'Registro de Cosechas')
 
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
-    <li class="breadcrumb-item active">Registro de producción</li>
+    <li class="breadcrumb-item active">Registro de Cosechas</li>
 @endsection
 
 @push('styles')
@@ -59,31 +59,18 @@
     </div>
 
     <div class="card card-outline card-success card-modulo-main elevation-1">
-        <div class="card-header">
-            <h3 class="card-title mb-0">
-                <i class="fas fa-tractor text-success mr-1"></i>
-                Registro de producción
-                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $producciones->total() }} registros</span>
-            </h3>
-            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
-                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosProduccionPanel" title="Filtros">
-                    <i class="fas fa-filter"></i>
-                </button>
-                <div class="btn-group btn-group-sm view-toggle mr-1">
-                    <button type="button" class="btn btn-default active" id="btnCardView" title="Tarjetas">
-                        <i class="fas fa-th-large"></i>
-                    </button>
-                    <button type="button" class="btn btn-default" id="btnTableView" title="Tabla">
-                        <i class="fas fa-list"></i>
-                    </button>
-                </div>
-                <a href="{{ route('producciones.create') }}" class="btn btn-success btn-sm">
-                    <i class="fas fa-plus mr-1"></i> Nueva cosecha
-                </a>
-            </div>
-        </div>
+        <x-modulo-index-header
+            titulo="Registro de Cosechas"
+            icono="fa-tractor"
+            :registros="$producciones->total()"
+            filtros-target="#filtrosProduccionPanel"
+            :view-toggle="true"
+            view-default="cards"
+            :nuevo-href="route('producciones.create')"
+            nuevo-text="Nueva cosecha"
+        />
 
-        <div id="filtrosProduccionPanel" class="filtros-panel collapse {{ request()->hasAny(['buscar','loteid','destinoid','procesoid','maquinaid','fecha_desde','fecha_hasta']) ? 'show' : '' }}">
+        <div id="filtrosProduccionPanel" class="filtros-panel collapse {{ request()->hasAny(['buscar','loteid','destinoid','fecha_desde','fecha_hasta']) ? 'show' : '' }}">
             <form method="GET" action="{{ route('producciones.index') }}">
                 <div class="row">
                     <div class="col-lg-4 col-md-6 mb-2">
@@ -116,31 +103,8 @@
                         <label class="small text-muted mb-1">Hasta</label>
                         <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="{{ request('fecha_hasta') }}">
                     </div>
-                    @if(($procesosFiltro ?? collect())->isNotEmpty())
-                    <div class="col-lg-3 col-md-6 mb-2">
-                        <label class="small text-muted mb-1">Proceso</label>
-                        <select name="procesoid" class="form-control form-control-sm">
-                            <option value="">Todos</option>
-                            @foreach($procesosFiltro as $pr)
-                                <option value="{{ $pr->procesoplantaid }}" @selected(request('procesoid') == $pr->procesoplantaid)>{{ $pr->nombre }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    @endif
-                    @if(($maquinasFiltro ?? collect())->isNotEmpty())
-                    <div class="col-lg-3 col-md-6 mb-2">
-                        <label class="small text-muted mb-1">Máquina</label>
-                        <select name="maquinaid" class="form-control form-control-sm">
-                            <option value="">Todas</option>
-                            @foreach($maquinasFiltro as $mq)
-                                <option value="{{ $mq->maquinaplantaid }}" @selected(request('maquinaid') == $mq->maquinaplantaid)>{{ $mq->nombre }}{{ $mq->codigo ? ' ('.$mq->codigo.')' : '' }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    @endif
-                    <div class="col-lg-12 d-flex align-items-end" style="gap: 8px;">
-                        <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-search mr-1"></i> Filtrar</button>
-                        <a href="{{ route('producciones.index') }}" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+                    <div class="col-lg-12">
+                        <x-filtros-form-actions :limpiar-url="route('producciones.index', ['filtros_abiertos' => 1])" />
                     </div>
                 </div>
             </form>

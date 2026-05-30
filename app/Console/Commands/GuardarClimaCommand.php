@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\Clima;
-use App\Services\OperacionAgricolaAutomaticaService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -61,12 +60,7 @@ class GuardarClimaCommand extends Command
 
                 $this->info("✅ Clima guardado: {$clima->temperatura}°C, {$clima->descripcion}");
                 Log::info("Clima guardado automáticamente", ['clima_id' => $clima->climaid]);
-
-                $svc = app(OperacionAgricolaAutomaticaService::class);
-                $porLote = $svc->registrarClimaPorLotes();
-                $alertas = $svc->generarAlertasClimaticas();
-                $this->info("✅ Clima por lote: {$porLote} · Alertas/actividades: {$alertas}");
-
+                
                 return 0;
             }
 

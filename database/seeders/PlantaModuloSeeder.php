@@ -35,7 +35,7 @@ class PlantaModuloSeeder extends Seeder
 {
     private const MARK = '[MOD-PLANTA]';
 
-    private const EMAIL_PLANTA = 'planta@agronexus.com';
+    private const EMAIL_PLANTA = 'planta@agrofusion.com';
 
     public function run(): void
     {
@@ -96,7 +96,7 @@ class PlantaModuloSeeder extends Seeder
                 'latitud' => -17.7833,
                 'longitud' => -63.1821,
                 'telefono' => '+591 3 3456789',
-                'email' => 'planta@agronexus.com',
+                'email' => 'planta@agrofusion.com',
             ]
         );
     }
@@ -220,7 +220,7 @@ class PlantaModuloSeeder extends Seeder
         }
 
         $operador = Usuario::where('email', self::EMAIL_PLANTA)->first()
-            ?? Usuario::where('email', 'admin@agronexus.com')->first();
+            ?? Usuario::where('email', 'admin@agrofusion.com')->first();
 
         if (! $operador) {
             return;
@@ -321,7 +321,7 @@ class PlantaModuloSeeder extends Seeder
     private function seedLogisticaPlantaExtra(): void
     {
         $planta = Usuario::where('email', self::EMAIL_PLANTA)->first();
-        $admin = Usuario::where('email', 'admin@agronexus.com')->first();
+        $admin = Usuario::where('email', 'admin@agrofusion.com')->first();
         $almPlanta = Almacen::where('nombre', 'Almacén Planta Procesadora')->first();
 
         if (Schema::hasTable('incidente_envio') && $planta) {

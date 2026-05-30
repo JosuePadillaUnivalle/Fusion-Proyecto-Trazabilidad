@@ -19,6 +19,7 @@ class RutaMultiEntrega extends Model
         'fecha_salida',
         'fecha_cierre',
         'resumen',
+        'rutageojson',
     ];
 
     protected $casts = [

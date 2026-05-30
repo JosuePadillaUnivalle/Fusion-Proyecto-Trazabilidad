@@ -45,24 +45,14 @@ class ApiAccessTest extends TestCase
         $this->getJson('/api/certificaciones')->assertOk();
     }
 
-    public function test_operador_accede_api_pedidos_y_ventas_pero_no_certificaciones(): void
-    {
-        $operador = $this->createUserWithRole('operador');
-        Sanctum::actingAs($operador);
-
-        $this->getJson('/api/pedidos')->assertOk();
-        $this->getJson('/api/ventas')->assertOk();
-        $this->getJson('/api/certificaciones')->assertForbidden();
-    }
-
-    public function test_agricultor_solo_accede_api_certificaciones(): void
+    public function test_agricultor_accede_api_campo_logistica_y_certificaciones(): void
     {
         $agricultor = $this->createUserWithRole('agricultor');
         Sanctum::actingAs($agricultor);
 
         $this->getJson('/api/certificaciones')->assertOk();
-        $this->getJson('/api/pedidos')->assertForbidden();
-        $this->getJson('/api/ventas')->assertForbidden();
+        $this->getJson('/api/pedidos')->assertOk();
+        $this->getJson('/api/ventas')->assertOk();
     }
 }
 

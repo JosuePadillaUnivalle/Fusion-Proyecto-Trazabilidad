@@ -237,8 +237,11 @@
                     <label>Estado</label>
                     <span><span class="badge badge-info">{{ $produccion->lote->estadoTipo->nombre ?? '-' }}</span></span>
                 </div>
-                <a href="{{ route('lotes.show', $produccion->lote) }}" class="btn btn-outline-success btn-sm btn-block mt-3">
-                    <i class="fas fa-eye mr-1"></i> Ver Lote
+                <a href="{{ route('lotes.show', $produccion->lote) }}" class="btn btn-outline-success btn-sm btn-block mt-2">
+                    <i class="fas fa-eye mr-1"></i> Ver lote
+                </a>
+                <a href="{{ route('lotes.trazabilidad', $produccion->lote) }}" class="btn btn-outline-secondary btn-sm btn-block">
+                    <i class="fas fa-history mr-1"></i> Trazabilidad del lote
                 </a>
             @else
                 <p class="text-muted mb-0">Sin lote asociado</p>

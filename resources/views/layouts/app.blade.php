@@ -1,854 +1,1469 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>@yield('title', 'Fusion-Proyectos | Panel')</title>
+    <title>@yield('title', 'AgroFusion | Panel')</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    {{-- FONT AWESOME (CDN) --}}
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-        integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
-        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
 
-    {{-- ADMINLTE (CDN) --}}
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
-
-    {{-- PALETA EXACTA Y ESTILO DE HEADER / SIDEBAR / FOOTER DE LA MAQUETA --}}
     <style>
+        /* ═══════════ DESIGN TOKENS ═══════════ */
         :root {
-            --primary-color: #2c5530;
-            --secondary-color: #4a7c59;
-            --accent-color: #e8f5e8;
-            --success-color: #28a745;
-            --warning-color: #ffc107;
-            --danger-color: #dc3545;
-            --info-color: #17a2b8;
-            --text-dark: #1a252f;
-            --text-light: #6c757d;
-            --border-color: #dee2e6;
+            --sw: 260px;
+            --sw-mini: 68px;
+            --th: 60px;
+
+            --bg:        #f0f4f8;
+            --surface:   #ffffff;
+            --border:    #e2e8f0;
+            --border-2:  #cbd5e1;
+
+            --txt-1:     #0f172a;
+            --txt-2:     #475569;
+            --txt-3:     #94a3b8;
+
+            --brand:     #10b981;
+            --brand-dk:  #059669;
+            --brand-lt:  #ecfdf5;
+            --brand-rng: rgba(16,185,129,.18);
+
+            --sb-bg:     #0d1117;
+            --sb-hover:  rgba(255,255,255,.055);
+            --sb-active: rgba(16,185,129,.13);
+            --sb-border: rgba(255,255,255,.07);
+            --sb-txt:    #8b9ab0;
+            --sb-txt-h:  #e2e8f0;
+            --sb-txt-a:  #10b981;
+
+            --sh-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+            --sh-md: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.05);
+            --sh-lg: 0 16px 32px rgba(0,0,0,.12);
+
+            --r:    8px;
+            --r-sm: 6px;
+            --r-lg: 14px;
         }
 
-        .main-header {
-            background: var(--primary-color) !important;
-            border-bottom: 3px solid var(--secondary-color);
-        }
-
-        .main-header .navbar-nav .nav-link {
-            color: rgba(255, 255, 255, 0.9) !important;
-        }
-
-        .main-header .navbar-nav .nav-link:hover {
-            color: #ffffff !important;
-        }
-
-        .main-sidebar {
-            background: #2d3748 !important;
-        }
-
-        .brand-link {
-            background: var(--primary-color) !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            color: #ffffff !important;
-        }
-
-        .brand-link .brand-image {
-            color: #ffffff;
-        }
-
-        .sidebar-dark-primary .nav-sidebar>.nav-item>.nav-link {
-            color: rgba(255, 255, 255, 0.8);
-        }
-
-        .sidebar-dark-primary .nav-sidebar>.nav-item>.nav-link:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: #ffffff;
-        }
-
-        .sidebar-dark-primary .nav-sidebar>.nav-item>.nav-link.active {
-            background: var(--primary-color) !important;
-            color: #ffffff;
-        }
-
-        .nav-sidebar .nav-item>.nav-link .right {
-            margin-left: auto;
-        }
-
-        .content-wrapper {
-            background: #f8f9fc;
-        }
+        /* ═══════════ RESET ═══════════ */
+        *, *::before, *::after { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
 
         body {
-            background: #f8f9fc;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--txt-1);
+            margin: 0;
+            overflow-x: hidden;
+            font-size: 14px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .user-panel img {
-            width: 35px;
-            height: 35px;
+        a { color: var(--brand); }
+        a:hover { color: var(--brand-dk); }
+
+        /* ═══════════ LAYOUT SHELL ═══════════ */
+        .ag-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ═══════════════════════════════════════════════
+           SIDEBAR
+        ═══════════════════════════════════════════════ */
+        .ag-sidebar {
+            width: var(--sw);
+            background: var(--sb-bg);
+            position: fixed;
+            inset: 0 auto 0 0;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            transition: width .22s cubic-bezier(.4,0,.2,1);
+            overflow: hidden;
+            border-right: 1px solid rgba(255,255,255,.05);
+        }
+
+        .ag-sidebar.mini { width: var(--sw-mini); }
+
+        /* — Brand / Logo — */
+        .ag-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 18px 14px;
+            border-bottom: 1px solid var(--sb-border);
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+
+        .ag-brand-icon {
+            width: 34px;
+            height: 34px;
+            background: linear-gradient(135deg, var(--brand), var(--brand-dk));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 0 0 3px rgba(16,185,129,.2);
+        }
+
+        .ag-brand-icon i { color: #fff; font-size: .9rem; }
+
+        .ag-brand-text { overflow: hidden; transition: opacity .2s, width .22s; }
+        .ag-brand-name { font-size: .88rem; font-weight: 700; color: #f1f5f9; white-space: nowrap; display: block; }
+        .ag-brand-sub  { font-size: .68rem; color: #475569; white-space: nowrap; display: block; margin-top: 1px; }
+
+        .ag-sidebar.mini .ag-brand-text { opacity: 0; width: 0; }
+
+        /* — User Panel — */
+        .ag-sb-user {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,.03);
+            border: 1px solid var(--sb-border);
+            border-radius: var(--r-sm);
+            overflow: hidden;
+        }
+
+        .ag-sb-user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            flex-shrink: 0;
+            border: 2px solid rgba(16,185,129,.35);
+        }
+
+        .ag-sb-user-info { overflow: hidden; transition: opacity .2s, width .22s; min-width: 0; }
+        .ag-sb-user-name { font-size: .78rem; font-weight: 600; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+        .ag-sb-user-role { font-size: .66rem; color: #475569; white-space: nowrap; display: block; margin-top: 1px; }
+
+        .ag-sidebar.mini .ag-sb-user { justify-content: center; }
+        .ag-sidebar.mini .ag-sb-user-info { opacity: 0; width: 0; overflow: hidden; }
+
+        /* — Nav Scroll Area — */
+        .ag-sb-nav {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 6px 0 10px;
+        }
+
+        .ag-sb-nav::-webkit-scrollbar { width: 3px; }
+        .ag-sb-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 3px; }
+
+        /* — Section Labels — */
+        .ag-nav-label {
+            font-size: .6rem;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: #334155;
+            padding: 14px 14px 4px;
+            white-space: nowrap;
+            display: block;
+        }
+
+        .ag-sidebar.mini .ag-nav-label { opacity: 0; height: 0; padding: 0; overflow: hidden; }
+
+        /* — Nav Items — */
+        .ag-nav-ul { list-style: none; margin: 0; padding: 0; }
+
+        .ag-nav-li { margin: 1px 8px; }
+
+        .ag-nav-a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 9px;
+            border-radius: var(--r-sm);
+            text-decoration: none !important;
+            color: var(--sb-txt);
+            font-size: .82rem;
+            font-weight: 500;
+            transition: background .12s, color .12s;
+            cursor: pointer;
+            white-space: nowrap;
+            position: relative;
+        }
+
+        .ag-nav-a:hover { background: var(--sb-hover); color: var(--sb-txt-h); }
+
+        .ag-nav-a.active {
+            background: var(--sb-active);
+            color: var(--sb-txt-a);
+            font-weight: 600;
+        }
+
+        .ag-nav-a.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 25%;
+            bottom: 25%;
+            width: 2px;
+            background: var(--brand);
+            border-radius: 0 2px 2px 0;
+        }
+
+        .ag-nav-icon {
+            width: 16px;
+            text-align: center;
+            font-size: .85rem;
+            flex-shrink: 0;
+            opacity: .8;
+        }
+
+        .ag-nav-a.active .ag-nav-icon,
+        .ag-nav-a:hover .ag-nav-icon { opacity: 1; }
+
+        .ag-nav-text { flex: 1; }
+        .ag-sidebar.mini .ag-nav-text { display: none; }
+
+        .ag-nav-arrow {
+            font-size: .6rem;
+            opacity: .4;
+            transition: transform .2s, opacity .12s;
+        }
+
+        .ag-nav-a:hover .ag-nav-arrow { opacity: .7; }
+        .ag-nav-a.group-open .ag-nav-arrow { transform: rotate(90deg); opacity: .7; }
+        .ag-sidebar.mini .ag-nav-arrow { display: none; }
+
+        /* — Submenu — */
+        .ag-subnav {
+            list-style: none;
+            padding: 2px 0 4px 36px;
+            margin: 0;
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height .28s ease;
+        }
+
+        .ag-subnav.open { max-height: 600px; }
+        .ag-subnav-nested {
+            padding-left: 12px;
+            margin-top: 2px;
+        }
+        .ag-subnav-nested.open { max-height: 220px; }
+        .ag-sub-a[data-toggle-sub] { justify-content: space-between; }
+        .ag-sub-a .ag-sub-arrow {
+            font-size: .62rem;
+            opacity: .45;
+            margin-left: auto;
+            transition: transform .2s;
+        }
+        .ag-sub-a.group-open .ag-sub-arrow { transform: rotate(90deg); opacity: .7; }
+        .ag-sidebar.mini .ag-subnav { display: none; }
+
+        .ag-sub-li { margin: 1px 8px 1px 0; }
+
+        .ag-sub-a {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 9px;
+            border-radius: var(--r-sm);
+            text-decoration: none !important;
+            color: #4b5563;
+            font-size: .79rem;
+            transition: background .12s, color .12s;
+        }
+
+        .ag-sub-a::before {
+            content: '';
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: currentColor;
+            flex-shrink: 0;
+            opacity: .35;
+            transition: opacity .12s;
+        }
+
+        .ag-sub-a:hover { color: #c7d2e0; background: rgba(255,255,255,.04); }
+        .ag-sub-a:hover::before { opacity: .7; }
+        .ag-sub-a.active { color: var(--brand); font-weight: 600; }
+        .ag-sub-a.active::before { opacity: 1; background: var(--brand); }
+
+        /* — Sidebar Footer — */
+        .ag-sb-footer {
+            padding: 10px;
+            border-top: 1px solid var(--sb-border);
+            flex-shrink: 0;
+        }
+
+        .ag-sb-foot-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 8px 9px;
+            border: none;
+            background: none;
+            border-radius: var(--r-sm);
+            color: #475569;
+            font-size: .79rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background .12s, color .12s;
+            white-space: nowrap;
+        }
+
+        .ag-sb-foot-btn:hover { background: rgba(239,68,68,.08); color: #f87171; }
+        .ag-sidebar.mini .ag-sb-foot-btn { justify-content: center; }
+        .ag-sidebar.mini .ag-sb-foot-btn span { display: none; }
+
+        /* ═══════════════════════════════════════════════
+           MAIN AREA
+        ═══════════════════════════════════════════════ */
+        .ag-main {
+            margin-left: var(--sw);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            transition: margin-left .22s cubic-bezier(.4,0,.2,1);
+        }
+
+        .ag-main.mini { margin-left: var(--sw-mini); }
+
+        /* ═══════════════════════════════════════════════
+           TOPBAR
+        ═══════════════════════════════════════════════ */
+        .ag-topbar {
+            height: var(--th);
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 12px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--sh-sm);
+        }
+
+        .ag-tb-icon-btn {
+            width: 34px;
+            height: 34px;
+            border: none;
+            background: transparent;
+            border-radius: var(--r-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--txt-2);
+            transition: background .12s, color .12s;
+            flex-shrink: 0;
+            text-decoration: none;
+        }
+
+        .ag-tb-icon-btn:hover { background: var(--bg); color: var(--txt-1); }
+
+        .ag-tb-breadcrumb {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow: hidden;
+        }
+
+        .ag-tb-title {
+            font-size: .92rem;
+            font-weight: 600;
+            color: var(--txt-1);
+            white-space: nowrap;
+        }
+
+        .ag-tb-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        /* User dropdown */
+        .ag-user-wrap { position: relative; }
+
+        .ag-user-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 10px 5px 6px;
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            background: transparent;
+            cursor: pointer;
+            transition: background .12s, border-color .12s;
+        }
+
+        .ag-user-btn:hover { background: var(--bg); border-color: var(--border-2); }
+
+        .ag-user-btn img {
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
             object-fit: cover;
         }
 
-        .main-footer {
-            background: #ffffff;
-            border-top: 1px solid #dee2e6;
-            color: var(--text-light);
+        .ag-user-btn-name {
+            font-size: .8rem;
+            font-weight: 500;
+            color: var(--txt-1);
+            max-width: 120px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .main-footer a {
-            color: var(--primary-color);
+        .ag-user-btn i { font-size: .6rem; color: var(--txt-3); }
+
+        .ag-dropdown {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 210px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            box-shadow: var(--sh-lg);
+            z-index: 999;
+            display: none;
+            overflow: hidden;
         }
 
+        .ag-dropdown.show { display: block; }
+
+        .ag-dd-header {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg);
+        }
+
+        .ag-dd-user-name { font-size: .83rem; font-weight: 600; color: var(--txt-1); display: block; }
+        .ag-dd-user-role { font-size: .72rem; color: var(--txt-3); display: block; margin-top: 2px; }
+
+        .ag-dd-body { padding: 4px 0; }
+
+        .ag-dd-item {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 8px 14px;
+            color: var(--txt-2);
+            font-size: .81rem;
+            text-decoration: none !important;
+            transition: background .12s;
+            cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            font-family: inherit;
+        }
+
+        .ag-dd-item:hover { background: var(--bg); color: var(--txt-1); }
+        .ag-dd-item.danger:hover { background: #fef2f2; color: #dc2626; }
+
+        .ag-dd-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+        /* ═══════════════════════════════════════════════
+           CONTENT AREA
+        ═══════════════════════════════════════════════ */
+        .ag-content {
+            flex: 1;
+            padding: 26px 28px;
+        }
+
+        /* ═══════════════════════════════════════════════
+           FOOTER
+        ═══════════════════════════════════════════════ */
+        .ag-footer {
+            padding: 14px 28px;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+            font-size: .75rem;
+            color: var(--txt-3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* ═══════════════════════════════════════════════
+           ROLE BADGES
+        ═══════════════════════════════════════════════ */
         .role-badge {
-            font-size: 10px;
+            display: inline-flex;
+            align-items: center;
+            font-size: .62rem;
+            font-weight: 700;
             padding: 2px 8px;
-            border-radius: 10px;
+            border-radius: 20px;
             text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+        .role-badge.admin        { background: #fee2e2; color: #dc2626; }
+        .role-badge.agricultor   { background: #d1fae5; color: #059669; }
+        .role-badge.operador     { background: #dbeafe; color: #2563eb; }
+        .role-badge.planta       { background: #ede9fe; color: #7c3aed; }
+        .role-badge.transportista{ background: #ffedd5; color: #ea580c; }
+        .role-badge.almacen      { background: #ccfbf1; color: #0d9488; }
+
+        /* ═══════════════════════════════════════════════
+           OVERRIDE BOOTSTRAP + ADMINLTE REMNANTS
+        ═══════════════════════════════════════════════ */
+
+        /* Cards */
+        .card {
+            border: 1px solid var(--border) !important;
+            border-radius: var(--r) !important;
+            box-shadow: var(--sh-sm) !important;
+            transition: box-shadow .15s;
         }
 
-        .role-badge.admin {
-            background: #dc3545;
-            color: white;
+        .card:hover { box-shadow: var(--sh-md) !important; }
+
+        .card-header {
+            background: var(--surface) !important;
+            border-bottom: 1px solid var(--border) !important;
+            padding: 14px 18px !important;
+            font-size: .87rem !important;
+            font-weight: 600 !important;
+            color: var(--txt-1) !important;
+            border-radius: var(--r) var(--r) 0 0 !important;
         }
 
-        .role-badge.agricultor {
-            background: #28a745;
-            color: white;
+        .card-body { padding: 18px !important; }
+
+        .card-footer {
+            background: var(--bg) !important;
+            border-top: 1px solid var(--border) !important;
+            padding: 10px 18px !important;
+            border-radius: 0 0 var(--r) var(--r) !important;
         }
 
-        .role-badge.operador {
-            background: #17a2b8;
-            color: white;
+        /* Stat boxes (small-box) */
+        .small-box {
+            border-radius: var(--r) !important;
+            border: none !important;
+            box-shadow: var(--sh-sm) !important;
+            overflow: hidden;
+            transition: transform .18s, box-shadow .18s;
+            position: relative;
         }
 
-        .role-badge.planta {
-            background: #6f42c1;
-            color: white;
+        .small-box:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--sh-md) !important;
         }
 
-        .role-badge.transportista {
-            background: #fd7e14;
-            color: white;
+        .small-box .inner {
+            padding: 16px 18px;
         }
 
-        .role-badge.almacen {
-            background: #20c997;
-            color: white;
+        .small-box .inner h3 {
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1;
+            margin: 0 0 4px;
         }
+
+        .small-box .inner p {
+            font-size: .82rem;
+            margin: 0;
+            opacity: .88;
+            font-weight: 500;
+        }
+
+        .small-box > .icon {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2.8rem !important;
+            opacity: .18;
+        }
+
+        /* Pie de stat box: ver partials/small-box-footer-styles.blade.php */
+
+        .bg-success, .small-box-green  { background: linear-gradient(135deg, #059669, #10b981) !important; color: #fff !important; }
+        .bg-info,    .small-box-blue   { background: linear-gradient(135deg, #2563eb, #3b82f6) !important; color: #fff !important; }
+        .bg-warning, .small-box-yellow { background: linear-gradient(135deg, #b45309, #d97706) !important; color: #fff !important; }
+        .bg-danger,  .small-box-red    { background: linear-gradient(135deg, #b91c1c, #ef4444) !important; color: #fff !important; }
+        .bg-purple   { background: linear-gradient(135deg, #6d28d9, #8b5cf6) !important; color: #fff !important; }
+
+        /* Tables */
+        .table { font-size: .83rem; }
+
+        .table thead th {
+            font-size: .7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--txt-3);
+            border-bottom: 2px solid var(--border) !important;
+            padding: 10px 14px;
+            background: #fafbfc;
+            vertical-align: middle;
+        }
+
+        .table tbody td {
+            padding: 11px 14px;
+            vertical-align: middle;
+            border-color: var(--border);
+            color: var(--txt-2);
+        }
+
+        .table-hover tbody tr:hover td { background: #f8fafc; }
+
+        /* Buttons */
+        .btn {
+            font-weight: 600 !important;
+            font-size: .81rem !important;
+            border-radius: var(--r-sm) !important;
+            letter-spacing: .01em;
+            transition: all .14s !important;
+        }
+
+        .btn-primary {
+            background: var(--brand) !important;
+            border-color: var(--brand) !important;
+            color: #fff !important;
+        }
+
+        .btn-primary:hover {
+            background: var(--brand-dk) !important;
+            border-color: var(--brand-dk) !important;
+            box-shadow: 0 4px 12px rgba(16,185,129,.3) !important;
+        }
+
+        .btn-success { background: #059669 !important; border-color: #059669 !important; }
+        .btn-success:hover { background: #047857 !important; border-color: #047857 !important; box-shadow: 0 4px 12px rgba(5,150,105,.3) !important; }
+
+        .btn-info { background: #2563eb !important; border-color: #2563eb !important; }
+        .btn-warning { background: #d97706 !important; border-color: #d97706 !important; color: #fff !important; }
+        .btn-danger { background: #dc2626 !important; border-color: #dc2626 !important; }
+
+        .btn:not(.btn-link):hover { transform: translateY(-1px); }
+        .btn:active { transform: translateY(0) !important; }
+
+        /* Forms — altura compatible con Bootstrap (evita campos “cortados” en filtros) */
+        .form-control {
+            border: 1px solid var(--border);
+            border-radius: var(--r-sm) !important;
+            font-size: .875rem;
+            padding: 0.4375rem 0.75rem;
+            min-height: calc(1.5em + 0.875rem + 2px);
+            height: auto !important;
+            line-height: 1.5;
+            color: var(--txt-1);
+            transition: border .14s, box-shadow .14s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .form-control-sm {
+            font-size: .8125rem;
+            padding: 0.3125rem 0.625rem;
+            min-height: calc(1.5em + 0.625rem + 2px);
+            height: auto !important;
+            line-height: 1.5;
+        }
+
+        select.form-control {
+            padding-right: 1.75rem;
+        }
+
+        .input-group > .form-control,
+        .input-group-sm > .form-control {
+            height: auto !important;
+        }
+
+        .input-group:not(.input-group-sm) > .form-control {
+            min-height: calc(1.5em + 0.875rem + 2px);
+        }
+
+        .input-group-sm > .form-control {
+            min-height: calc(1.5em + 0.625rem + 2px);
+        }
+
+        .input-group-prepend .input-group-text,
+        .input-group-append .input-group-text {
+            height: auto !important;
+            min-height: calc(1.5em + 0.875rem + 2px);
+            display: flex;
+            align-items: center;
+            line-height: 1.5;
+            padding: 0.4375rem 0.75rem;
+        }
+
+        .input-group-sm > .input-group-prepend > .input-group-text,
+        .input-group-sm > .input-group-append > .input-group-text {
+            min-height: calc(1.5em + 0.625rem + 2px);
+            padding: 0.3125rem 0.625rem;
+            font-size: .8125rem;
+        }
+
+        .filtros-panel label.small,
+        .filtros-panel .small.text-muted {
+            display: block;
+            margin-bottom: 0.35rem;
+            line-height: 1.3;
+        }
+
+        .card-tools {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .card-modulo-main > .card-header {
+            background: #fff;
+            border-bottom: 1px solid #dee2e6;
+            padding: 0.75rem 1rem;
+        }
+
+        .card-modulo-main > .card-header .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1a252f;
+        }
+
+        .card-modulo-main .badge-registros {
+            font-size: 0.78rem;
+            font-weight: 500;
+            padding: 0.35em 0.65em;
+            white-space: nowrap;
+        }
+
+        .card-modulo-main .view-toggle .btn {
+            border-color: #ced4da;
+            color: #6c757d;
+        }
+
+        .card-modulo-main .view-toggle .btn.active {
+            background: #2c5530;
+            border-color: #2c5530;
+            color: #fff;
+        }
+
+        .filtros-panel {
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            padding: 1rem 1.25rem;
+        }
+
+        .card-tools .btn-filtros-toggle {
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+
+        .form-control:focus {
+            border-color: var(--brand) !important;
+            box-shadow: 0 0 0 3px var(--brand-rng) !important;
+            outline: none;
+        }
+
+        label, .form-label {
+            font-size: .8rem;
+            font-weight: 500;
+            color: var(--txt-2);
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        /* Badges */
+        .badge {
+            border-radius: 20px !important;
+            font-weight: 600;
+            font-size: .68rem;
+            padding: .28em .7em;
+        }
+
+        /* Alerts */
+        .alert {
+            border-radius: var(--r) !important;
+            border-width: 1px !important;
+            border-left-width: 3px !important;
+            font-size: .84rem;
+            padding: 11px 15px;
+        }
+
+        .alert-success { background: #f0fdf4 !important; border-color: #bbf7d0 !important; border-left-color: #22c55e !important; color: #15803d !important; }
+        .alert-danger  { background: #fef2f2 !important; border-color: #fecaca !important; border-left-color: #ef4444 !important; color: #b91c1c !important; }
+        .alert-warning { background: #fffbeb !important; border-color: #fde68a !important; border-left-color: #f59e0b !important; color: #92400e !important; }
+        .alert-info    { background: #eff6ff !important; border-color: #bfdbfe !important; border-left-color: #3b82f6 !important; color: #1d4ed8 !important; }
+
+        /* Pagination */
+        .pagination .page-link {
+            border-radius: var(--r-sm) !important;
+            margin: 0 2px;
+            color: var(--brand);
+            border-color: var(--border);
+            font-size: .8rem;
+            padding: 5px 10px;
+        }
+
+        .pagination .page-item.active .page-link { background: var(--brand); border-color: var(--brand); color: #fff; }
+        .pagination .page-link:hover { background: var(--brand-lt); color: var(--brand-dk); }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            font-size: .78rem;
+        }
+
+        .breadcrumb-item + .breadcrumb-item::before { color: var(--txt-3); }
+        .breadcrumb-item a { color: var(--brand); text-decoration: none; }
+        .breadcrumb-item.active { color: var(--txt-3); }
+
+        /* Content header */
+        .content-header { padding: 0 0 22px; }
+        .content-header h1, .content-header .h1 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--txt-1);
+            margin: 0;
+        }
+
+        /* ── Info Box (AdminLTE compat) ── */
+        .info-box {
+            display: flex;
+            align-items: stretch;
+            min-height: 70px;
+            border-radius: var(--r) !important;
+            box-shadow: var(--sh-sm) !important;
+            margin-bottom: 14px;
+            overflow: hidden;
+            transition: transform .15s, box-shadow .15s;
+        }
+
+        .info-box:hover { transform: translateY(-2px); box-shadow: var(--sh-md) !important; }
+
+        .info-box-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            flex-shrink: 0;
+            font-size: 1.5rem;
+            background: rgba(0,0,0,.15);
+            color: #fff;
+        }
+
+        .info-box-content {
+            padding: 9px 14px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .info-box-text {
+            display: block;
+            font-size: .72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .info-box-number {
+            display: block;
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
+        .info-box.bg-secondary { background: #64748b !important; color: #fff !important; }
+        .info-box.bg-info      { background: linear-gradient(135deg,#2563eb,#3b82f6) !important; color: #fff !important; }
+        .info-box.bg-primary   { background: linear-gradient(135deg,var(--brand-dk),var(--brand)) !important; color: #fff !important; }
+        .info-box.bg-success   { background: linear-gradient(135deg,#059669,#10b981) !important; color: #fff !important; }
+        .info-box.bg-warning   { background: linear-gradient(135deg,#b45309,#d97706) !important; color: #fff !important; }
+        .info-box.bg-dark      { background: linear-gradient(135deg,#1e293b,#334155) !important; color: #fff !important; }
+
+        /* Compat wrappers (AdminLTE remnants used in some views) */
+        .content-wrapper { background: transparent !important; }
+        .main-header, .main-sidebar { display: none !important; }
+
+        /* ═══════════════════════════════════════════════
+           RESPONSIVE
+        ═══════════════════════════════════════════════ */
+        @media (max-width: 768px) {
+            .ag-sidebar {
+                transform: translateX(-100%);
+                width: var(--sw) !important;
+            }
+
+            .ag-sidebar.mobile-open { transform: translateX(0); }
+
+            .ag-main { margin-left: 0 !important; }
+            .ag-content { padding: 16px; }
+            .ag-tb-breadcrumb { display: none; }
+        }
+
+        /* ═══════════════════════════════════════════════
+           MOBILE OVERLAY
+        ═══════════════════════════════════════════════ */
+        .ag-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.45);
+            z-index: 999;
+        }
+
+        .ag-overlay.show { display: block; }
     </style>
 
     @stack('styles')
+    @include('partials.small-box-footer-styles')
 </head>
 
 @php
-    $authUser = auth()->user();
-    $userFullName = $authUser
-        ? trim(($authUser->nombre ?? '') . ' ' . ($authUser->apellido ?? ''))
-        : 'Usuario';
-
-    if ($authUser && $userFullName === '') {
-        $userFullName = $authUser->nombreusuario ?? 'Usuario';
-    }
-
-    $userImageUrl = $authUser && $authUser->imagenurl
-        ? $authUser->imagenurl
-        : asset('images/user.png');
-
-    // Obtener rol del usuario
-    $userRole = $authUser ? ($authUser->getRoleNames()->first() ?? 'sin rol') : 'invitado';
-    // Fix: Check for 'Admin' (capitalized) as stored in DB.
-    $isAdmin = $authUser && ($authUser->hasRole('Admin') || $authUser->hasRole('admin'));
-
-    // Fix: Lowercase for CSS class matching
-    $userRoleCss = strtolower($userRole);
+    $authUser    = auth()->user();
+    $userFull    = $authUser ? trim(($authUser->nombre ?? '') . ' ' . ($authUser->apellido ?? '')) : 'Usuario';
+    if ($authUser && !$userFull) $userFull = $authUser->nombreusuario ?? 'Usuario';
+    $userImg     = $authUser ? $authUser->avatarUrl() : \App\Support\UsuarioAvatar::placeholder();
+    $userImgFallback = \App\Support\UsuarioAvatar::placeholder();
+    $userRole    = $authUser ? ($authUser->getRoleNames()->first() ?? 'sin rol') : 'invitado';
+    $isAdmin     = $authUser && ($authUser->hasRole('Admin') || $authUser->hasRole('admin'));
+    $roleCss     = strtolower($userRole);
 @endphp
 
-<body class="hold-transition sidebar-mini layout-fixed">
-    <div class="wrapper">
+<body>
 
-        {{-- NAVBAR SUPERIOR --}}
-        <nav class="main-header navbar navbar-expand navbar-dark">
-            <ul class="navbar-nav">
-                <li class="nav-item">
-                    <a class="nav-link" data-widget="pushmenu" href="#" role="button">
-                        <i class="fas fa-bars"></i>
+<div class="ag-overlay" id="agOverlay"></div>
+
+<div class="ag-layout">
+
+    {{-- ═══════════════ SIDEBAR ═══════════════ --}}
+    <aside class="ag-sidebar" id="agSidebar">
+
+        {{-- Logo --}}
+        <a href="{{ route('dashboard') }}" class="ag-brand">
+            <div class="ag-brand-icon">
+                <i class="fas fa-seedling"></i>
+            </div>
+            <div class="ag-brand-text">
+                <span class="ag-brand-name">AgroFusion</span>
+                <span class="ag-brand-sub">Panel de trazabilidad</span>
+            </div>
+        </a>
+
+        {{-- User panel --}}
+        <div class="ag-sb-user">
+            <img src="{{ $userImg }}" alt="Avatar" class="ag-sb-user-avatar"
+                 data-avatar-fallback="{{ $userImgFallback }}"
+                 onerror="if(this.dataset.avatarFallback){this.onerror=null;this.src=this.dataset.avatarFallback;}">
+            <div class="ag-sb-user-info">
+                <span class="ag-sb-user-name">{{ $userFull }}</span>
+                <span class="ag-sb-user-role">{{ ucfirst($userRole) }}</span>
+            </div>
+        </div>
+
+        {{-- Navigation --}}
+        <nav class="ag-sb-nav">
+            <ul class="ag-nav-ul">
+
+                {{-- Dashboard --}}
+                <li class="ag-nav-li">
+                    <a href="{{ route('dashboard') }}"
+                       class="ag-nav-a {{ request()->routeIs('dashboard') && !request()->routeIs('dashboard.panel-*') ? 'active' : '' }}">
+                        <i class="ag-nav-icon fas fa-home"></i>
+                        <span class="ag-nav-text">Inicio</span>
                     </a>
                 </li>
-                <li class="nav-item d-none d-sm-inline-block">
-                    <a href="{{ route('dashboard') }}" class="nav-link d-flex align-items-center">
-                        <img src="{{ asset('images/logo.png') }}" alt="Logo" style="height: 28px; margin-right: 8px;">
-                        <span class="font-weight-bold">Fusion-Proyectos</span>
+
+                @php
+                    $puedeAlmacenAgricola = $isAdmin || ($authUser && $authUser->hasRole('agricultor'));
+                    $puedeAlmacenPlanta = $isAdmin || ($authUser && $authUser->hasRole('planta'));
+                    $almAgrOpen = request()->routeIs('almacen-agricola.*');
+                    $almPlaOpen = request()->routeIs('almacen-planta.*');
+                    $prodAgrOpen = request()->routeIs('producciones.*', 'climas.*');
+                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'maquinas-planta.*', 'registro-planta.*', 'almacen-planta.*');
+                    $puedeProdPlanta = $isAdmin || ($authUser && ! $authUser->hasRole('agricultor') && ! $authUser->hasRole('transportista'));
+                    $showProdAgricola = $isAdmin
+                        || auth()->user()?->canany(['lotes.view','lotes.create','lotes.update','lotes.delete'])
+                        || auth()->user()?->can('certificaciones.view')
+                        || auth()->user()?->canany(['inventario.view','inventario.create','inventario.update','inventario.delete'])
+                        || $puedeAlmacenAgricola
+                        || ! auth()->user()?->hasRole('transportista');
+                    $envPerm = [
+                        'envios.view', 'envios.create', 'envios.admin.view',
+                        'vehiculos.view', 'transportistas.view', 'direcciones.view',
+                        'reportes.view', 'pedidos.view',
+                        'asignaciones.view', 'rutas_multi.view', 'rutas_multi.create',
+                        'documentos.view', 'incidentes.view',
+                    ];
+                    $envOpen = request()->routeIs(
+                        'envios.*',
+                        'logistica.asignaciones.*',
+                        'logistica.rutas.*',
+                        'logistica.documentos.*',
+                        'logistica.incidentes.*'
+                    );
+                    $puedeEnvios = $isAdmin || ($authUser && $authUser->hasAnyPermission($envPerm));
+                    $showOperLogistica = auth()->user()?->can('panel_transportista.view') || $puedeEnvios;
+                    $showProdPlantaSection = auth()->user()?->can('panel_planta.view') || $puedeProdPlanta || $puedeAlmacenPlanta;
+                @endphp
+
+                @if($showProdAgricola)
+                <span class="ag-nav-label">Producción agrícola</span>
+                @endif
+
+                {{-- Lotes & Actividades --}}
+                @canany(['lotes.view','lotes.create','lotes.update','lotes.delete'])
+                @php $lotesOpen = request()->routeIs('lotes.*','actividades.*'); @endphp
+                <li class="ag-nav-li">
+                    <a href="#" class="ag-nav-a {{ $lotesOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-lotes">
+                        <i class="ag-nav-icon fas fa-map-marked-alt"></i>
+                        <span class="ag-nav-text">Lotes y actividades</span>
+                        <i class="ag-nav-arrow fas fa-chevron-right"></i>
                     </a>
-                </li>
-            </ul>
-
-            <ul class="navbar-nav ml-auto">
-
-
-                <li class="nav-item">
-                    <a class="nav-link" data-widget="fullscreen" href="#" role="button">
-                        <i class="fas fa-expand-arrows-alt"></i>
-                    </a>
-                </li>
-
-                <li class="nav-item dropdown user-menu">
-                    <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
-                        <img src="{{ $userImageUrl }}" class="user-image img-circle elevation-2" alt="User Image">
-                        <span class="d-none d-md-inline">
-                            @auth
-                                {{ $userFullName }}
-                            @else
-                                Invitado
-                            @endauth
-                        </span>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
-                        <li class="user-header bg-primary">
-                            <img src="{{ $userImageUrl }}" class="img-circle elevation-2" alt="User Image">
-                            <p>
-                                @auth
-                                    {{ $userFullName }}
-                                    <small class="role-badge {{ $userRoleCss }}">{{ ucfirst($userRole) }}</small>
-                                @else
-                                    Invitado
-                                @endauth
-                                <small>Fusion-Proyectos · Panel de trazabilidad</small>
-                            </p>
-                        </li>
-                        <li class="user-footer">
-                            <a href="{{ route('profile.show') }}" class="btn btn-default btn-flat">Perfil</a>
-                            <form action="{{ route('logout') }}" method="POST" class="d-inline float-right">
-                                @csrf
-                                <button type="submit" class="btn btn-default btn-flat">Salir</button>
-                            </form>
-                        </li>
+                    <ul class="ag-subnav {{ $lotesOpen ? 'open' : '' }}" id="sub-lotes">
+                        @can('lotes.view')
+                        <li class="ag-sub-li"><a href="{{ route('lotes.index') }}" class="ag-sub-a {{ request()->routeIs('lotes.index') ? 'active' : '' }}">Lotes</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('lotes.mapa') }}" class="ag-sub-a {{ request()->routeIs('lotes.mapa') ? 'active' : '' }}">Mapa de lotes</a></li>
+                        @endcan
+                        <li class="ag-sub-li"><a href="{{ route('actividades.index') }}" class="ag-sub-a {{ request()->routeIs('actividades.index') ? 'active' : '' }}">Actividades</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('actividades.calendario') }}" class="ag-sub-a {{ request()->routeIs('actividades.calendario') ? 'active' : '' }}">Calendario</a></li>
                     </ul>
                 </li>
+                @endcanany
+
+                {{-- Certificaciones --}}
+                @can('certificaciones.view')
+                <li class="ag-nav-li">
+                    <a href="{{ route('certificaciones.index') }}" class="ag-nav-a {{ request()->routeIs('certificaciones.*') ? 'active' : '' }}">
+                        <i class="ag-nav-icon fas fa-certificate"></i>
+                        <span class="ag-nav-text">Certificaciones</span>
+                    </a>
+                </li>
+                @endcan
+
+                {{-- Producción agrícola (cosechas y clima) --}}
+                <li class="ag-nav-li">
+                    <a href="#" class="ag-nav-a {{ $prodAgrOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-prod-agr">
+                        <i class="ag-nav-icon fas fa-seedling"></i>
+                        <span class="ag-nav-text">Producción</span>
+                        <i class="ag-nav-arrow fas fa-chevron-right"></i>
+                    </a>
+                    <ul class="ag-subnav {{ $prodAgrOpen ? 'open' : '' }}" id="sub-prod-agr">
+                        @unless(auth()->user()?->hasRole('transportista'))
+                        <li class="ag-sub-li"><a href="{{ route('producciones.index') }}" class="ag-sub-a {{ request()->routeIs('producciones.*') ? 'active' : '' }}">Cosechas</a></li>
+                        @endunless
+                        <li class="ag-sub-li"><a href="{{ route('climas.index') }}" class="ag-sub-a {{ request()->routeIs('climas.*') ? 'active' : '' }}">Clima</a></li>
+                    </ul>
+                </li>
+
+                {{-- Inventario --}}
+                @canany(['inventario.view','inventario.create','inventario.update','inventario.delete'])
+                @php $invOpen = request()->routeIs('insumos.*','lote-insumos.*'); @endphp
+                <li class="ag-nav-li">
+                    <a href="#" class="ag-nav-a {{ $invOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-inv">
+                        <i class="ag-nav-icon fas fa-warehouse"></i>
+                        <span class="ag-nav-text">Inventario</span>
+                        <i class="ag-nav-arrow fas fa-chevron-right"></i>
+                    </a>
+                    <ul class="ag-subnav {{ $invOpen ? 'open' : '' }}" id="sub-inv">
+                        <li class="ag-sub-li"><a href="{{ route('insumos.index') }}" class="ag-sub-a {{ request()->routeIs('insumos.*') ? 'active' : '' }}">Insumos</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('lote-insumos.index') }}" class="ag-sub-a {{ request()->routeIs('lote-insumos.*') ? 'active' : '' }}">Aplicación de insumos</a></li>
+                    </ul>
+                </li>
+                @endcanany
+
+                @if($puedeAlmacenAgricola)
+                <li class="ag-nav-li">
+                    <a href="#" class="ag-nav-a {{ $almAgrOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-alm-agr">
+                        <i class="ag-nav-icon fas fa-tractor"></i>
+                        <span class="ag-nav-text">Almacén agrícola</span>
+                        <i class="ag-nav-arrow fas fa-chevron-right"></i>
+                    </a>
+                    <ul class="ag-subnav {{ $almAgrOpen ? 'open' : '' }}" id="sub-alm-agr">
+                        <li class="ag-sub-li"><a href="{{ route('almacen-agricola.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-agricola.index', 'almacen-agricola.show', 'almacen-agricola.create', 'almacen-agricola.edit') ? 'active' : '' }}">Almacenes</a></li>
+                        @can('almacen.movimientos.view')
+                        <li class="ag-sub-li"><a href="{{ route('almacen-agricola.movimientos.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-agricola.movimientos.*') && !request()->routeIs('almacen-agricola.movimientos.reportes') ? 'active' : '' }}">Movimientos</a></li>
+                        @endcan
+                        @can('almacen.reportes.view')
+                        <li class="ag-sub-li"><a href="{{ route('almacen-agricola.movimientos.reportes') }}" class="ag-sub-a {{ request()->routeIs('almacen-agricola.movimientos.reportes') ? 'active' : '' }}">Reportes</a></li>
+                        @endcan
+                    </ul>
+                </li>
+                @endif
+
+                @if($showOperLogistica)
+                <span class="ag-nav-label">Operación logística</span>
+                @endif
+
+                @can('panel_transportista.view')
+                <li class="ag-nav-li"><a href="{{ route('dashboard.panel-transportista') }}" class="ag-nav-a {{ request()->routeIs('dashboard.panel-transportista') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-truck-moving"></i><span class="ag-nav-text">Panel Transportista</span></a></li>
+                @endcan
+
+                {{-- Envíos --}}
+                @if($puedeEnvios)
+                <li class="ag-nav-li">
+                    <a href="#" class="ag-nav-a {{ $envOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-env">
+                        <i class="ag-nav-icon fas fa-truck"></i>
+                        <span class="ag-nav-text">Envíos</span>
+                        <i class="ag-nav-arrow fas fa-chevron-right"></i>
+                    </a>
+                    <ul class="ag-subnav {{ $envOpen ? 'open' : '' }}" id="sub-env">
+                        @if($isAdmin || auth()->user()?->can('envios.create'))
+                        <li class="ag-sub-li"><a href="{{ route('envios.mandar') }}" class="ag-sub-a {{ request()->routeIs('envios.mandar') ? 'active' : '' }}">Crear envío</a></li>
+                        @endif
+                        @if($isAdmin || auth()->user()?->can('envios.view'))
+                        <li class="ag-sub-li"><a href="{{ route('envios.seguimiento') }}" class="ag-sub-a {{ request()->routeIs('envios.seguimiento') ? 'active' : '' }}">Seguimiento</a></li>
+                        @endif
+                        @if($isAdmin || auth()->user()?->can('envios.admin.view'))
+                        <li class="ag-sub-li"><a href="{{ route('envios.admin') }}" class="ag-sub-a {{ request()->routeIs('envios.admin') ? 'active' : '' }}">Dashboard logístico</a></li>
+                        @endif
+                        @can('asignaciones.view')
+                        <li class="ag-sub-li"><a href="{{ route('logistica.asignaciones.index') }}" class="ag-sub-a {{ request()->routeIs('logistica.asignaciones.*') ? 'active' : '' }}">Asignar envíos</a></li>
+                        @endcan
+                        @can('rutas_multi.view')
+                        <li class="ag-sub-li"><a href="{{ route('logistica.rutas.index') }}" class="ag-sub-a {{ request()->routeIs('logistica.rutas.index', 'logistica.rutas.create', 'logistica.rutas.show', 'logistica.rutas.trazado') ? 'active' : '' }}">Rutas de entrega</a></li>
+                        @endcan
+                        @if($isAdmin || auth()->user()?->can('rutas_multi.create'))
+                        <li class="ag-sub-li"><a href="{{ route('logistica.rutas.mapa') }}" class="ag-sub-a {{ request()->routeIs('logistica.rutas.mapa') ? 'active' : '' }}">Mapa de envíos</a></li>
+                        @endif
+                        @if($isAdmin || auth()->user()?->can('transportistas.view'))
+                        <li class="ag-sub-li"><a href="{{ route('envios.transportistas') }}" class="ag-sub-a {{ request()->routeIs('envios.transportistas*') ? 'active' : '' }}">Transportistas</a></li>
+                        @endif
+                        @if($isAdmin || auth()->user()?->can('vehiculos.view'))
+                        <li class="ag-sub-li"><a href="{{ route('envios.vehiculos') }}" class="ag-sub-a {{ request()->routeIs('envios.vehiculos*') ? 'active' : '' }}">Vehículos</a></li>
+                        @endif
+                        @if($isAdmin || auth()->user()?->can('direcciones.view'))
+                        <li class="ag-sub-li"><a href="{{ route('envios.direcciones') }}" class="ag-sub-a {{ request()->routeIs('envios.direcciones*') ? 'active' : '' }}">Direcciones</a></li>
+                        @endif
+                        @can('documentos.view')
+                        <li class="ag-sub-li"><a href="{{ route('logistica.documentos.index') }}" class="ag-sub-a {{ request()->routeIs('logistica.documentos.*') ? 'active' : '' }}">Documentos entrega</a></li>
+                        @endcan
+                        @can('incidentes.view')
+                        <li class="ag-sub-li"><a href="{{ route('logistica.incidentes.index') }}" class="ag-sub-a {{ request()->routeIs('logistica.incidentes.*') ? 'active' : '' }}">Incidentes</a></li>
+                        @endcan
+                        @if($isAdmin || auth()->user()?->can('reportes.view'))
+                        <li class="ag-sub-li"><a href="{{ route('envios.reportes-distribucion') }}" class="ag-sub-a {{ request()->routeIs('envios.reportes-distribucion') ? 'active' : '' }}">Reportes distribución</a></li>
+                        @endif
+                        @can('pedidos.view')
+                        <li class="ag-sub-li"><a href="{{ route('pedidos.index') }}" class="ag-sub-a {{ request()->routeIs('pedidos.*') ? 'active' : '' }}">Pedidos</a></li>
+                        @endcan
+                    </ul>
+                </li>
+                @endif
+
+                @if($showProdPlantaSection)
+                <span class="ag-nav-label">Producción planta</span>
+                @endif
+
+                @can('panel_planta.view')
+                <li class="ag-nav-li"><a href="{{ route('dashboard.panel-planta') }}" class="ag-nav-a {{ request()->routeIs('dashboard.panel-planta') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-industry"></i><span class="ag-nav-text">Panel Planta</span></a></li>
+                @endcan
+
+                @if($puedeProdPlanta || $puedeAlmacenPlanta)
+                <li class="ag-nav-li">
+                    <a href="#" class="ag-nav-a {{ $prodPlaMenuOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-prod-pla">
+                        <i class="ag-nav-icon fas fa-cogs"></i>
+                        <span class="ag-nav-text">Producción</span>
+                        <i class="ag-nav-arrow fas fa-chevron-right"></i>
+                    </a>
+                    <ul class="ag-subnav {{ $prodPlaMenuOpen ? 'open' : '' }}" id="sub-prod-pla">
+                        @if($puedeProdPlanta)
+                        <li class="ag-sub-li"><a href="{{ route('registro-planta.index') }}" class="ag-sub-a {{ request()->routeIs('registro-planta.*') ? 'active' : '' }}">Registro a Planta</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('procesos-planta.index') }}" class="ag-sub-a {{ request()->routeIs('procesos-planta.*') ? 'active' : '' }}">Procesos de planta</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('maquinas-planta.index') }}" class="ag-sub-a {{ request()->routeIs('maquinas-planta.*') ? 'active' : '' }}">Máquinas de planta</a></li>
+                        @endif
+                        @if($puedeAlmacenPlanta)
+                        <li class="ag-sub-li">
+                            <a href="#" class="ag-sub-a {{ $almPlaOpen ? 'group-open' : '' }}" data-toggle-sub="sub-alm-pla">
+                                Almacén de planta
+                                <i class="fas fa-chevron-right ag-sub-arrow"></i>
+                            </a>
+                            <ul class="ag-subnav ag-subnav-nested {{ $almPlaOpen ? 'open' : '' }}" id="sub-alm-pla">
+                                <li class="ag-sub-li"><a href="{{ route('almacen-planta.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-planta.index', 'almacen-planta.show', 'almacen-planta.create', 'almacen-planta.edit') ? 'active' : '' }}">Almacenes</a></li>
+                                @can('almacen.movimientos.view')
+                                <li class="ag-sub-li"><a href="{{ route('almacen-planta.movimientos.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-planta.movimientos.*') && !request()->routeIs('almacen-planta.movimientos.reportes') ? 'active' : '' }}">Movimientos</a></li>
+                                @endcan
+                                @can('almacen.reportes.view')
+                                <li class="ag-sub-li"><a href="{{ route('almacen-planta.movimientos.reportes') }}" class="ag-sub-a {{ request()->routeIs('almacen-planta.movimientos.reportes') ? 'active' : '' }}">Reportes</a></li>
+                                @endcan
+                            </ul>
+                        </li>
+                        @endif
+                    </ul>
+                </li>
+                @endif
+
+                {{-- Ventas / Reportes (no-admin) --}}
+                @if(!$isAdmin)
+                    @can('ventas.view')
+                    <li class="ag-nav-li"><a href="{{ route('ventas.index') }}" class="ag-nav-a {{ request()->routeIs('ventas.*') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-dollar-sign"></i><span class="ag-nav-text">Ventas</span></a></li>
+                    @endcan
+                    @can('reportes.view')
+                    <li class="ag-nav-li"><a href="{{ route('reportes.index') }}" class="ag-nav-a {{ request()->routeIs('reportes.*') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-chart-pie"></i><span class="ag-nav-text">Reportes</span></a></li>
+                    @endcan
+                @endif
+
+                {{-- Admin-only --}}
+                @if($isAdmin)
+                <span class="ag-nav-label">Administración</span>
+
+                @can('ventas.view')
+                <li class="ag-nav-li"><a href="{{ route('ventas.index') }}" class="ag-nav-a {{ request()->routeIs('ventas.*') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-dollar-sign"></i><span class="ag-nav-text">Ventas</span></a></li>
+                @endcan
+
+                {{-- Reportes admin --}}
+                @php $repOpen = request()->routeIs('reportes.*'); @endphp
+                <li class="ag-nav-li">
+                    <a href="#" class="ag-nav-a {{ $repOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-rep">
+                        <i class="ag-nav-icon fas fa-chart-bar"></i>
+                        <span class="ag-nav-text">Reportes</span>
+                        <i class="ag-nav-arrow fas fa-chevron-right"></i>
+                    </a>
+                    <ul class="ag-subnav {{ $repOpen ? 'open' : '' }}" id="sub-rep">
+                        <li class="ag-sub-li"><a href="{{ route('reportes.index') }}" class="ag-sub-a {{ request()->routeIs('reportes.index') ? 'active' : '' }}">Centro de reportes</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('reportes.ventas') }}" class="ag-sub-a {{ request()->routeIs('reportes.ventas') ? 'active' : '' }}">Ventas</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('reportes.inventario') }}" class="ag-sub-a {{ request()->routeIs('reportes.inventario') ? 'active' : '' }}">Inventario</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('reportes.produccion') }}" class="ag-sub-a {{ request()->routeIs('reportes.produccion') ? 'active' : '' }}">Producción</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('reportes.climatico') }}" class="ag-sub-a {{ request()->routeIs('reportes.climatico') ? 'active' : '' }}">Climático</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('reportes.actividades') }}" class="ag-sub-a {{ request()->routeIs('reportes.actividades') ? 'active' : '' }}">Actividades</a></li>
+                    </ul>
+                </li>
+
+                {{-- Usuarios admin --}}
+                @if($isAdmin || auth()->user()?->can('usuarios.view'))
+                <li class="ag-nav-li">
+                    <a href="{{ route('gestion.index') }}" class="ag-nav-a {{ request()->routeIs('gestion.*') ? 'active' : '' }}">
+                        <i class="ag-nav-icon fas fa-users-cog"></i>
+                        <span class="ag-nav-text">Gestión de usuarios</span>
+                    </a>
+                </li>
+                @endif
+
+                @endif {{-- end isAdmin --}}
+
             </ul>
         </nav>
 
-        {{-- SIDEBAR --}}
-        <aside class="main-sidebar sidebar-dark-primary elevation-4">
-
-            <a href="{{ route('dashboard') }}" class="brand-link">
-                <img src="{{ asset('images/logo.png') }}" alt="Fusion-Proyectos Logo"
-                    class="brand-image img-circle elevation-3" style="opacity:.9">
-                <span class="brand-text font-weight-light">Fusion-Proyectos</span>
-            </a>
-
-            <div class="sidebar">
-
-                <div class="user-panel mt-3 pb-3 mb-3 d-flex">
-                    <div class="image">
-                        <img src="{{ $userImageUrl }}" class="img-circle elevation-2" alt="User Image">
-                    </div>
-                    <div class="info">
-                        <a href="#" class="d-block">
-                            @auth
-                                {{ $userFullName }}
-                            @else
-                                Invitado
-                            @endauth
-                        </a>
-                        <span class="role-badge {{ $userRoleCss }}">{{ ucfirst($userRole) }}</span>
-                    </div>
-                </div>
-
-                <nav class="mt-2">
-                    <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
-                        data-accordion="false">
-
-                        {{-- DASHBOARD (todos) --}}
-                        <li class="nav-item">
-                            <a href="{{ route('dashboard') }}"
-                                class="nav-link {{ request()->routeIs('dashboard') && !request()->routeIs('dashboard.panel-*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-tachometer-alt"></i>
-                                <p>Inicio</p>
-                            </a>
-                        </li>
-
-                        {{-- GESTIÓN DE LOTES (todos) --}}
-                        @canany(['lotes.view', 'lotes.create', 'lotes.update', 'lotes.delete'])
-                        <li class="nav-item {{ request()->routeIs('lotes.*', 'actividades.*') ? 'menu-open' : '' }}">
-                            <a href="#"
-                                class="nav-link {{ request()->routeIs('lotes.*', 'actividades.*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-map-marked-alt"></i>
-                                <p>
-                                    Lotes y actividades
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
-                            </a>
-                            <ul class="nav nav-treeview">
-                                @can('lotes.view')
-                                <li class="nav-item">
-                                    <a href="{{ route('lotes.index') }}"
-                                        class="nav-link {{ request()->routeIs('lotes.index') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Lotes</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="{{ route('lotes.mapa') }}"
-                                        class="nav-link {{ request()->routeIs('lotes.mapa') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Mapa de Lotes</p>
-                                    </a>
-                                </li>
-                                @endcan
-                                <li class="nav-item">
-                                    <a href="{{ route('actividades.index') }}"
-                                        class="nav-link {{ request()->routeIs('actividades.index') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Actividades</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="{{ route('actividades.calendario') }}"
-                                        class="nav-link {{ request()->routeIs('actividades.calendario') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Calendario</p>
-                                    </a>
-                                </li>
-                            </ul>
-                        </li>
-                        @endcanany
-
-                        {{-- CERTIFICACIONES (fusionado desde Planta) --}}
-                        @can('certificaciones.view')
-                            <li class="nav-item">
-                                <a href="{{ route('certificaciones.index') }}"
-                                    class="nav-link {{ request()->routeIs('certificaciones.*') ? 'active' : '' }}">
-                                    <i class="nav-icon fas fa-certificate"></i>
-                                    <p>Certificaciones</p>
-                                </a>
-                            </li>
-                        @endcan
-
-                        @can('catalogos.view')
-                            <li class="nav-item">
-                                <a href="{{ route('catalogos.index') }}"
-                                    class="nav-link {{ request()->routeIs('catalogos.*') ? 'active' : '' }}">
-                                    <i class="nav-icon fas fa-book"></i>
-                                    <p>Catálogos</p>
-                                </a>
-                            </li>
-                        @endcan
-
-                        {{-- PRODUCCIÓN (todos) --}}
-                        <li class="nav-item {{ request()->routeIs('producciones.*', 'climas.*', 'procesos-planta.*', 'maquinas-planta.*') ? 'menu-open' : '' }}">
-                            <a href="#"
-                                class="nav-link {{ request()->routeIs('producciones.*', 'climas.*', 'procesos-planta.*', 'maquinas-planta.*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-seedling"></i>
-                                <p>
-                                    Producción
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
-                            </a>
-                            <ul class="nav nav-treeview">
-                                @unless(auth()->user()?->hasRole('transportista') || auth()->user()?->hasRole('almacen'))
-                                <li class="nav-item">
-                                    <a href="{{ route('producciones.index') }}"
-                                        class="nav-link {{ request()->routeIs('producciones.*') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-tractor"></i>
-                                        <p>Registro de producción</p>
-                                    </a>
-                                </li>
-                                @endunless
-                                <li class="nav-item">
-                                    <a href="{{ route('climas.index') }}"
-                                        class="nav-link {{ request()->routeIs('climas.*') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-cloud-sun"></i>
-                                        <p>Clima</p>
-                                    </a>
-                                </li>
-                                @unless(auth()->user()?->hasRole('agricultor') || auth()->user()?->hasRole('transportista') || auth()->user()?->hasRole('almacen'))
-                                <li class="nav-item">
-                                    <a href="{{ route('procesos-planta.index') }}"
-                                        class="nav-link {{ request()->routeIs('procesos-planta.*') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-industry"></i>
-                                        <p>Procesos de planta</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="{{ route('maquinas-planta.index') }}"
-                                        class="nav-link {{ request()->routeIs('maquinas-planta.*') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-cogs"></i>
-                                        <p>Máquinas de planta</p>
-                                    </a>
-                                </li>
-                                @endunless
-                            </ul>
-                        </li>
-
-                        {{-- INVENTARIO (todos pueden ver, solo admin edita) --}}
-                        @canany(['inventario.view', 'inventario.create', 'inventario.update', 'inventario.delete'])
-                        <li
-                            class="nav-item {{ request()->routeIs('insumos.*', 'lote-insumos.*', 'almacenes.*', 'actores-abastecimiento.*', 'recursos-productivos.*', 'almacen-movimientos.*', 'producciones_almacenamiento.*') ? 'menu-open' : '' }}">
-                            <a href="#"
-                                class="nav-link {{ request()->routeIs('insumos.*', 'lote-insumos.*', 'almacenes.*', 'actores-abastecimiento.*', 'recursos-productivos.*', 'almacen-movimientos.*', 'producciones_almacenamiento.*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-warehouse"></i>
-                                <p>
-                                    Inventario
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
-                            </a>
-                            <ul class="nav nav-treeview">
-                                <li class="nav-item">
-                                    <a href="{{ route('insumos.index') }}"
-                                        class="nav-link {{ request()->routeIs('insumos.*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Insumos</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="{{ route('actores-abastecimiento.index') }}"
-                                        class="nav-link {{ request()->routeIs('actores-abastecimiento.*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Actores de abastecimiento</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="{{ route('recursos-productivos.index') }}"
-                                        class="nav-link {{ request()->routeIs('recursos-productivos.*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Vista consolidada de recursos</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="{{ route('lote-insumos.index') }}"
-                                        class="nav-link {{ request()->routeIs('lote-insumos.*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Aplicación de Insumos</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="{{ route('almacenes.index') }}"
-                                        class="nav-link {{ request()->routeIs('almacenes.*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Almacenes</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="{{ route('producciones_almacenamiento.index') }}"
-                                        class="nav-link {{ request()->routeIs('producciones_almacenamiento.*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Almacenamiento de producción</p>
-                                    </a>
-                                </li>
-                                @can('almacen.movimientos.view')
-                                <li class="nav-item">
-                                    <a href="{{ route('almacen-movimientos.index') }}"
-                                        class="nav-link {{ request()->routeIs('almacen-movimientos.*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Movimientos de almacén</p>
-                                    </a>
-                                </li>
-                                @endcan
-                            </ul>
-                        </li>
-                        @endcanany
-
-
-
-                        {{-- ENVÍOS (todos) --}}
-                        @php
-                            $enviosPermissions = ['envios.view', 'envios.create', 'envios.admin.view', 'vehiculos.view', 'transportistas.view', 'direcciones.view', 'reportes.view'];
-                        @endphp
-                        @if($isAdmin || ($authUser && $authUser->hasAnyPermission($enviosPermissions)))
-                        <li class="nav-item {{ request()->routeIs('envios.*') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('envios.*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-truck"></i>
-                                <p>
-                                    Envíos
-                                    <i class="right fas fa-angle-left"></i>
-                                </p>
-                            </a>
-                            <ul class="nav nav-treeview">
-                                @if($isAdmin || auth()->user()?->can('envios.create'))
-                                <li class="nav-item">
-                                    <a href="{{ route('envios.mandar') }}"
-                                        class="nav-link {{ request()->routeIs('envios.mandar') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Crear envío</p>
-                                    </a>
-                                </li>
-                                @endif
-                                @if($isAdmin || auth()->user()?->can('envios.view'))
-                                <li class="nav-item">
-                                    <a href="{{ route('envios.seguimiento') }}"
-                                        class="nav-link {{ request()->routeIs('envios.seguimiento') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Seguimiento de envíos</p>
-                                    </a>
-                                </li>
-                                @endif
-                                @if($isAdmin || auth()->user()?->can('envios.admin.view'))
-                                <li class="nav-item">
-                                    <a href="{{ route('envios.admin') }}"
-                                        class="nav-link {{ request()->routeIs('envios.admin') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Dashboard logístico</p>
-                                    </a>
-                                </li>
-                                @endif
-                                @if($isAdmin || auth()->user()?->can('transportistas.view'))
-                                <li class="nav-item">
-                                    <a href="{{ route('envios.transportistas') }}"
-                                        class="nav-link {{ request()->routeIs('envios.transportistas') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Transportistas</p>
-                                    </a>
-                                </li>
-                                @endif
-                                @if($isAdmin || auth()->user()?->can('vehiculos.view'))
-                                <li class="nav-item">
-                                    <a href="{{ route('envios.vehiculos') }}"
-                                        class="nav-link {{ request()->routeIs('envios.vehiculos') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Vehículos</p>
-                                    </a>
-                                </li>
-                                @endif
-                                @if($isAdmin || auth()->user()?->can('direcciones.view'))
-                                <li class="nav-item">
-                                    <a href="{{ route('envios.direcciones') }}"
-                                        class="nav-link {{ request()->routeIs('envios.direcciones') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Direcciones</p>
-                                    </a>
-                                </li>
-                                @endif
-                                @if($isAdmin || auth()->user()?->can('reportes.view'))
-                                <li class="nav-item">
-                                    <a href="{{ route('envios.reportes-distribucion') }}"
-                                        class="nav-link {{ request()->routeIs('envios.reportes-distribucion') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Reportes de distribución</p>
-                                    </a>
-                                </li>
-                                @endif
-                                @can('pedidos.view')
-                                        <li class="nav-item {{ request()->routeIs('pedidos.*') ? 'menu-open' : '' }}">
-                                            <a href="{{ route('pedidos.index') }}"
-                                                class="nav-link {{ request()->routeIs('pedidos.*') ? 'active' : '' }}">
-                                                <i class="nav-icon fas fa-clipboard-list"></i>
-                                                <p>Pedidos</p>
-                                            </a>
-                                        </li>
-                                    @endcan
-                            </ul>
-                        </li>
-                            @endif
-
-                        {{-- OPERACIÓN LOGÍSTICA --}}
-                        @canany(['panel_planta.view', 'panel_transportista.view', 'panel_almacen.view', 'asignaciones.view', 'rutas_multi.view', 'incidentes.view', 'documentos.view'])
-                            <li class="nav-header">Operación logística</li>
-                            @can('panel_planta.view')
-                                <li class="nav-item">
-                                    <a href="{{ route('dashboard.panel-planta') }}" class="nav-link {{ request()->routeIs('dashboard.panel-planta') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-industry"></i>
-                                        <p>Panel Planta</p>
-                                    </a>
-                                </li>
-                            @endcan
-                            @can('panel_transportista.view')
-                                <li class="nav-item">
-                                    <a href="{{ route('dashboard.panel-transportista') }}" class="nav-link {{ request()->routeIs('dashboard.panel-transportista') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-truck-moving"></i>
-                                        <p>Panel Transportista</p>
-                                    </a>
-                                </li>
-                            @endcan
-                            @can('panel_almacen.view')
-                                <li class="nav-item">
-                                    <a href="{{ route('dashboard.panel-almacen') }}" class="nav-link {{ request()->routeIs('dashboard.panel-almacen') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-warehouse"></i>
-                                        <p>Panel Almacén</p>
-                                    </a>
-                                </li>
-                            @endcan
-                            @can('asignaciones.view')
-                                <li class="nav-item">
-                                    <a href="{{ route('logistica.asignaciones.index') }}" class="nav-link {{ request()->routeIs('logistica.asignaciones.*') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-user-tag"></i>
-                                        <p>Asignación múltiple</p>
-                                    </a>
-                                </li>
-                            @endcan
-                            @can('rutas_multi.view')
-                                <li class="nav-item">
-                                    <a href="{{ route('logistica.rutas.index') }}" class="nav-link {{ request()->routeIs('logistica.rutas.*') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-route"></i>
-                                        <p>Rutas multi-entrega</p>
-                                    </a>
-                                </li>
-                            @endcan
-                            @can('documentos.view')
-                                <li class="nav-item">
-                                    <a href="{{ route('logistica.documentos.index') }}" class="nav-link {{ request()->routeIs('logistica.documentos.*') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-file-signature"></i>
-                                        <p>Documentos entrega</p>
-                                    </a>
-                                </li>
-                            @endcan
-                            @can('incidentes.view')
-                                <li class="nav-item">
-                                    <a href="{{ route('logistica.incidentes.index') }}" class="nav-link {{ request()->routeIs('logistica.incidentes.*') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-exclamation-triangle"></i>
-                                        <p>Incidentes</p>
-                                    </a>
-                                </li>
-                            @endcan
-                        @endcanany
-
-                        {{-- Ventas y centro de reportes: no-admin con permisos (el admin ve el menú expandido más abajo) --}}
-                        @if(!$isAdmin)
-                            @can('ventas.view')
-                                <li class="nav-item">
-                                    <a href="{{ route('ventas.index') }}"
-                                        class="nav-link {{ request()->routeIs('ventas.*') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-dollar-sign"></i>
-                                        <p>Ventas</p>
-                                    </a>
-                                </li>
-                            @endcan
-                            @can('reportes.view')
-                                <li class="nav-item">
-                                    <a href="{{ route('reportes.index') }}"
-                                        class="nav-link {{ request()->routeIs('reportes.*') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-chart-pie"></i>
-                                        <p>Reportes</p>
-                                    </a>
-                                </li>
-                            @endcan
-                        @endif
-
-                        {{-- ============================================ --}}
-                        {{-- SECCIONES SOLO PARA ADMIN --}}
-                        {{-- ============================================ --}}
-                        @if($isAdmin)
-
-                            @can('ventas.view')
-                                {{-- VENTAS --}}
-                                <li class="nav-item {{ request()->routeIs('ventas.*') ? 'menu-open' : '' }}">
-                                    <a href="#" class="nav-link {{ request()->routeIs('ventas.*') ? 'active' : '' }}">
-                                        <i class="nav-icon fas fa-dollar-sign"></i>
-                                        <p>
-                                            Ventas
-                                            <i class="right fas fa-angle-left"></i>
-                                        </p>
-                                    </a>
-                                    <ul class="nav nav-treeview">
-                                        <li class="nav-item">
-                                            <a href="{{ route('ventas.index') }}"
-                                                class="nav-link {{ request()->routeIs('ventas.*') ? 'active' : '' }}">
-                                                <i class="far fa-circle nav-icon"></i>
-                                                <p>Listado de Ventas</p>
-                                            </a>
-                                        </li>
-                                    </ul>
-                                </li>
-                            @endcan
-
-                            {{-- REPORTES (solo admin) --}}
-                            <li class="nav-item {{ request()->routeIs('reportes.*') ? 'menu-open' : '' }}">
-                                <a href="#" class="nav-link {{ request()->routeIs('reportes.*') ? 'active' : '' }}">
-                                    <i class="nav-icon fas fa-chart-bar"></i>
-                                    <p>
-                                        Reportes
-                                        <i class="right fas fa-angle-left"></i>
-                                    </p>
-                                </a>
-                                <ul class="nav nav-treeview">
-                                    <li class="nav-item">
-                                        <a href="{{ route('reportes.index') }}"
-                                            class="nav-link {{ request()->routeIs('reportes.index') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Centro de Reportes</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('reportes.ventas') }}"
-                                            class="nav-link {{ request()->routeIs('reportes.ventas') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Ventas</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('reportes.inventario') }}"
-                                            class="nav-link {{ request()->routeIs('reportes.inventario') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Inventario</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('reportes.produccion') }}"
-                                            class="nav-link {{ request()->routeIs('reportes.produccion') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Producción</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('reportes.climatico') }}"
-                                            class="nav-link {{ request()->routeIs('reportes.climatico') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Climático</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('reportes.actividades') }}"
-                                            class="nav-link {{ request()->routeIs('reportes.actividades') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Actividades</p>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </li>
-
-                            {{-- CATÁLOGOS (solo admin) --}}
-                            <li
-                                class="nav-item {{ request()->routeIs('cultivos.*', 'tipo-actividad.*', 'tipo-insumos.*', 'unidades-medida.*', 'estado-lote-tipos.*', 'estado-lote-insumos.*', 'historial-estados-lote.*', 'prioridades.*', 'tipoalmacenes.*') ? 'menu-open' : '' }}">
-                                <a href="#"
-                                    class="nav-link {{ request()->routeIs('cultivos.*', 'tipo-actividad.*', 'tipo-insumos.*', 'unidades-medida.*', 'estado-lote-tipos.*', 'estado-lote-insumos.*', 'historial-estados-lote.*', 'prioridades.*', 'tipoalmacenes.*') ? 'active' : '' }}">
-                                    <i class="nav-icon fas fa-book-open"></i>
-                                    <p>
-                                        Catálogos
-                                        <i class="right fas fa-angle-left"></i>
-                                    </p>
-                                </a>
-                                <ul class="nav nav-treeview">
-                                    <li class="nav-item">
-                                        <a href="{{ route('cultivos.index') }}"
-                                            class="nav-link {{ request()->routeIs('cultivos.*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Cultivos</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('tipo-actividad.index') }}"
-                                            class="nav-link {{ request()->routeIs('tipo-actividad.*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                        <p>Tipos de actividad</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('tipo-insumos.index') }}"
-                                            class="nav-link {{ request()->routeIs('tipo-insumos.*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                        <p>Tipos de insumo</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('unidades-medida.index') }}"
-                                            class="nav-link {{ request()->routeIs('unidades-medida.*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                        <p>Unidades de medida</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('tipoalmacenes.index') }}"
-                                            class="nav-link {{ request()->routeIs('tipoalmacenes.*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Tipo de Almacén</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('estado-lote-tipos.index') }}"
-                                            class="nav-link {{ request()->routeIs('estado-lote-tipos.*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                        <p>Estados de lote</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('estado-lote-insumos.index') }}"
-                                            class="nav-link {{ request()->routeIs('estado-lote-insumos.*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                        <p>Estados de aplicación de insumo</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('historial-estados-lote.index') }}"
-                                            class="nav-link {{ request()->routeIs('historial-estados-lote.*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                        <p>Historial de estados de lote</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="{{ route('prioridades.index') }}"
-                                            class="nav-link {{ request()->routeIs('prioridades.*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Prioridades</p>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </li>
-
-                            {{-- GESTIÓN DE USUARIOS (solo admin) --}}
-                            @if($isAdmin || auth()->user()?->can('usuarios.view'))
-                            <li class="nav-item {{ request()->routeIs('gestion.*') ? 'menu-open' : '' }}">
-                                <a href="{{ route('gestion.index') }}"
-                                    class="nav-link {{ request()->routeIs('gestion.*') ? 'active' : '' }}">
-                                    <i class="nav-icon fas fa-users"></i>
-                                    <p>Gestión de Usuarios</p>
-                                </a>
-                            </li>
-                            @endif
-
-                        @endif
-                        {{-- FIN SECCIONES SOLO ADMIN --}}
-
-                    </ul>
-                </nav>
-            </div>
-        </aside>
-
-        {{-- CONTENT WRAPPER --}}
-        <div class="content-wrapper">
-
-            <div class="content-header">
-                <div class="container-fluid">
-                    <div class="row mb-2">
-                        <div class="col-sm-6">
-                            <h1 class="m-0">@yield('page_title', 'Dashboard Principal')</h1>
-                        </div>
-                        <div class="col-sm-6">
-                            <ol class="breadcrumb float-sm-right">
-                                @yield('breadcrumbs')
-                            </ol>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <section class="content">
-                <div class="container-fluid">
-                    @yield('content')
-                </div>
-            </section>
+        {{-- Footer --}}
+        <div class="ag-sb-footer">
+            <form action="{{ route('logout') }}" method="POST">
+                @csrf
+                <button type="submit" class="ag-sb-foot-btn">
+                    <i class="fas fa-sign-out-alt" style="width:16px;text-align:center;"></i>
+                    <span>Cerrar sesión</span>
+                </button>
+            </form>
         </div>
 
-        {{-- FOOTER --}}
-        <footer class="main-footer">
-            <strong>
-                &copy; {{ date('Y') }}
-                <a href="#">Fusion-Proyectos</a>.
-            </strong>
-            Sistema de Gestión de Producción Agrícola.
-            <div class="float-right d-none d-sm-inline-block">
-                <b>Versión</b> 1.0.0
+    </aside>
+    {{-- END SIDEBAR --}}
+
+    {{-- ═══════════════ MAIN ═══════════════ --}}
+    <div class="ag-main" id="agMain">
+
+        {{-- TOPBAR --}}
+        <header class="ag-topbar">
+            <button class="ag-tb-icon-btn" id="agToggle" title="Colapsar menú">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <div class="ag-tb-breadcrumb">
+                <span class="ag-tb-title">@yield('page_title', 'Dashboard')</span>
+                @hasSection('breadcrumbs')
+                    <span style="color:var(--border-2);margin:0 4px;">/</span>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            @yield('breadcrumbs')
+                        </ol>
+                    </nav>
+                @endif
             </div>
+
+            <div class="ag-tb-right">
+                {{-- Fullscreen --}}
+                <button class="ag-tb-icon-btn" id="agFullscreen" title="Pantalla completa">
+                    <i class="fas fa-expand"></i>
+                </button>
+
+                {{-- User menu --}}
+                <div class="ag-user-wrap">
+                    <button class="ag-user-btn" id="agUserBtn">
+                        <img src="{{ $userImg }}" alt="Avatar"
+                             data-avatar-fallback="{{ $userImgFallback }}"
+                             onerror="if(this.dataset.avatarFallback){this.onerror=null;this.src=this.dataset.avatarFallback;}">
+                        <span class="ag-user-btn-name">{{ $userFull }}</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+
+                    <div class="ag-dropdown" id="agUserDropdown">
+                        <div class="ag-dd-header">
+                            <span class="ag-dd-user-name">{{ $userFull }}</span>
+                            <span class="ag-dd-user-role">
+                                <span class="role-badge {{ $roleCss }}">{{ ucfirst($userRole) }}</span>
+                            </span>
+                        </div>
+                        <div class="ag-dd-body">
+                            <a href="{{ route('profile.show') }}" class="ag-dd-item">
+                                <i class="fas fa-user-circle" style="width:14px;"></i> Mi perfil
+                            </a>
+                            <div class="ag-dd-sep"></div>
+                            <form action="{{ route('logout') }}" method="POST">
+                                @csrf
+                                <button type="submit" class="ag-dd-item danger">
+                                    <i class="fas fa-sign-out-alt" style="width:14px;"></i> Cerrar sesión
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        {{-- END TOPBAR --}}
+
+        {{-- CONTENT --}}
+        <main class="ag-content">
+            <div class="content-header">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h1 class="m-0">@yield('page_title', 'Dashboard')</h1>
+                    </div>
+                </div>
+            </div>
+
+            @include('partials.flash-messages')
+
+            @yield('content')
+        </main>
+
+        {{-- FOOTER --}}
+        <footer class="ag-footer">
+            <span>&copy; {{ date('Y') }} <strong>AgroFusion</strong> · Sistema de Gestión Agrícola</span>
+            <span>v1.0.0</span>
         </footer>
 
     </div>
+    {{-- END MAIN --}}
 
-    {{-- JS CDN --}}
-    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
+</div>
 
-    @stack('scripts')
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+(function () {
+    'use strict';
+
+    var sidebar  = document.getElementById('agSidebar');
+    var main     = document.getElementById('agMain');
+    var toggle   = document.getElementById('agToggle');
+    var overlay  = document.getElementById('agOverlay');
+    var userBtn  = document.getElementById('agUserBtn');
+    var userDrop = document.getElementById('agUserDropdown');
+    var fullBtn  = document.getElementById('agFullscreen');
+
+    // ── Sidebar toggle (desktop: mini / mobile: open) ─────────────────
+    var isMobile = window.innerWidth <= 768;
+
+    function refreshState() {
+        isMobile = window.innerWidth <= 768;
+    }
+
+    window.addEventListener('resize', refreshState);
+
+    if (toggle) {
+        toggle.addEventListener('click', function () {
+            if (isMobile) {
+                sidebar.classList.toggle('mobile-open');
+                overlay.classList.toggle('show');
+                main.classList.remove('mini');
+            } else {
+                var mini = sidebar.classList.toggle('mini');
+                main.classList.toggle('mini', mini);
+            }
+        });
+    }
+
+    if (overlay) {
+        overlay.addEventListener('click', function () {
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.remove('show');
+        });
+    }
+
+    // ── Sub-menus ─────────────────────────────────────────────────────
+    document.querySelectorAll('[data-toggle-sub]').forEach(function (trigger) {
+        trigger.addEventListener('click', function (e) {
+            e.preventDefault();
+            var targetId = this.getAttribute('data-toggle-sub');
+            var sub = document.getElementById(targetId);
+            if (!sub) return;
+
+            var isOpen = sub.classList.contains('open');
+
+            // close siblings in same level (optional accordion)
+            // (uncomment if you want accordion behaviour)
+            // document.querySelectorAll('.ag-subnav.open').forEach(function(s){ s.classList.remove('open'); });
+            // document.querySelectorAll('.ag-nav-a.group-open').forEach(function(a){ a.classList.remove('group-open'); });
+
+            sub.classList.toggle('open', !isOpen);
+            trigger.classList.toggle('group-open', !isOpen);
+        });
+    });
+
+    // ── User dropdown ──────────────────────────────────────────────────
+    if (userBtn && userDrop) {
+        userBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            userDrop.classList.toggle('show');
+        });
+
+        document.addEventListener('click', function () {
+            userDrop.classList.remove('show');
+        });
+
+        userDrop.addEventListener('click', function (e) {
+            e.stopPropagation();
+        });
+    }
+
+    // ── Fullscreen ─────────────────────────────────────────────────────
+    if (fullBtn) {
+        fullBtn.addEventListener('click', function () {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+                fullBtn.querySelector('i').className = 'fas fa-compress';
+            } else {
+                document.exitFullscreen();
+                fullBtn.querySelector('i').className = 'fas fa-expand';
+            }
+        });
+    }
+
+})();
+</script>
+
+@include('partials.filtros-ui-script')
+
+@stack('scripts')
 </body>
-
 </html>

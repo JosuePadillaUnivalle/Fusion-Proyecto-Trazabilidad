@@ -5,7 +5,7 @@
 
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="{{ route('catalogos.index') }}">Catálogos</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Catálogos</a></li>
     <li class="breadcrumb-item active">Prioridades</li>
 @endsection
 

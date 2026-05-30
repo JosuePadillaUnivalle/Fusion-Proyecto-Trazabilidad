@@ -36,27 +36,30 @@
 
         <div class="alert alert-light border m-3 mb-0">
             <strong><i class="fas fa-magic text-success mr-1"></i> Se completa automáticamente:</strong>
-            código de trazabilidad, fecha de siembra (hoy), estado «Disponible» y unidad en hectáreas.
-            Las actividades de campo se generan al registrar insumos o cosechas; no hace falta cargarlas aquí.
+            código de trazabilidad, estado «Planificado» y unidad en hectáreas.
+            La fecha de siembra se registrará al completar la actividad de siembra.
         </div>
 
-        <form action="{{ route('lotes.store') }}" method="POST" id="formNuevoLote">
+        <form action="{{ route('lotes.store') }}" method="POST" enctype="multipart/form-data" id="formNuevoLote">
             @csrf
             <div class="card-body">
                 <div class="row">
                     <div class="col-lg-5">
                         @if($mostrarSelectorPropietario)
-                            <div class="form-group">
-                                <label><i class="fas fa-user mr-1"></i> Responsable del lote</label>
-                                <select name="usuarioid" class="form-control">
-                                    @foreach($usuarios as $u)
-                                        <option value="{{ $u->usuarioid }}" @selected(old('usuarioid', $propietarioPorDefecto) == $u->usuarioid)>
-                                            {{ $u->nombre }} {{ $u->apellido }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <p class="campo-guia">Agricultor u operador que administra esta parcela.</p>
-                            </div>
+                            @include('partials.selector-catalogo', [
+                                'id' => 'lote_responsable',
+                                'name' => 'usuarioid',
+                                'label' => 'Responsable del lote',
+                                'icon' => 'fa-user',
+                                'value' => $usuarioidInicial ?: '',
+                                'labelSelected' => $responsableLabel ?? '',
+                                'endpoint' => route('catalogo-selector.usuarios'),
+                                'params' => ['roles' => 'agricultor'],
+                                'title' => 'Seleccionar responsable del lote',
+                                'searchPlaceholder' => 'Nombre, correo o usuario…',
+                                'help' => 'Solo usuarios con rol agricultor. El administrador supervisa el sistema y no es responsable de parcelas.',
+                                'required' => true,
+                            ])
                         @else
                             <input type="hidden" name="usuarioid" value="{{ $propietarioPorDefecto }}">
                         @endif
@@ -77,18 +80,22 @@
 
                         <div class="form-group">
                             <label><i class="fas fa-seedling mr-1"></i> Cultivo principal</label>
-                            <div class="input-group">
-                                <select name="cultivoid" id="cultivoid" class="form-control">
-                                    <option value="">— Definir después —</option>
-                                    @foreach($cultivos as $c)
-                                        <option value="{{ $c->cultivoid }}" @selected(old('cultivoid') == $c->cultivoid)>{{ $c->nombre }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="input-group-append">
-                                    <button type="button" class="btn btn-outline-success" data-toggle="modal" data-target="#modalCultivo" title="Agregar cultivo">
-                                        <i class="fas fa-plus"></i>
-                                    </button>
-                                </div>
+                            <div class="d-flex flex-wrap align-items-start" style="gap: 6px;">
+                                @include('partials.selector-catalogo', [
+                                    'id' => 'lote_cultivo',
+                                    'name' => 'cultivoid',
+                                    'value' => $cultivoidInicial ?? '',
+                                    'labelSelected' => $cultivoLabel ?? '',
+                                    'endpoint' => route('catalogo-selector.cultivos'),
+                                    'allowEmpty' => true,
+                                    'placeholderEmpty' => 'Opcional — sin cultivo asignado',
+                                    'title' => 'Seleccionar cultivo',
+                                    'searchPlaceholder' => 'Nombre del cultivo…',
+                                    'inputGroup' => true,
+                                ])
+                                <button type="button" class="btn btn-outline-success" data-toggle="modal" data-target="#modalCultivo" title="Agregar cultivo nuevo">
+                                    <i class="fas fa-plus"></i>
+                                </button>
                             </div>
                             <p class="campo-guia">Opcional al crear; puedes asignarlo luego desde editar lote.</p>
                         </div>
@@ -98,6 +105,15 @@
                             <input type="text" name="ubicacion" id="ubicacion" class="form-control" maxlength="200"
                                    placeholder="Se completa al marcar el mapa" value="{{ old('ubicacion') }}" readonly>
                             <p class="campo-guia">Se genera al hacer clic en el mapa. Puedes editarla después si necesitas una descripción más clara.</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-image mr-1"></i> Imagen del lote <span class="text-muted">(opcional)</span></label>
+                            <div class="custom-file">
+                                <input type="file" class="custom-file-input" id="imagen" name="imagen" accept="image/*">
+                                <label class="custom-file-label" for="imagen">Elegir imagen…</label>
+                            </div>
+                            <p class="campo-guia">Puedes omitirla y agregarla más tarde.</p>
                         </div>
                     </div>
 
@@ -221,6 +237,11 @@
                 }
             });
 
+            document.getElementById('imagen')?.addEventListener('change', function () {
+                var label = this.nextElementSibling;
+                if (label) label.textContent = this.files[0]?.name || 'Elegir imagen…';
+            });
+
             document.getElementById('btnGuardarCultivo').addEventListener('click', function () {
                 const nombre = document.getElementById('nuevoCultivoNombre').value.trim();
                 const err = document.getElementById('cultivoError');
@@ -241,12 +262,9 @@
                     .then(r => r.json())
                     .then(data => {
                         if (data.cultivoid) {
-                            const sel = document.getElementById('cultivoid');
-                            const opt = document.createElement('option');
-                            opt.value = data.cultivoid;
-                            opt.text = data.nombre;
-                            opt.selected = true;
-                            sel.appendChild(opt);
+                            if (window.CatalogoSelector) {
+                                CatalogoSelector.setValue('lote_cultivo', data.cultivoid, data.nombre);
+                            }
                             $('#modalCultivo').modal('hide');
                             document.getElementById('nuevoCultivoNombre').value = '';
                             err.style.display = 'none';

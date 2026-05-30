@@ -11,6 +11,11 @@ class Vehiculo extends Model
     protected $table = 'vehiculo';
     protected $primaryKey = 'vehiculoid';
 
+    public function getRouteKeyName(): string
+    {
+        return 'vehiculoid';
+    }
+
     protected $fillable = [
         'placa',
         'marca',

@@ -82,7 +82,7 @@ final class DashboardPresentacion
                 'tone' => 'indigo',
                 'value' => (string) ($stats['usuarios'] ?? 0),
                 'label' => 'Usuarios',
-                'hint' => 'Agricultores y operadores',
+                'hint' => 'Agricultores',
             ],
             [
                 'icon' => 'fa-boxes',

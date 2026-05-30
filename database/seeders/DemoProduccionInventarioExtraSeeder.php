@@ -77,11 +77,16 @@ class DemoProduccionInventarioExtraSeeder extends Seeder
             ['nombre' => 'Balanza Digital BD-500', 'codigo' => 'BD-500', 'tipo' => 'Pesaje', 'ubicacion' => 'Control de calidad', 'activo' => true],
         ];
 
+        $descripciones = MaquinaPlanta::descripcionesPorCodigo();
+
         foreach ($defs as $d) {
-            $desc = 'Tipo: '.$d['tipo'].'. Ubicación: '.$d['ubicacion'].'. '.self::MARK;
             $m = MaquinaPlanta::updateOrCreate(
                 ['nombre' => $d['nombre']],
-                ['codigo' => $d['codigo'], 'descripcion' => $desc, 'activo' => $d['activo']]
+                [
+                    'codigo' => $d['codigo'],
+                    'descripcion' => $descripciones[$d['codigo']] ?? ('Tipo: '.$d['tipo'].'. Ubicación: '.$d['ubicacion'].'.'),
+                    'activo' => $d['activo'],
+                ]
             );
             $out[$d['nombre']] = $m;
         }
@@ -160,7 +165,7 @@ class DemoProduccionInventarioExtraSeeder extends Seeder
             ['nombre' => 'Aplicado']
         );
 
-        $agricultor = Usuario::where('email', 'agricultor@agronexus.com')->first();
+        $agricultor = Usuario::where('email', 'agricultor@agrofusion.com')->first();
         if (! $agricultor) {
             return;
         }

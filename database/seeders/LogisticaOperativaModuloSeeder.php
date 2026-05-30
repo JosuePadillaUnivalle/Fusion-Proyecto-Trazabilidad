@@ -76,12 +76,12 @@ class LogisticaOperativaModuloSeeder extends Seeder
      */
     private function resolveContext(): ?array
     {
-        $admin = Usuario::where('email', 'admin@agronexus.com')->first();
-        $operador = Usuario::where('email', 'operador@agronexus.com')->first();
-        $planta = Usuario::where('email', 'planta@agronexus.com')->first();
-        $almacenUser = Usuario::where('email', 'almacen@agronexus.com')->first();
-        $transportista = Usuario::where('email', 'transportista@agronexus.com')->first();
-        $miguel = Usuario::where('email', 'miguel.rojas@agronexus.com')->first();
+        $admin = Usuario::where('email', 'admin@agrofusion.com')->first();
+        $operador = Usuario::where('email', 'operador@agrofusion.com')->first();
+        $planta = Usuario::where('email', 'planta@agrofusion.com')->first();
+        $almacenUser = Usuario::where('email', 'almacen@agrofusion.com')->first();
+        $transportista = Usuario::where('email', 'transportista@agrofusion.com')->first();
+        $miguel = Usuario::where('email', 'miguel.rojas@agrofusion.com')->first();
 
         if (! $admin) {
             $this->command?->error(self::MARK.' Falta usuario admin.');
@@ -145,6 +145,7 @@ class LogisticaOperativaModuloSeeder extends Seeder
             $dir = DireccionLogistica::updateOrCreate(
                 ['nombre' => $d['nombre']],
                 [
+                    'tipo_punto' => 'hub',
                     'direccion_completa' => $d['dir'],
                     'ciudad' => $d['ciudad'],
                     'departamento' => 'Santa Cruz',
@@ -181,15 +182,15 @@ class LogisticaOperativaModuloSeeder extends Seeder
             : $estadoDisponibleId;
 
         $vehiculos = [
-            'transportista@agronexus.com' => Vehiculo::where('placa', 'SCZ-MOD-01')->value('vehiculoid'),
-            'miguel.rojas@agronexus.com' => Vehiculo::where('placa', 'SCZ-MOD-02')->value('vehiculoid'),
-            'luis.fernandez@agronexus.com' => Vehiculo::where('placa', 'SCZ-MOD-03')->value('vehiculoid'),
+            'transportista@agrofusion.com' => Vehiculo::where('placa', 'SCZ-MOD-01')->value('vehiculoid'),
+            'miguel.rojas@agrofusion.com' => Vehiculo::where('placa', 'SCZ-MOD-02')->value('vehiculoid'),
+            'luis.fernandez@agrofusion.com' => Vehiculo::where('placa', 'SCZ-MOD-03')->value('vehiculoid'),
         ];
 
         $defs = [
-            ['email' => 'transportista@agronexus.com', 'lic' => 'B-4521987', 'tipo' => 'C', 'estado' => $estadoDisponibleId, 'disp' => true],
-            ['email' => 'miguel.rojas@agronexus.com', 'lic' => 'B-7788123', 'tipo' => 'B', 'estado' => $estadoEnRutaId, 'disp' => true],
-            ['email' => 'luis.fernandez@agronexus.com', 'lic' => 'C-9912345', 'tipo' => 'C', 'estado' => $estadoDisponibleId, 'disp' => false],
+            ['email' => 'transportista@agrofusion.com', 'lic' => 'B-4521987', 'tipo' => 'C', 'estado' => $estadoDisponibleId, 'disp' => true],
+            ['email' => 'miguel.rojas@agrofusion.com', 'lic' => 'B-7788123', 'tipo' => 'B', 'estado' => $estadoEnRutaId, 'disp' => true],
+            ['email' => 'luis.fernandez@agrofusion.com', 'lic' => 'C-9912345', 'tipo' => 'C', 'estado' => $estadoDisponibleId, 'disp' => false],
         ];
 
         foreach ($defs as $d) {
@@ -432,7 +433,13 @@ class LogisticaOperativaModuloSeeder extends Seeder
                 'transportista_usuarioid' => $carlos->usuarioid,
                 'estado' => 'planificada',
                 'fecha_salida' => now()->addDays(3)->setTime(7, 30),
-                'resumen' => ['mod_log' => true, 'vehiculo_placa' => 'SCZ-MOD-01'],
+                'resumen' => [
+                    'mod_log' => true,
+                    'vehiculo_placa' => 'SCZ-MOD-01',
+                    'vehiculo_nombre' => 'Camión Volvo FH',
+                    'capacidad_kg' => 10000,
+                    'vehiculo_estado' => 'Activo',
+                ],
             ]
         );
 

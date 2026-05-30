@@ -4,14 +4,7 @@
 
 <div class="modulo-cat">
 
-    @if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show">
-        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
-        <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
-    </div>
-    @endif
-
-    <div class="mb-3 d-flex flex-wrap" style="gap: 8px;">
+<div class="mb-3 d-flex flex-wrap" style="gap: 8px;">
         <a href="{{ route($routePrefix.'.index') }}" class="btn btn-outline-secondary btn-sm">
             <i class="fas fa-arrow-left mr-1"></i> Listado
         </a>

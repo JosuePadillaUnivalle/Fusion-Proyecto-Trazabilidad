@@ -19,8 +19,8 @@ class EnviosSeguimientoBoliviaSeeder extends Seeder
 
     public function run(): void
     {
-        $admin = Usuario::where('email', 'admin@agronexus.com')->first();
-        $transportista = Usuario::where('email', 'transportista@agronexus.com')->first()
+        $admin = Usuario::where('email', 'admin@agrofusion.com')->first();
+        $transportista = Usuario::where('email', 'transportista@agrofusion.com')->first()
             ?? Usuario::where('role', 'transportista')->where('activo', true)->first();
 
         if (! $admin || ! $transportista) {

@@ -10,19 +10,21 @@ use App\Models\UnidadMedida;
 use App\Models\EstadoLoteTipo;
 use App\Models\HistorialEstadoLote;
 use App\Models\Almacen;
+use App\Support\AlmacenAmbito;
 use App\Models\ProduccionAlmacenamiento;
-use App\Models\ProcesoPlanta;
-use App\Models\MaquinaPlanta;
+use App\Support\EstadoLoteCatalogo;
+use App\Services\AlmacenCapacidadService;
 use App\Services\OperacionAgricolaAutomaticaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ProduccionController extends Controller
 {
-    public function __construct()
-    {
+    public function __construct(
+        private readonly AlmacenCapacidadService $capacidadService,
+    ) {
         $this->middleware(function ($request, $next) {
-            if ($request->user()?->hasRole('transportista') || $request->user()?->hasRole('almacen')) {
+            if ($request->user()?->hasRole('transportista')) {
                 abort(403, 'No tienes permiso para acceder al registro de producción.');
             }
 
@@ -88,16 +90,11 @@ class ProduccionController extends Controller
 
         $lotesFiltro = Lote::query()->orderBy('nombre')->get(['loteid', 'nombre']);
         $destinosFiltro = DestinoProduccion::query()->orderBy('nombre')->get(['destinoproduccionid', 'nombre']);
-        $procesosFiltro = ProcesoPlanta::query()->where('activo', true)->orderBy('nombre')->get(['procesoplantaid', 'nombre']);
-        $maquinasFiltro = MaquinaPlanta::query()->where('activo', true)->orderBy('nombre')->get(['maquinaplantaid', 'nombre', 'codigo']);
-
         return view('producciones.index', compact(
             'producciones',
             'stats',
             'lotesFiltro',
             'destinosFiltro',
-            'procesosFiltro',
-            'maquinasFiltro'
         ));
     }
 
@@ -111,14 +108,6 @@ class ProduccionController extends Controller
 
         if ($request->filled('destinoid')) {
             $query->where('destinoproduccionid', (int) $request->destinoid);
-        }
-
-        if ($request->filled('procesoid')) {
-            $query->where('procesoplantaid', (int) $request->procesoid);
-        }
-
-        if ($request->filled('maquinaid')) {
-            $query->where('maquinaplantaid', (int) $request->maquinaid);
         }
 
         if ($request->filled('fecha_desde')) {
@@ -142,12 +131,24 @@ class ProduccionController extends Controller
         return $query;
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        $lotesQuery = Lote::with(['usuario', 'cultivo', 'estadoTipo'])
-            ->whereHas('estadoTipo', function ($q) {
-                $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en producción']);
-            });
+        $loteidParam = $request->integer('loteid') ?: null;
+
+        $lotesQuery = Lote::with(['usuario', 'cultivo', 'estadoTipo']);
+
+        if ($loteidParam) {
+            $lotesQuery->where('loteid', $loteidParam);
+        } else {
+            $ids = EstadoLoteCatalogo::idsPorSlugs(['listo_para_cosecha']);
+            if ($ids !== []) {
+                $lotesQuery->whereIn('estadolotetipoid', $ids);
+            } else {
+                $lotesQuery->whereHas('estadoTipo', function ($q) {
+                    $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['listo para cosecha']);
+                });
+            }
+        }
 
         if (auth()->user()?->hasRole('agricultor')) {
             $lotesQuery->where('usuarioid', auth()->id());
@@ -156,21 +157,27 @@ class ProduccionController extends Controller
         $lotes = $lotesQuery->orderBy('nombre')->get();
 
         $unidades = UnidadMedida::where('categoria', 'peso')->get();
-        $almacenes = Almacen::with(['tipoAlmacen', 'unidadMedida', 'almacenamientos'])
-            ->where('activo', true)
-            ->get();
-        $procesos = ProcesoPlanta::where('activo', true)->orderBy('nombre')->get();
-        $maquinas = MaquinaPlanta::where('activo', true)->orderBy('nombre')->get();
+        $almacenes = AlmacenAmbito::scope(
+            Almacen::with(['tipoAlmacen', 'unidadMedida', 'almacenamientos'])->where('activo', true),
+            AlmacenAmbito::AGRICOLA
+        )->get();
+        $lotePreseleccionado = $loteidParam
+            ?? (old('loteid') ?: ($lotes->count() === 1 ? $lotes->first()->loteid : null));
+        $lotePreseleccionadoLabel = null;
+        if ($lotePreseleccionado) {
+            $loteSel = $lotes->firstWhere('loteid', $lotePreseleccionado) ?? Lote::find($lotePreseleccionado);
+            $lotePreseleccionadoLabel = $loteSel?->nombre;
+        }
 
-        $lotePreseleccionado = $lotes->count() === 1 ? $lotes->first()->loteid : old('loteid');
+        $returnUrl = $this->validReturnUrl($request->input('return'));
 
         return view('producciones.create', compact(
             'lotes',
             'unidades',
             'almacenes',
-            'procesos',
-            'maquinas',
-            'lotePreseleccionado'
+            'lotePreseleccionado',
+            'lotePreseleccionadoLabel',
+            'returnUrl'
         ));
     }
 
@@ -181,10 +188,7 @@ class ProduccionController extends Controller
             'cantidad' => 'required|numeric|min:0.01',
             'unidadmedidaid' => 'required|exists:unidadmedida,unidadmedidaid',
             'observaciones' => 'nullable|string',
-            'procesoplantaid' => 'nullable|exists:proceso_planta,procesoplantaid',
-            'maquinaplantaid' => 'nullable|exists:maquina_planta,maquinaplantaid',
-            'enviar_almacen' => 'nullable|boolean',
-            'almacenid' => 'nullable|exists:almacen,almacenid',
+            'almacenid' => 'required|exists:almacen,almacenid',
         ]);
 
         DB::beginTransaction();
@@ -192,16 +196,15 @@ class ProduccionController extends Controller
         try {
             $lote = Lote::with(['estadoTipo', 'cultivo'])->findOrFail($data['loteid']);
 
-            // Validar que el lote esté en producción
-            if (strtolower(trim($lote->estadoTipo->nombre ?? '')) !== 'en producción') {
+            if (! EstadoLoteCatalogo::loteEnSlug($lote->estadoTipo->nombre ?? '', 'listo_para_cosecha')) {
                 return back()->withErrors([
-                    'loteid' => "El lote debe estar 'en producción' para registrar cosecha. Estado actual: {$lote->estadoTipo->nombre}",
+                    'loteid' => 'El lote debe estar en estado «Listo para cosecha». Estado actual: '.($lote->estadoTipo->nombre ?? 'sin estado'),
                 ])->withInput();
             }
 
             $destinoAlmacenamiento = DestinoProduccion::where('nombre', 'almacenamiento')->first();
             $unidadProduccion = UnidadMedida::find($data['unidadmedidaid']);
-            $cantidadBaseKg = $this->convertirAKg((float) $data['cantidad'], $unidadProduccion);
+            $cantidadBaseKg = $this->capacidadService->convertirAKg((float) $data['cantidad'], $unidadProduccion);
 
             $produccion = Produccion::create([
                 'loteid' => $data['loteid'],
@@ -210,40 +213,21 @@ class ProduccionController extends Controller
                 'cantidad_base' => $cantidadBaseKg,
                 'fechacosecha' => now()->toDateString(),
                 'destinoproduccionid' => $destinoAlmacenamiento->destinoproduccionid ?? null,
-                'procesoplantaid' => $data['procesoplantaid'] ?? null,
-                'maquinaplantaid' => $data['maquinaplantaid'] ?? null,
-                'observaciones' => $data['observaciones'],
+                'observaciones' => $data['observaciones'] ?? null,
             ]);
 
-            // Si se seleccionó enviar a almacén
             $mensajeAlmacen = '';
-            $almacen = null;
+            $almacen = AlmacenAmbito::scope(Almacen::query(), AlmacenAmbito::AGRICOLA)
+                ->where('almacenid', $data['almacenid'])
+                ->firstOrFail();
 
-            if ($request->filled('enviar_almacen') && $request->filled('almacenid')) {
-                // Usar almacén seleccionado manualmente
-                $almacen = Almacen::find($request->almacenid);
-            }
-
-            // Si hay almacén, crear el registro de almacenamiento
-            if ($almacen) {
-                // ================================
-                // 1) Capacidad del almacén en KG
-                // ================================
+            // ================================
+            // 1) Capacidad del almacén en KG
+            // ================================
                 $unidadAlmacen = $almacen->unidadMedida; // relación unidadMedida en modelo Almacen
-                $capacidadKg = $this->convertirAKg((float) ($almacen->capacidad ?? 0), $unidadAlmacen);
-
-                // ======================================
-                // 2) Ocupación actual del almacén en KG
-                // ======================================
-                $almacenamientos = ProduccionAlmacenamiento::with('unidadMedida')
-                    ->where('almacenid', $almacen->almacenid)
-                    ->whereNull('fechasalida')
-                    ->get();
-
-                $ocupadoKg = 0;
-                foreach ($almacenamientos as $alm) {
-                    $ocupadoKg += $this->convertirAKg((float) $alm->cantidad, $alm->unidadMedida);
-                }
+                $resumenAlmacen = $this->capacidadService->resumen($almacen);
+                $capacidadKg = $resumenAlmacen['capacidad_kg'];
+                $ocupadoKg = $resumenAlmacen['ocupado_kg'];
 
                 // =====================================
                 // 3) Nueva cantidad a ingresar en KG
@@ -271,8 +255,7 @@ class ProduccionController extends Controller
                     'observaciones' => "Cosecha del lote {$lote->nombre}",
                 ]);
 
-                $mensajeAlmacen = " y almacenado en {$almacen->nombre}";
-            }
+            $mensajeAlmacen = " y almacenado en {$almacen->nombre}";
 
             // Cambiar estado del lote a "cosechado"
             $estadoCosechado = EstadoLoteTipo::where('nombre', 'cosechado')->first();
@@ -301,10 +284,17 @@ class ProduccionController extends Controller
             DB::commit();
 
             $unidad = UnidadMedida::find($data['unidadmedidaid']);
+            $mensaje = "¡Cosecha registrada! {$data['cantidad']} {$unidad->abreviatura} de {$lote->cultivo->nombre}"
+                . $mensajeAlmacen.'. El ingreso aparece en Movimientos de almacén agrícola.';
+
+            $returnUrl = $this->validReturnUrl($request->input('return'));
+            if ($returnUrl) {
+                return redirect($returnUrl)->with('success', $mensaje);
+            }
+
             return redirect()
                 ->route('producciones.index')
-                ->with('success', "¡Cosecha registrada! {$data['cantidad']} {$unidad->abreviatura} de {$lote->cultivo->nombre}"
-                    . $mensajeAlmacen.' · Actividad de cosecha generada automáticamente.');
+                ->with('success', $mensaje);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -324,10 +314,7 @@ class ProduccionController extends Controller
         $lotes = Lote::with(['usuario', 'cultivo'])->get();
         $destinos = DestinoProduccion::all();
         $unidades = UnidadMedida::where('categoria', 'peso')->get();
-        $procesos = ProcesoPlanta::where('activo', true)->orderBy('nombre')->get();
-        $maquinas = MaquinaPlanta::where('activo', true)->orderBy('nombre')->get();
-
-        return view('producciones.edit', compact('produccion', 'lotes', 'destinos', 'unidades', 'procesos', 'maquinas'));
+        return view('producciones.edit', compact('produccion', 'lotes', 'destinos', 'unidades'));
     }
 
     public function update(Request $request, Produccion $produccion)
@@ -338,9 +325,6 @@ class ProduccionController extends Controller
             'unidadmedidaid' => 'required|exists:unidadmedida,unidadmedidaid',
             'fechacosecha' => 'required|date',
             'destinoproduccionid' => 'nullable|exists:destinoproduccion,destinoproduccionid',
-            'procesoplantaid' => 'nullable|exists:proceso_planta,procesoplantaid',
-            'maquinaplantaid' => 'nullable|exists:maquina_planta,maquinaplantaid',
-            'observaciones' => 'nullable|string',
         ]);
 
         $produccion->update($data);
@@ -387,5 +371,20 @@ class ProduccionController extends Controller
             DB::rollBack();
             return back()->withErrors(['error' => 'Error al eliminar: ' . $e->getMessage()]);
         }
+    }
+
+    private function validReturnUrl(mixed $return): ?string
+    {
+        if (! is_string($return) || trim($return) === '') {
+            return null;
+        }
+
+        $return = trim($return);
+        $appUrl = rtrim((string) config('app.url'), '/');
+        if (! str_starts_with($return, '/') && ! str_starts_with($return, $appUrl)) {
+            return null;
+        }
+
+        return $return;
     }
 }

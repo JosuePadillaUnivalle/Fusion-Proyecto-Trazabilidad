@@ -14,6 +14,9 @@ WORKDIR /var/www
 
 COPY . .
 
+# Instalar dependencias en build time (filesystem del contenedor = rápido, sin bind mount)
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader
+
 # Copiar entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh

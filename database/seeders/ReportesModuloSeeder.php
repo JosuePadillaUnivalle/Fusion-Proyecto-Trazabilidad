@@ -65,12 +65,12 @@ class ReportesModuloSeeder extends Seeder
             $clima7
         ));
         $this->command?->info('  Rutas: /reportes · /reportes/ventas · /reportes/inventario · /envios/reportes-distribucion');
-        $this->command?->info('  Usuario sugerido: admin@agronexus.com / 123456');
+        $this->command?->info('  Usuario sugerido: admin@agrofusion.com / 123456');
     }
 
     private function ensureDependencies(): void
     {
-        if (Usuario::where('email', 'admin@agronexus.com')->doesntExist()) {
+        if (Usuario::where('email', 'admin@agrofusion.com')->doesntExist()) {
             $this->call(DatosPruebaSeeder::class);
         }
 
@@ -276,7 +276,7 @@ class ReportesModuloSeeder extends Seeder
             return;
         }
 
-        $agricultor = Usuario::where('email', 'agricultor@agronexus.com')->first();
+        $agricultor = Usuario::where('email', 'agricultor@agrofusion.com')->first();
         $prioridadAlta = Prioridad::whereRaw('LOWER(nombre) = ?', ['alta'])->value('prioridadid')
             ?? Prioridad::query()->orderByDesc('prioridadid')->value('prioridadid');
 
@@ -327,7 +327,7 @@ class ReportesModuloSeeder extends Seeder
             return;
         }
 
-        $agricultor = Usuario::where('email', 'agricultor@agronexus.com')->first();
+        $agricultor = Usuario::where('email', 'agricultor@agrofusion.com')->first();
         $lote = Lote::where('nombre', 'Lote Norte A1')->first();
         $insumo = Insumo::where('nombre', 'Fertilizante NPK 15-15-15')->first();
 

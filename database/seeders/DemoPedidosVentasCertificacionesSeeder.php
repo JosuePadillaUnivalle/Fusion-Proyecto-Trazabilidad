@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Schema;
 
 class DemoPedidosVentasCertificacionesSeeder extends Seeder
 {
-    private const EMAIL_ADMIN = 'admin@agronexus.com';
+    private const EMAIL_ADMIN = 'admin@agrofusion.com';
 
     private const MARK_PED_OBS = '[DEMO-B5] Pedido demo';
 

@@ -192,18 +192,12 @@
 
         <div class="col-lg-7">
             <div class="card card-outline card-success card-modulo-main elevation-1">
-                <div class="card-header">
-                    <h3 class="card-title mb-0">
-                        <i class="fas fa-history text-success mr-1"></i>
-                        Historial climático
-                        <span class="badge badge-light border text-muted badge-registros ml-2">Últimos 30 días · {{ $historial->total() }} registros</span>
-                    </h3>
-                    <div class="card-tools">
-                        <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosClimaPanel" title="Filtros">
-                            <i class="fas fa-filter"></i>
-                        </button>
-                    </div>
-                </div>
+                <x-modulo-index-header
+                    titulo="Historial climático"
+                    icono="fa-history"
+                    :registros-text="'Últimos 30 días · '.$historial->total().' registros'"
+                    filtros-target="#filtrosClimaPanel"
+                />
 
                 <div id="filtrosClimaPanel" class="filtros-panel collapse {{ request()->hasAny(['buscar','loteid','fecha_desde','fecha_hasta','temp_min','temp_max']) ? 'show' : '' }}">
                     <form method="GET" action="{{ route('climas.index') }}">
@@ -237,9 +231,8 @@
                                 <label class="small text-muted mb-1">Hasta</label>
                                 <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="{{ request('fecha_hasta') }}">
                             </div>
-                            <div class="col-md-6 d-flex align-items-end mb-2" style="gap: 8px;">
-                                <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-search mr-1"></i> Filtrar</button>
-                                <a href="{{ route('climas.index') }}" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+                            <div class="col-12">
+                                <x-filtros-form-actions :limpiar-url="route('climas.index', ['filtros_abiertos' => 1])" />
                             </div>
                         </div>
                     </form>

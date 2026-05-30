@@ -59,9 +59,9 @@ class PanelesPorRolModuloSeeder extends Seeder
 
     private function imprimirResumen(): void
     {
-        $planta = Usuario::where('email', 'planta@agronexus.com')->first();
-        $transportista = Usuario::where('email', 'transportista@agronexus.com')->first();
-        $almacenUser = Usuario::where('email', 'almacen@agronexus.com')->first();
+        $planta = Usuario::where('email', 'planta@agrofusion.com')->first();
+        $transportista = Usuario::where('email', 'transportista@agrofusion.com')->first();
+        $almacenUser = Usuario::where('email', 'almacen@agrofusion.com')->first();
 
         $lineas = [self::MARK.' Métricas estimadas por rol:'];
 
@@ -114,12 +114,12 @@ class PanelesPorRolModuloSeeder extends Seeder
      */
     private function resolveContext(): ?array
     {
-        $admin = Usuario::where('email', 'admin@agronexus.com')->first();
-        $planta = Usuario::where('email', 'planta@agronexus.com')->first();
-        $operador = Usuario::where('email', 'operador@agronexus.com')->first();
-        $carlos = Usuario::where('email', 'transportista@agronexus.com')->first();
-        $miguel = Usuario::where('email', 'miguel.rojas@agronexus.com')->first();
-        $almacenUser = Usuario::where('email', 'almacen@agronexus.com')->first();
+        $admin = Usuario::where('email', 'admin@agrofusion.com')->first();
+        $planta = Usuario::where('email', 'planta@agrofusion.com')->first();
+        $operador = Usuario::where('email', 'operador@agrofusion.com')->first();
+        $carlos = Usuario::where('email', 'transportista@agrofusion.com')->first();
+        $miguel = Usuario::where('email', 'miguel.rojas@agrofusion.com')->first();
+        $almacenUser = Usuario::where('email', 'almacen@agrofusion.com')->first();
 
         if (! $admin || ! $planta || ! $carlos || ! $almacenUser) {
             $this->command?->error(self::MARK.' Faltan usuarios demo (admin, planta, transportista o almacen). Ejecute DemoUsuariosAlmacenesActoresSeeder.');
@@ -146,10 +146,10 @@ class PanelesPorRolModuloSeeder extends Seeder
     private function asegurarUsuariosRoles(array $ctx): void
     {
         $map = [
-            'planta@agronexus.com' => 'planta',
-            'transportista@agronexus.com' => 'transportista',
-            'miguel.rojas@agronexus.com' => 'transportista',
-            'almacen@agronexus.com' => 'almacen',
+            'planta@agrofusion.com' => 'planta',
+            'transportista@agrofusion.com' => 'transportista',
+            'miguel.rojas@agrofusion.com' => 'transportista',
+            'almacen@agrofusion.com' => 'almacen',
         ];
 
         foreach ($map as $email => $roleName) {

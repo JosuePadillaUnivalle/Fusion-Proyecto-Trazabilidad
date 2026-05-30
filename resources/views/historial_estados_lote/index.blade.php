@@ -5,7 +5,7 @@
 
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="{{ route('catalogos.index') }}">Catálogos</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('lotes.index') }}">Lotes</a></li>
     <li class="breadcrumb-item active">Historial de estados</li>
 @endsection
 
@@ -16,14 +16,7 @@
 @section('content')
 <div class="modulo-cat">
 
-    @if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show">
-        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
-        <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
-    </div>
-    @endif
-
-    <div class="row mb-2">
+<div class="row mb-2">
         <div class="col-lg-4 col-6">
             <div class="small-box small-box-green">
                 <div class="inner">
@@ -37,21 +30,14 @@
     </div>
 
     <div class="card card-outline card-success card-modulo-main elevation-1 mb-3">
-        <div class="card-header">
-            <h3 class="card-title mb-0">
-                <i class="fas fa-history text-success mr-1"></i>
-                Historial de estados de lote
-                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $historial->total() }} registros</span>
-            </h3>
-            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
-                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosHistorialPanel" title="Filtros">
-                    <i class="fas fa-filter"></i>
-                </button>
-                <a href="{{ route('historial-estados-lote.create') }}" class="btn btn-success btn-sm">
-                    <i class="fas fa-plus mr-1"></i> Nuevo registro
-                </a>
-            </div>
-        </div>
+        <x-modulo-index-header
+            titulo="Historial de estados de lote"
+            icono="fa-history"
+            :registros="$historial->total()"
+            filtros-target="#filtrosHistorialPanel"
+            :nuevo-href="route('historial-estados-lote.create')"
+            nuevo-text="Nuevo registro"
+        />
 
         <div id="filtrosHistorialPanel" class="filtros-panel collapse {{ request()->hasAny(['buscar','loteid','estadolotetipoid','fecha_desde','fecha_hasta']) ? 'show' : '' }}">
             <form method="GET" action="{{ route('historial-estados-lote.index') }}">
@@ -87,11 +73,8 @@
                         <label class="small text-muted mb-1">Hasta</label>
                         <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="{{ request('fecha_hasta') }}">
                     </div>
-                    <div class="col-md-1 d-flex" style="gap: 8px;">
-                        <button type="submit" class="btn btn-success btn-sm" title="Filtrar"><i class="fas fa-search"></i></button>
-                        <a href="{{ route('historial-estados-lote.index') }}" class="btn btn-outline-secondary btn-sm" title="Limpiar"><i class="fas fa-eraser"></i></a>
-                    </div>
                 </div>
+                <x-filtros-form-actions :limpiar-url="route('historial-estados-lote.index', ['filtros_abiertos' => 1])" />
             </form>
         </div>
 
@@ -158,8 +141,8 @@
         @endif
     </div>
 
-    <a href="{{ route('catalogos.index') }}" class="btn btn-outline-secondary btn-sm">
-        <i class="fas fa-arrow-left mr-1"></i> Volver a Catálogos
+    <a href="{{ route('lotes.index') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left mr-1"></i> Volver a Lotes
     </a>
 </div>
 @endsection

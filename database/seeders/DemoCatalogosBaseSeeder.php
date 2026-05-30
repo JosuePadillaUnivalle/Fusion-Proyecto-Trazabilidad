@@ -38,9 +38,12 @@ class DemoCatalogosBaseSeeder extends Seeder
 
         $items = [
             ['nombre' => 'Kilogramo', 'abreviatura' => 'kg', 'categoria' => 'peso'],
+            ['nombre' => 'Gramo', 'abreviatura' => 'g', 'categoria' => 'peso'],
             ['nombre' => 'Quintal', 'abreviatura' => 'qq', 'categoria' => 'peso'],
-            ['nombre' => 'Unidad', 'abreviatura' => 'und', 'categoria' => 'cantidad'],
             ['nombre' => 'Litro', 'abreviatura' => 'l', 'categoria' => 'volumen'],
+            ['nombre' => 'Mililitro', 'abreviatura' => 'ml', 'categoria' => 'volumen'],
+            ['nombre' => 'Metro', 'abreviatura' => 'm', 'categoria' => 'longitud'],
+            ['nombre' => 'Unidad', 'abreviatura' => 'und', 'categoria' => 'cantidad'],
             ['nombre' => 'Hectárea', 'abreviatura' => 'ha', 'categoria' => 'superficie'],
         ];
 
@@ -100,19 +103,20 @@ class DemoCatalogosBaseSeeder extends Seeder
 
         $hasDescripcion = Schema::hasColumn('estadolote_tipo', 'descripcion');
         $items = [
-            'Disponible',
-            'Sembrado',
-            'En producción',
-            'Cosechado',
-            'En descanso',
+            ['nombre' => 'Planificado', 'descripcion' => 'El lote fue creado pero aún no se ha sembrado.'],
+            ['nombre' => 'Sembrado', 'descripcion' => 'La siembra ya fue realizada.'],
+            ['nombre' => 'En crecimiento', 'descripcion' => 'El cultivo está desarrollándose.'],
+            ['nombre' => 'Listo para cosecha', 'descripcion' => 'El cultivo alcanzó las condiciones para ser cosechado.'],
+            ['nombre' => 'Cosechado', 'descripcion' => 'La producción fue recolectada.'],
+            ['nombre' => 'Finalizado', 'descripcion' => 'El ciclo del lote terminó y ya no se realizarán más actividades.'],
         ];
 
-        foreach ($items as $nombre) {
-            $data = ['nombre' => $nombre];
+        foreach ($items as $item) {
+            $data = ['nombre' => $item['nombre']];
             if ($hasDescripcion) {
-                $data['descripcion'] = $nombre;
+                $data['descripcion'] = $item['descripcion'];
             }
-            EstadoLoteTipo::updateOrCreate(['nombre' => $nombre], $data);
+            EstadoLoteTipo::updateOrCreate(['nombre' => $item['nombre']], $data);
         }
     }
 
@@ -140,8 +144,8 @@ class DemoCatalogosBaseSeeder extends Seeder
             return;
         }
 
-        foreach (['Semilla', 'Fertilizante', 'Herramienta', 'Producto agrícola', 'Materia prima'] as $nombre) {
-            TipoInsumo::firstOrCreate(['nombre' => $nombre], ['nombre' => $nombre]);
+        foreach (\App\Support\InsumoCatalogo::TIPOS as $nombre) {
+            TipoInsumo::updateOrCreate(['nombre' => $nombre], ['nombre' => $nombre]);
         }
     }
 

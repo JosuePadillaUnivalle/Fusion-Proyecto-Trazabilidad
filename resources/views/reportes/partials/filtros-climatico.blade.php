@@ -5,7 +5,7 @@
     <div class="card-header">
         <h3 class="card-title mb-0"><i class="fas fa-filter text-info mr-1"></i> Filtros del reporte</h3>
         <div class="card-tools">
-            <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosRepClima"><i class="fas fa-filter"></i></button>
+            @include('partials.btn-filtros-toggle', ['target' => '#filtrosRepClima'])
         </div>
     </div>
     <div id="filtrosRepClima" class="filtros-panel collapse {{ $filtrosAbiertos ? 'show' : '' }}">

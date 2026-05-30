@@ -26,7 +26,7 @@ class AdministracionModuloSeeder extends Seeder
 
     public function run(): void
     {
-        if (Usuario::where('email', 'admin@agronexus.com')->doesntExist()) {
+        if (Usuario::where('email', 'admin@agrofusion.com')->doesntExist()) {
             $this->call(DatosPruebaSeeder::class);
         }
 
@@ -53,8 +53,8 @@ class AdministracionModuloSeeder extends Seeder
             $counts['roles']
         ));
         $this->command?->info('  Rutas: /catalogos · /gestion-usuarios');
-        $this->command?->info('  Admin: admin@agronexus.com / 123456');
-        $this->command?->info('  Usuarios demo extra: supervisor@agronexus.com · auditor@agronexus.com (password)');
+        $this->command?->info('  Admin: admin@agrofusion.com / 123456');
+        $this->command?->info('  Usuarios demo extra: supervisor@agrofusion.com · auditor@agrofusion.com (password)');
     }
 
     private function seedCatalogosAdministracion(): void
@@ -114,15 +114,7 @@ class AdministracionModuloSeeder extends Seeder
         }
 
         if (Schema::hasTable('estadolote_tipo')) {
-            $hasDesc = Schema::hasColumn('estadolote_tipo', 'descripcion');
-            $estados = ['En certificación', 'Suspendido', 'Archivado'];
-            foreach ($estados as $nombre) {
-                $data = ['nombre' => $nombre];
-                if ($hasDesc) {
-                    $data['descripcion'] = self::MARK.' Estado administrativo demo.';
-                }
-                EstadoLoteTipo::updateOrCreate(['nombre' => $nombre], $data);
-            }
+            // Estados canónicos definidos en EstadoLoteCatalogo / migración consolidate_estado_lote_catalogo.
         }
 
         if (Schema::hasTable('estadoloteinsumo')) {
@@ -147,7 +139,7 @@ class AdministracionModuloSeeder extends Seeder
                 'nombre' => 'María',
                 'apellido' => 'Supervisora',
                 'nombreusuario' => 'supervisor',
-                'email' => 'supervisor@agronexus.com',
+                'email' => 'supervisor@agrofusion.com',
                 'role' => 'operador',
                 'telefono' => '700000201',
                 'activo' => true,
@@ -157,7 +149,7 @@ class AdministracionModuloSeeder extends Seeder
                 'nombre' => 'Luis',
                 'apellido' => 'Auditor',
                 'nombreusuario' => 'auditor',
-                'email' => 'auditor@agronexus.com',
+                'email' => 'auditor@agrofusion.com',
                 'role' => 'operador',
                 'telefono' => '700000202',
                 'activo' => true,
@@ -167,7 +159,7 @@ class AdministracionModuloSeeder extends Seeder
                 'nombre' => 'Ana',
                 'apellido' => 'Inactiva',
                 'nombreusuario' => 'ana_inactiva',
-                'email' => 'inactiva@agronexus.com',
+                'email' => 'inactiva@agrofusion.com',
                 'role' => 'agricultor',
                 'telefono' => '700000203',
                 'activo' => false,

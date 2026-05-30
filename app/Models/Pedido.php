@@ -15,7 +15,6 @@ class Pedido extends Model
 
     protected $fillable = [
         'numero_solicitud',
-        'clientecomercialid',
         'nombre_planta',
         'cultivo_personalizado',
         'latitud',
@@ -29,7 +28,6 @@ class Pedido extends Model
 
     protected $casts = [
         'pedidoid'            => 'integer',
-        'clientecomercialid' => 'integer',
         'numero_solicitud'    => 'string',
         'latitud'             => 'float',
         'longitud'            => 'float',
@@ -42,40 +40,5 @@ class Pedido extends Model
     public function detalles()
     {
         return $this->hasMany(DetallePedido::class, 'pedidoid', 'pedidoid');
-    }
-
-    public function clienteComercial()
-    {
-        return $this->belongsTo(ClienteComercial::class, 'clientecomercialid', 'clientecomercialid');
-    }
-
-    public function destinos()
-    {
-        return $this->hasMany(PedidoDestino::class, 'pedidoid', 'pedidoid');
-    }
-
-    public function seguimientosEnvio()
-    {
-        return $this->hasMany(SeguimientoEnvioPedido::class, 'pedidoid', 'pedidoid');
-    }
-
-    public function asignacionesMultipleEnvio()
-    {
-        return $this->hasMany(EnvioAsignacionMultiple::class, 'pedidoid', 'pedidoid');
-    }
-
-    public function calificacionesEnvio()
-    {
-        return $this->hasMany(CalificacionEnvio::class, 'pedidoid', 'pedidoid');
-    }
-
-    public function lotesProduccionPedido()
-    {
-        return $this->hasMany(LoteProduccionPedido::class, 'pedidoid', 'pedidoid');
-    }
-
-    public function solicitudesMaterial()
-    {
-        return $this->hasMany(SolicitudMaterialPedido::class, 'pedidoid', 'pedidoid');
     }
 }

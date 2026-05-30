@@ -44,39 +44,33 @@ class LotesAccessTest extends TestCase
         $this->get(route('lotes.create'))->assertOk();
     }
 
-    public function test_operador_solo_lectura_en_lotes(): void
-    {
-        $operador = $this->createUser('operador');
-        $this->actingAs($operador);
-
-        $this->get(route('lotes.index'))->assertOk();
-        $this->get(route('lotes.create'))->assertForbidden();
-    }
-
-    public function test_agricultor_no_accede_a_lotes(): void
+    public function test_agricultor_puede_gestionar_lotes(): void
     {
         $agricultor = $this->createUser('agricultor');
         $this->actingAs($agricultor);
 
-        $this->get(route('lotes.index'))->assertForbidden();
+        $this->get(route('lotes.index'))->assertOk();
+        $this->get(route('lotes.create'))->assertOk();
+        $this->get(route('actividades.index'))->assertOk();
+        $this->get(route('actividades.calendario'))->assertOk();
     }
 
-    public function test_admin_y_operador_acceden_api_lotes(): void
+    public function test_admin_y_agricultor_acceden_api_lotes(): void
     {
         $admin = $this->createUser('admin');
         Sanctum::actingAs($admin);
         $this->getJson('/api/lotes')->assertOk();
 
-        $operador = $this->createUser('operador');
-        Sanctum::actingAs($operador);
+        $agricultor = $this->createUser('agricultor');
+        Sanctum::actingAs($agricultor);
         $this->getJson('/api/lotes')->assertOk();
     }
 
-    public function test_agricultor_no_accede_api_lotes(): void
+    public function test_agricultor_accede_api_lotes(): void
     {
         $agricultor = $this->createUser('agricultor');
         Sanctum::actingAs($agricultor);
-        $this->getJson('/api/lotes')->assertForbidden();
+        $this->getJson('/api/lotes')->assertOk();
     }
 }
 

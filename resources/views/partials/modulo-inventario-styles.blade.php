@@ -58,16 +58,6 @@
     background: linear-gradient(135deg, #28a745, #34ce57) !important;
     color: #fff;
 }
-.modulo-inv .small-box-footer {
-    background: rgba(0, 0, 0, 0.12);
-    color: rgba(255, 255, 255, 0.9);
-    position: relative;
-    z-index: 1;
-}
-.modulo-inv .small-box-footer:hover {
-    background: rgba(0, 0, 0, 0.18);
-    color: #fff;
-}
 .modulo-inv .card-modulo-main {
     border-top: 3px solid #2c5530;
 }
@@ -119,5 +109,8 @@
 .modulo-inv .btn-actions .btn {
     padding: 0.2rem 0.45rem;
     line-height: 1.2;
+}
+.modulo-inv .card-footer .pagination {
+    margin-bottom: 0;
 }
 </style>

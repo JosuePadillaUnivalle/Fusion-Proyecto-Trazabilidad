@@ -159,6 +159,8 @@ class ProduccionModuloSeeder extends Seeder
             return $out;
         }
 
+        $descripciones = MaquinaPlanta::descripcionesPorCodigo();
+
         foreach (
             [
                 ['nombre' => 'Lavadora Industrial L-100', 'codigo' => 'L-100', 'activo' => true],
@@ -171,7 +173,7 @@ class ProduccionModuloSeeder extends Seeder
                 ['codigo' => $d['codigo']],
                 [
                     'nombre' => $d['nombre'],
-                    'descripcion' => 'Equipo de planta · '.self::MARK,
+                    'descripcion' => $descripciones[$d['codigo']] ?? 'Equipo de planta · '.self::MARK,
                     'activo' => $d['activo'],
                 ]
             );

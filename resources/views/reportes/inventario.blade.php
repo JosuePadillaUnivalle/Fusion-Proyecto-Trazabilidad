@@ -69,17 +69,17 @@
                     <p>Stock disponible</p>
                 </div>
                 <div class="icon"><i class="fas fa-check-circle"></i></div>
-                <span class="small-box-footer">Por encima del mínimo</span>
+                <span class="small-box-footer">Stock por encima del umbral crítico ({{ $umbral ?? 5 }})</span>
             </div>
         </div>
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-yellow">
                 <div class="inner">
-                    <h3>Bs. {{ number_format($stats['valor_total'], 0) }}</h3>
-                    <p>Valor estimado</p>
+                    <h3>{{ $stats['stock_atencion'] ?? 0 }}</h3>
+                    <p>En atención</p>
                 </div>
-                <div class="icon"><i class="fas fa-coins"></i></div>
-                <span class="small-box-footer">Stock × precio unitario</span>
+                <div class="icon"><i class="fas fa-bell"></i></div>
+                <span class="small-box-footer">Entre {{ ($umbral ?? 5) + 1 }} y {{ ($umbral ?? 5) * 2 }} unidades</span>
             </div>
         </div>
     </div>
@@ -229,7 +229,7 @@
                     @else
                         <ul class="products-list product-list-in-card pl-2 pr-2 mb-0">
                             @foreach ($alertasStock as $insumo)
-                                @php $stockMin = $insumo->stockminimo ?? 10; @endphp
+                                @php $umbralAlerta = $umbral ?? \App\Support\InsumoCatalogo::UMBRAL_ALERTA_STOCK; @endphp
                                 <li class="item">
                                     <div class="product-img">
                                         <span class="badge badge-danger elevation-2 p-2">
@@ -246,8 +246,8 @@
                                         <span class="product-description">
                                             {{ $insumo->tipo->nombre ?? '—' }} ·
                                             Stock <strong class="text-danger">{{ number_format($insumo->stock, 2) }}</strong>
-                                            / mín. {{ number_format($stockMin, 2) }}
                                             {{ $insumo->unidadMedida->abreviatura ?? '' }}
+                                            · alerta ≤ {{ $umbralAlerta }}
                                         </span>
                                     </div>
                                 </li>
@@ -350,32 +350,25 @@
                                 <th>Insumo</th>
                                 <th>Tipo</th>
                                 <th class="text-right">Stock actual</th>
-                                <th class="text-right">Stock mínimo</th>
                                 <th>Estado</th>
-                                <th class="text-right">Valor estimado</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($insumos as $insumo)
                                 @php
-                                    $stockMin = $insumo->stockminimo ?? 10;
-                                    $porcentaje = $stockMin > 0 ? ($insumo->stock / $stockMin) * 100 : 100;
-                                    if ($porcentaje < 30) {
+                                    $clase = \App\Support\InsumoCatalogo::claseStock((float) $insumo->stock);
+                                    if ($clase === 'low') {
                                         $estado = 'Crítico';
                                         $badge = 'danger';
                                         $orden = 1;
-                                    } elseif ($porcentaje < 80) {
-                                        $estado = 'Bajo';
+                                    } elseif ($clase === 'medium') {
+                                        $estado = 'Atención';
                                         $badge = 'warning';
                                         $orden = 2;
-                                    } elseif ($porcentaje < 150) {
-                                        $estado = 'Bueno';
+                                    } else {
+                                        $estado = 'Normal';
                                         $badge = 'success';
                                         $orden = 3;
-                                    } else {
-                                        $estado = 'Óptimo';
-                                        $badge = 'info';
-                                        $orden = 4;
                                     }
                                 @endphp
                                 <tr>
@@ -392,16 +385,8 @@
                                         {{ number_format($insumo->stock, 2) }}
                                         <small class="text-muted">{{ $insumo->unidadMedida->abreviatura ?? '' }}</small>
                                     </td>
-                                    <td class="text-right" data-order="{{ $stockMin }}">
-                                        {{ number_format($stockMin, 2) }}
-                                    </td>
                                     <td data-order="{{ $orden }}">
                                         <span class="badge badge-{{ $badge }}">{{ $estado }}</span>
-                                    </td>
-                                    <td class="text-right" data-order="{{ $insumo->stock * ($insumo->preciounitario ?? 0) }}">
-                                        <strong class="text-success">
-                                            Bs. {{ number_format($insumo->stock * ($insumo->preciounitario ?? 0), 2) }}
-                                        </strong>
                                     </td>
                                 </tr>
                             @endforeach

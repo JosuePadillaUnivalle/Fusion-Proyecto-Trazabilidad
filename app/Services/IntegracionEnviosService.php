@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\EnvioPendiente;
-use App\Support\LocalOrgTrackFallback;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
@@ -232,7 +231,7 @@ class IntegracionEnviosService
         $cacheKey = 'orgtrack_tipos_transporte';
 
         $cached = Cache::get($cacheKey);
-        if (! $this->estaConectado() && is_array($cached) && $cached !== []) {
+        if (!$this->estaConectado() && $cached) {
             return $cached;
         }
 
@@ -241,26 +240,15 @@ class IntegracionEnviosService
                 $response = Http::timeout(5)->get($this->apiUrl . '/api/tipo-transporte');
                 if ($response->successful()) {
                     $tipos = $response->json();
-                    if (is_array($tipos) && isset($tipos['data']) && is_array($tipos['data'])) {
-                        $tipos = $tipos['data'];
-                    }
-                    if (is_array($tipos) && $tipos !== []) {
-                        Cache::put($cacheKey, $tipos, 3600);
-
-                        return $tipos;
-                    }
+                    Cache::put($cacheKey, $tipos, 3600);
+                    return $tipos;
                 }
             } catch (\Exception $e) {
                 Log::warning('Error obteniendo tipos transporte: ' . $e->getMessage());
             }
         }
 
-        $local = LocalOrgTrackFallback::tiposTransporteList();
-        if ($local !== []) {
-            return $local;
-        }
-
-        return is_array($cached) ? $cached : [];
+        return $cached ?? [];
     }
 
     /**

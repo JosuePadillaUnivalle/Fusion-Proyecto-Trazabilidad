@@ -27,14 +27,7 @@
 @section('content')
 <div class="modulo-inv page-insumos">
 
-    @if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show shadow-sm">
-        <button type="button" class="close" data-dismiss="alert">&times;</button>
-        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
-    </div>
-    @endif
-
-    <div class="row mb-2">
+<div class="row mb-2">
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-green">
                 <div class="inner">
@@ -70,41 +63,27 @@
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-yellow">
                 <div class="inner">
-                    <h3>Bs. {{ number_format($stats['valor_total'], 0) }}</h3>
-                    <p>Valor en stock</p>
+                    <h3>≤ {{ $umbral ?? 5 }}</h3>
+                    <p>Umbral de alerta</p>
                 </div>
-                <div class="icon"><i class="fas fa-coins"></i></div>
-                <span class="small-box-footer">Stock × precio unitario</span>
+                <div class="icon"><i class="fas fa-bell"></i></div>
+                <span class="small-box-footer">Aviso cuando el stock llega a {{ $umbral ?? 5 }} o menos</span>
             </div>
         </div>
     </div>
 
     <div class="card card-outline card-success card-modulo-main elevation-1">
-        <div class="card-header">
-            <h3 class="card-title mb-0">
-                <i class="fas fa-boxes text-success mr-1"></i>
-                Insumos
-                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $insumos->total() }} registros</span>
-            </h3>
-            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
-                <div class="btn-group btn-group-sm view-toggle mr-1">
-                    <button type="button" class="btn btn-default" id="btnCardView" title="Tarjetas">
-                        <i class="fas fa-th-large"></i>
-                    </button>
-                    <button type="button" class="btn btn-default active" id="btnTableView" title="Tabla">
-                        <i class="fas fa-list"></i>
-                    </button>
-                </div>
-                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosInsumosPanel" title="Filtros">
-                    <i class="fas fa-filter"></i>
-                </button>
-                @can('inventario.create')
-                <a href="{{ route('insumos.create') }}" class="btn btn-success btn-sm">
-                    <i class="fas fa-plus mr-1"></i> Nuevo
-                </a>
-                @endcan
-            </div>
-        </div>
+        <x-modulo-index-header
+            titulo="Insumos"
+            icono="fa-boxes"
+            :registros="$insumos->total()"
+            filtros-target="#filtrosInsumosPanel"
+            :view-toggle="true"
+            view-default="table"
+            :nuevo-href="route('insumos.create')"
+            nuevo-text="Nuevo Insumo"
+            nuevo-can="inventario.create"
+        />
 
         <div id="filtrosInsumosPanel" class="filtros-panel collapse">
             <div class="row">
@@ -144,12 +123,8 @@
                         <option value="high">Stock alto</option>
                     </select>
                 </div>
-                <div class="col-lg-2 col-md-6 mb-2 d-flex align-items-end">
-                    <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btnLimpiarFiltros">
-                        <i class="fas fa-times mr-1"></i> Limpiar
-                    </button>
-                </div>
             </div>
+            <x-filtros-client-actions />
         </div>
 
         <div id="tableView" class="table-responsive">
@@ -160,19 +135,14 @@
                         <th>Tipo</th>
                         <th>Unidad</th>
                         <th>Stock</th>
-                        <th>Mínimo</th>
+                        <th>Estado</th>
                         <th class="text-center" style="width: 110px;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($insumos as $i)
                         @php
-                            $rowStockClass = 'high';
-                            if ($i->stock <= $i->stockminimo) {
-                                $rowStockClass = 'low';
-                            } elseif ($i->stock < $i->stockminimo * 1.5) {
-                                $rowStockClass = 'medium';
-                            }
+                            $rowStockClass = \App\Support\InsumoCatalogo::claseStock((float) $i->stock);
                         @endphp
                         <tr class="search-item-row"
                             data-nombre="{{ strtolower($i->nombre) }}"
@@ -187,7 +157,15 @@
                                     {{ number_format($i->stock, 2) }}
                                 </span>
                             </td>
-                            <td>{{ number_format($i->stockminimo, 2) }}</td>
+                            <td>
+                                @if($rowStockClass === 'low')
+                                    <span class="text-danger small font-weight-bold"><i class="fas fa-exclamation-triangle mr-1"></i>Alerta</span>
+                                @elseif($rowStockClass === 'medium')
+                                    <span class="text-warning small">Atención</span>
+                                @else
+                                    <span class="text-success small">Normal</span>
+                                @endif
+                            </td>
                             <td class="text-center">
                                 <div class="btn-group btn-group-sm btn-actions">
                                     <a href="{{ route('insumos.show', $i) }}" class="btn btn-default" title="Ver"><i class="fas fa-eye text-info"></i></a>
@@ -221,21 +199,16 @@
         <div id="cardView" style="display: none;">
             @forelse($insumos as $i)
                 @php
-                    $stockClass = 'high';
-                    if ($i->stock <= $i->stockminimo) {
-                        $stockClass = 'low';
-                    } elseif ($i->stock < $i->stockminimo * 1.5) {
-                        $stockClass = 'medium';
-                    }
+                    $stockClass = \App\Support\InsumoCatalogo::claseStock((float) $i->stock);
                     $icon = 'box';
-                    $tipo = strtolower($i->tipo->nombre ?? '');
-                    if (str_contains($tipo, 'fertil')) {
-                        $icon = 'flask';
-                    } elseif (str_contains($tipo, 'semilla')) {
-                        $icon = 'seedling';
-                    } elseif (str_contains($tipo, 'pest')) {
-                        $icon = 'bug';
-                    }
+                    $slugTipo = \App\Support\InsumoCatalogo::slugFromNombreTipo($i->tipo->nombre ?? '');
+                    $icon = match ($slugTipo) {
+                        'material_siembra' => 'seedling',
+                        'fertilizantes' => 'flask',
+                        'pesticidas' => 'bug',
+                        'material_riego' => 'tint',
+                        default => 'box',
+                    };
                     $outline = $stockClass === 'low' ? 'danger' : ($stockClass === 'medium' ? 'warning' : 'success');
                 @endphp
                 <div class="search-item border-bottom"
@@ -260,10 +233,8 @@
                                     <span class="mx-2 text-muted">|</span>
                                     <i class="fas fa-balance-scale text-muted mr-1"></i>{{ $i->unidadMedida->nombre ?? '—' }}
                                     <span class="mx-2 text-muted">|</span>
-                                    <i class="fas fa-level-down-alt text-muted mr-1"></i>Mín: {{ number_format($i->stockminimo, 2) }}
-                                    @if($i->preciounitario)
-                                    <span class="mx-2 text-muted">|</span>
-                                    <i class="fas fa-coins text-muted mr-1"></i>Bs. {{ number_format($i->preciounitario, 2) }}
+                                    @if($stockClass === 'low')
+                                    <span class="mx-2 text-danger font-weight-bold">| Alerta (≤ {{ $umbral ?? 5 }})</span>
                                     @endif
                                 </span>
                             </div>
@@ -288,8 +259,11 @@
         </div>
 
         @if($insumos->hasPages())
-        <div class="card-footer bg-white d-flex justify-content-end py-2">
-            {{ $insumos->links() }}
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap py-2">
+            <small class="text-muted mb-2 mb-sm-0">
+                Mostrando {{ $insumos->firstItem() }}–{{ $insumos->lastItem() }} de {{ $insumos->total() }}
+            </small>
+            <div class="mb-0">{{ $insumos->links() }}</div>
         </div>
         @endif
     </div>
@@ -337,6 +311,7 @@ $(function () {
 
     $('#searchInput').on('keyup', aplicarFiltros);
     $('#filterTipo, #filterUnidad, #filterStock').on('change', aplicarFiltros);
+    $('#btnAplicarFiltros').on('click', aplicarFiltros);
 
     $('#btnLimpiarFiltros').on('click', function () {
         $('#searchInput').val('');

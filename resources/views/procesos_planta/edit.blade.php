@@ -1,0 +1,56 @@
+@extends('layouts.app')
+
+@section('title', 'Editar proceso | Fusion-Proyectos')
+@section('page_title', 'Editar proceso')
+
+@section('breadcrumbs')
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('procesos-planta.index') }}">Procesos de planta</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('procesos-planta.show', $proceso) }}">{{ $proceso->nombre }}</a></li>
+    <li class="breadcrumb-item active">Editar</li>
+@endsection
+
+@push('styles')
+@include('partials.modulo-produccion-styles')
+@endpush
+
+@section('content')
+<div class="modulo-prod">
+    <div class="card card-outline card-success card-modulo-main elevation-1">
+        <div class="card-header">
+            <h3 class="card-title mb-0"><i class="fas fa-edit text-success mr-1"></i> Editar: {{ $proceso->nombre }}</h3>
+        </div>
+
+        <form method="POST" action="{{ route('procesos-planta.update', $proceso) }}">
+            @csrf
+            @method('PUT')
+            <div class="card-body">
+                @if($errors->any())
+                    <div class="alert alert-danger">
+                        <ul class="mb-0">
+                            @foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                <div class="form-group">
+                    <label>Nombre <span class="text-danger">*</span></label>
+                    <input name="nombre" class="form-control" value="{{ old('nombre', $proceso->nombre) }}" required maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea name="descripcion" class="form-control" rows="4">{{ old('descripcion', $proceso->descripcion) }}</textarea>
+                </div>
+                <div class="custom-control custom-checkbox">
+                    <input type="checkbox" class="custom-control-input" id="activoProceso" name="activo" value="1" @checked(old('activo', $proceso->activo))>
+                    <label class="custom-control-label" for="activoProceso">Proceso activo</label>
+                </div>
+            </div>
+            <div class="card-footer d-flex justify-content-between">
+                <a href="{{ route('procesos-planta.show', $proceso) }}" class="btn btn-outline-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-success"><i class="fas fa-save mr-1"></i> Guardar cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endsection

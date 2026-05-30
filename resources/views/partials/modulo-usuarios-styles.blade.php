@@ -35,12 +35,6 @@
 .modulo-usu .small-box-purple {
     background: linear-gradient(135deg, #6f42c1, #8e64e8) !important;
 }
-.modulo-usu .small-box-footer {
-    background: rgba(0, 0, 0, 0.12);
-    color: rgba(255, 255, 255, 0.9);
-    position: relative;
-    z-index: 1;
-}
 .modulo-usu .card-modulo-main {
     border-top: 3px solid #2c5530;
 }

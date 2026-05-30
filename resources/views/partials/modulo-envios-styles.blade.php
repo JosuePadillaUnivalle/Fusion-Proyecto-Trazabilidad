@@ -52,12 +52,6 @@
     background: linear-gradient(135deg, #007bff, #17a2b8) !important;
     color: #fff;
 }
-.modulo-env .small-box-footer {
-    background: rgba(0, 0, 0, 0.12);
-    color: rgba(255, 255, 255, 0.9);
-    position: relative;
-    z-index: 1;
-}
 .modulo-env .card-modulo-main {
     border-top: 3px solid #2c5530;
 }

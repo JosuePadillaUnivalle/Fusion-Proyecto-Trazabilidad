@@ -22,7 +22,6 @@ class LoteInsumoController extends Controller
             'lotes' => (clone $q)->distinct()->count('loteid'),
             'insumos' => (clone $q)->distinct()->count('insumoid'),
             'cantidad_total' => (float) (clone $q)->sum('cantidadusada'),
-            'costo_total' => (float) (clone $q)->sum('costototal'),
         ];
 
         $estadosFiltro = (clone $q)
@@ -39,7 +38,7 @@ class LoteInsumoController extends Controller
             ->orderBy('usuario.nombre')
             ->pluck('usuario.nombre');
 
-        $loteInsumos = LoteInsumo::with(['lote', 'insumo', 'usuario', 'estado'])
+        $loteInsumos = LoteInsumo::with(['lote', 'insumo.unidadMedida', 'usuario', 'estado'])
             ->orderBy('loteinsumoid', 'desc')
             ->paginate(15);
 
@@ -48,15 +47,10 @@ class LoteInsumoController extends Controller
 
     public function create()
     {
-        // Solo lotes con usuario asignado
-        $lotes = Lote::with('usuario')->get();
+        $loteLabel = old('loteid') ? Lote::find(old('loteid'))?->nombre : null;
+        $insumoLabel = old('insumoid') ? Insumo::find(old('insumoid'))?->nombre : null;
 
-        // Solo insumos con stock disponible
-        $insumos = Insumo::with('unidadMedida')
-            ->where('stock', '>', 0)
-            ->get();
-
-        return view('lote_insumos.create', compact('lotes', 'insumos'));
+        return view('lote_insumos.create', compact('loteLabel', 'insumoLabel'));
     }
 
     public function store(Request $request)
@@ -66,6 +60,9 @@ class LoteInsumoController extends Controller
             'insumoid' => 'required|exists:insumo,insumoid',
             'cantidadusada' => 'required|numeric|gt:0',
             'observaciones' => 'nullable|string|max:200',
+        ], [
+            'loteid.required' => 'Primero selecciona un lote',
+            'insumoid.required' => 'Primero selecciona un insumo',
         ]);
 
         DB::beginTransaction();
@@ -88,17 +85,13 @@ class LoteInsumoController extends Controller
             $insumo->stock -= $data['cantidadusada'];
             $insumo->save();
 
-            // Calcular costo total automáticamente
-            $costoTotal = $data['cantidadusada'] * ($insumo->preciounitario ?? 0);
-
-            // Crear el registro con usuario automático del lote y fecha actual
             $loteInsumo = LoteInsumo::create([
                 'loteid' => $data['loteid'],
                 'insumoid' => $data['insumoid'],
-                'usuarioid' => $lote->usuarioid, // Usuario responsable del lote (automático)
+                'usuarioid' => $lote->usuarioid,
                 'cantidadusada' => $data['cantidadusada'],
-                'fechauo' => now(), // Fecha actual automática
-                'costototal' => $costoTotal,
+                'fechauo' => now(),
+                'costototal' => 0,
                 'estadoloteinsumoid' => $this->idEstadoAplicado(),
                 'observaciones' => $data['observaciones'],
             ]);
@@ -111,7 +104,7 @@ class LoteInsumoController extends Controller
             $mensaje = "Aplicación registrada. Se descontaron {$data['cantidadusada']} {$insumo->unidadMedida->abreviatura} de {$insumo->nombre}.";
 
             // Alerta si el stock quedó bajo
-            if ($insumo->stock <= $insumo->stockminimo) {
+            if ($insumo->stockBajo()) {
                 $mensaje .= " ⚠️ ALERTA: Stock bajo ({$insumo->stock} {$insumo->unidadMedida->abreviatura})";
             }
 
@@ -186,17 +179,13 @@ class LoteInsumoController extends Controller
 
             $insumo->save();
 
-            // Calcular nuevo costo total
-            $costoTotal = $data['cantidadusada'] * ($insumo->preciounitario ?? 0);
-
-            // Actualizar registro
             $loteInsumo->update([
                 'loteid' => $data['loteid'],
                 'insumoid' => $data['insumoid'],
-                'usuarioid' => $lote->usuarioid, // Usuario del lote
+                'usuarioid' => $lote->usuarioid,
                 'cantidadusada' => $data['cantidadusada'],
-                'costototal' => $costoTotal,
-                'estadoloteinsumoid' => $data['estadoloteinsumoid'],
+                'costototal' => 0,
+                'estadoloteinsumoid' => $data['estadoloteinsumoid'] ?? $this->idEstadoAplicado(),
                 'observaciones' => $data['observaciones'],
             ]);
 

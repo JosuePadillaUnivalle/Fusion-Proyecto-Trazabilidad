@@ -50,6 +50,9 @@
         <a href="{{ route('procesos-planta.index') }}" class="btn btn-outline-secondary btn-sm">
             <i class="fas fa-arrow-left mr-1"></i> Volver al catálogo
         </a>
+        <a href="{{ route('procesos-planta.edit', $proceso) }}" class="btn btn-primary btn-sm">
+            <i class="fas fa-edit mr-1"></i> Editar proceso
+        </a>
     </div>
 
     <div class="card card-outline card-success card-modulo-main elevation-1">

@@ -15,23 +15,21 @@ class Almacen extends Model
 
     protected $fillable = [
         'nombre',
-        'codigo',
         'descripcion',
         'ubicacion',
-        'direccionlogisticaid',
         'capacidad',
         'unidadmedidaid',
         'tipoalmacenid',
+        'ambito',
         'activo',
     ];
 
     protected $casts = [
-        'almacenid'             => 'integer',
-        'direccionlogisticaid'  => 'integer',
-        'capacidad'             => 'float',
-        'unidadmedidaid'        => 'integer',
-        'tipoalmacenid'         => 'integer',
-        'activo'                => 'boolean',
+        'almacenid'      => 'integer',
+        'capacidad'      => 'float',
+        'unidadmedidaid' => 'integer',
+        'tipoalmacenid'  => 'integer',
+        'activo'         => 'boolean',
     ];
 
     protected $hidden = [
@@ -58,25 +56,5 @@ class Almacen extends Model
     public function usuarios()
     {
         return $this->hasMany(Usuario::class, 'almacenid', 'almacenid');
-    }
-
-    public function direccionLogistica()
-    {
-        return $this->belongsTo(DireccionLogistica::class, 'direccionlogisticaid', 'direccionlogisticaid');
-    }
-
-    public function almacenProductos()
-    {
-        return $this->hasMany(AlmacenProducto::class, 'almacenid', 'almacenid');
-    }
-
-    public function inventarioAlmacenEnvios()
-    {
-        return $this->hasMany(InventarioAlmacenEnvio::class, 'almacenid', 'almacenid');
-    }
-
-    public function almacenUsuarios()
-    {
-        return $this->hasMany(AlmacenUsuario::class, 'almacenid', 'almacenid');
     }
 }

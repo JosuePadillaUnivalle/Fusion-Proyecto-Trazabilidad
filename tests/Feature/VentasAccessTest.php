@@ -43,21 +43,13 @@ class VentasAccessTest extends TestCase
         $this->get(route('ventas.create'))->assertOk();
     }
 
-    public function test_operador_puede_ver_y_no_crear_ventas(): void
-    {
-        $operador = $this->createUser('operador');
-        $this->actingAs($operador);
-
-        $this->get(route('ventas.index'))->assertOk();
-        $this->get(route('ventas.create'))->assertForbidden();
-    }
-
-    public function test_agricultor_no_accede_a_ventas(): void
+    public function test_agricultor_puede_ver_ventas_sin_crear(): void
     {
         $agricultor = $this->createUser('agricultor');
         $this->actingAs($agricultor);
 
-        $this->get(route('ventas.index'))->assertForbidden();
+        $this->get(route('ventas.index'))->assertOk();
+        $this->get(route('ventas.create'))->assertForbidden();
     }
 }
 

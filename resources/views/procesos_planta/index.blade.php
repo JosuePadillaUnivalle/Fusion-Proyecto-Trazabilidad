@@ -15,25 +15,6 @@
 @section('content')
 <div class="modulo-prod">
 
-    @if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show">
-        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
-        <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
-    </div>
-    @endif
-
-    @if($errors->any())
-    <div class="alert alert-danger alert-dismissible fade show">
-        <strong><i class="fas fa-exclamation-triangle mr-1"></i> No se pudo guardar el proceso.</strong>
-        <ul class="mb-0 mt-2">
-            @foreach($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-        <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
-    </div>
-    @endif
-
     <div class="row mb-2">
         <div class="col-lg-4 col-6">
             <div class="small-box small-box-green">
@@ -67,51 +48,15 @@
         </div>
     </div>
 
-    <div class="card card-outline card-success card-form-modulo elevation-1 mb-3">
-        <div class="card-header">
-            <h3 class="card-title mb-0"><i class="fas fa-plus-circle mr-1"></i> Nuevo proceso</h3>
-        </div>
-        <div class="card-body">
-            <form method="POST" action="{{ route('procesos-planta.store') }}">
-                @csrf
-                <div class="row align-items-end">
-                    <div class="col-md-4 mb-2 mb-md-0">
-                        <label class="small text-muted mb-1">Nombre</label>
-                        <input name="nombre" class="form-control" placeholder="Ej. Lavado, Secado…" value="{{ old('nombre') }}" required>
-                    </div>
-                    <div class="col-md-5 mb-2 mb-md-0">
-                        <label class="small text-muted mb-1">Descripción</label>
-                        <input name="descripcion" class="form-control" placeholder="Opcional" value="{{ old('descripcion') }}">
-                    </div>
-                    <div class="col-md-2 mb-2 mb-md-0">
-                        <div class="custom-control custom-checkbox">
-                            <input type="checkbox" class="custom-control-input" id="activoProceso" name="activo" value="1" checked>
-                            <label class="custom-control-label" for="activoProceso">Activo</label>
-                        </div>
-                    </div>
-                    <div class="col-md-1">
-                        <button type="submit" class="btn btn-success btn-block">
-                            <i class="fas fa-save"></i>
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <div class="card card-outline card-success card-modulo-main elevation-1">
-        <div class="card-header">
-            <h3 class="card-title mb-0">
-                <i class="fas fa-industry text-success mr-1"></i>
-                Catálogo de procesos
-                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $procesos->total() }} registros</span>
-            </h3>
-            <div class="card-tools">
-                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosProcesosPanel" title="Filtros">
-                    <i class="fas fa-filter"></i>
-                </button>
-            </div>
-        </div>
+        <x-modulo-index-header
+            titulo="Catálogo de procesos"
+            icono="fa-industry"
+            :registros="$procesos->total()"
+            filtros-target="#filtrosProcesosPanel"
+            :nuevo-href="route('procesos-planta.create')"
+            nuevo-text="Nuevo proceso"
+        />
 
         <div id="filtrosProcesosPanel" class="filtros-panel collapse {{ request()->hasAny(['buscar','estado']) ? 'show' : '' }}">
             <form method="GET" action="{{ route('procesos-planta.index') }}">
@@ -128,9 +73,8 @@
                             <option value="inactivo" @selected(request('estado') === 'inactivo')>Inactivos</option>
                         </select>
                     </div>
-                    <div class="col-md-4 d-flex" style="gap: 8px;">
-                        <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-search mr-1"></i> Filtrar</button>
-                        <a href="{{ route('procesos-planta.index') }}" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+                    <div class="col-12">
+                        <x-filtros-form-actions :limpiar-url="route('procesos-planta.index', ['filtros_abiertos' => 1])" />
                     </div>
                 </div>
             </form>
@@ -143,7 +87,7 @@
                         <th>Nombre</th>
                         <th>Descripción</th>
                         <th style="width: 100px;">Estado</th>
-                        <th style="width: 100px;">Acciones</th>
+                        <th style="width: 120px;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -162,6 +106,9 @@
                             <a href="{{ route('procesos-planta.show', $proceso) }}" class="btn btn-sm btn-outline-info" title="Ver detalle">
                                 <i class="fas fa-eye"></i>
                             </a>
+                            <a href="{{ route('procesos-planta.edit', $proceso) }}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
                             <form method="POST" action="{{ route('procesos-planta.destroy', $proceso) }}" class="d-inline"
                                 onsubmit="return confirm('¿Eliminar este proceso?')">
                                 @csrf
@@ -176,7 +123,10 @@
                     <tr id="filaVaciaProcesos">
                         <td colspan="4" class="text-center text-muted py-4">
                             <i class="fas fa-industry fa-2x mb-2 d-block"></i>
-                            Sin procesos registrados. Agrega uno para vincularlo en el registro de producción.
+                            Sin procesos registrados.
+                            <a href="{{ route('procesos-planta.create') }}" class="btn btn-success btn-sm mt-2 d-inline-block">
+                                <i class="fas fa-plus mr-1"></i> Registrar primer proceso
+                            </a>
                         </td>
                     </tr>
                     @endforelse

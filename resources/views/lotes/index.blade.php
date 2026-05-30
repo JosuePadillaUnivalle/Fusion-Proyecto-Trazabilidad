@@ -9,15 +9,19 @@
 @endsection
 
 @php
-    $estadoBadge = fn ($nombre) => match (strtolower($nombre ?? '')) {
-        'en producción' => 'success',
+    use App\Support\EstadoLoteCatalogo;
+
+    $estadoBadge = fn ($nombre) => match (EstadoLoteCatalogo::slugFromNombre($nombre) ?? '') {
+        'planificado' => 'secondary',
         'sembrado' => 'primary',
+        'en_crecimiento' => 'success',
+        'listo_para_cosecha' => 'info',
         'cosechado' => 'warning',
-        'en preparación' => 'info',
-        'en descanso' => 'dark',
+        'finalizado' => 'dark',
         default => 'secondary',
     };
     $filtrosActivos = collect($filtros ?? [])->filter(fn ($v) => $v !== null && $v !== '');
+    $filtrosAbiertos = EstadoLoteCatalogo::filtrosPanelAbierto(request(), $filtrosActivos->isNotEmpty());
 @endphp
 
 @push('styles')
@@ -78,6 +82,12 @@
     padding: 0.2rem 0.45rem;
     line-height: 1.2;
 }
+.page-lotes .card-header .badge-registros {
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.35em 0.65em;
+    white-space: nowrap;
+}
 .page-lotes .sync-hint {
     font-size: 0.8rem;
     color: #6c757d;
@@ -88,14 +98,7 @@
 @section('content')
 <div class="modulo-la page-lotes">
 
-    @if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show shadow-sm">
-        <button type="button" class="close" data-dismiss="alert">&times;</button>
-        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
-    </div>
-    @endif
-
-    <div class="row mb-2">
+<div class="row mb-2">
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-green">
                 <div class="inner">
@@ -110,7 +113,7 @@
             <div class="small-box small-box-blue">
                 <div class="inner">
                     <h3>{{ $stats['en_produccion'] }}</h3>
-                    <p>En producción</p>
+                    <p>En crecimiento</p>
                 </div>
                 <div class="icon"><i class="fas fa-leaf"></i></div>
                 <span class="small-box-footer">Lotes activos</span>
@@ -140,34 +143,26 @@
         </div>
     </div>
 
-    <div class="card card-outline card-success card-modulo-main elevation-1">
-        <div class="card-header">
-            <h3 class="card-title mb-0">
-                <i class="fas fa-seedling text-success mr-1"></i>
-                Lotes
-                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $lotes->total() }} registros</span>
-            </h3>
-            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
-                <div class="btn-group btn-group-sm view-toggle mr-1">
-                    <button type="button" class="btn btn-default" id="btnCardView" title="Tarjetas">
-                        <i class="fas fa-th-large"></i>
-                    </button>
-                    <button type="button" class="btn btn-default active" id="btnTableView" title="Tabla">
-                        <i class="fas fa-list"></i>
-                    </button>
-                </div>
-                <button type="button" class="btn btn-tool" data-card-widget="collapse" data-toggle="collapse" data-target="#filtrosLotesPanel" title="Filtros">
-                    <i class="fas fa-filter"></i>
-                </button>
-                @can('lotes.create')
-                <a href="{{ route('lotes.create') }}" class="btn btn-success btn-sm">
-                    <i class="fas fa-plus mr-1"></i> Nuevo
-                </a>
-                @endcan
-            </div>
-        </div>
+    <div class="alert alert-light border small mb-3">
+        <i class="fas fa-info-circle text-success mr-1"></i>
+        <strong>Estados del lote:</strong> al crear queda en <em>Planificado</em>.
+        Pasa a <em>Sembrado</em> al completar siembra; a <em>En crecimiento</em> con riego, fumigación o fertilización;
+        y a <em>Cosechado</em> al registrar la cosecha. También puedes cambiarlo manualmente al editar el lote.
+    </div>
 
-        <div id="filtrosLotesPanel" class="filtros-panel collapse {{ $filtrosActivos->isNotEmpty() ? 'show' : '' }}">
+    <div class="card card-outline card-success card-modulo-main elevation-1">
+        <x-modulo-index-header
+            titulo="Lotes"
+            icono="fa-seedling"
+            :registros="$lotes->total()"
+            filtros-target="#filtrosLotesPanel"
+            :view-toggle="true"
+            view-default="table"
+            :nuevo-href="route('lotes.create')"
+            nuevo-can="lotes.create"
+        />
+
+        <div id="filtrosLotesPanel" class="filtros-panel collapse {{ $filtrosAbiertos ? 'show' : '' }}">
             <form method="GET" action="{{ route('lotes.index') }}">
                 <div class="row">
                     <div class="col-lg-4 col-md-6 mb-2">
@@ -194,12 +189,17 @@
                         <select name="estadolotetipoid" class="form-control form-control-sm">
                             <option value="">Todos</option>
                             @foreach($estados as $e)
-                                <option value="{{ $e->estadolotetipoid }}" @selected(($filtros['estadolotetipoid'] ?? '') == $e->estadolotetipoid)>{{ ucfirst($e->nombre) }}</option>
+                                @php $slug = \App\Support\EstadoLoteCatalogo::slugFromNombre($e->nombre); @endphp
+                                <option value="{{ $e->estadolotetipoid }}"
+                                    @selected(($filtros['estadolotetipoid'] ?? '') == $e->estadolotetipoid)
+                                    title="{{ $slug ? \App\Support\EstadoLoteCatalogo::descripcion($slug) : '' }}">
+                                    {{ $e->nombre }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
                     <div class="col-lg-2 col-md-3 col-6 mb-2">
-                        <label class="small text-muted mb-1">Propietario</label>
+                        <label class="small text-muted mb-1">Encargado</label>
                         <select name="usuarioid" class="form-control form-control-sm">
                             <option value="">Todos</option>
                             @foreach($usuarios as $u)
@@ -216,19 +216,10 @@
                         </select>
                     </div>
                 </div>
-                <div class="d-flex flex-wrap align-items-center mt-1" style="gap: 8px;">
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="fas fa-search mr-1"></i> Aplicar
-                    </button>
-                    <a href="{{ route('lotes.index') }}" class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-times mr-1"></i> Limpiar
-                    </a>
-                    @if($filtrosActivos->isNotEmpty())
-                    <span class="small text-muted ml-1">
-                        <i class="fas fa-filter mr-1"></i>{{ $lotes->total() }} resultado(s)
-                    </span>
-                    @endif
-                </div>
+                <x-filtros-form-actions
+                    :limpiar-url="route('lotes.index', ['filtros_abiertos' => 1])"
+                    :resultados="$filtrosActivos->isNotEmpty() ? $lotes->total() : null"
+                />
             </form>
         </div>
 
@@ -238,12 +229,12 @@
                 <thead>
                     <tr>
                         <th>Lote</th>
-                        <th>Propietario</th>
+                        <th>Encargado</th>
                         <th>Cultivo</th>
                         <th>Estado</th>
                         <th class="text-right">Superficie</th>
                         <th>GPS</th>
-                        <th class="text-center" style="width: 110px;">Acciones</th>
+                        <th class="text-center" style="width: 140px;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -274,6 +265,7 @@
                                     <a href="{{ route('lotes.show', $l) }}" class="btn btn-default" title="Ver"><i class="fas fa-eye text-info"></i></a>
                                     @can('lotes.update')
                                     <a href="{{ route('lotes.edit', $l) }}" class="btn btn-default" title="Editar"><i class="fas fa-edit text-warning"></i></a>
+                                    @include('lotes.partials.btn-cambiar-estado', ['lote' => $l])
                                     @endcan
                                     @can('lotes.delete')
                                     <form action="{{ route('lotes.destroy', $l) }}" method="POST" class="d-inline on-submit-confirm">
@@ -329,6 +321,7 @@
                         <a href="{{ route('lotes.show', $l) }}" class="btn btn-default"><i class="fas fa-eye text-info"></i></a>
                         @can('lotes.update')
                         <a href="{{ route('lotes.edit', $l) }}" class="btn btn-default"><i class="fas fa-edit text-warning"></i></a>
+                        @include('lotes.partials.btn-cambiar-estado', ['lote' => $l])
                         @endcan
                         @can('lotes.delete')
                         <form action="{{ route('lotes.destroy', $l) }}" method="POST" class="d-inline on-submit-confirm">

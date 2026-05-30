@@ -1,6 +1,6 @@
 @extends('layouts.auth')
 
-@section('title', 'Iniciar Sesión | AgroNexus')
+@section('title', 'Iniciar Sesión | AgroFusion')
 
 @section('content')
 <div class="form-header">

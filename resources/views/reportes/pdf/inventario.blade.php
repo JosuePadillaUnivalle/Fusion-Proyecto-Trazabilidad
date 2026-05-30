@@ -3,13 +3,13 @@
 @section('content')
     <div class="report-title">
         <h2>Reporte de Inventario de Insumos</h2>
-        <p>Estado actual del stock en almacenes</p>
+        <p>Estado actual del stock — alerta automática ≤ {{ \App\Support\InsumoCatalogo::UMBRAL_ALERTA_STOCK }} unidades</p>
     </div>
 
     @php
+        $umbral = \App\Support\InsumoCatalogo::UMBRAL_ALERTA_STOCK;
         $totalItems = $datos->count();
-        $valorTotal = $datos->sum(fn($i) => $i->stock * ($i->preciounitario ?? 0));
-        $bajosDeStock = $datos->filter(fn($i) => $i->stock <= ($i->stockminimo ?? 0))->count();
+        $bajosDeStock = $datos->filter(fn ($i) => \App\Support\InsumoCatalogo::stockCritico((float) $i->stock))->count();
     @endphp
 
     <table class="summary-cards">
@@ -19,13 +19,12 @@
                 <span class="value">{{ $totalItems }}</span>
             </td>
             <td class="card">
-                <span class="label">Valorización Total</span>
-                <span class="value">Bs. {{ number_format($valorTotal, 2) }}</span>
+                <span class="label">Umbral de alerta</span>
+                <span class="value">≤ {{ $umbral }} u.</span>
             </td>
             <td class="card" style="{{ $bajosDeStock > 0 ? 'background:#fff3cd; border-color:#ffeeba;' : '' }}">
                 <span class="label">Alertas de Stock</span>
-                <span class="value" style="{{ $bajosDeStock > 0 ? 'color:#856404;' : '' }}">{{ $bajosDeStock }} Ítems
-                    Críticos</span>
+                <span class="value" style="{{ $bajosDeStock > 0 ? 'color:#856404;' : '' }}">{{ $bajosDeStock }} ítems críticos</span>
             </td>
         </tr>
     </table>
@@ -33,18 +32,18 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th style="width: 30%">Insumo / Descripción</th>
-                <th style="width: 15%">Tipo</th>
-                <th style="width: 15%" class="numeric">Stock Actual</th>
-                <th style="width: 15%" class="numeric">Mínimo</th>
+                <th style="width: 35%">Insumo / Descripción</th>
+                <th style="width: 20%">Tipo</th>
+                <th style="width: 20%" class="numeric">Stock actual</th>
                 <th style="width: 10%">Unidad</th>
-                <th style="width: 15%" class="numeric">Valor Unit.</th>
+                <th style="width: 15%">Estado</th>
             </tr>
         </thead>
         <tbody>
             @foreach($datos as $insumo)
                 @php
-                    $isLow = $insumo->stock <= ($insumo->stockminimo ?? 0);
+                    $isLow = \App\Support\InsumoCatalogo::stockCritico((float) $insumo->stock);
+                    $estado = $isLow ? 'Crítico' : (\App\Support\InsumoCatalogo::stockMedio((float) $insumo->stock) ? 'Atención' : 'Normal');
                 @endphp
                 <tr style="{{ $isLow ? 'background-color: #fff5f5;' : '' }}">
                     <td>
@@ -57,11 +56,8 @@
                     <td class="numeric" style="{{ $isLow ? 'color:#d32f2f; font-weight:bold;' : '' }}">
                         {{ number_format($insumo->stock, 2) }}
                     </td>
-                    <td class="numeric" style="color:#7f8c8d;">
-                        {{ number_format($insumo->stockminimo, 2) }}
-                    </td>
                     <td>{{ $insumo->unidadMedida->abreviatura ?? '' }}</td>
-                    <td class="numeric">{{ number_format($insumo->preciounitario ?? 0, 2) }}</td>
+                    <td>{{ $estado }}</td>
                 </tr>
             @endforeach
         </tbody>

@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Editar producción | Fusion-Proyectos')
-@section('page_title', 'Editar Producción')
+@section('title', 'Editar cosecha | AgroFusion')
+@section('page_title', 'Editar Cosecha')
 
 @section('breadcrumbs')
-    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}" style="color: #2c5530;">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="{{ route('producciones.index') }}" style="color: #2c5530;">Producción</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('producciones.index') }}">Registro de Cosechas</a></li>
     <li class="breadcrumb-item active">Editar</li>
 @endsection
 
@@ -111,7 +111,7 @@
 @section('content')
     <!-- Header -->
     <div class="form-header">
-        <h2><i class="fas fa-edit mr-2"></i>Editar Producción</h2>
+        <h2><i class="fas fa-edit mr-2"></i>Editar Cosecha</h2>
         <p class="mb-0 mt-2" style="opacity: 0.9;">
             <i class="fas fa-map-marker-alt mr-1"></i> {{ $produccion->lote->nombre ?? 'Lote' }}
             @if($produccion->lote && $produccion->lote->cultivo)
@@ -120,7 +120,7 @@
         </p>
     </div>
 
-    <form action="{{ route('producciones.update', $produccion) }}" method="POST" enctype="multipart/form-data">
+    <form action="{{ route('producciones.update', $produccion) }}" method="POST">
         @csrf
         @method('PUT')
 
@@ -158,34 +158,6 @@
                         </div>
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label><i class="fas fa-cogs mr-1"></i>Proceso de planta</label>
-                                <select name="procesoplantaid" class="form-control">
-                                    <option value="">-- Sin proceso específico --</option>
-                                    @foreach($procesos as $proceso)
-                                        <option value="{{ $proceso->procesoplantaid }}" {{ (int) $produccion->procesoplantaid === (int) $proceso->procesoplantaid ? 'selected' : '' }}>
-                                            {{ $proceso->nombre }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label><i class="fas fa-industry mr-1"></i>Máquina usada</label>
-                                <select name="maquinaplantaid" class="form-control">
-                                    <option value="">-- Sin máquina específica --</option>
-                                    @foreach($maquinas as $maquina)
-                                        <option value="{{ $maquina->maquinaplantaid }}" {{ (int) $produccion->maquinaplantaid === (int) $maquina->maquinaplantaid ? 'selected' : '' }}>
-                                            {{ $maquina->nombre }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Cantidad y Destino -->
@@ -235,38 +207,6 @@
                     </div>
                 </div>
 
-                <!-- Imagen y Observaciones -->
-                <div class="form-card">
-                    <h5><i class="fas fa-image mr-2"></i>Imagen y Observaciones</h5>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label><i class="fas fa-camera mr-1"></i> Imagen</label>
-                                <input type="file" name="imagen" class="form-control" accept="image/*">
-                                @if($produccion->imagenurl)
-                                    <small class="text-muted d-block mt-2">
-                                        <i class="fas fa-image mr-1"></i> Imagen actual: {{ basename($produccion->imagenurl) }}
-                                    </small>
-                                @endif
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            @if($produccion->imagenurl)
-                                <div class="text-center">
-                                    <img src="{{ asset($produccion->imagenurl) }}" alt="Imagen actual"
-                                        style="max-height: 100px; border-radius: 8px;">
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-
-                    <div class="form-group mb-0">
-                        <label><i class="fas fa-comment mr-1"></i> Observaciones</label>
-                        <textarea name="observaciones" class="form-control" rows="3"
-                            placeholder="Notas adicionales sobre la cosecha...">{{ $produccion->observaciones }}</textarea>
-                    </div>
-                </div>
             </div>
 
             <!-- Panel Lateral -->

@@ -19,7 +19,7 @@
 
     <div class="env-page-intro mb-3">
         <strong><i class="fas fa-chart-pie text-success mr-1"></i> Reportes de distribución</strong>
-        <span class="d-block small text-muted mt-1">Filtra cada tabla y haz clic en una fila para ver los envíos o ir al detalle.</span>
+        <span class="d-block small text-muted mt-1">Filtra cada tabla, haz clic en una fila para desplegar sus envíos y usa el buscador dentro del detalle para acotar la lista.</span>
     </div>
 
     <div class="row mb-2">
@@ -86,6 +86,7 @@
                 <div class="col-md-5 mb-2 mb-md-0">
                     <label class="text-muted">Buscar transportista</label>
                     <input type="text" id="searchTopTransportista" class="form-control form-control-sm" placeholder="Nombre del transportista...">
+                    <small class="form-text text-muted">Al expandir un transportista podrás filtrar sus envíos abajo.</small>
                 </div>
                 <div class="col-md-3">
                     <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btnLimpiarTopTransportista">
@@ -112,11 +113,13 @@
                         $lista = $enviosPorTransportistaId[$t->transportista_usuarioid] ?? [];
                         $uid = 'rep-trans-'.$t->transportista_usuarioid;
                     @endphp
-                    <tr class="fila-expandible fila-filtro-rep"
+                    <tr class="fila-estado-toggle fila-filtro-rep"
                         data-texto="{{ strtolower($nombre) }}"
-                        data-toggle="collapse"
                         data-target="#{{ $uid }}"
-                        aria-expanded="false">
+                        role="button"
+                        tabindex="0"
+                        aria-expanded="false"
+                        aria-controls="{{ $uid }}">
                         <td><i class="fas fa-chevron-right chevron-estado"></i></td>
                         <td class="font-weight-bold">{{ $nombre }}</td>
                         <td class="text-right font-weight-bold">{{ $t->c }}</td>
@@ -127,7 +130,11 @@
                     <tr>
                         <td colspan="4" class="p-0 border-0">
                             <div class="collapse detalle-estado-envios" id="{{ $uid }}">
-                                @include('partials.envios-lista-detalle-collapse', ['lista' => $lista])
+                                @include('partials.envios-lista-detalle-collapse', [
+                                    'lista' => $lista,
+                                    'filtroId' => $uid,
+                                    'placeholderFiltro' => 'Código, remitente, estado o destino...',
+                                ])
                             </div>
                         </td>
                     </tr>
@@ -176,11 +183,13 @@
                                 $lista = $enviosPorEstado[$estado] ?? [];
                                 $uid = 'rep-est-'.preg_replace('/[^a-z0-9]+/', '-', $estado);
                             @endphp
-                            <tr class="fila-expandible fila-filtro-rep-est"
+                            <tr class="fila-estado-toggle fila-filtro-rep-est"
                                 data-texto="{{ $estado }}"
-                                data-toggle="collapse"
                                 data-target="#{{ $uid }}"
-                                aria-expanded="false">
+                                role="button"
+                                tabindex="0"
+                                aria-expanded="false"
+                                aria-controls="{{ $uid }}">
                                 <td><i class="fas fa-chevron-right chevron-estado"></i></td>
                                 <td class="text-capitalize">{{ $estado }}</td>
                                 <td class="text-right font-weight-bold">{{ $cant }}</td>
@@ -188,7 +197,7 @@
                             <tr>
                                 <td colspan="3" class="p-0 border-0">
                                     <div class="collapse detalle-estado-envios" id="{{ $uid }}">
-                                        @include('partials.envios-lista-detalle-collapse', ['lista' => $lista])
+                                        @include('partials.envios-lista-detalle-collapse', ['lista' => $lista, 'filtroId' => $uid])
                                         <div class="p-2 border-top bg-white text-right">
                                             <a href="{{ route('envios.seguimiento') }}?estado={{ urlencode($estado) }}" class="btn btn-sm btn-success">
                                                 <i class="fas fa-route mr-1"></i> Ver todos en seguimiento
@@ -242,11 +251,13 @@
                                 $lista = $enviosPorDestino[$destino] ?? [];
                                 $uid = 'rep-dest-'.md5($destino);
                             @endphp
-                            <tr class="fila-expandible fila-filtro-rep-dest"
+                            <tr class="fila-estado-toggle fila-filtro-rep-dest"
                                 data-texto="{{ strtolower($destino) }}"
-                                data-toggle="collapse"
                                 data-target="#{{ $uid }}"
-                                aria-expanded="false">
+                                role="button"
+                                tabindex="0"
+                                aria-expanded="false"
+                                aria-controls="{{ $uid }}">
                                 <td><i class="fas fa-chevron-right chevron-estado"></i></td>
                                 <td>{{ $destino }}</td>
                                 <td class="text-right font-weight-bold">{{ $cant }}</td>
@@ -254,7 +265,7 @@
                             <tr>
                                 <td colspan="3" class="p-0 border-0">
                                     <div class="collapse detalle-estado-envios" id="{{ $uid }}">
-                                        @include('partials.envios-lista-detalle-collapse', ['lista' => $lista])
+                                        @include('partials.envios-lista-detalle-collapse', ['lista' => $lista, 'filtroId' => $uid])
                                         <div class="p-2 border-top bg-white text-right">
                                             <a href="{{ route('envios.seguimiento') }}?destino={{ urlencode($destino) }}" class="btn btn-sm btn-success">
                                                 <i class="fas fa-route mr-1"></i> Ver todos en seguimiento
@@ -342,10 +353,52 @@ $(function () {
         limpiarId: 'btnLimpiarPorDestino'
     });
 
+    function aplicarFiltroDetalleEnvios(input) {
+        const listId = input.dataset.lista;
+        const ul = document.getElementById(listId);
+        if (!ul) return;
+        const q = (input.value || '').trim().toLowerCase();
+        let visibles = 0;
+        ul.querySelectorAll('.fila-detalle-envio').forEach(li => {
+            const match = !q || (li.dataset.texto || '').includes(q);
+            li.style.display = match ? '' : 'none';
+            if (match) visibles++;
+        });
+        const sin = ul.querySelector('.sin-coincidencias-detalle');
+        const total = ul.querySelectorAll('.fila-detalle-envio').length;
+        if (sin) sin.style.display = visibles === 0 && total > 0 ? '' : 'none';
+    }
+
+    document.addEventListener('input', function (e) {
+        if (e.target.classList.contains('filtro-detalle-envios')) {
+            aplicarFiltroDetalleEnvios(e.target);
+        }
+    });
+
+    function toggleFilaReporte($row) {
+        const target = $row.data('target');
+        if (!target) return;
+        $(target).collapse('toggle');
+    }
+
+    $(document).on('click', '.fila-estado-toggle[data-target]', function (e) {
+        if ($(e.target).closest('a, button, .btn, input, select, label').length) return;
+        toggleFilaReporte($(this));
+    }).on('keydown', '.fila-estado-toggle[data-target]', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleFilaReporte($(this));
+        }
+    });
+
     $('.detalle-estado-envios').on('show.bs.collapse', function () {
         $('[data-target="#' + this.id + '"]').attr('aria-expanded', 'true');
     }).on('hide.bs.collapse', function () {
         $('[data-target="#' + this.id + '"]').attr('aria-expanded', 'false');
+        $(this).find('.filtro-detalle-envios').each(function () {
+            this.value = '';
+            aplicarFiltroDetalleEnvios(this);
+        });
     });
 });
 </script>

@@ -38,13 +38,6 @@
 .modulo-ven .small-box-yellow .icon > i { color: rgba(0, 0, 0, 0.12) !important; }
 .modulo-ven .small-box-red { background: linear-gradient(135deg, #dc3545, #e74c3c) !important; }
 .modulo-ven .small-box-brand { background: linear-gradient(135deg, #2c5530, #4a7c59) !important; }
-.modulo-ven .small-box-footer {
-    background: rgba(0, 0, 0, 0.15) !important;
-    color: rgba(255, 255, 255, 0.95) !important;
-    position: relative;
-    z-index: 1;
-    display: block;
-}
 
 .modulo-ven .ven-page-header {
     border-radius: 12px;

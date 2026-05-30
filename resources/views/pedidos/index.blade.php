@@ -1,24 +1,9 @@
 @extends('layouts.app')
 
-@section('content')
-<div class="content-header">
-    <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-sm-6">
-                <h1 class="m-0">Gestión de Pedidos</h1>
-            </div>
-            <div class="col-sm-6">
-                <ol class="breadcrumb float-sm-right">
-                    <li class="breadcrumb-item"><a href="#">Inicio</a></li>
-                    <li class="breadcrumb-item active">Pedidos</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-</div>
+@section('title', 'Gestión de Pedidos | AgroFusion')
+@section('page_title', 'Gestión de Pedidos')
 
-<section class="content">
-    <div class="container-fluid">
+@section('content')
         <!-- Stats Cards -->
         <div class="row">
             <div class="col-lg-3 col-6">
@@ -71,13 +56,14 @@
         </div>
 
         <!-- Main Card -->
-        <div class="card card-primary card-outline">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-list mr-2"></i>
-                    Listado de Pedidos
-                </h3>
-            </div>
+        <div class="card card-outline card-success card-modulo-main elevation-1">
+            <x-modulo-index-header
+                titulo="Pedidos"
+                icono="fa-shopping-cart"
+                :registros="$pedidos->count()"
+                :nuevo-href="route('pedidos.create')"
+                nuevo-can="pedidos.create"
+            />
 
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -230,9 +216,6 @@
             </div>
             @endif
         </div>
-    </div>
-</section>
-
 @push('styles')
 <style>
     .estado-select {

@@ -24,14 +24,7 @@
 @section('content')
 <div class="modulo-inv page-prod-almacen">
 
-    @if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show shadow-sm">
-        <button type="button" class="close" data-dismiss="alert">&times;</button>
-        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
-    </div>
-    @endif
-
-    <div class="row mb-2">
+<div class="row mb-2">
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-green">
                 <div class="inner">
@@ -75,31 +68,16 @@
     </div>
 
     <div class="card card-outline card-success card-modulo-main elevation-1">
-        <div class="card-header">
-            <h3 class="card-title mb-0">
-                <i class="fas fa-pallet text-success mr-1"></i>
-                Almacenamiento de producción
-                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $registros->total() }} registros</span>
-            </h3>
-            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
-                <div class="btn-group btn-group-sm view-toggle mr-1">
-                    <button type="button" class="btn btn-default" id="btnCardView" title="Tarjetas">
-                        <i class="fas fa-th-large"></i>
-                    </button>
-                    <button type="button" class="btn btn-default active" id="btnTableView" title="Tabla">
-                        <i class="fas fa-list"></i>
-                    </button>
-                </div>
-                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosAlmacenamientoPanel" title="Filtros">
-                    <i class="fas fa-filter"></i>
-                </button>
-                @can('inventario.create')
-                <a href="{{ route('producciones_almacenamiento.create') }}" class="btn btn-success btn-sm">
-                    <i class="fas fa-plus mr-1"></i> Nuevo
-                </a>
-                @endcan
-            </div>
-        </div>
+        <x-modulo-index-header
+            titulo="Almacenamiento de producción"
+            icono="fa-pallet"
+            :registros="$registros->total()"
+            filtros-target="#filtrosAlmacenamientoPanel"
+            :view-toggle="true"
+            view-default="table"
+            :nuevo-href="route('producciones_almacenamiento.create')"
+            nuevo-can="inventario.create"
+        />
 
         <div id="filtrosAlmacenamientoPanel" class="filtros-panel collapse">
             <div class="row">
@@ -130,12 +108,8 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-lg-1 col-md-12 mb-2 d-flex align-items-end">
-                    <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btnLimpiarFiltros" title="Limpiar">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
             </div>
+            <x-filtros-client-actions />
         </div>
 
         <div id="tableView" class="table-responsive">
@@ -294,6 +268,8 @@ $(function () {
 
     $('#searchInput').on('keyup', aplicarFiltros);
     $('#filterAlmacen, #filterUnidad').on('change', aplicarFiltros);
+    $('#btnAplicarFiltros').on('click', aplicarFiltros);
+
     $('#btnLimpiarFiltros').on('click', function () {
         $('#searchInput').val('');
         $('#filterAlmacen, #filterUnidad').val('');

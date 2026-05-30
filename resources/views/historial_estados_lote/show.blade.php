@@ -5,7 +5,7 @@
 
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="{{ route('catalogos.index') }}">Catálogos</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Catálogos</a></li>
     <li class="breadcrumb-item"><a href="{{ route('historial-estados-lote.index') }}">Historial de estados</a></li>
     <li class="breadcrumb-item active">#{{ $registro->historial_estado_id }}</li>
 @endsection
@@ -17,14 +17,7 @@
 @section('content')
 <div class="modulo-cat">
 
-    @if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show">
-        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
-        <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
-    </div>
-    @endif
-
-    <div class="mb-3 d-flex flex-wrap" style="gap: 8px;">
+<div class="mb-3 d-flex flex-wrap" style="gap: 8px;">
         <a href="{{ route('historial-estados-lote.index') }}" class="btn btn-outline-secondary btn-sm">
             <i class="fas fa-arrow-left mr-1"></i> Listado
         </a>

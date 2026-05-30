@@ -474,6 +474,7 @@
 
 @push('scripts')
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="{{ asset('js/ruta-por-calles.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         // URLs de las APIs
@@ -761,30 +762,22 @@
 
             const start = origin.getLatLng();
             const end = destination.getLatLng();
+            const waypoints = [{ lat: start.lat, lng: start.lng }, { lat: end.lat, lng: end.lng }];
 
-            try {
-                const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_KEY}&start=${start.lng},${start.lat}&end=${end.lng},${end.lat}`;
-                const res = await fetch(url);
-                const data = await res.json();
+            if (state.routeLayer) state.map.removeLayer(state.routeLayer);
 
-                if (data.features && data.features.length > 0) {
-                    const geoJSON = data.features[0];
-                    if (state.routeLayer) state.map.removeLayer(state.routeLayer);
-                    state.routeLayer = L.geoJSON(geoJSON, {
-                        style: { color: '#3b82f6', weight: 5, opacity: 0.8 }
-                    }).addTo(state.map);
-                    state.map.fitBounds(state.routeLayer.getBounds(), { padding: [50, 50] });
-                    state.geoJSON = JSON.stringify({ type: "FeatureCollection", features: [geoJSON] });
-                }
-            } catch (e) {
-                const line = [[start.lat, start.lng], [end.lat, end.lng]];
-                if (state.routeLayer) state.map.removeLayer(state.routeLayer);
-                state.routeLayer = L.polyline(line, { color: 'red', weight: 4, dashArray: '10, 10' }).addTo(state.map);
+            const routeResult = await RutaPorCalles.fetchRoute(waypoints);
+            if (routeResult?.geojson) {
+                state.routeLayer = L.geoJSON(routeResult.geojson, {
+                    style: {
+                        color: routeResult.straight ? '#e67e22' : '#2563eb',
+                        weight: 5,
+                        opacity: 0.85,
+                        dashArray: routeResult.straight ? '8,8' : null,
+                    },
+                }).addTo(state.map);
                 state.map.fitBounds(state.routeLayer.getBounds(), { padding: [50, 50] });
-                state.geoJSON = JSON.stringify({
-                    type: "FeatureCollection",
-                    features: [{ type: "Feature", geometry: { type: "LineString", coordinates: [[start.lng, start.lat], [end.lng, end.lat]] } }]
-                });
+                state.geoJSON = JSON.stringify(routeResult.geojson);
             }
         }
 

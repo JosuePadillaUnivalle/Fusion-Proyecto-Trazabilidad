@@ -12,6 +12,7 @@ class TipoMovimientoAlmacen extends Model
     use HasFactory;
 
     protected $table = 'tipo_movimiento_almacen';
+
     protected $primaryKey = 'tipo_movimiento_almacenid';
 
     protected $fillable = [

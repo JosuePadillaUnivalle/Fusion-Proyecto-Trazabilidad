@@ -355,22 +355,50 @@
                                 L.marker(d, { icon: iconoDestino }).addTo(map).bindPopup(`<strong>Destino:</strong><br>${envio.nombre_destino || 'N/A'}`);
                             }
 
-                            // Dibujar ruta
-                            if (envio.rutaGeoJSON) {
-                                try {
-                                    const gj = JSON.parse(envio.rutaGeoJSON);
-                                    const layer = L.geoJSON(gj, { style: { color: '#007bff', weight: 4, opacity: 0.7 } }).addTo(map);
-                                    map.fitBounds(layer.getBounds(), { padding: [20, 20] });
-                                } catch (e) {
-                                    if (o[0] && d[0]) {
-                                        const line = L.polyline([o, d], { color: '#007bff', weight: 4, opacity: 0.7 }).addTo(map);
-                                        map.fitBounds(line.getBounds(), { padding: [20, 20] });
-                                    }
+                            async function dibujarRutaEnvio() {
+                                const estilo = (straight) => ({
+                                    color: straight ? '#e67e22' : '#2563eb',
+                                    weight: 5,
+                                    opacity: 0.85,
+                                    dashArray: straight ? '8,8' : null,
+                                });
+                                if (envio.rutaGeoJSON) {
+                                    try {
+                                        const gj = JSON.parse(envio.rutaGeoJSON);
+                                        const layer = L.geoJSON(gj, { style: estilo(false) }).addTo(map);
+                                        map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+                                        return;
+                                    } catch (e) {}
                                 }
-                            } else if (o[0] && d[0]) {
-                                const line = L.polyline([o, d], { color: '#007bff', weight: 4, opacity: 0.7 }).addTo(map);
+                                if (!o[0] || !d[0]) return;
+                                const cargarRuta = () => {
+                                    if (!window.RutaPorCalles) return Promise.reject();
+                                    return RutaPorCalles.fetchRoute([
+                                        { lat: o[0], lng: o[1] },
+                                        { lat: d[0], lng: d[1] },
+                                    ]);
+                                };
+                                const conScript = window.RutaPorCalles
+                                    ? cargarRuta()
+                                    : new Promise((resolve, reject) => {
+                                        const s = document.createElement('script');
+                                        s.src = @json(asset('js/ruta-por-calles.js'));
+                                        s.onload = () => cargarRuta().then(resolve).catch(reject);
+                                        s.onerror = reject;
+                                        document.body.appendChild(s);
+                                    });
+                                try {
+                                    const routeResult = await conScript;
+                                    if (routeResult?.geojson) {
+                                        const layer = L.geoJSON(routeResult.geojson, { style: estilo(routeResult.straight) }).addTo(map);
+                                        map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+                                        return;
+                                    }
+                                } catch (e) {}
+                                const line = L.polyline([o, d], { color: '#e67e22', weight: 4, dashArray: '8,8', opacity: 0.7 }).addTo(map);
                                 map.fitBounds(line.getBounds(), { padding: [20, 20] });
                             }
+                            dibujarRutaEnvio();
                         } catch (e) {
                             console.error('Error inicializando mapa:', e);
                             mapEl.innerHTML = '<div class="alert alert-light mb-0 text-center small">Mapa no disponible</div>';

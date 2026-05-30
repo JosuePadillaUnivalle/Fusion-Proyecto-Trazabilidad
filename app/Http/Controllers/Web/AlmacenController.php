@@ -1,175 +1,525 @@
 <?php
 
+
+
 namespace App\Http\Controllers\Web;
 
+
+
 use App\Http\Controllers\Controller;
+
 use App\Models\Almacen;
+
+use App\Models\Insumo;
+
+use App\Models\ProduccionAlmacenamiento;
+
 use App\Models\TipoAlmacen;
+
 use App\Models\UnidadMedida;
+
+use App\Services\AlmacenCapacidadService;
+
 use App\Services\UbicacionesAlmacenService;
+
+use App\Support\AlmacenAmbito;
+
+use App\Support\InsumoCatalogo;
+
 use Illuminate\Http\Request;
+
 use Illuminate\Support\Facades\Schema;
 
+
+
 class AlmacenController extends Controller
+
 {
-    public function index()
+
+    public function __construct(
+
+        private readonly AlmacenCapacidadService $capacidadService,
+
+    ) {}
+
+
+
+    public function index(Request $request)
+
     {
-        $q = Almacen::query();
 
-        $stats = [
-            'total' => (clone $q)->count(),
-            'capacidad_total' => (float) (clone $q)->sum('capacidad'),
-            'activos' => (clone $q)->where('activo', true)->count(),
-            'inactivos' => (clone $q)->where('activo', false)->count(),
-            'tipos' => (clone $q)->distinct()->count('tipoalmacenid'),
-        ];
+        $ctx = AlmacenAmbito::contexto($request);
 
-        $tiposFiltro = (clone $q)
-            ->join('tipoalmacen', 'almacen.tipoalmacenid', '=', 'tipoalmacen.tipoalmacenid')
-            ->whereNotNull('almacen.tipoalmacenid')
-            ->distinct()
-            ->orderBy('tipoalmacen.nombre')
-            ->pluck('tipoalmacen.nombre');
+        $ambito = $ctx['ambito'];
 
-        $almacenes = Almacen::with(['tipoAlmacen', 'unidadMedida'])
+        $q = AlmacenAmbito::scope(Almacen::query(), $ambito);
+
+
+
+        $almacenesPagina = AlmacenAmbito::scope(
+
+            Almacen::with(['unidadMedida']),
+
+            $ambito
+
+        )
+
             ->orderBy('almacenid', 'desc')
+
             ->paginate(15);
 
-        return view('almacenes.index', compact('almacenes', 'stats', 'tiposFiltro'));
+
+
+        $ocupacionPorId = [];
+
+        $capacidadTotalKg = 0;
+
+        $ocupadoTotalKg = 0;
+
+
+
+        foreach ($almacenesPagina as $almacen) {
+
+            $resumen = $this->capacidadService->resumen($almacen);
+
+            $ocupacionPorId[$almacen->almacenid] = $resumen;
+
+            $capacidadTotalKg += $resumen['capacidad_kg'];
+
+            $ocupadoTotalKg += $resumen['ocupado_kg'];
+
+        }
+
+
+
+        $stats = [
+
+            'total' => (clone $q)->count(),
+
+            'capacidad_total' => $capacidadTotalKg,
+
+            'ocupado_total' => $ocupadoTotalKg,
+
+            'ocupacion_promedio' => $capacidadTotalKg > 0
+
+                ? round(($ocupadoTotalKg / $capacidadTotalKg) * 100, 1)
+
+                : 0,
+
+        ];
+
+
+
+        return view('almacenes.index', array_merge(compact('almacenesPagina', 'stats', 'ocupacionPorId'), $ctx, [
+
+            'almacenes' => $almacenesPagina,
+
+        ]));
+
     }
 
-    public function create()
+
+
+    public function create(Request $request)
+
     {
-        $tipos    = TipoAlmacen::all();
-        $unidades = UnidadMedida::all();
 
-        return view('almacenes.create', $this->datosFormulario($tipos, $unidades));
+        $ctx = AlmacenAmbito::contexto($request);
+
+
+
+        return view('almacenes.create', array_merge(
+
+            $this->datosFormulario(null),
+
+            $ctx
+
+        ));
+
     }
+
+
 
     public function selectorUbicacion(Request $request)
+
     {
+
+        $ctx = AlmacenAmbito::contexto($request);
+
         $excluirAlmacenId = $request->integer('excluir_almacen_id') ?: null;
+
         $ubicacionesGrupos = app(UbicacionesAlmacenService::class)
+
             ->listarParaFormulario($excluirAlmacenId);
 
-        return view('almacenes.selector-ubicacion', [
+
+
+        return view('almacenes.selector-ubicacion', array_merge([
+
             'ubicacionesGrupos' => $ubicacionesGrupos,
-        ]);
+
+        ], $ctx));
+
     }
 
+
+
     public function store(Request $request)
+
     {
+
+        $ctx = AlmacenAmbito::contexto($request);
+
         $data = $this->validarAlmacen($request);
+
+        $data['ambito'] = $ctx['ambito'];
+
+        $data['activo'] = true;
+
+        $data['unidadmedidaid'] = $this->unidadKilogramoId();
+
+        $data['tipoalmacenid'] = $this->tipoAlmacenPorDefecto();
+
+
 
         Almacen::create($data);
 
+
+
         return redirect()
-            ->route('almacenes.index')
+
+            ->route($ctx['rutaPrefijo'].'.index')
+
             ->with('success', 'Almacén creado.');
+
     }
 
-    public function show(Almacen $almacen)
+
+
+    public function show(Request $request, Almacen $almacen)
+
     {
-        $almacen->load(['tipoAlmacen', 'unidadMedida', 'almacenamientos']);
 
-        return view('almacenes.show', compact('almacen'));
+        $ctx = AlmacenAmbito::contexto($request);
+
+        $this->asegurarAmbitoAlmacen($almacen, $ctx['ambito']);
+
+        $almacen->load(['unidadMedida', 'almacenamientos']);
+
+        $resumenCapacidad = $this->capacidadService->resumen($almacen);
+
+        $contenidos = $this->contenidoAlmacen($almacen);
+
+        $tiposContenidoFiltro = $contenidos->pluck('tipo_label')->unique()->sort()->values();
+
+
+
+        return view('almacenes.show', array_merge(compact(
+            'almacen',
+            'resumenCapacidad',
+            'contenidos',
+            'tiposContenidoFiltro'
+        ), $ctx));
+
     }
 
-    public function edit(Almacen $almacen)
+
+
+    public function edit(Request $request, Almacen $almacen)
+
     {
-        $tipos    = TipoAlmacen::all();
-        $unidades = UnidadMedida::all();
 
-        return view('almacenes.edit', $this->datosFormulario($tipos, $unidades, $almacen));
+        $ctx = AlmacenAmbito::contexto($request);
+
+        $this->asegurarAmbitoAlmacen($almacen, $ctx['ambito']);
+
+
+
+        return view('almacenes.edit', array_merge(
+
+            $this->datosFormulario($almacen),
+
+            $ctx,
+
+            ['almacen' => $almacen]
+
+        ));
+
     }
+
+
 
     public function update(Request $request, Almacen $almacen)
+
     {
-        $almacen->update($this->validarAlmacen($request, $almacen));
+
+        $ctx = AlmacenAmbito::contexto($request);
+
+        $this->asegurarAmbitoAlmacen($almacen, $ctx['ambito']);
+
+
+
+        $data = $this->validarAlmacen($request, $almacen);
+
+        $data['ambito'] = $ctx['ambito'];
+
+        $data['activo'] = true;
+
+        $data['unidadmedidaid'] = $this->unidadKilogramoId();
+
+        if (! $almacen->tipoalmacenid) {
+            $data['tipoalmacenid'] = $this->tipoAlmacenPorDefecto();
+        } else {
+            unset($data['tipoalmacenid']);
+        }
+
+
+
+        $almacen->update($data);
+
+
 
         return redirect()
-            ->route('almacenes.index')
+
+            ->route($ctx['rutaPrefijo'].'.index')
+
             ->with('success', 'Almacén actualizado.');
+
     }
 
-    public function destroy(Almacen $almacen)
+
+
+    public function destroy(Request $request, Almacen $almacen)
+
     {
+
+        $ctx = AlmacenAmbito::contexto($request);
+
+        $this->asegurarAmbitoAlmacen($almacen, $ctx['ambito']);
+
         $almacen->delete();
 
+
+
         return redirect()
-            ->route('almacenes.index')
+
+            ->route($ctx['rutaPrefijo'].'.index')
+
             ->with('success', 'Almacén eliminado.');
+
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function datosFormulario($tipos, $unidades, ?Almacen $almacen = null): array
+
+
+    private function asegurarAmbitoAlmacen(Almacen $almacen, string $ambito): void
+
     {
-        $ubicacionesGrupos = app(UbicacionesAlmacenService::class)
-            ->listarParaFormulario($almacen?->almacenid);
 
-        $ubicacionValor = trim((string) old('ubicacion', $almacen->ubicacion ?? ''));
-        $ubicacionEnCatalogo = false;
-        foreach ($ubicacionesGrupos as $grupo) {
-            foreach ($grupo['items'] as $item) {
-                if (strcasecmp($ubicacionValor, $item['valor']) === 0) {
-                    $ubicacionEnCatalogo = true;
-                    break 2;
-                }
-            }
+        if (Schema::hasColumn('almacen', 'ambito') && $almacen->ambito !== $ambito) {
+
+            abort(404);
+
         }
 
-        $tiposConfig = config('almacenes.tipos', []);
-        $tiposAyuda = [];
-        foreach ($tipos as $tipo) {
-            if (isset($tiposConfig[$tipo->nombre])) {
-                $tiposAyuda[$tipo->nombre] = $tiposConfig[$tipo->nombre];
-            }
-        }
+    }
+
+
+
+    /**
+
+     * @return array<string, mixed>
+
+     */
+
+    private function datosFormulario(?Almacen $almacen = null): array
+
+    {
 
         return [
-            'tipos' => $tipos,
-            'unidades' => $unidades,
+
             'almacen' => $almacen,
+
             'guias' => config('almacenes', []),
-            'ubicacionesGrupos' => $ubicacionesGrupos,
-            'ubicacionEnCatalogo' => $ubicacionEnCatalogo,
-            'tiposAyuda' => $tiposAyuda,
+
         ];
+
     }
 
+
+
     /**
+
      * @return array<string, mixed>
+
      */
+
     private function validarAlmacen(Request $request, ?Almacen $almacen = null): array
+
     {
+
         $reglas = [
-            'nombre'         => 'required|string|max:100|unique:almacen,nombre'.($almacen ? ','.$almacen->almacenid.',almacenid' : ''),
-            'descripcion'    => 'nullable|string|max:250',
-            'ubicacion'      => 'nullable|string|max:200',
-            'capacidad'      => 'nullable|numeric|min:0',
-            'unidadmedidaid' => 'nullable|exists:unidadmedida,unidadmedidaid',
-            'tipoalmacenid'  => 'nullable|exists:tipoalmacen,tipoalmacenid',
-            'activo'         => 'boolean',
+
+            'nombre' => 'required|string|max:100|unique:almacen,nombre'.($almacen ? ','.$almacen->almacenid.',almacenid' : ''),
+
+            'descripcion' => 'nullable|string|max:250',
+
+            'ubicacion' => 'nullable|string|max:200',
+
+            'capacidad' => 'nullable|numeric|min:0',
+
         ];
 
+
+
         if (Schema::hasColumn('almacen', 'direccionlogisticaid')) {
+
             $reglas['direccionlogisticaid'] = 'nullable|exists:direccion_logistica,direccionlogisticaid';
+
         }
+
+
 
         $data = $request->validate($reglas);
 
-        if (! isset($data['activo'])) {
-            unset($data['activo']);
-        }
+
 
         if (! Schema::hasColumn('almacen', 'direccionlogisticaid')) {
+
             unset($data['direccionlogisticaid']);
+
         } elseif (empty($data['direccionlogisticaid'])) {
+
             $data['direccionlogisticaid'] = null;
+
         }
 
+
+
         return $data;
+
     }
+
+
+
+    private function unidadKilogramoId(): ?int
+
+    {
+
+        $id = UnidadMedida::query()
+
+            ->where(function ($q) {
+
+                $q->whereRaw('LOWER(abreviatura) = ?', ['kg'])
+
+                    ->orWhereRaw('LOWER(nombre) LIKE ?', ['%kilogramo%']);
+
+            })
+
+            ->value('unidadmedidaid');
+
+
+
+        return $id ? (int) $id : null;
+
+    }
+
+
+
+    private function tipoAlmacenPorDefecto(): ?int
+
+    {
+
+        $id = TipoAlmacen::query()
+
+            ->whereIn('nombre', ['Central', 'Secundario', 'Planta'])
+
+            ->orderByRaw("CASE nombre WHEN 'Central' THEN 1 WHEN 'Secundario' THEN 2 ELSE 3 END")
+
+            ->value('tipoalmacenid');
+
+
+
+        if ($id) {
+
+            return (int) $id;
+
+        }
+
+
+
+        $fallback = TipoAlmacen::query()->orderBy('tipoalmacenid')->value('tipoalmacenid');
+
+
+
+        return $fallback ? (int) $fallback : null;
+
+    }
+
+
+
+    /**
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    private function contenidoAlmacen(Almacen $almacen): \Illuminate\Support\Collection
+    {
+        $items = collect();
+
+        $insumos = Insumo::query()
+            ->with(['tipo', 'unidadMedida'])
+            ->where('almacenid', $almacen->almacenid)
+            ->orderBy('nombre')
+            ->get();
+
+        foreach ($insumos as $insumo) {
+            if ((float) $insumo->stock <= 0) {
+                continue;
+            }
+
+            $tipoNombre = $insumo->tipo?->nombre ?? 'Insumo';
+            $slug = InsumoCatalogo::slugFromNombreTipo($tipoNombre) ?? 'insumo';
+            $kg = $this->capacidadService->convertirAKg((float) $insumo->stock, $insumo->unidadMedida);
+
+            $items->push((object) [
+                'categoria' => 'insumo',
+                'tipo_label' => $tipoNombre,
+                'tipo_filtro' => $slug,
+                'nombre' => $insumo->nombre,
+                'detalle' => $insumo->descripcion ? \Illuminate\Support\Str::limit($insumo->descripcion, 60) : '—',
+                'cantidad' => (float) $insumo->stock,
+                'unidad' => $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? '',
+                'kg' => $kg,
+                'search' => strtolower(trim($insumo->nombre.' '.$tipoNombre)),
+            ]);
+        }
+
+        $cosechas = ProduccionAlmacenamiento::query()
+            ->with(['produccion.lote.cultivo', 'unidadMedida'])
+            ->where('almacenid', $almacen->almacenid)
+            ->whereNull('fechasalida')
+            ->orderByDesc('fechaentrada')
+            ->get();
+
+        foreach ($cosechas as $c) {
+            $lote = $c->produccion?->lote;
+            $cultivo = $lote?->cultivo?->nombre ?? 'Cultivo';
+            $nombre = $cultivo.' · '.($lote?->nombre ?? 'Producción #'.$c->produccionid);
+            $kg = $this->capacidadService->convertirAKg((float) $c->cantidad, $c->unidadMedida);
+
+            $items->push((object) [
+                'categoria' => 'cosecha',
+                'tipo_label' => 'Cosecha',
+                'tipo_filtro' => 'cosecha',
+                'nombre' => $nombre,
+                'detalle' => $c->fechaentrada ? \Carbon\Carbon::parse($c->fechaentrada)->format('d/m/Y') : '—',
+                'cantidad' => (float) $c->cantidad,
+                'unidad' => $c->unidadMedida?->abreviatura ?? 'kg',
+                'kg' => $kg,
+                'search' => strtolower(trim($nombre.' cosecha '.$cultivo)),
+            ]);
+        }
+
+        return $items->sortBy('nombre')->values();
+    }
+
 }
+

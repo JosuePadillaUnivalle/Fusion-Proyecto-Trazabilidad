@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Editar Estado | AgroNexus')
+@section('title', 'Editar Estado | AgroFusion')
 @section('page_title', 'Actualizar Almacenamiento')
 
 @section('breadcrumbs')
@@ -22,34 +22,6 @@
                 @method('PUT')
 
                 <div class="card-body p-4">
-                    @if($errors->any())
-                        <div class="alert alert-danger">
-                            <strong>No se pudo guardar:</strong>
-                            <ul class="mb-0 mt-2">
-                                @foreach($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
-
-                    <div class="card card-outline card-secondary collapsed-card mb-3">
-                        <div class="card-header py-2">
-                            <h3 class="card-title small mb-0">
-                                <i class="fas fa-question-circle text-info mr-1"></i> Guía rápida de almacenamiento
-                            </h3>
-                            <div class="card-tools">
-                                <button type="button" class="btn btn-tool" data-card-widget="collapse">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body py-2 small" style="display:none;">
-                            <p class="mb-1"><strong>1)</strong> En edición, la producción origen se mantiene fija para preservar trazabilidad.</p>
-                            <p class="mb-1"><strong>2)</strong> Actualice solo lo clave: almacén, cantidad, temperatura y humedad actual.</p>
-                            <p class="mb-0"><strong>3)</strong> Rangos recomendados y fecha de salida quedan en la sección avanzada.</p>
-                        </div>
-                    </div>
                     
                     <div class="alert alert-info border-left-info shadow-sm">
                         <div class="row align-items-center">
@@ -66,14 +38,13 @@
                             <div class="form-group">
                                 <label class="font-weight-bold">Producción (Solo Lectura)</label>
                                 <input type="text" class="form-control" value="Producción N°{{ $registro->produccionid }}" readonly disabled>
-                                <input type="hidden" name="produccionid" id="produccionid" value="{{ $registro->produccionid }}">
-                                <small class="text-muted">Documento origen del producto almacenado.</small>
+                                <input type="hidden" name="produccionid" value="{{ $registro->produccionid }}">
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="almacenid" class="font-weight-bold">Almacén Ubicación</label>
-                                <select name="almacenid" id="almacenid" class="form-control" required>
+                                <select name="almacenid" class="form-control" required>
                                     @foreach($almacenes as $a)
                                         <option value="{{ $a->almacenid }}"
                                             {{ $registro->almacenid == $a->almacenid ? 'selected' : '' }}>
@@ -81,7 +52,6 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <small class="text-muted">Bodega donde está guardado actualmente el producto.</small>
                             </div>
                         </div>
                     </div>
@@ -92,7 +62,6 @@
                                 <label for="cantidad" class="font-weight-bold">Cantidad Almacenada</label>
                                 <input type="number" step="0.01" min="0.01" name="cantidad"
                                        class="form-control" value="{{ $registro->cantidad }}" required>
-                                <small class="text-muted">Cantidad vigente para control de stock.</small>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -107,7 +76,6 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <small class="text-muted">Unidad de medida de la cantidad almacenada.</small>
                             </div>
                         </div>
                     </div>
@@ -118,54 +86,35 @@
                         <div class="form-group col-md-6">
                             <label class="font-weight-bold text-danger">Temperatura Actual (°C)</label>
                             <input type="number" step="0.01" name="temperatura"
-                                   id="temperatura" class="form-control" value="{{ $registro->temperatura }}">
-                            <small class="text-muted">Lectura real de la bodega en este momento.</small>
+                                   class="form-control" value="{{ $registro->temperatura }}">
                         </div>
                         <div class="form-group col-md-6">
                             <label class="font-weight-bold text-primary">Humedad Actual (%)</label>
                             <input type="number" step="0.01" name="humedad"
-                                   id="humedad" class="form-control" value="{{ $registro->humedad }}">
-                            <small class="text-muted">Lectura real de humedad del ambiente.</small>
+                                   class="form-control" value="{{ $registro->humedad }}">
                         </div>
                     </div>
-                    <small id="sugerencia_ambiental" class="text-info d-block mb-2"></small>
 
-                    <div class="card card-outline card-light collapsed-card mb-3">
-                        <div class="card-header py-2">
-                            <h3 class="card-title small mb-0">Opcionales avanzados (rangos y salida)</h3>
-                            <div class="card-tools">
-                                <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-plus"></i></button>
-                            </div>
+                    <div class="form-row bg-light p-3 rounded">
+                        <div class="form-group col-md-3">
+                            <label class="small text-muted">Temp. Mín (°C)</label>
+                            <input type="number" step="0.01" name="temperatura_min"
+                                   class="form-control form-control-sm" value="{{ $registro->temperatura_min }}">
                         </div>
-                        <div class="card-body py-2 small" style="display:none;">
-                            <div class="form-row bg-light p-3 rounded">
-                                <div class="form-group col-md-3">
-                                    <label class="small text-muted">Temp. Mín (°C)</label>
-                                    <input type="number" step="0.01" name="temperatura_min"
-                                           id="temperatura_min" class="form-control form-control-sm" value="{{ $registro->temperatura_min }}">
-                                </div>
-                                <div class="form-group col-md-3">
-                                    <label class="small text-muted">Temp. Máx (°C)</label>
-                                    <input type="number" step="0.01" name="temperatura_max"
-                                           id="temperatura_max" class="form-control form-control-sm" value="{{ $registro->temperatura_max }}">
-                                </div>
-                                <div class="form-group col-md-3">
-                                    <label class="small text-muted">Hum. Mín (%)</label>
-                                    <input type="number" step="0.01" name="humedad_min"
-                                           id="humedad_min" class="form-control form-control-sm" value="{{ $registro->humedad_min }}">
-                                </div>
-                                <div class="form-group col-md-3">
-                                    <label class="small text-muted">Hum. Máx (%)</label>
-                                    <input type="number" step="0.01" name="humedad_max"
-                                           id="humedad_max" class="form-control form-control-sm" value="{{ $registro->humedad_max }}">
-                                </div>
-                            </div>
-                            <div class="form-group col-md-6 pl-0">
-                                <label class="font-weight-bold">Fecha de Salida</label>
-                                <input type="datetime-local" name="fechasalida" class="form-control"
-                                       value="{{ $registro->fechasalida ? \Carbon\Carbon::parse($registro->fechasalida)->format('Y-m-d\TH:i') : '' }}">
-                                <small class="text-muted">Opcional, solo si el producto ya salió de bodega.</small>
-                            </div>
+                        <div class="form-group col-md-3">
+                            <label class="small text-muted">Temp. Máx (°C)</label>
+                            <input type="number" step="0.01" name="temperatura_max"
+                                   class="form-control form-control-sm" value="{{ $registro->temperatura_max }}">
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label class="small text-muted">Hum. Mín (%)</label>
+                            <input type="number" step="0.01" name="humedad_min"
+                                   class="form-control form-control-sm" value="{{ $registro->humedad_min }}">
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label class="small text-muted">Hum. Máx (%)</label>
+                            <input type="number" step="0.01" name="humedad_max"
+                                   class="form-control form-control-sm" value="{{ $registro->humedad_max }}">
                         </div>
                     </div>
 
@@ -176,14 +125,17 @@
                             <label class="font-weight-bold">Fecha de Entrada</label>
                             <input type="datetime-local" name="fechaentrada" class="form-control"
                                    value="{{ $registro->fechaentrada ? \Carbon\Carbon::parse($registro->fechaentrada)->format('Y-m-d\TH:i') : '' }}">
-                            <small class="text-muted">Fecha real de ingreso a almacén para auditoría.</small>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label class="font-weight-bold">Fecha de Salida</label>
+                            <input type="datetime-local" name="fechasalida" class="form-control"
+                                   value="{{ $registro->fechasalida ? \Carbon\Carbon::parse($registro->fechasalida)->format('Y-m-d\TH:i') : '' }}">
                         </div>
                     </div>
 
                     <div class="form-group mt-3">
                         <label class="font-weight-bold">Observaciones</label>
                         <textarea name="observaciones" class="form-control" rows="3" maxlength="250" pattern="^[a-zA-Z0-9\sñÑáéíóúÁÉÍÓÚ\.]+$">{{ $registro->observaciones }}</textarea>
-                        <small class="text-muted">Notas breves de calidad, empaque o incidencias (opcional).</small>
                     </div>
 
                 </div>
@@ -202,43 +154,6 @@
 @push('scripts')
 <script>
     $(document).ready(function() {
-        const sugerenciasProduccion = @json($sugerenciasPorProduccion ?? []);
-        const sugerenciasAlmacen = @json($sugerenciasPorAlmacen ?? []);
-        const produccionIdInput = document.getElementById('produccionid');
-        const almacenSelect = document.getElementById('almacenid');
-        const temperatura = document.getElementById('temperatura');
-        const humedad = document.getElementById('humedad');
-        const temperaturaMin = document.getElementById('temperatura_min');
-        const temperaturaMax = document.getElementById('temperatura_max');
-        const humedadMin = document.getElementById('humedad_min');
-        const humedadMax = document.getElementById('humedad_max');
-        const sugerenciaAmbiental = document.getElementById('sugerencia_ambiental');
-
-        function aplicarSugerenciaAmbiental() {
-            const pid = produccionIdInput ? produccionIdInput.value : '';
-            const aid = almacenSelect ? almacenSelect.value : '';
-            const sugProd = pid ? sugerenciasProduccion[pid] : null;
-            const sugAlm = aid ? sugerenciasAlmacen[aid] : null;
-            const sug = sugProd || sugAlm;
-            if (!sug) return;
-
-            if (temperatura) temperatura.value = sug.temperatura ?? '';
-            if (humedad) humedad.value = sug.humedad ?? '';
-            if (temperaturaMin) temperaturaMin.value = sug.temperatura_min ?? '';
-            if (temperaturaMax) temperaturaMax.value = sug.temperatura_max ?? '';
-            if (humedadMin) humedadMin.value = sug.humedad_min ?? '';
-            if (humedadMax) humedadMax.value = sug.humedad_max ?? '';
-
-            if (sugerenciaAmbiental) {
-                const fuente = sugProd ? 'lote/producción' : 'almacén';
-                sugerenciaAmbiental.textContent = `Sugerencia automática aplicada por ${fuente}: ${sug.origen}. Puedes ajustar los valores.`;
-            }
-        }
-
-        if (almacenSelect) {
-            almacenSelect.addEventListener('change', aplicarSugerenciaAmbiental);
-        }
-
         // SMART UNIT CONVERSION
         function checkSmartConversion() {
             const cantidadInput = $('input[name="cantidad"]');
@@ -295,8 +210,6 @@
         $('input[name="cantidad"], select[name="unidadmedidaid"]').on('change keyup blur', function() {
             checkSmartConversion();
         });
-
-        aplicarSugerenciaAmbiental();
     });
 </script>
 @endpush

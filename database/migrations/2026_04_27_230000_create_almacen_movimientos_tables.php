@@ -19,7 +19,7 @@ return new class extends Migration {
 
             DB::table('tipo_movimiento_almacen')->insert([
                 ['nombre' => 'Compra', 'naturaleza' => 'ingreso', 'activo' => true, 'created_at' => now(), 'updated_at' => now()],
-                ['nombre' => 'Devolución', 'naturaleza' => 'ingreso', 'activo' => true, 'created_at' => now(), 'updated_at' => now()],
+                ['nombre' => 'Devolucion', 'naturaleza' => 'ingreso', 'activo' => true, 'created_at' => now(), 'updated_at' => now()],
                 ['nombre' => 'Ajuste positivo', 'naturaleza' => 'ingreso', 'activo' => true, 'created_at' => now(), 'updated_at' => now()],
                 ['nombre' => 'Consumo interno', 'naturaleza' => 'salida', 'activo' => true, 'created_at' => now(), 'updated_at' => now()],
                 ['nombre' => 'Despacho', 'naturaleza' => 'salida', 'activo' => true, 'created_at' => now(), 'updated_at' => now()],

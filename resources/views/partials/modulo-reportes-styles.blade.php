@@ -66,23 +66,6 @@
 .modulo-rep .small-box-brand {
     background: linear-gradient(135deg, #2c5530, #4a7c59) !important;
 }
-.modulo-rep .small-box-footer {
-    background: rgba(0, 0, 0, 0.15) !important;
-    color: rgba(255, 255, 255, 0.95) !important;
-    position: relative;
-    z-index: 1;
-    display: block;
-}
-.modulo-rep .small-box-yellow .small-box-footer,
-.modulo-rep .small-box-orange .small-box-footer {
-    background: rgba(0, 0, 0, 0.08) !important;
-    color: rgba(26, 37, 47, 0.9) !important;
-}
-.modulo-rep a.small-box-footer:hover {
-    background: rgba(0, 0, 0, 0.22) !important;
-    color: #fff !important;
-}
-
 /* ── Encabezado de subcategoría ── */
 .modulo-rep .rep-page-header {
     border-radius: 12px;

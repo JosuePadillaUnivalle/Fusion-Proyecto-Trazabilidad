@@ -54,16 +54,6 @@
     background: linear-gradient(135deg, #28a745, #34ce57) !important;
     color: #fff;
 }
-.modulo-la .small-box-footer {
-    background: rgba(0, 0, 0, 0.12);
-    color: rgba(255, 255, 255, 0.9);
-    position: relative;
-    z-index: 1;
-}
-.modulo-la .small-box-footer:hover {
-    background: rgba(0, 0, 0, 0.18);
-    color: #fff;
-}
 .modulo-la .card-modulo-main {
     border-top: 3px solid #2c5530;
 }

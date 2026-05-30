@@ -16,6 +16,8 @@ class RutaParada extends Model
         'externo_envio_id',
         'orden',
         'destino',
+        'latitud',
+        'longitud',
         'estado',
         'eta',
         'fecha_entrega',
@@ -26,6 +28,8 @@ class RutaParada extends Model
         'rutamultientregaid' => 'integer',
         'pedidoid' => 'integer',
         'orden' => 'integer',
+        'latitud' => 'float',
+        'longitud' => 'float',
         'eta' => 'datetime',
         'fecha_entrega' => 'datetime',
     ];

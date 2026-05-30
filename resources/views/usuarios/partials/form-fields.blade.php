@@ -111,9 +111,10 @@
             @if($mostrarGuias)
             <div class="guia-campo mb-2">
                 <strong>Permisos.</strong>
-                <em>agricultor</em> → lotes y cosechas propias;
-                <em>admin</em> → gestión completa;
-                <em>almacen</em> / <em>transportista</em> → módulos logísticos.
+                <em>agricultor</em> → campo, inventario, envíos y almacén;
+                <em>planta</em> → procesamiento y despacho;
+                <em>transportista</em> → rutas y entregas;
+                <em>admin</em> → gestión completa del sistema.
             </div>
             @endif
             @php

@@ -24,7 +24,15 @@ class ProcesoPlanta extends Model
 
     public function procesoMaquinas(): HasMany
     {
-        return $this->hasMany(ProcesoMaquinaPlanta::class, 'procesoplantaid', 'procesoplantaid');
+        return $this->hasMany(ProcesoMaquinaPlanta::class, 'procesoplantaid', 'procesoplantaid')
+            ->orderBy('orden_paso');
+    }
+
+    /** Pasos del proceso (línea proceso–máquina), usado en registro de planta. */
+    public function pasos(): HasMany
+    {
+        return $this->hasMany(ProcesoMaquinaPlanta::class, 'procesoplantaid', 'procesoplantaid')
+            ->orderBy('orden_paso');
     }
 }
 

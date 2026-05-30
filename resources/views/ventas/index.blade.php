@@ -15,14 +15,7 @@
 @section('content')
 <div class="modulo-ven">
 
-    @if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show">
-        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
-        <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
-    </div>
-    @endif
-
-    <div class="row mb-2">
+<div class="row mb-2">
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-green">
                 <div class="inner">
@@ -66,31 +59,17 @@
     </div>
 
     <div class="card card-outline card-success card-modulo-main elevation-1">
-        <div class="card-header">
-            <h3 class="card-title mb-0">
-                <i class="fas fa-shopping-cart text-success mr-1"></i>
-                Listado de ventas
-                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $ventas->total() }} registros</span>
-            </h3>
-            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
-                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosVentasPanel" title="Filtros">
-                    <i class="fas fa-filter"></i>
-                </button>
-                <div class="btn-group btn-group-sm view-toggle mr-1">
-                    <button type="button" class="btn btn-default active" id="btnCardView" title="Tarjetas">
-                        <i class="fas fa-th-large"></i>
-                    </button>
-                    <button type="button" class="btn btn-default" id="btnTableView" title="Tabla">
-                        <i class="fas fa-list"></i>
-                    </button>
-                </div>
-                @can('ventas.create')
-                <a href="{{ route('ventas.create') }}" class="btn btn-success btn-sm">
-                    <i class="fas fa-plus mr-1"></i> Nueva venta
-                </a>
-                @endcan
-            </div>
-        </div>
+        <x-modulo-index-header
+            titulo="Listado de ventas"
+            icono="fa-shopping-cart"
+            :registros="$ventas->total()"
+            filtros-target="#filtrosVentasPanel"
+            :view-toggle="true"
+            view-default="cards"
+            :nuevo-href="route('ventas.create')"
+            nuevo-text="Nueva venta"
+            nuevo-can="ventas.create"
+        />
 
         <div id="filtrosVentasPanel" class="filtros-panel collapse {{ request()->hasAny(['buscar','cultivo_id','fecha_desde','fecha_hasta']) ? 'show' : '' }}">
             <form method="GET" action="{{ route('ventas.index') }}">
@@ -117,9 +96,8 @@
                         <label class="small text-muted mb-1">Hasta</label>
                         <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="{{ request('fecha_hasta') }}">
                     </div>
-                    <div class="col-lg-2 col-md-6 mb-2 d-flex" style="gap: 8px;">
-                        <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-search mr-1"></i> Filtrar</button>
-                        <a href="{{ route('ventas.index') }}" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+                    <div class="col-12">
+                        <x-filtros-form-actions :limpiar-url="route('ventas.index', ['filtros_abiertos' => 1])" />
                     </div>
                 </div>
             </form>

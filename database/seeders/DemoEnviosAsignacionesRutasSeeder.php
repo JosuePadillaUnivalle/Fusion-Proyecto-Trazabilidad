@@ -25,13 +25,13 @@ class DemoEnviosAsignacionesRutasSeeder extends Seeder
 {
     private const MARK_PED = '[DEMO-B6] Envío demo';
 
-    private const EMAIL_PLANTA = 'planta@agronexus.com';
+    private const EMAIL_PLANTA = 'planta@agrofusion.com';
 
-    private const T_TRANSPORTISTA_CARLOS = 'transportista@agronexus.com';
+    private const T_TRANSPORTISTA_CARLOS = 'transportista@agrofusion.com';
 
-    private const T_TRANSPORTISTA_MIGUEL = 'miguel.rojas@agronexus.com';
+    private const T_TRANSPORTISTA_MIGUEL = 'miguel.rojas@agrofusion.com';
 
-    private const T_TRANSPORTISTA_LUIS = 'luis.fernandez@agronexus.com';
+    private const T_TRANSPORTISTA_LUIS = 'luis.fernandez@agrofusion.com';
 
     public function run(): void
     {
@@ -42,7 +42,7 @@ class DemoEnviosAsignacionesRutasSeeder extends Seeder
         }
 
         $planta = Usuario::where('email', self::EMAIL_PLANTA)->first();
-        $admin = Usuario::where('email', 'admin@agronexus.com')->first();
+        $admin = Usuario::where('email', 'admin@agrofusion.com')->first();
         $asignadorId = $planta?->usuarioid ?? $admin?->usuarioid;
 
         $roleTransportista = Role::firstOrCreate(['name' => 'transportista', 'guard_name' => 'web']);

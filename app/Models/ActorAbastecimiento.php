@@ -32,10 +32,5 @@ class ActorAbastecimiento extends Model
     {
         return $this->hasMany(Lote::class, 'actorid', 'actorid');
     }
-
-    public function respuestasProveedorSolicitud(): HasMany
-    {
-        return $this->hasMany(RespuestaProveedorSolicitud::class, 'proveedor_actorid', 'actorid');
-    }
 }
 

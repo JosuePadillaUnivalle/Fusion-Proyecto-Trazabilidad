@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Panel Planta | Fusion-Proyectos')
+@section('title', 'Panel Planta | AgroFusion')
 @section('page_title', 'Panel Planta')
 
 @section('breadcrumbs')
@@ -52,7 +52,7 @@
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-primary btn-block quick-link" href="{{ route('envios.mandar') }}"><i class="fas fa-plus-circle"></i>Crear envío</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-info btn-block quick-link" href="{{ route('envios.seguimiento') }}"><i class="fas fa-truck"></i>Mis envíos</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-warning btn-block quick-link" href="{{ route('logistica.asignaciones.index') }}"><i class="fas fa-user-tag"></i>Asignaciones</a></div>
-                    <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-success btn-block quick-link" href="{{ route('logistica.rutas.index') }}"><i class="fas fa-route"></i>Rutas multi-entrega</a></div>
+                    <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-success btn-block quick-link" href="{{ route('logistica.rutas.index') }}"><i class="fas fa-route"></i>Rutas de entrega</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-secondary btn-block quick-link" href="{{ route('logistica.documentos.index') }}"><i class="fas fa-file-alt"></i>Documentos</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-danger btn-block quick-link" href="{{ route('logistica.incidentes.index') }}"><i class="fas fa-exclamation-circle"></i>Incidentes</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-dark btn-block quick-link" href="{{ route('ventas.index') }}"><i class="fas fa-receipt"></i>Notas de venta</a></div>

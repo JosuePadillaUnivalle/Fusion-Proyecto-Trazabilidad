@@ -43,21 +43,13 @@ class InventarioAccessTest extends TestCase
         $this->get(route('insumos.create'))->assertOk();
     }
 
-    public function test_operador_puede_ver_inventario_y_no_crear(): void
-    {
-        $operador = $this->createUser('operador');
-        $this->actingAs($operador);
-
-        $this->get(route('insumos.index'))->assertOk();
-        $this->get(route('insumos.create'))->assertForbidden();
-    }
-
-    public function test_agricultor_puede_ver_inventario(): void
+    public function test_agricultor_puede_ver_y_crear_inventario(): void
     {
         $agricultor = $this->createUser('agricultor');
         $this->actingAs($agricultor);
 
         $this->get(route('insumos.index'))->assertOk();
+        $this->get(route('insumos.create'))->assertOk();
     }
 }
 

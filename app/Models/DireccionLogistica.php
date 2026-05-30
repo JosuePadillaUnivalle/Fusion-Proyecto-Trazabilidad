@@ -10,10 +10,24 @@ class DireccionLogistica extends Model
     protected $table = 'direccion_logistica';
     protected $primaryKey = 'direccionlogisticaid';
 
+    public function getRouteKeyName(): string
+    {
+        return 'direccionlogisticaid';
+    }
+
     protected $fillable = [
-        'nombre', 'direccion_completa', 'ciudad', 'departamento', 'pais',
+        'nombre', 'tipo_punto', 'direccion_completa', 'ciudad', 'departamento', 'pais',
         'latitud', 'longitud', 'referencia', 'activo',
     ];
+
+    public function etiquetaTipo(): string
+    {
+        return match (strtolower((string) ($this->tipo_punto ?? ''))) {
+            'origen' => 'Origen',
+            'destino' => 'Destino',
+            default => 'Punto logístico',
+        };
+    }
 
     protected $casts = [
         'latitud'  => 'float',

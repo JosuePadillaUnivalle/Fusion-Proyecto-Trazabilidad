@@ -25,7 +25,7 @@ class LotesActividadesModuloSeeder extends Seeder
 {
     private const MARK = '[MOD-LOTES]';
 
-    private const AGRICULTOR_EMAIL = 'agricultor@agronexus.com';
+    private const AGRICULTOR_EMAIL = 'agricultor@agrofusion.com';
 
     public function run(): void
     {

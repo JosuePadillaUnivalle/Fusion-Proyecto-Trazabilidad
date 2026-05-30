@@ -42,14 +42,6 @@ class UsuariosAccessTest extends TestCase
         $this->get(route('gestion.index'))->assertOk();
     }
 
-    public function test_operador_no_puede_ver_gestion_usuarios(): void
-    {
-        $operador = $this->createUser('operador');
-        $this->actingAs($operador);
-
-        $this->get(route('gestion.index'))->assertForbidden();
-    }
-
     public function test_agricultor_no_puede_ver_gestion_usuarios(): void
     {
         $agricultor = $this->createUser('agricultor');

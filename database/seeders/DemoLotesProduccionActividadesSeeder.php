@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Schema;
 
 class DemoLotesProduccionActividadesSeeder extends Seeder
 {
-    private const USUARIO_AGRICULTOR_EMAIL = 'agricultor@agronexus.com';
+    private const USUARIO_AGRICULTOR_EMAIL = 'agricultor@agrofusion.com';
 
     private const ACTOR_PRODUCTOR_NOMBRE = 'Productor Valle Verde';
 

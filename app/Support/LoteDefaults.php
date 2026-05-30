@@ -6,6 +6,7 @@ use App\Models\EstadoLoteTipo;
 use App\Models\HistorialEstadoLote;
 use App\Models\Lote;
 use App\Models\UnidadMedida;
+use App\Support\EstadoLoteCatalogo;
 use Illuminate\Support\Facades\Schema;
 
 class LoteDefaults
@@ -21,12 +22,12 @@ class LoteDefaults
             $data['codigo_trazabilidad'] = 'TRAZ-'.now()->format('Ymd').'-'.strtoupper(substr(uniqid(), -6));
         }
 
-        if (empty($data['estadolotetipoid'])) {
-            $data['estadolotetipoid'] = self::estadoDisponibleId();
+        if ($isNew && empty($data['estadolotetipoid'])) {
+            $data['estadolotetipoid'] = self::estadoPlanificadoId();
         }
 
-        if (empty($data['fechasiembra'])) {
-            $data['fechasiembra'] = now()->toDateString();
+        if ($isNew) {
+            unset($data['fechasiembra']);
         }
 
         $data['fechamodificacion'] = now();
@@ -50,7 +51,7 @@ class LoteDefaults
                 'observaciones' => 'Registro inicial del lote',
             ],
             [
-                'fecha_cambio' => $lote->fechasiembra ?? now(),
+                'fecha_cambio' => $lote->fechacreacion ?? now(),
                 'usuarioid' => $lote->usuarioid,
             ]
         );
@@ -63,10 +64,15 @@ class LoteDefaults
         return $id ? (int) $id : UnidadMedida::where('nombre', 'Hectárea')->value('unidadmedidaid');
     }
 
+    public static function estadoPlanificadoId(): ?int
+    {
+        return EstadoLoteCatalogo::idPorSlug('planificado')
+            ?? EstadoLoteTipo::whereRaw('LOWER(TRIM(nombre)) IN (?, ?)', ['planificado', 'disponible'])->value('estadolotetipoid');
+    }
+
+    /** @deprecated Use estadoPlanificadoId() */
     public static function estadoDisponibleId(): ?int
     {
-        $id = EstadoLoteTipo::whereRaw('LOWER(TRIM(nombre)) = ?', ['disponible'])->value('estadolotetipoid');
-
-        return $id ? (int) $id : EstadoLoteTipo::query()->orderBy('estadolotetipoid')->value('estadolotetipoid');
+        return self::estadoPlanificadoId();
     }
 }

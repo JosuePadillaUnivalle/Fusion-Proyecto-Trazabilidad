@@ -16,6 +16,21 @@ class Usuario extends Authenticatable
     protected $primaryKey = 'usuarioid';
     public $timestamps = false;
 
+    public function getRouteKeyName(): string
+    {
+        return 'usuarioid';
+    }
+
+    public function nombreCompleto(): string
+    {
+        return trim($this->nombre.' '.($this->apellido ?? '')) ?: ($this->nombreusuario ?? 'Sin nombre');
+    }
+
+    public function avatarUrl(): string
+    {
+        return \App\Support\UsuarioAvatar::resolve($this);
+    }
+
     protected $fillable = [
         'nombre',
         'apellido',
@@ -72,20 +87,5 @@ class Usuario extends Authenticatable
     public function almacen()
     {
         return $this->belongsTo(Almacen::class, 'almacenid', 'almacenid');
-    }
-
-    public function operadorPlanta()
-    {
-        return $this->hasOne(OperadorPlanta::class, 'usuarioid', 'usuarioid');
-    }
-
-    public function direccionesGeoEnvio()
-    {
-        return $this->hasMany(DireccionGeoEnvio::class, 'usuarioid', 'usuarioid');
-    }
-
-    public function almacenUsuarios()
-    {
-        return $this->hasMany(AlmacenUsuario::class, 'usuarioid', 'usuarioid');
     }
 }

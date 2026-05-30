@@ -42,8 +42,6 @@ class DashboardController extends Controller
             return view('dashboard.roles.planta', $this->buildPlantaData());
         } elseif ($user && $user->can('panel_transportista.view')) {
             return view('dashboard.roles.transportista', $this->buildTransportistaData($user));
-        } elseif ($user && $user->can('panel_almacen.view')) {
-            return view('dashboard.roles.almacen', $this->buildAlmacenData($user));
         }
 
         // ========================================
@@ -63,8 +61,7 @@ class DashboardController extends Controller
                 ->whereYear('fechacosecha', now()->year)
                 ->sum('cantidad'),
             
-            // Insumos con stock bajo (manejar NULL en stockminimo)
-            'insumos_stock_bajo' => Insumo::whereRaw('stock <= COALESCE(stockminimo, 10)')->count(),
+            'insumos_stock_bajo' => Insumo::where('stock', '<=', \App\Support\InsumoCatalogo::UMBRAL_ALERTA_STOCK)->count(),
             
             // Ventas del mes
             'ventas_mes' => Venta::whereMonth('fechaventa', now()->month)
@@ -151,8 +148,8 @@ class DashboardController extends Controller
         // ========================================
         // INSUMOS CON STOCK BAJO (para alertas)
         // ========================================
-        $insumosStockBajo = Insumo::with('tipo')
-            ->whereRaw('stock <= COALESCE(stockminimo, 10)')
+        $insumosStockBajo = Insumo::with(['tipo', 'unidadMedida'])
+            ->where('stock', '<=', \App\Support\InsumoCatalogo::UMBRAL_ALERTA_STOCK)
             ->orderBy('stock')
             ->limit(5)
             ->get();

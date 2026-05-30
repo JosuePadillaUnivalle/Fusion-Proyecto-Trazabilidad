@@ -44,7 +44,8 @@ class AuthController extends Controller
 
         $usuario->save();
 
-        $usuario->assignRole('agricultor');
+        // 👇 Rol Agricultor
+        $usuario->assignRole('Agricultor');
 
         $token = $usuario->createToken('mobile')->plainTextToken;
 
@@ -88,7 +89,8 @@ class AuthController extends Controller
 
         $usuario->save();
 
-        $usuario->assignRole('admin');
+        // 👇 Rol Administrador
+        $usuario->assignRole('Admin');
 
         return response()->json([
             'message' => 'Administrador creado correctamente',

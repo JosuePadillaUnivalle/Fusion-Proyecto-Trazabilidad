@@ -87,12 +87,12 @@ class DemoUsuariosAlmacenesActoresSeeder extends Seeder
         }
 
         $usuarios = [
-            ['nombre' => 'Administrador', 'apellido' => 'Sistema', 'nombreusuario' => 'admin', 'email' => 'admin@agronexus.com', 'role' => 'admin', 'telefono' => '700000100'],
-            ['nombre' => 'Agricultor', 'apellido' => 'Demo', 'nombreusuario' => 'agricultor', 'email' => 'agricultor@agronexus.com', 'role' => 'agricultor', 'telefono' => '700000101'],
-            ['nombre' => 'Operador', 'apellido' => 'Logístico', 'nombreusuario' => 'operador', 'email' => 'operador@agronexus.com', 'role' => 'operador', 'telefono' => '700000102'],
-            ['nombre' => 'Planta', 'apellido' => 'Principal', 'nombreusuario' => 'planta', 'email' => 'planta@agronexus.com', 'role' => 'planta', 'telefono' => '700000103'],
-            ['nombre' => 'Carlos', 'apellido' => 'Mamani', 'nombreusuario' => 'transportista', 'email' => 'transportista@agronexus.com', 'role' => 'transportista', 'telefono' => '700000104'],
-            ['nombre' => 'Jorge', 'apellido' => 'Almacenero', 'nombreusuario' => 'almacen', 'email' => 'almacen@agronexus.com', 'role' => 'almacen', 'telefono' => '700000105'],
+            ['nombre' => 'Administrador', 'apellido' => 'Sistema', 'nombreusuario' => 'admin', 'email' => 'admin@agrofusion.com', 'role' => 'admin', 'telefono' => '700000100'],
+            ['nombre' => 'Agricultor', 'apellido' => 'Demo', 'nombreusuario' => 'agricultor', 'email' => 'agricultor@agrofusion.com', 'role' => 'agricultor', 'telefono' => '700000101'],
+            ['nombre' => 'Operador', 'apellido' => 'Logístico', 'nombreusuario' => 'operador', 'email' => 'operador@agrofusion.com', 'role' => 'operador', 'telefono' => '700000102'],
+            ['nombre' => 'Planta', 'apellido' => 'Principal', 'nombreusuario' => 'planta', 'email' => 'planta@agrofusion.com', 'role' => 'planta', 'telefono' => '700000103'],
+            ['nombre' => 'Carlos', 'apellido' => 'Mamani', 'nombreusuario' => 'transportista', 'email' => 'transportista@agrofusion.com', 'role' => 'transportista', 'telefono' => '700000104'],
+            ['nombre' => 'Jorge', 'apellido' => 'Almacenero', 'nombreusuario' => 'almacen', 'email' => 'almacen@agrofusion.com', 'role' => 'almacen', 'telefono' => '700000105'],
         ];
 
         foreach ($usuarios as $item) {

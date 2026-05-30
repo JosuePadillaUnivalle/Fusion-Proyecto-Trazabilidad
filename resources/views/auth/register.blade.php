@@ -1,6 +1,6 @@
 @extends('layouts.auth')
 
-@section('title', 'Registro | AgroNexus')
+@section('title', 'Registro | AgroFusion')
 
 @push('styles')
 <style>
@@ -30,7 +30,7 @@
 @section('content')
 <div class="form-header">
     <h2>Crear Cuenta</h2>
-    <p>Únete a AgroNexus y optimiza tu producción</p>
+    <p>Únete a AgroFusion y optimiza tu producción</p>
 </div>
 
 @if($errors->any())

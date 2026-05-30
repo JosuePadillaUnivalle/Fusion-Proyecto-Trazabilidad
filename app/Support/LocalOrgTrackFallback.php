@@ -8,6 +8,7 @@ use App\Models\RutaMultiEntrega;
 use App\Models\TipoEmpaque;
 use App\Models\TipoTransporte;
 use App\Models\Usuario;
+use App\Models\Vehiculo;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -239,32 +240,35 @@ final class LocalOrgTrackFallback
 
     public static function vehiculosPayload(): array
     {
+        $catalogo = self::catalogoVehiculosPorPlaca();
         $items = [];
         $seen = [];
 
-        if (Schema::hasTable('ruta_multi_entrega')) {
-            foreach (RutaMultiEntrega::query()->orderBy('rutamultientregaid')->get() as $r) {
-                $sum = $r->resumen;
-                if (! is_array($sum)) {
-                    continue;
-                }
-                $placa = $sum['vehiculo_placa'] ?? null;
-                if (! $placa || isset($seen[$placa])) {
+        if (Schema::hasTable('vehiculo')) {
+            foreach (Vehiculo::query()->with(['tipoVehiculo', 'estadoVehiculo'])->orderBy('placa')->get() as $vehiculo) {
+                $placa = trim((string) $vehiculo->placa);
+                if ($placa === '') {
                     continue;
                 }
                 $seen[$placa] = true;
-                $nombre = $sum['vehiculo_nombre'] ?? 'Vehículo';
-                $estado = $sum['vehiculo_estado'] ?? 'Activo';
-                $capKg = $sum['capacidad_kg'] ?? null;
-                $items[] = [
-                    'placa' => $placa,
-                    'tipo_vehiculo' => ['nombre' => $nombre],
-                    'tipoVehiculo' => ['nombre' => $nombre],
-                    'estado_vehiculo' => ['nombre' => $estado],
-                    'estadoVehiculo' => ['nombre' => $estado],
-                    'capacidad_carga' => $capKg !== null ? $capKg.' kg' : null,
-                    'capacidad' => $capKg,
-                ];
+                $items[] = self::filaVehiculoDesdeModelo($vehiculo, $catalogo[$placa] ?? null);
+            }
+        }
+
+        if (Schema::hasTable('ruta_multi_entrega')) {
+            foreach (RutaMultiEntrega::query()->orderBy('rutamultientregaid')->get() as $r) {
+                $sum = is_array($r->resumen) ? $r->resumen : [];
+                $placa = trim((string) ($sum['vehiculo_placa'] ?? ''));
+                if ($placa === '' || isset($seen[$placa])) {
+                    continue;
+                }
+                $seen[$placa] = true;
+                $meta = array_merge($catalogo[$placa] ?? [], [
+                    'vehiculo_nombre' => $sum['vehiculo_nombre'] ?? null,
+                    'vehiculo_estado' => $sum['vehiculo_estado'] ?? null,
+                    'capacidad_kg' => $sum['capacidad_kg'] ?? null,
+                ]);
+                $items[] = self::filaVehiculoDesdeMeta($placa, $meta);
             }
         }
 
@@ -275,15 +279,7 @@ final class LocalOrgTrackFallback
                     continue;
                 }
                 $seen[$key] = true;
-                $items[] = [
-                    'placa' => $key,
-                    'tipo_vehiculo' => ['nombre' => 'Referencia envío'],
-                    'tipoVehiculo' => ['nombre' => 'Referencia envío'],
-                    'estado_vehiculo' => ['nombre' => '—'],
-                    'estadoVehiculo' => ['nombre' => '—'],
-                    'capacidad_carga' => null,
-                    'capacidad' => null,
-                ];
+                $items[] = self::filaVehiculoDesdeMeta($key, $catalogo[$key] ?? ['vehiculo_nombre' => 'Referencia de envío']);
             }
         }
 
@@ -296,6 +292,97 @@ final class LocalOrgTrackFallback
                     : 'No hay datos disponibles de vehículos registrados.',
             ],
         ];
+    }
+
+    /**
+     * @return array<string, array{vehiculo_nombre: string, capacidad_kg: int|float, vehiculo_estado?: string}>
+     */
+    private static function catalogoVehiculosPorPlaca(): array
+    {
+        return [
+            'SCZ-1020' => ['vehiculo_nombre' => 'Camión Volvo FH', 'capacidad_kg' => 10000, 'vehiculo_estado' => 'Activo'],
+            'SCZ-2040' => ['vehiculo_nombre' => 'Camioneta Toyota Hilux', 'capacidad_kg' => 1200, 'vehiculo_estado' => 'Activo'],
+            'SCZ-3090' => ['vehiculo_nombre' => 'Camión Mercedes Atego', 'capacidad_kg' => 7000, 'vehiculo_estado' => 'En mantenimiento'],
+            'SCZ-MOD-01' => ['vehiculo_nombre' => 'Camión Volvo FH', 'capacidad_kg' => 10000, 'vehiculo_estado' => 'Activo'],
+            'SCZ-MOD-02' => ['vehiculo_nombre' => 'Camioneta Toyota Hilux', 'capacidad_kg' => 1200, 'vehiculo_estado' => 'Activo'],
+            'SCZ-MOD-03' => ['vehiculo_nombre' => 'Camión Mercedes Atego', 'capacidad_kg' => 7000, 'vehiculo_estado' => 'Activo'],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $meta
+     * @return array<string, mixed>
+     */
+    private static function filaVehiculoDesdeModelo(Vehiculo $vehiculo, ?array $meta = null): array
+    {
+        $meta = $meta ?? [];
+        $tipo = $meta['vehiculo_nombre']
+            ?? self::nombreTipoDesdeMarcaModelo($vehiculo->marca, $vehiculo->modelo, $vehiculo->tipoVehiculo?->nombre);
+
+        $capKg = $meta['capacidad_kg'] ?? $vehiculo->tipoVehiculo?->capacidad_kg;
+        $estado = $meta['vehiculo_estado']
+            ?? $vehiculo->estadoVehiculo?->nombre
+            ?? ($vehiculo->activo ? 'Activo' : 'En mantenimiento');
+
+        return self::filaVehiculo($vehiculo->placa, $tipo, $estado, $capKg);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    private static function filaVehiculoDesdeMeta(string $placa, array $meta): array
+    {
+        $tipo = $meta['vehiculo_nombre'] ?? 'Vehículo';
+        $estado = $meta['vehiculo_estado'] ?? 'Activo';
+        $capKg = $meta['capacidad_kg'] ?? null;
+
+        return self::filaVehiculo($placa, $tipo, $estado, $capKg);
+    }
+
+    private static function nombreTipoDesdeMarcaModelo(?string $marca, ?string $modelo, ?string $tipoCatalogo = null): string
+    {
+        $marca = trim((string) $marca);
+        $modelo = trim((string) $modelo);
+        if ($marca !== '' && $modelo !== '') {
+            $prefijo = preg_match('/hilux|ranger|amarok/i', $modelo) ? 'Camioneta' : 'Camión';
+
+            return trim($prefijo.' '.$marca.' '.$modelo);
+        }
+
+        return $tipoCatalogo ?: 'Vehículo';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function filaVehiculo(string $placa, string $tipo, string $estado, mixed $capKg): array
+    {
+        $capFormateada = self::formatearCapacidadKg($capKg);
+
+        return [
+            'placa' => $placa,
+            'tipo_vehiculo' => ['nombre' => $tipo],
+            'tipoVehiculo' => ['nombre' => $tipo],
+            'estado_vehiculo' => ['nombre' => $estado],
+            'estadoVehiculo' => ['nombre' => $estado],
+            'capacidad_carga' => $capFormateada,
+            'capacidad' => $capKg,
+        ];
+    }
+
+    private static function formatearCapacidadKg(mixed $capKg): ?string
+    {
+        if ($capKg === null || $capKg === '' || $capKg === '—') {
+            return null;
+        }
+
+        $num = is_numeric($capKg) ? (float) $capKg : null;
+        if ($num === null) {
+            return (string) $capKg;
+        }
+
+        return number_format($num, 0, ',', '.').' kg';
     }
 
     /**

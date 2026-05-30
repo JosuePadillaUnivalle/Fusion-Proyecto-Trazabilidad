@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Mi Perfil | AgroNexus')
+@section('title', 'Mi Perfil | AgroFusion')
 @section('page_title', 'Configuración de Cuenta')
 
 @section('breadcrumbs')
@@ -24,16 +24,21 @@
                             <div class="col-lg-4 border-right pr-lg-5 mb-4 mb-lg-0">
                                 <div
                                     class="d-flex flex-column align-items-center text-center p-4 bg-light rounded shadow-sm">
-                                    <div class="position-relative mb-3">
-                                        <img class="profile-user-img img-fluid img-circle elevation-2"
-                                            src="{{ $user->imagenurl ? $user->imagenurl : asset('images/user.png') }}"
+                                    <div class="position-relative mb-3" id="avatarPreviewWrap">
+                                        <img id="avatarPreview" class="profile-user-img img-fluid img-circle elevation-2"
+                                            src="{{ $avatarUrl }}"
                                             alt="Avatar"
+                                            data-avatar-fallback="{{ \App\Support\UsuarioAvatar::placeholder() }}"
+                                            onerror="if(this.dataset.avatarFallback){this.onerror=null;this.src=this.dataset.avatarFallback;}"
                                             style="width: 140px; height: 140px; object-fit: cover; border: 4px solid #28a745;">
-                                        <div class="position-absolute bg-success rounded-circle d-flex align-items-center justify-content-center text-white"
-                                            style="width: 35px; height: 35px; bottom: 0; right: 0; border: 2px solid white;">
+                                        <label for="imagen"
+                                            class="position-absolute bg-success rounded-circle d-flex align-items-center justify-content-center text-white mb-0"
+                                            style="width: 35px; height: 35px; bottom: 0; right: 0; border: 2px solid white; cursor: pointer;"
+                                            title="Cambiar foto de perfil">
                                             <i class="fas fa-camera"></i>
-                                        </div>
+                                        </label>
                                     </div>
+                                    <p class="small text-muted text-center mb-0">Haz clic en la cámara o elige archivo abajo</p>
 
                                     <h3 class="profile-username font-weight-bold text-dark mb-1">{{ $user->nombre }}
                                         {{ $user->apellido }}
@@ -81,22 +86,6 @@
                                     <small class="text-muted"><i class="fas fa-info-circle mr-1"></i> Los campos marcados
                                         con * son obligatorios</small>
                                 </div>
-
-                                @if(session('success'))
-                                    <div class="alert alert-success alert-dismissible fade show shadow-sm border-left-success">
-                                        <button type="button" class="close" data-dismiss="alert">&times;</button>
-                                        <div class="d-flex align-items-center">
-                                            <div class="icon-circle bg-success text-white mr-3 d-flex align-items-center justify-content-center rounded-circle"
-                                                style="width: 30px; height: 30px;">
-                                                <i class="fas fa-check"></i>
-                                            </div>
-                                            <div>
-                                                <h6 class="mb-0 font-weight-bold">¡Éxito!</h6>
-                                                <span>{{ session('success') }}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endif
 
                                 <form class="form-horizontal" method="POST" action="{{ route('profile.update') }}"
                                     enctype="multipart/form-data">
@@ -170,13 +159,10 @@
                                             <label for="imagen"
                                                 class="font-weight-bold small text-uppercase text-muted">Foto de
                                                 Perfil</label>
-                                            <div class="custom-file">
-                                                <input type="file" class="custom-file-input" id="imagen" name="imagen"
-                                                    accept="image/*">
-                                                <label class="custom-file-label" for="imagen">Seleccionar archivo...</label>
-                                            </div>
-                                            <small class="form-text text-muted mt-2">Formatos: JPG, PNG, JPEG. Máx
-                                                2MB.</small>
+                                            <input type="file" class="form-control-file" id="imagen" name="imagen"
+                                                accept="image/jpeg,image/png,image/webp,image/gif">
+                                            <small class="form-text text-muted mt-2" id="imagenFileName">Ningún archivo seleccionado</small>
+                                            <small class="form-text text-muted d-block">JPG, PNG o WEBP. Máximo 2 MB.</small>
                                         </div>
                                     </div>
 
@@ -249,3 +235,33 @@
         }
     </style>
 @endsection
+
+@push('scripts')
+<script>
+$(function () {
+    var $input = $('#imagen');
+    var $preview = $('#avatarPreview');
+    var $fileName = $('#imagenFileName');
+
+    $input.on('change', function () {
+        var file = this.files && this.files[0];
+        if (!file) {
+            $fileName.text('Ningún archivo seleccionado');
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            alert('La imagen no puede superar 2 MB.');
+            this.value = '';
+            $fileName.text('Ningún archivo seleccionado');
+            return;
+        }
+        $fileName.text(file.name);
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            $preview.attr('src', e.target.result);
+        };
+        reader.readAsDataURL(file);
+    });
+});
+</script>
+@endpush

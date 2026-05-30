@@ -38,12 +38,6 @@
 .modulo-cat .small-box-red {
     background: linear-gradient(135deg, #c0392b, #e74c3c) !important;
 }
-.modulo-cat .small-box-footer {
-    background: rgba(0, 0, 0, 0.12);
-    color: rgba(255, 255, 255, 0.9);
-    position: relative;
-    z-index: 1;
-}
 .modulo-cat .card-modulo-main {
     border-top: 3px solid #2c5530;
 }

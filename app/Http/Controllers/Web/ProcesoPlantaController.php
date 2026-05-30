@@ -13,7 +13,7 @@ class ProcesoPlantaController extends Controller
     public function __construct()
     {
         $this->middleware(function ($request, $next) {
-            if ($request->user()?->hasRole('agricultor') || $request->user()?->hasRole('transportista') || $request->user()?->hasRole('almacen')) {
+            if ($request->user()?->hasRole('agricultor') || $request->user()?->hasRole('transportista')) {
                 abort(403);
             }
 
@@ -26,7 +26,7 @@ class ProcesoPlantaController extends Controller
         $query = $this->filteredQuery($request);
 
         $stats = [
-            'total' => (clone $query)->count(),
+            'total' => ProcesoPlanta::count(),
             'activos' => ProcesoPlanta::where('activo', true)->count(),
             'inactivos' => ProcesoPlanta::where('activo', false)->count(),
         ];
@@ -34,6 +34,11 @@ class ProcesoPlantaController extends Controller
         $procesos = $query->orderBy('procesoplantaid', 'desc')->paginate(15)->withQueryString();
 
         return view('procesos_planta.index', compact('procesos', 'stats'));
+    }
+
+    public function create(): View
+    {
+        return view('procesos_planta.create');
     }
 
     public function show(ProcesoPlanta $procesos_plantum): View
@@ -50,6 +55,11 @@ class ProcesoPlantaController extends Controller
         return view('procesos_planta.show', compact('proceso', 'produccionesRecientes'));
     }
 
+    public function edit(ProcesoPlanta $procesos_plantum): View
+    {
+        return view('procesos_planta.edit', ['proceso' => $procesos_plantum]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -58,9 +68,11 @@ class ProcesoPlantaController extends Controller
             'activo' => 'nullable|boolean',
         ]);
         $data['activo'] = $request->boolean('activo', true);
-        ProcesoPlanta::create($data);
+        $proceso = ProcesoPlanta::create($data);
 
-        return redirect()->route('procesos-planta.index')->with('success', 'Proceso creado.');
+        return redirect()
+            ->route('procesos-planta.show', $proceso)
+            ->with('success', 'Proceso registrado correctamente.');
     }
 
     public function update(Request $request, ProcesoPlanta $procesos_plantum): RedirectResponse
@@ -73,7 +85,9 @@ class ProcesoPlantaController extends Controller
         $data['activo'] = $request->boolean('activo', false);
         $procesos_plantum->update($data);
 
-        return redirect()->route('procesos-planta.index')->with('success', 'Proceso actualizado.');
+        return redirect()
+            ->route('procesos-planta.show', $procesos_plantum)
+            ->with('success', 'Proceso actualizado.');
     }
 
     public function destroy(ProcesoPlanta $procesos_plantum): RedirectResponse

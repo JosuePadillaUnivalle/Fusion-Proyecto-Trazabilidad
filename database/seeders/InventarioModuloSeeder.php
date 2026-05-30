@@ -32,9 +32,9 @@ class InventarioModuloSeeder extends Seeder
 
     private const ALMACEN_CENTRAL = 'Almacén Central Santa Cruz';
 
-    private const EMAIL_ALMACEN = 'almacen@agronexus.com';
+    private const EMAIL_ALMACEN = 'almacen@agrofusion.com';
 
-    private const EMAIL_AGRICULTOR = 'agricultor@agronexus.com';
+    private const EMAIL_AGRICULTOR = 'agricultor@agrofusion.com';
 
     public function run(): void
     {

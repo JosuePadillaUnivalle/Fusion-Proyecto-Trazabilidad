@@ -38,15 +38,15 @@ class DemoEnviosCatalogosExtraSeeder extends Seeder
 
         $roleTransportista = Role::firstOrCreate(['name' => 'transportista', 'guard_name' => 'web']);
 
-        $admin = Usuario::where('email', 'admin@agronexus.com')->first();
-        $planta = Usuario::where('email', 'planta@agronexus.com')->first();
+        $admin = Usuario::where('email', 'admin@agrofusion.com')->first();
+        $planta = Usuario::where('email', 'planta@agrofusion.com')->first();
         $asignadorId = $planta?->usuarioid ?? $admin?->usuarioid;
 
         $carlos = $this->ensureTransportistaUsuario([
             'nombre' => 'Carlos',
             'apellido' => 'Mamani',
             'nombreusuario' => 'transportista',
-            'email' => 'transportista@agronexus.com',
+            'email' => 'transportista@agrofusion.com',
             'telefono' => '+59170001001',
             'ci' => '7894561',
             'licencia' => 'C',
@@ -57,7 +57,7 @@ class DemoEnviosCatalogosExtraSeeder extends Seeder
             'nombre' => 'Miguel',
             'apellido' => 'Rojas',
             'nombreusuario' => 'mrojas',
-            'email' => 'miguel.rojas@agronexus.com',
+            'email' => 'miguel.rojas@agrofusion.com',
             'telefono' => '+59170001002',
             'ci' => '6541239',
             'licencia' => 'B',
@@ -68,7 +68,7 @@ class DemoEnviosCatalogosExtraSeeder extends Seeder
             'nombre' => 'Luis',
             'apellido' => 'Fernández',
             'nombreusuario' => 'lfernandez',
-            'email' => 'luis.fernandez@agronexus.com',
+            'email' => 'luis.fernandez@agrofusion.com',
             'telefono' => '+59170001003',
             'ci' => '9873215',
             'licencia' => 'C',
@@ -445,8 +445,8 @@ class DemoEnviosCatalogosExtraSeeder extends Seeder
             return;
         }
 
-        $actor = Usuario::where('email', 'agricultor@agronexus.com')->first()
-            ?? Usuario::where('email', 'admin@agronexus.com')->first();
+        $actor = Usuario::where('email', 'agricultor@agrofusion.com')->first()
+            ?? Usuario::where('email', 'admin@agrofusion.com')->first();
 
         $filas = [
             ['lote' => 'Lote Norte A1', 'estado' => 'Sembrado', 'fecha' => '2026-01-26 08:00:00'],

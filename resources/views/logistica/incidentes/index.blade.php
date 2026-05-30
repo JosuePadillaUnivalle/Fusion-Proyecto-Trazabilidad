@@ -1,28 +1,28 @@
 @extends('layouts.app')
+
+@section('title', 'Incidentes de envío | AgroFusion')
+@section('page_title', 'Incidentes de envío')
+
 @push('styles')
 <style>
-.x-card{border:0;border-radius:14px;box-shadow:0 8px 24px rgba(18,38,63,.08)}
 .x-table thead th{background:#fff2f2;border-bottom:0}
 </style>
 @endpush
 
 @section('content')
-<div class="content-header">
-    <div class="container-fluid d-flex justify-content-between align-items-center">
-        <h1 class="m-0">Incidentes de envío</h1>
-        <a href="{{ route('logistica.incidentes.create') }}" class="btn btn-primary">Nuevo incidente</a>
-    </div>
-</div>
-
 <section class="content">
     <div class="container-fluid">
-        @if (session('success'))
-            <div class="alert alert-success">{{ session('success') }}</div>
-        @endif
-
-        <div class="card x-card">
+        <div class="card card-outline card-success card-modulo-main elevation-1">
+            <x-modulo-index-header
+                titulo="Incidentes de envío"
+                icono="fa-shield-alt"
+                :registros="$incidentes->total()"
+                :nuevo-href="route('logistica.incidentes.create')"
+                nuevo-text="Nuevo incidente"
+                nuevo-can="incidentes.create"
+            />
             <div class="card-body table-responsive p-0">
-                <table class="table table-hover x-table">
+                <table class="table table-modulo table-hover mb-0 x-table">
                     <thead>
                         <tr>
                             <th>Fecha</th>
@@ -69,4 +69,3 @@
     </div>
 </section>
 @endsection
-

@@ -42,14 +42,6 @@ class CertificacionesAccessTest extends TestCase
         $this->get(route('certificaciones.index'))->assertOk();
     }
 
-    public function test_operador_no_accede_a_certificaciones(): void
-    {
-        $operador = $this->createUser('operador');
-        $this->actingAs($operador);
-
-        $this->get(route('certificaciones.index'))->assertForbidden();
-    }
-
     public function test_agricultor_accede_a_certificaciones(): void
     {
         $agricultor = $this->createUser('agricultor');

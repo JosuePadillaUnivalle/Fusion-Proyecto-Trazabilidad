@@ -128,31 +128,17 @@
     </div>
 
     <div class="card card-outline card-success card-modulo-main elevation-1">
-        <div class="card-header">
-            <h3 class="card-title mb-0">
-                <i class="fas fa-tasks text-success mr-1"></i>
-                Actividades
-                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $actividades->total() }} registros</span>
-            </h3>
-            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
-                <div class="btn-group btn-group-sm view-toggle mr-1">
-                    <button type="button" class="btn btn-default" id="btnCardView" title="Tarjetas">
-                        <i class="fas fa-th-large"></i>
-                    </button>
-                    <button type="button" class="btn btn-default active" id="btnTableView" title="Tabla">
-                        <i class="fas fa-list"></i>
-                    </button>
-                </div>
-                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosActividadesPanel" title="Filtros">
-                    <i class="fas fa-filter"></i>
-                </button>
-                @can('lotes.update')
-                <a href="{{ route('actividades.create') }}" class="btn btn-success btn-sm">
-                    <i class="fas fa-plus mr-1"></i> Nueva
-                </a>
-                @endcan
-            </div>
-        </div>
+        <x-modulo-index-header
+            titulo="Actividades"
+            icono="fa-tasks"
+            :registros="$actividades->total()"
+            filtros-target="#filtrosActividadesPanel"
+            :view-toggle="true"
+            view-default="table"
+            :nuevo-href="route('actividades.create')"
+            nuevo-text="Nueva"
+            nuevo-can="lotes.update"
+        />
 
         <div id="filtrosActividadesPanel" class="filtros-panel collapse {{ $filtrosActivos->isNotEmpty() ? 'show' : '' }}">
             <form method="GET" action="{{ route('actividades.index') }}">
@@ -194,19 +180,10 @@
                         </select>
                     </div>
                 </div>
-                <div class="d-flex flex-wrap align-items-center mt-1" style="gap: 8px;">
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="fas fa-search mr-1"></i> Aplicar
-                    </button>
-                    <a href="{{ route('actividades.index') }}" class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-times mr-1"></i> Limpiar
-                    </a>
-                    @if($filtrosActivos->isNotEmpty())
-                    <span class="small text-muted ml-1">
-                        <i class="fas fa-filter mr-1"></i>{{ $actividades->total() }} resultado(s)
-                    </span>
-                    @endif
-                </div>
+                <x-filtros-form-actions
+                    :limpiar-url="route('actividades.index', ['filtros_abiertos' => 1])"
+                    :resultados="$filtrosActivos->isNotEmpty() ? $actividades->total() : null"
+                />
             </form>
         </div>
 
@@ -437,17 +414,7 @@ $(function () {
         });
     });
 
-    @if(session('success'))
-    Swal.fire({
-        icon: 'success',
-        title: '¡Completado!',
-        html: @json(session('success')),
-        confirmButtonColor: '#2c5530',
-        timer: 5000,
-        timerProgressBar: true
-    });
-    @endif
-    @if(session('error'))
+@if(session('error'))
     Swal.fire({
         icon: 'error',
         title: 'Error',

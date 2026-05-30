@@ -9,11 +9,26 @@ use Illuminate\Http\Request;
 
 class EnvioFusionController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $envios = EnvioAsignacionMultiple::with(['pedido', 'transportista', 'ruta', 'almacen'])
-            ->orderByDesc('envioasignacionmultipleid')
-            ->paginate(20);
+        $query = EnvioAsignacionMultiple::with(['pedido', 'transportista', 'ruta', 'almacen'])
+            ->orderByDesc('envioasignacionmultipleid');
+
+        if ($request->filled('buscar')) {
+            $term = '%' . $request->string('buscar')->trim() . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('vehiculo_ref', 'like', $term)
+                    ->orWhere('externo_envio_id', 'like', $term)
+                    ->orWhereHas('pedido', fn ($p) => $p->where('nombre_planta', 'like', $term))
+                    ->orWhereHas('transportista', fn ($t) => $t->where('nombre', 'like', $term)->orWhere('apellido', 'like', $term));
+            });
+        }
+
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->string('estado'));
+        }
+
+        $envios = $query->paginate(20)->withQueryString();
 
         return view('orgtrack.envios.index', compact('envios'));
     }
@@ -35,14 +50,7 @@ class EnvioFusionController extends Controller
             'estado' => 'nullable|string|max:50',
             'vehiculo_ref' => 'nullable|string|max:100',
             'transportista_usuarioid' => 'nullable|integer',
-            'tipotransporteid' => 'nullable|integer|exists:tipo_transporte,tipotransporteid',
-            'motivocancelacionid' => 'nullable|integer|exists:motivo_cancelacion_envio,motivocancelacionid',
-            'recogidaentregaid' => 'nullable|integer|exists:recogida_entrega,recogidaentregaid',
         ]);
-
-        if (! empty($data['estado'])) {
-            $data = \App\Support\EnvioAsignacionEstadoCatalogo::applyToAttributes($data);
-        }
 
         $envio->update($data);
 

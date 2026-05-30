@@ -27,7 +27,6 @@ use App\Http\Controllers\Web\UserProfileController;
 // 🔹 nuevos controladores web de almacenamiento
 use App\Http\Controllers\Web\TipoAlmacenController;
 use App\Http\Controllers\Web\AlmacenController;
-use App\Http\Controllers\Web\ProduccionAlmacenamientoController;
 
 
 
@@ -38,17 +37,19 @@ use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\ReporteController;
 
 // 🔹 Catálogos Controller
-use App\Http\Controllers\Web\CatalogoController;
+use App\Http\Controllers\Web\CatalogoSelectorController;
 
 // 🔹 External API Proxy Controller
 use App\Http\Controllers\Web\EnvioDashboardController;
 use App\Http\Controllers\Web\EnvioDetalleController;
 use App\Http\Controllers\Web\EnvioMandarController;
 use App\Http\Controllers\Web\EnvioSeguimientoController;
+use App\Http\Controllers\Web\Envios\EnvioDireccionController;
+use App\Http\Controllers\Web\Envios\EnvioTransportistaController;
+use App\Http\Controllers\Web\Envios\EnvioVehiculoController;
 use App\Http\Controllers\Web\ExternalApiProxyController;
 use App\Http\Controllers\Web\CertificacionController;
 use App\Http\Controllers\Web\ActorAbastecimientoController;
-use App\Http\Controllers\Web\RecursoProductivoController;
 use App\Http\Controllers\Web\ProcesoPlantaController;
 use App\Http\Controllers\Web\MaquinaPlantaController;
 use App\Http\Controllers\Web\AsignacionMultipleController;
@@ -91,10 +92,17 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/panel-transportista', [DashboardController::class, 'panelTransportista'])->name('dashboard.panel-transportista');
     Route::get('/dashboard/panel-almacen', [DashboardController::class, 'panelAlmacen'])->name('dashboard.panel-almacen');
 
-    // Catálogos centralizados
-    Route::get('/catalogos', [CatalogoController::class, 'index'])
-        ->name('catalogos.index')
-        ->middleware('action.permission:catalogos,read');
+    Route::prefix('catalogo-selector')->name('catalogo-selector.')->group(function () {
+        Route::get('/usuarios', [CatalogoSelectorController::class, 'usuarios'])->name('usuarios');
+        Route::get('/cultivos', [CatalogoSelectorController::class, 'cultivos'])->name('cultivos');
+        Route::get('/lotes', [CatalogoSelectorController::class, 'lotes'])->name('lotes');
+        Route::get('/insumos', [CatalogoSelectorController::class, 'insumos'])->name('insumos');
+        Route::get('/actores', [CatalogoSelectorController::class, 'actores'])->name('actores');
+        Route::get('/almacenes', [CatalogoSelectorController::class, 'almacenes'])->name('almacenes');
+        Route::get('/producciones', [CatalogoSelectorController::class, 'producciones'])->name('producciones');
+        Route::get('/procesos-planta', [CatalogoSelectorController::class, 'procesosPlanta'])->name('procesos-planta');
+        Route::get('/maquinas-planta', [CatalogoSelectorController::class, 'maquinasPlanta'])->name('maquinas-planta');
+    });
 
     // API endpoints para clima (OpenWeather)
     Route::get('/api/clima', [DashboardController::class, 'getClima'])->name('api.clima');
@@ -129,12 +137,15 @@ Route::middleware('auth')->group(function () {
     Route::post('actores-abastecimiento', [ActorAbastecimientoController::class, 'store'])->name('actores-abastecimiento.store')->middleware('action.permission:inventario,update');
     Route::put('actores-abastecimiento/{actores_abastecimiento}', [ActorAbastecimientoController::class, 'update'])->name('actores-abastecimiento.update')->middleware('action.permission:inventario,update');
     Route::delete('actores-abastecimiento/{actores_abastecimiento}', [ActorAbastecimientoController::class, 'destroy'])->name('actores-abastecimiento.destroy')->middleware('action.permission:inventario,update');
-    Route::get('recursos-productivos', [RecursoProductivoController::class, 'index'])->name('recursos-productivos.index')->middleware('action.permission:inventario,read');
     Route::get('lotes/mapa', [LoteController::class, 'mapa'])->name('lotes.mapa')->middleware('action.permission:lotes,read');
     Route::get('lotes', [LoteController::class, 'index'])->name('lotes.index')->middleware('action.permission:lotes,read');
     Route::get('lotes/create', [LoteController::class, 'create'])->name('lotes.create')->middleware('action.permission:lotes,create');
     Route::post('lotes/sincronizar-operacion', [LoteController::class, 'sincronizarOperacion'])->name('lotes.sincronizar-operacion')->middleware('action.permission:lotes,update');
     Route::post('lotes', [LoteController::class, 'store'])->name('lotes.store')->middleware('action.permission:lotes,create');
+    Route::get('lotes/{lote}/trazabilidad', [LoteController::class, 'trazabilidad'])->name('lotes.trazabilidad')->middleware('action.permission:lotes,read');
+    Route::get('lotes/{lote}/cambiar-estado', [LoteController::class, 'cambiarEstadoForm'])->name('lotes.cambiar-estado')->middleware('action.permission:lotes,update');
+    Route::post('lotes/{lote}/cambiar-estado', [LoteController::class, 'cambiarEstadoStore'])->name('lotes.cambiar-estado.store')->middleware('action.permission:lotes,update');
+    Route::get('lotes/{lote}/ubicacion', [LoteController::class, 'ubicacion'])->name('lotes.ubicacion')->middleware('action.permission:lotes,read');
     Route::get('lotes/{lote}', [LoteController::class, 'show'])->name('lotes.show')->middleware('action.permission:lotes,read');
     Route::get('lotes/{lote}/edit', [LoteController::class, 'edit'])->name('lotes.edit')->middleware('action.permission:lotes,update');
     Route::put('lotes/{lote}', [LoteController::class, 'update'])->name('lotes.update')->middleware('action.permission:lotes,update');
@@ -150,8 +161,17 @@ Route::middleware('auth')->group(function () {
         ->parameters(['prioridades' => 'prioridad']);
     Route::resource('producciones', ProduccionController::class)
         ->parameters(['producciones' => 'produccion']);
-    Route::resource('procesos-planta', ProcesoPlantaController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
-    Route::resource('maquinas-planta', MaquinaPlantaController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+    Route::resource('procesos-planta', ProcesoPlantaController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::resource('maquinas-planta', MaquinaPlantaController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::patch('maquinas-planta/{maquinas_plantum}/toggle-activo', [MaquinaPlantaController::class, 'toggleActivo'])
+        ->name('maquinas-planta.toggle-activo');
+
+    // ── Registro a Planta (Entregable 10) ──
+    Route::get('registro-planta', [\App\Http\Controllers\Web\RegistroPlantaController::class, 'index'])->name('registro-planta.index');
+    Route::get('registro-planta/create', [\App\Http\Controllers\Web\RegistroPlantaController::class, 'create'])->name('registro-planta.create');
+    Route::post('registro-planta', [\App\Http\Controllers\Web\RegistroPlantaController::class, 'store'])->name('registro-planta.store');
+    Route::get('registro-planta/{lote}', [\App\Http\Controllers\Web\RegistroPlantaController::class, 'show'])->name('registro-planta.show')->where('lote', '[0-9]+');
+
     Route::resource('tipo-actividad', TipoActividadController::class);
     Route::resource('tipo-insumos', TipoInsumoController::class);
     Route::resource('unidades-medida', UnidadMedidaController::class)
@@ -165,38 +185,70 @@ Route::middleware('auth')->group(function () {
     Route::delete('ventas/{venta}', [VentaController::class, 'destroy'])->name('ventas.destroy')->middleware('action.permission:ventas,delete');
     Route::resource('tipoalmacenes', TipoAlmacenController::class)
         ->parameters(['tipoalmacenes' => 'tipoalmacen']);
-    // Evita conflicto /almacenes/create vs /almacenes/{almacen} (404 por model binding)
-    Route::get('almacenes', [AlmacenController::class, 'index'])->name('almacenes.index')->middleware('action.permission:inventario,read');
-    Route::get('almacenes/create', [AlmacenController::class, 'create'])->name('almacenes.create')->middleware('action.permission:inventario,create');
-    Route::get('almacenes/selector-ubicacion', [AlmacenController::class, 'selectorUbicacion'])->name('almacenes.selector-ubicacion')->middleware('action.permission:inventario,read');
-    Route::post('almacenes', [AlmacenController::class, 'store'])->name('almacenes.store')->middleware('action.permission:inventario,create');
-    Route::get('almacenes/{almacen}', [AlmacenController::class, 'show'])->name('almacenes.show')->middleware('action.permission:inventario,read');
-    Route::get('almacenes/{almacen}/edit', [AlmacenController::class, 'edit'])->name('almacenes.edit')->middleware('action.permission:inventario,update');
-    Route::put('almacenes/{almacen}', [AlmacenController::class, 'update'])->name('almacenes.update')->middleware('action.permission:inventario,update');
-    Route::delete('almacenes/{almacen}', [AlmacenController::class, 'destroy'])->name('almacenes.destroy')->middleware('action.permission:inventario,delete');
-    Route::resource('producciones_almacenamiento', ProduccionAlmacenamientoController::class)->only(['create', 'store'])->middleware('action.permission:inventario,create');
-    Route::resource('producciones_almacenamiento', ProduccionAlmacenamientoController::class)->only(['edit', 'update'])->middleware('action.permission:inventario,update');
-    Route::resource('producciones_almacenamiento', ProduccionAlmacenamientoController::class)->only(['destroy'])->middleware('action.permission:inventario,delete');
-    Route::resource('producciones_almacenamiento', ProduccionAlmacenamientoController::class)->only(['index', 'show'])->middleware('action.permission:inventario,read');
-    Route::get('almacen-movimientos', [AlmacenMovimientoController::class, 'index'])
-        ->name('almacen-movimientos.index')
-        ->middleware('action.permission:almacen_movimientos,read');
-    Route::get('almacen-movimientos/referencias-disponibles', [AlmacenMovimientoController::class, 'referenciasDisponibles'])
-        ->name('almacen-movimientos.referencias')
-        ->middleware('action.permission:almacen_movimientos,read');
-    Route::get('almacen-movimientos/{almacenMovimiento}', [AlmacenMovimientoController::class, 'show'])
-        ->whereNumber('almacenMovimiento')
-        ->name('almacen-movimientos.show')
-        ->middleware('action.permission:almacen_movimientos,read');
-    Route::get('almacen-movimientos/{naturaleza}/create', [AlmacenMovimientoController::class, 'create'])
-        ->name('almacen-movimientos.create')
-        ->middleware('action.permission:almacen_movimientos,read');
-    Route::post('almacen-movimientos/{naturaleza}', [AlmacenMovimientoController::class, 'store'])
-        ->name('almacen-movimientos.store')
-        ->middleware('action.permission:almacen_movimientos,read');
-    Route::get('almacen-reportes', [AlmacenMovimientoController::class, 'reportes'])
-        ->name('almacen-movimientos.reportes')
-        ->middleware('action.permission:almacen_reportes,read');
+    Route::redirect('almacenes', '/almacen-agricola');
+    Route::redirect('almacen-movimientos', '/almacen-agricola/movimientos');
+    Route::redirect('almacen-reportes', '/almacen-agricola/movimientos/reportes');
+
+    $registrarModuloAlmacen = function (string $prefijo, string $ambito) {
+        Route::prefix($prefijo)
+            ->name($prefijo.'.')
+            ->middleware(['almacen.ambito:'.$ambito])
+            ->group(function () use ($ambito) {
+                Route::get('/', [AlmacenController::class, 'index'])->name('index')->middleware('action.permission:inventario,read');
+                Route::get('/create', [AlmacenController::class, 'create'])->name('create')->middleware('action.permission:inventario,create');
+                Route::get('/selector-ubicacion', [AlmacenController::class, 'selectorUbicacion'])->name('selector-ubicacion')->middleware('action.permission:inventario,read');
+                Route::post('/', [AlmacenController::class, 'store'])->name('store')->middleware('action.permission:inventario,create');
+
+                Route::get('/movimientos/referencias-disponibles', [AlmacenMovimientoController::class, 'referenciasDisponibles'])
+                    ->name('movimientos.referencias')
+                    ->middleware('action.permission:almacen_movimientos,read');
+                Route::get('/movimientos/reportes', [AlmacenMovimientoController::class, 'reportes'])
+                    ->name('movimientos.reportes')
+                    ->middleware('action.permission:almacen_reportes,read');
+                Route::get('/movimientos', [AlmacenMovimientoController::class, 'index'])
+                    ->name('movimientos.index')
+                    ->middleware('action.permission:almacen_movimientos,read');
+                Route::get('/movimientos/cosecha/{produccionAlmacenamiento}', [AlmacenMovimientoController::class, 'showCosecha'])
+                    ->whereNumber('produccionAlmacenamiento')
+                    ->name('movimientos.cosecha.show')
+                    ->middleware('action.permission:almacen_movimientos,read');
+                Route::get('/movimientos/{almacenMovimiento}', [AlmacenMovimientoController::class, 'show'])
+                    ->whereNumber('almacenMovimiento')
+                    ->name('movimientos.show')
+                    ->middleware('action.permission:almacen_movimientos,read');
+                Route::get('/movimientos/{naturaleza}/create', [AlmacenMovimientoController::class, 'create'])
+                    ->whereIn('naturaleza', ['ingreso', 'salida'])
+                    ->name('movimientos.create')
+                    ->middleware('action.permission:almacen_movimientos,read');
+                Route::post('/movimientos/{naturaleza}', [AlmacenMovimientoController::class, 'store'])
+                    ->whereIn('naturaleza', ['ingreso', 'salida'])
+                    ->name('movimientos.store')
+                    ->middleware('action.permission:almacen_movimientos,read');
+
+                Route::get('/{almacen}', [AlmacenController::class, 'show'])
+                    ->whereNumber('almacen')
+                    ->name('show')
+                    ->middleware('action.permission:inventario,read');
+                Route::get('/{almacen}/edit', [AlmacenController::class, 'edit'])
+                    ->whereNumber('almacen')
+                    ->name('edit')
+                    ->middleware('action.permission:inventario,update');
+                Route::put('/{almacen}', [AlmacenController::class, 'update'])
+                    ->whereNumber('almacen')
+                    ->name('update')
+                    ->middleware('action.permission:inventario,update');
+                Route::delete('/{almacen}', [AlmacenController::class, 'destroy'])
+                    ->whereNumber('almacen')
+                    ->name('destroy')
+                    ->middleware('action.permission:inventario,delete');
+            });
+    };
+
+    Route::redirect('/almacen-agricola/almacenamiento-produccion', '/almacen-agricola/movimientos', 301);
+    Route::redirect('/almacen-agricola/almacenamiento-produccion/{any}', '/almacen-agricola/movimientos')->where('any', '.*');
+
+    $registrarModuloAlmacen('almacen-agricola', \App\Support\AlmacenAmbito::AGRICOLA);
+    $registrarModuloAlmacen('almacen-planta', \App\Support\AlmacenAmbito::PLANTA);
     Route::get('/certificaciones', [CertificacionController::class, 'index'])->name('certificaciones.index')->middleware('action.permission:certificaciones,read');
     Route::post('/certificaciones/masivo', [CertificacionController::class, 'storeBulk'])->name('certificaciones.store-bulk')->middleware('action.permission:certificaciones,create');
     Route::post('/certificaciones', [CertificacionController::class, 'store'])->name('certificaciones.store')->middleware('action.permission:certificaciones,create');
@@ -277,55 +329,39 @@ Route::middleware('auth')->group(function () {
         Route::get('/mandar', [EnvioMandarController::class, 'create'])->name('mandar')->middleware('action.permission:envios,create');
         Route::get('/seguimiento', [EnvioSeguimientoController::class, 'index'])->name('seguimiento')->middleware('action.permission:envios,read');
         Route::get('/admin', [EnvioDashboardController::class, 'index'])->name('admin')->middleware('action.permission:envios,admin');
-        Route::get('/transportistas', function () {
-            $payload = \App\Support\LocalOrgTrackFallback::transportistasPayload();
-            $transportistas = $payload['data'] ?? [];
-            $estadosFiltro = collect($transportistas)->map(function ($t) {
-                return $t['estado']['nombre'] ?? $t['estadotransportista']['nombre'] ?? ($t['estado'] ?? null);
-            })->filter()->unique()->sort()->values()->all();
-
-            return view('envios.transportistas', [
-                'transportistas' => $transportistas,
-                'metaInicial' => $payload['_meta'] ?? [],
-                'estadosFiltro' => $estadosFiltro,
+        Route::resource('transportistas', EnvioTransportistaController::class)
+            ->parameters(['transportistas' => 'transportista'])
+            ->names([
+                'index' => 'transportistas',
+                'create' => 'transportistas.create',
+                'store' => 'transportistas.store',
+                'show' => 'transportistas.show',
+                'edit' => 'transportistas.edit',
+                'update' => 'transportistas.update',
+                'destroy' => 'transportistas.destroy',
             ]);
-        })->name('transportistas')->middleware('action.permission:transportistas,read');
-        Route::get('/vehiculos', function () {
-            $payload = \App\Support\LocalOrgTrackFallback::vehiculosPayload();
-            $vehiculos = $payload['data'] ?? [];
-            $estadosFiltro = collect($vehiculos)->map(fn ($v) => $v['estado_vehiculo']['nombre'] ?? $v['estadoVehiculo']['nombre'] ?? ($v['estado'] ?? null))
-                ->filter()->unique()->sort()->values()->all();
-            $tiposFiltro = collect($vehiculos)->map(fn ($v) => $v['tipo_vehiculo']['nombre'] ?? $v['tipoVehiculo']['nombre'] ?? ($v['tipo'] ?? null))
-                ->filter()->unique()->sort()->values()->all();
-
-            return view('envios.vehiculos', [
-                'vehiculos' => $vehiculos,
-                'metaInicial' => $payload['_meta'] ?? [],
-                'estadosFiltro' => $estadosFiltro,
-                'tiposFiltro' => $tiposFiltro,
+        Route::resource('vehiculos', EnvioVehiculoController::class)
+            ->parameters(['vehiculos' => 'vehiculo'])
+            ->names([
+                'index' => 'vehiculos',
+                'create' => 'vehiculos.create',
+                'store' => 'vehiculos.store',
+                'show' => 'vehiculos.show',
+                'edit' => 'vehiculos.edit',
+                'update' => 'vehiculos.update',
+                'destroy' => 'vehiculos.destroy',
             ]);
-        })->name('vehiculos')->middleware('action.permission:vehiculos,read');
-        Route::get('/direcciones', function () {
-            $envios = \App\Support\LocalOrgTrackFallback::enviosPayload(500)['data'] ?? [];
-            $direcciones = [];
-            $seen = [];
-            foreach ($envios as $e) {
-                foreach ([['Origen', $e['direccion_origen'] ?? $e['origen'] ?? ''], ['Destino', $e['direccion_destino'] ?? $e['destino'] ?? '']] as [$tipo, $valor]) {
-                    $valor = trim((string) $valor);
-                    if ($valor === '') {
-                        continue;
-                    }
-                    $key = $tipo.'|'.$valor;
-                    if (isset($seen[$key])) {
-                        continue;
-                    }
-                    $seen[$key] = true;
-                    $direcciones[] = ['tipo' => $tipo, 'valor' => $valor];
-                }
-            }
-
-            return view('envios.direcciones', compact('direcciones'));
-        })->name('direcciones')->middleware('action.permission:direcciones,read');
+        Route::resource('direcciones', EnvioDireccionController::class)
+            ->parameters(['direcciones' => 'direccion'])
+            ->names([
+                'index' => 'direcciones',
+                'create' => 'direcciones.create',
+                'store' => 'direcciones.store',
+                'show' => 'direcciones.show',
+                'edit' => 'direcciones.edit',
+                'update' => 'direcciones.update',
+                'destroy' => 'direcciones.destroy',
+            ]);
         Route::get('/reportes-distribucion', [\App\Http\Controllers\Web\OrgTrackReportController::class, 'index'])->name('reportes-distribucion')->middleware('action.permission:reportes,read');
         Route::get('/{id}', [EnvioDetalleController::class, 'show'])->name('detalle')->where('id', '[0-9]+')->middleware('action.permission:envios,read');
 
@@ -384,6 +420,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/asignaciones/lote', [AsignacionMultipleController::class, 'storeBatch'])
             ->name('asignaciones.store-batch')
             ->middleware('action.permission:asignaciones,multiple');
+        Route::post('/asignaciones/asignar-automatica', [AsignacionMultipleController::class, 'asignarAutomatica'])
+            ->name('asignaciones.asignar-automatica')
+            ->middleware('action.permission:asignaciones,multiple');
         Route::patch('/asignaciones/{asignacion}/recepcion', [AsignacionMultipleController::class, 'markDelivered'])
             ->name('asignaciones.mark-delivered')
             ->middleware('action.permission:asignaciones,create');
@@ -397,6 +436,18 @@ Route::middleware('auth')->group(function () {
         Route::post('/rutas-multi', [RutaMultiEntregaController::class, 'store'])
             ->name('rutas.store')
             ->middleware('action.permission:rutas_multi,create');
+        Route::get('/rutas-multi/mapa', [RutaMultiEntregaController::class, 'mapa'])
+            ->name('rutas.mapa')
+            ->middleware('action.permission:rutas_multi,create');
+        Route::get('/rutas-multi/generar-automatica/vista-previa', [RutaMultiEntregaController::class, 'previewGenerarAutomatica'])
+            ->name('rutas.generar-automatica.preview')
+            ->middleware('action.permission:rutas_multi,create');
+        Route::post('/rutas-multi/generar-automatica', [RutaMultiEntregaController::class, 'generarAutomatica'])
+            ->name('rutas.generar-automatica')
+            ->middleware('action.permission:rutas_multi,create');
+        Route::get('/rutas-multi/{ruta}/trazado', [RutaMultiEntregaController::class, 'trazado'])
+            ->name('rutas.trazado')
+            ->middleware('action.permission:rutas_multi,read');
         Route::get('/rutas-multi/{ruta}', [RutaMultiEntregaController::class, 'show'])
             ->name('rutas.show')
             ->middleware('action.permission:rutas_multi,read');

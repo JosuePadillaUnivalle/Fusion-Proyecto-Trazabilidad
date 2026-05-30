@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\EnvioAsignacionMultiple;
-use App\Support\EnvioAsignacionEstadoCatalogo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,14 +14,6 @@ class AsignacionMultipleController extends Controller
         $q = EnvioAsignacionMultiple::query()
             ->with(['transportista', 'asignadoPor', 'ruta'])
             ->orderByDesc('created_at');
-        $user = auth()->user();
-        if ($user?->hasRole('almacen')) {
-            if ($user->almacenid) {
-                $q->where('almacenid', $user->almacenid);
-            } else {
-                $q->whereRaw('0 = 1');
-            }
-        }
         $asignaciones = $q->paginate(30);
 
         return response()->json($asignaciones);
@@ -44,7 +35,7 @@ class AsignacionMultipleController extends Controller
                 'externo_envio_id' => $validated['externo_envio_id'],
                 'transportista_usuarioid' => $validated['transportista_usuarioid'],
             ],
-            EnvioAsignacionEstadoCatalogo::applyToAttributes([
+            [
                 'pedidoid' => $validated['pedidoid'] ?? null,
                 'asignadopor_usuarioid' => auth()->id(),
                 'rutamultientregaid' => $validated['rutamultientregaid'] ?? null,
@@ -52,10 +43,10 @@ class AsignacionMultipleController extends Controller
                 'almacenid' => $validated['almacenid'] ?? null,
                 'estado' => 'asignado',
                 'fecha_asignacion' => now(),
-            ])
+            ]
         );
 
-        return response()->json($asignacion->load(['transportista', 'asignadoPor', 'ruta', 'estadoCatalogo']), 201);
+        return response()->json($asignacion->load(['transportista', 'asignadoPor', 'ruta']), 201);
     }
 
     public function storeBatch(Request $request): JsonResponse
@@ -75,14 +66,14 @@ class AsignacionMultipleController extends Controller
                     'externo_envio_id' => $envioId,
                     'transportista_usuarioid' => $validated['transportista_usuarioid'],
                 ],
-                EnvioAsignacionEstadoCatalogo::applyToAttributes([
+                [
                     'asignadopor_usuarioid' => auth()->id(),
                     'rutamultientregaid' => $validated['rutamultientregaid'] ?? null,
                     'vehiculo_ref' => $validated['vehiculo_ref'] ?? null,
                     'almacenid' => $validated['almacenid'] ?? null,
                     'estado' => 'asignado',
                     'fecha_asignacion' => now(),
-                ])
+                ]
             );
         }
 

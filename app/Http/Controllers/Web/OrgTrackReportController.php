@@ -6,14 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\AlmacenProducto;
 use App\Models\EnvioAsignacionMultiple;
 use App\Models\InventarioAlmacenEnvio;
+use App\Support\LocalOrgTrackFallback;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\View\View;
 
 class OrgTrackReportController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): View
     {
-        // dashboard counts
         $counts = [
             'total' => EnvioAsignacionMultiple::count(),
             'pendientes' => EnvioAsignacionMultiple::where('estado', 'pendiente')->count(),
@@ -28,7 +29,6 @@ class OrgTrackReportController extends Controller
                 : 0,
         ];
 
-        // top transportistas by asignaciones
         $topTransportistas = EnvioAsignacionMultiple::selectRaw('transportista_usuarioid, count(*) as c')
             ->whereNotNull('transportista_usuarioid')
             ->groupBy('transportista_usuarioid')
@@ -36,7 +36,7 @@ class OrgTrackReportController extends Controller
             ->limit(10)
             ->get();
 
-        $payload = \App\Support\LocalOrgTrackFallback::enviosPayload(500);
+        $payload = LocalOrgTrackFallback::enviosPayload(500);
         $envios = $payload['data'] ?? [];
 
         $porEstado = [];
@@ -75,8 +75,6 @@ class OrgTrackReportController extends Controller
             ];
         }
 
-        $metaInicial = $payload['_meta'] ?? [];
-
         return view('envios.reportes-distribucion', compact(
             'counts',
             'topTransportistas',
@@ -85,7 +83,6 @@ class OrgTrackReportController extends Controller
             'enviosPorEstado',
             'enviosPorDestino',
             'enviosPorTransportistaId',
-            'metaInicial'
         ));
     }
 }

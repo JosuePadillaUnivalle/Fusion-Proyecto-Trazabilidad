@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Calendario de actividades | AgroNexus')
+@section('title', 'Calendario de actividades | AgroFusion')
 @section('page_title', 'Calendario de actividades')
 
 @section('breadcrumbs')
@@ -18,10 +18,10 @@
         'riego' => '#17a2b8',
         'cosecha' => '#e67e00',
         'fumigacion' => '#dc3545',
-        'fumigaciÃ³n' => '#dc3545',
+        'fumigación' => '#dc3545',
         'labranza' => '#6c757d',
         'fertilizacion' => '#fd7e14',
-        'fertilizaciÃ³n' => '#fd7e14',
+        'fertilización' => '#fd7e14',
         'control-de-plagas' => '#6f42c1',
         'poda' => '#20c997',
         'auditoria-de-calidad' => '#5a6268',
@@ -32,10 +32,10 @@
         'siembra' => 'fa-seedling',
         'riego' => 'fa-tint',
         'fertilizacion' => 'fa-flask',
-        'fertilizaciÃ³n' => 'fa-flask',
+        'fertilización' => 'fa-flask',
         'cosecha' => 'fa-box-open',
         'fumigacion' => 'fa-spray-can',
-        'fumigaciÃ³n' => 'fa-spray-can',
+        'fumigación' => 'fa-spray-can',
         'labranza' => 'fa-tractor',
         'control-de-plagas' => 'fa-bug',
         'poda' => 'fa-cut',
@@ -74,7 +74,7 @@
     background-color: #17a2b8 !important;
     border-color: #17a2b8 !important;
 }
-/* Vista mes: cuadrÃ­cula limpia, sin barras de eventos */
+/* Vista mes: cuadrícula limpia, sin barras de eventos */
 .page-calendario .fc-dayGridMonth-view .fc-daygrid-day-events,
 .page-calendario .fc-dayGridMonth-view .fc-daygrid-event-harness,
 .page-calendario .fc-dayGridMonth-view .fc-more-link {
@@ -318,23 +318,21 @@
     </div>
 
     <div class="card card-outline card-success card-modulo-main elevation-1">
-        <div class="card-header">
-            <h3 class="card-title mb-0">
-                <i class="fas fa-calendar-alt text-success mr-1"></i>
-                Calendario
-                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $eventos->count() }} eventos</span>
-            </h3>
-            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
-                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosCalendarioPanel" title="Filtros">
-                    <i class="fas fa-filter"></i>
-                </button>
+        <x-modulo-index-header
+            titulo="Calendario"
+            icono="fa-calendar-alt"
+            :registros="$eventos->count()"
+            registros-label="eventos"
+            filtros-target="#filtrosCalendarioPanel"
+        >
+            <x-slot:tools>
                 @can('lotes.update')
-                <button type="button" class="btn btn-success btn-sm" data-toggle="modal" data-target="#newActivityModal">
-                    <i class="fas fa-plus mr-1"></i> Nueva
+                <button type="button" class="btn btn-success btn-sm ml-1" data-toggle="modal" data-target="#newActivityModal">
+                    <i class="fas fa-plus mr-1"></i> Nueva Actividad
                 </button>
                 @endcan
-            </div>
-        </div>
+            </x-slot:tools>
+        </x-modulo-index-header>
 
         <div id="filtrosCalendarioPanel" class="filtros-panel collapse show">
             <div class="row align-items-end">
@@ -395,7 +393,7 @@
                         class="btn btn-tipo-filtro {{ $activoDefecto ? 'active' : '' }}"
                         data-tipo-slug="{{ $slug }}"
                         data-color="{{ $color }}"
-                        title="{{ $activoDefecto ? 'Activo â€” clic para ocultar' : 'Inactivo â€” clic para mostrar' }}"
+                        title="{{ $activoDefecto ? 'Activo — clic para ocultar' : 'Inactivo — clic para mostrar' }}"
                         style="--tipo-color: {{ $color }};"
                         aria-pressed="{{ $activoDefecto ? 'true' : 'false' }}">
                         <i class="fas {{ $icono }} tipo-icono"></i>
@@ -413,11 +411,11 @@
         <div class="card-footer py-2 d-flex flex-wrap align-items-center" style="gap: 12px;">
             <small class="text-muted">
                 <i class="fas fa-mouse-pointer mr-1"></i>
-                <strong>Mes:</strong> clic en un dÃ­a (nÃºmero = cantidad de actividades).
+                <strong>Mes:</strong> clic en un día (número = cantidad de actividades).
             </small>
             <small class="text-muted">
                 <span class="dia-badge-calendario d-inline-block" style="position:static;transform:none;min-width:22px;height:22px;line-height:22px;font-size:0.7rem;"></span>
-                Total del dÃ­a
+                Total del día
             </small>
             <small class="text-muted">
                 <span class="dia-badge-calendario tiene-pendientes d-inline-block" style="position:static;transform:none;min-width:22px;height:22px;line-height:22px;font-size:0.7rem;"></span>
@@ -438,7 +436,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-success text-white py-2">
-                <h5 class="modal-title mb-0"><i class="fas fa-calendar-day mr-2"></i> <span id="dia-modal-titulo">Actividades del dÃ­a</span></h5>
+                <h5 class="modal-title mb-0"><i class="fas fa-calendar-day mr-2"></i> <span id="dia-modal-titulo">Actividades del día</span></h5>
                 <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <div class="modal-body p-0">
@@ -465,21 +463,21 @@
                             <div class="activity-detail-icon bg-success"><i class="fas fa-tasks"></i></div>
                             <div>
                                 <small class="text-muted d-block">Tipo</small>
-                                <strong id="modal-tipo">â€”</strong>
+                                <strong id="modal-tipo">—</strong>
                             </div>
                         </div>
                         <div class="d-flex align-items-center mb-3">
                             <div class="activity-detail-icon bg-info"><i class="fas fa-map-marked-alt"></i></div>
                             <div>
                                 <small class="text-muted d-block">Lote</small>
-                                <strong id="modal-lote">â€”</strong>
+                                <strong id="modal-lote">—</strong>
                             </div>
                         </div>
                         <div class="d-flex align-items-center mb-3">
                             <div class="activity-detail-icon" style="background:#4a7c59;"><i class="fas fa-user"></i></div>
                             <div>
                                 <small class="text-muted d-block">Responsable</small>
-                                <strong id="modal-responsable">â€”</strong>
+                                <strong id="modal-responsable">—</strong>
                             </div>
                         </div>
                     </div>
@@ -488,14 +486,14 @@
                             <div class="activity-detail-icon bg-warning"><i class="fas fa-calendar"></i></div>
                             <div>
                                 <small class="text-muted d-block">Inicio</small>
-                                <strong id="modal-fecha-inicio">â€”</strong>
+                                <strong id="modal-fecha-inicio">—</strong>
                             </div>
                         </div>
                         <div class="d-flex align-items-center mb-3">
                             <div class="activity-detail-icon bg-primary"><i class="fas fa-calendar-check"></i></div>
                             <div>
                                 <small class="text-muted d-block">Fin</small>
-                                <strong id="modal-fecha-fin">â€”</strong>
+                                <strong id="modal-fecha-fin">—</strong>
                             </div>
                         </div>
                         <div class="d-flex align-items-center mb-3">
@@ -509,7 +507,7 @@
                 </div>
                 <div class="callout callout-info mb-0 py-2">
                     <strong><i class="fas fa-comment mr-1"></i> Observaciones</strong>
-                    <p id="modal-observaciones" class="mb-0 text-muted small">â€”</p>
+                    <p id="modal-observaciones" class="mb-0 text-muted small">—</p>
                 </div>
             </div>
             <div class="modal-footer">
@@ -553,7 +551,7 @@
                                 <select name="loteid" class="form-control form-control-sm" required>
                                     <option value="">Seleccionar...</option>
                                     @foreach($lotes as $lote)
-                                        <option value="{{ $lote->loteid }}">{{ $lote->nombre }} â€” {{ $lote->cultivo->nombre ?? 'Sin cultivo' }}</option>
+                                        <option value="{{ $lote->loteid }}">{{ $lote->nombre }} — {{ $lote->cultivo->nombre ?? 'Sin cultivo' }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -679,9 +677,9 @@ document.addEventListener('DOMContentLoaded', function () {
             var g = grupos[key];
             var e = g.event;
             var props = e.extendedProps || {};
-            var sufijo = g.count > 1 ? ' (Ã—' + g.count + ')' : '';
+            var sufijo = g.count > 1 ? ' (×' + g.count + ')' : '';
             return Object.assign({}, e, {
-                title: (props.tipo || 'Actividad') + ' Â· ' + (props.lote || '') + sufijo,
+                title: (props.tipo || 'Actividad') + ' · ' + (props.lote || '') + sufijo,
                 classNames: [claseTipoEvento(props.tipoSlug)].concat(props.pendiente ? ['event-pendiente'] : []),
             });
         });
@@ -710,7 +708,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var html = '<i class="fas fa-filter mr-1"></i> Mostrando <strong>' + n + '</strong> de ' + allEvents.length + ' actividades';
         if (slugs.length === 0) {
             contadorEl.className = 'mt-1 filtro-alerta';
-            html = '<i class="fas fa-exclamation-triangle mr-1"></i> <strong>NingÃºn tipo seleccionado</strong> â€” activa al menos uno o pulsa Â«TodosÂ»';
+            html = '<i class="fas fa-exclamation-triangle mr-1"></i> <strong>Ningún tipo seleccionado</strong> — activa al menos uno o pulsa «Todos»';
         } else {
             contadorEl.className = 'mt-1 filtro-actualizado';
             setTimeout(function () {
@@ -729,13 +727,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function abrirDetalleActividad(props) {
-        document.getElementById('modal-tipo').textContent = props.tipo || 'â€”';
-        document.getElementById('modal-lote').textContent = props.lote || 'â€”';
-        document.getElementById('modal-responsable').textContent = props.responsable || 'â€”';
-        document.getElementById('modal-fecha-inicio').textContent = props.fechainicioFmt || 'â€”';
+        document.getElementById('modal-tipo').textContent = props.tipo || '—';
+        document.getElementById('modal-lote').textContent = props.lote || '—';
+        document.getElementById('modal-responsable').textContent = props.responsable || '—';
+        document.getElementById('modal-fecha-inicio').textContent = props.fechainicioFmt || '—';
         document.getElementById('modal-fecha-fin').textContent = props.pendiente
             ? 'Pendiente (se registra al completar)'
-            : (props.fechafin || 'â€”');
+            : (props.fechafin || '—');
         document.getElementById('modal-observaciones').textContent = props.observaciones || 'Sin observaciones';
         document.getElementById('modal-estado').innerHTML = props.pendiente
             ? '<span class="badge badge-warning">Pendiente</span>'
@@ -761,18 +759,18 @@ document.addEventListener('DOMContentLoaded', function () {
         lista.innerHTML = '';
 
         if (!grupos.length) {
-            lista.innerHTML = '<div class="p-3 text-muted text-center">Sin actividades este dÃ­a</div>';
+            lista.innerHTML = '<div class="p-3 text-muted text-center">Sin actividades este día</div>';
         } else {
             grupos.forEach(function (g) {
                 var li = document.createElement('button');
                 li.type = 'button';
                 li.className = 'list-group-item list-group-item-action text-left d-flex justify-content-between align-items-center';
-                var texto = '<span><strong>' + g.tipo + '</strong> <span class="text-muted">Â· ' + g.lote + '</span></span>';
+                var texto = '<span><strong>' + g.tipo + '</strong> <span class="text-muted">· ' + g.lote + '</span></span>';
                 var badges = g.pendiente
                     ? '<span class="badge badge-warning">Pendiente</span>'
                     : '<span class="badge badge-success">Hecha</span>';
                 if (g.cantidad > 1) {
-                    badges = '<span class="badge badge-secondary mr-1">Ã—' + g.cantidad + '</span>' + badges;
+                    badges = '<span class="badge badge-secondary mr-1">×' + g.cantidad + '</span>' + badges;
                 }
                 li.innerHTML = texto + badges;
                 li.addEventListener('click', function () {
@@ -863,7 +861,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function setBtnTipoActivo(btn, activo) {
         btn.classList.toggle('active', activo);
         btn.setAttribute('aria-pressed', activo ? 'true' : 'false');
-        btn.title = activo ? 'Activo â€” clic para ocultar' : 'Inactivo â€” clic para mostrar';
+        btn.title = activo ? 'Activo — clic para ocultar' : 'Inactivo — clic para mostrar';
     }
 
     document.querySelectorAll('.btn-tipo-filtro').forEach(function (btn) {

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Detalle de Aplicación | AgroNexus')
+@section('title', 'Detalle de Aplicación | AgroFusion')
 @section('page_title', 'Control de Insumos')
 
 @section('breadcrumbs')
@@ -28,7 +28,7 @@
                                     {{ $loteInsumo->insumo->nombre ?? 'Insumo Eliminado' }}
                                 </h4>
                                 <small
-                                    class="text-muted">{{ $loteInsumo->insumo->tipoInsumo->nombre ?? 'Tipo General' }}</small>
+                                    class="text-muted">{{ $loteInsumo->insumo->tipo->nombre ?? 'Tipo General' }}</small>
                             </div>
                         </div>
                     </div>
@@ -68,10 +68,6 @@
                                     <small class="text-muted">Operador</small>
                                 </div>
                             </div>
-                        </div>
-                        <div class="col-md-6 mb-4">
-                            <small class="text-uppercase text-muted font-weight-bold">Costo Total</small>
-                            <h4 class="text-dark font-weight-bold">Bs. {{ number_format($loteInsumo->costototal, 2) }}</h4>
                         </div>
                     </div>
 

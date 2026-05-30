@@ -19,14 +19,6 @@ class AlmacenMovimientoController extends Controller
             ->orderByDesc('fecha')
             ->orderByDesc('almacen_movimientoid');
 
-        if ($user?->hasRole('almacen')) {
-            if ($user->almacenid) {
-                $q->where('almacenid', $user->almacenid);
-            } else {
-                $q->whereRaw('0 = 1');
-            }
-        }
-
         return response()->json($q->paginate(20));
     }
 
@@ -48,11 +40,6 @@ class AlmacenMovimientoController extends Controller
         ]);
 
         $user = $request->user();
-        if ($user?->hasRole('almacen')) {
-            if (! $user->almacenid || (int) $user->almacenid !== (int) $data['almacenid']) {
-                abort(403);
-            }
-        }
 
         $tipo = TipoMovimientoAlmacen::query()
             ->whereKey($data['tipo_movimiento_almacenid'])

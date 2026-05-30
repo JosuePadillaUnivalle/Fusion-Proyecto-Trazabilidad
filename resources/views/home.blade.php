@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard | AgroNexus')
+@section('title', 'Dashboard | AgroFusion')
 @section('page_title', 'Dashboard Principal')
 
 @section('breadcrumbs')
@@ -135,72 +135,38 @@
             background: var(--primary-color);
         }
 
-        .stat-summary-grid {
+        .progress-group {
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 16px;
+            grid-template-columns: 6.5rem minmax(0, 1fr) 5.75rem;
+            align-items: center;
+            gap: 0 12px;
+            margin-bottom: 16px;
         }
 
-        @media (max-width: 991px) {
-            .stat-summary-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
-
-        @media (max-width: 575px) {
-            .stat-summary-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        .stat-mini-card {
-            border-radius: 12px;
-            padding: 18px 16px;
-            color: #fff;
-            min-height: 120px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-            transition: transform .2s ease;
-        }
-
-        .stat-mini-card:hover {
-            transform: translateY(-3px);
-        }
-
-        .stat-mini-icon {
-            font-size: 1.4rem;
-            opacity: .9;
-        }
-
-        .stat-mini-value {
-            font-size: 1.55rem;
-            font-weight: 700;
-            line-height: 1.2;
-            margin: 8px 0 4px;
-        }
-
-        .stat-mini-label {
-            font-size: .8rem;
+        .progress-group .pg-label {
             font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            opacity: .95;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .stat-mini-hint {
-            font-size: .7rem;
-            opacity: .8;
-            margin-top: 4px;
+        .progress-group .pg-value {
+            font-weight: 600;
+            text-align: right;
+            white-space: nowrap;
+            font-size: .9rem;
         }
 
-        .stat-tone-green { background: linear-gradient(135deg, #28a745, #20c997); }
-        .stat-tone-teal { background: linear-gradient(135deg, #17a2b8, #20c997); }
-        .stat-tone-blue { background: linear-gradient(135deg, #007bff, #6f42c1); }
-        .stat-tone-indigo { background: linear-gradient(135deg, #6610f2, #6f42c1); }
-        .stat-tone-orange { background: linear-gradient(135deg, #fd7e14, #ffc107); }
-        .stat-tone-gold { background: linear-gradient(135deg, #f39c12, #e74c3c); }
+        .progress-group .progress {
+            height: 10px;
+            border-radius: 5px;
+            margin: 0;
+            background: #e9ecef;
+        }
+
+        .progress-group .progress-bar {
+            border-radius: 5px;
+        }
 
         .weather-fuente-badge {
             display: inline-block;
@@ -315,15 +281,6 @@
             height: 100% !important;
         }
 
-        .progress-group {
-            margin-bottom: 15px;
-        }
-
-        .progress-group .progress {
-            height: 8px;
-            border-radius: 4px;
-        }
-
         .description-block {
             text-align: center;
             padding: 15px 0;
@@ -345,10 +302,48 @@
             font-size: 12px;
             font-weight: 600;
         }
+
+        .dashboard-home > .row {
+            margin-bottom: 1.35rem;
+        }
+
+        .dashboard-home > .row:last-child {
+            margin-bottom: 0;
+        }
+
+        .dashboard-home .card {
+            margin-bottom: 0;
+            box-shadow: 0 2px 12px rgba(18, 38, 63, 0.07);
+        }
+
+        .dashboard-home .card-header {
+            padding: 1rem 1.35rem;
+        }
+
+        .dashboard-home .card-body {
+            padding: 1.25rem 1.5rem;
+        }
+
+        .dashboard-home .small-box {
+            margin-bottom: 0.75rem;
+        }
+
+        .dashboard-home .weather-widget {
+            padding: 1.5rem 1.25rem;
+        }
+
+        .dashboard-home .quick-actions .btn {
+            margin-bottom: 0.65rem;
+        }
+
+        .dashboard-home .quick-actions .btn:last-child {
+            margin-bottom: 0;
+        }
     </style>
 @endpush
 
 @section('content')
+<div class="dashboard-home">
     <!-- FILA 1: Métricas Principales (4 small-boxes) -->
     <div class="row">
         <div class="col-lg-3 col-6">
@@ -542,7 +537,7 @@
                             </div>
                             <div class="alert-content">
                                 <h6>Stock bajo: {{ $insumo->nombre }}</h6>
-                                <small>Stock actual: {{ $insumo->stock }} | Mirimo: {{ $insumo->stockminimo }}</small>
+                                <small>Stock actual: {{ number_format($insumo->stock, 2) }} {{ $insumo->unidadMedida->abreviatura ?? '' }} (alerta ≤ {{ \App\Support\InsumoCatalogo::UMBRAL_ALERTA_STOCK }})</small>
                             </div>
                         </div>
                     @empty
@@ -556,78 +551,9 @@
         </div>
     </div>
 
-    <!-- FILA 4: Estado Actual de Lotes + Top Cultivos por Producción -->
+    <!-- FILA 4: Top Cultivos por Producción -->
     <div class="row">
-        <!-- Estado Actual de Lotes (solo si puede gestionar/ver lotes) -->
-        @can('lotes.view')
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-map mr-2"></i>
-                        Estado Actual de Lotes
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <!-- Columna Izquierda: Info Boxes (60%) -->
-                        <div class="col-md-7">
-                            <div class="row">
-                                @foreach($lotesPorEstado as $estado)
-                                    @php
-                                        $colores = [
-                                            'disponible' => 'secondary',
-                                            'en preparación' => 'info',
-                                            'sembrado' => 'primary',
-                                            'en producción' => 'success',
-                                            'cosechado' => 'warning',
-                                            'en descanso' => 'dark',
-                                        ];
-                                        $iconos = [
-                                            'disponible' => 'fa-pause',
-                                            'en preparación' => 'fa-tractor',
-                                            'sembrado' => 'fa-seedling',
-                                            'en producción' => 'fa-leaf',
-                                            'cosechado' => 'fa-cut',
-                                            'en descanso' => 'fa-bed',
-                                        ];
-                                        $color = $colores[$estado->nombre] ?? 'secondary';
-                                        $icono = $iconos[$estado->nombre] ?? 'fa-map';
-                                    @endphp
-                                    <div class="col-md-6">
-                                        <div class="info-box bg-{{ $color }}">
-                                            <span class="info-box-icon"><i class="fas {{ $icono }}"></i></span>
-                                            <div class="info-box-content">
-                                                <span class="info-box-text">{{ ucfirst($estado->nombre) }}</span>
-                                                <span class="info-box-number">{{ $estado->total }} Lotes</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-
-                                @if($lotesPorEstado->isEmpty())
-                                    <div class="col-12 text-center text-muted py-3">
-                                        <i class="fas fa-map-marked-alt fa-2x mb-2"></i>
-                                        <p class="mb-0">No hay lotes registrados</p>
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-
-                        <!-- Columna Derecha: Gráfico Circular (40%) -->
-                        <div class="col-md-5">
-                            <div style="height: 250px; position: relative;">
-                                <canvas id="lotesStateChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        @endcan
-
-        <!-- Top Cultivos por Producción -->
-        <div class="col-md-{{ auth()->user()->can('lotes.view') ? '6' : '12' }}">
+        <div class="col-lg-8 col-xl-6">
             <div class="card h-100">
                 <div class="card-header">
                     <h3 class="card-title">
@@ -635,19 +561,19 @@
                         Top Cultivos por Produccion
                     </h3>
                 </div>
-                <div class="card-body d-flex flex-column justify-content-around">
+                <div class="card-body d-flex flex-column justify-content-center py-4">
                     @php
                         $coloresProgress = ['success', 'warning', 'info', 'danger', 'primary'];
                         $maxProduccion = $topCultivos->max('total') ?: 1;
                     @endphp
                     @forelse($topCultivos as $index => $cultivo)
                         <div class="progress-group">
-                            <span class="float-left"><b>{{ $cultivo->nombre }}</b></span>
-                            <span class="float-right"><b>{{ number_format($cultivo->total, 0) }}kg</b></span>
+                            <span class="pg-label">{{ $cultivo->nombre }}</span>
                             <div class="progress progress-sm">
                                 <div class="progress-bar bg-{{ $coloresProgress[$index % 5] }}"
                                     style="width: {{ ($cultivo->total / $maxProduccion) * 100 }}%"></div>
                             </div>
+                            <span class="pg-value">{{ number_format($cultivo->total, 0) }} kg</span>
                         </div>
                     @empty
                         <div class="text-center text-muted py-3 my-auto">
@@ -659,34 +585,7 @@
             </div>
         </div>
     </div>
-
-    <!-- FILA 5: Resumen Estadístico del Sistema -->
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-chart-pie mr-2"></i>
-                        Resumen Estadistico del Sistema
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="stat-summary-grid">
-                        @foreach($resumenEstadistico as $item)
-                            <div class="stat-mini-card stat-tone-{{ $item['tone'] }}" title="{{ $item['hint'] }}">
-                                <div class="stat-mini-icon"><i class="fas {{ $item['icon'] }}"></i></div>
-                                <div>
-                                    <div class="stat-mini-value">{{ $item['value'] }}</div>
-                                    <div class="stat-mini-label">{{ $item['label'] }}</div>
-                                    <div class="stat-mini-hint">{{ $item['hint'] }}</div>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -766,47 +665,6 @@
             } else {
                 $('#productionChart').parent().html('<div class="text-center text-muted py-5"><i class="fas fa-chart-line fa-3x mb-3 d-block"></i><p>No hay datos de produccion aun</p></div>');
             }
-
-            @can('lotes.view')
-            // Gráfico de Estado de Lotes (Pie Chart)
-            var lotesData = @json($lotesPorEstado);
-            if (lotesData.length > 0 && document.getElementById('lotesStateChart')) {
-                var ctxPie = document.getElementById('lotesStateChart').getContext('2d');
-
-                var coloresMap = {
-                    'disponible': '#6c757d',
-                    'en preparación': '#17a2b8',
-                    'sembrado': '#007bff',
-                    'en producción': '#28a745',
-                    'cosechado': '#ffc107',
-                    'en descanso': '#343a40'
-                };
-
-                new Chart(ctxPie, {
-                    type: 'doughnut',
-                    data: {
-                        labels: lotesData.map(l => l.nombre.charAt(0).toUpperCase() + l.nombre.slice(1)),
-                        datasets: [{
-                            data: lotesData.map(l => l.total),
-                            backgroundColor: lotesData.map(l => coloresMap[l.nombre.toLowerCase()] || '#6c757d'),
-                            borderWidth: 2,
-                            borderColor: '#fff'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'right',
-                                labels: { boxWidth: 15, padding: 10 }
-                            }
-                        },
-                        cutout: '60%'
-                    }
-                });
-            }
-            @endcan
 
             // Efectos hover
             $('.small-box').hover(

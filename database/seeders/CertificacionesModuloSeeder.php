@@ -19,7 +19,7 @@ class CertificacionesModuloSeeder extends Seeder
 {
     private const MARK = '[MOD-CERT]';
 
-    private const ADMIN_EMAIL = 'admin@agronexus.com';
+    private const ADMIN_EMAIL = 'admin@agrofusion.com';
 
     public function run(): void
     {

@@ -387,6 +387,14 @@ return new class extends Migration {
             return count($rows) > 0;
         }
 
+        if ($connection->getDriverName() === 'pgsql') {
+            $result = $connection->selectOne(
+                "SELECT COUNT(*) AS c FROM pg_indexes WHERE schemaname = 'public' AND tablename = ? AND indexname = ?",
+                [$table, $indexName]
+            );
+            return isset($result->c) && (int) $result->c > 0;
+        }
+
         $db = $connection->getDatabaseName();
         $result = $connection->selectOne(
             'SELECT COUNT(*) AS c FROM information_schema.statistics WHERE table_schema = ? AND table_name = ? AND index_name = ?',

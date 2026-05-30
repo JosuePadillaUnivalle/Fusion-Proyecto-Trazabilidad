@@ -20,14 +20,7 @@
 @section('content')
 <div class="modulo-inv page-actores">
 
-    @if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show shadow-sm">
-        <button type="button" class="close" data-dismiss="alert">&times;</button>
-        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
-    </div>
-    @endif
-
-    @if($errors->any())
+@if($errors->any())
     <div class="alert alert-danger alert-dismissible fade show shadow-sm">
         <button type="button" class="close" data-dismiss="alert">&times;</button>
         <i class="fas fa-exclamation-triangle mr-1"></i>
@@ -136,18 +129,12 @@
     </div>
 
     <div class="card card-outline card-success card-modulo-main elevation-1">
-        <div class="card-header">
-            <h3 class="card-title mb-0">
-                <i class="fas fa-handshake text-success mr-1"></i>
-                Actores de abastecimiento
-                <span class="badge badge-light border text-muted badge-registros ml-2">{{ $actores->total() }} registros</span>
-            </h3>
-            <div class="card-tools d-flex align-items-center flex-wrap" style="gap: 6px;">
-                <button type="button" class="btn btn-tool" data-toggle="collapse" data-target="#filtrosActoresPanel" title="Filtros">
-                    <i class="fas fa-filter"></i>
-                </button>
-            </div>
-        </div>
+        <x-modulo-index-header
+            titulo="Actores de abastecimiento"
+            icono="fa-handshake"
+            :registros="$actores->total()"
+            filtros-target="#filtrosActoresPanel"
+        />
 
         <div id="filtrosActoresPanel" class="filtros-panel collapse">
             <div class="row">
@@ -178,12 +165,8 @@
                         <option value="inactivo">Inactivo</option>
                     </select>
                 </div>
-                <div class="col-lg-2 col-md-12 mb-2 d-flex align-items-end">
-                    <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btnLimpiarFiltros">
-                        <i class="fas fa-times mr-1"></i> Limpiar
-                    </button>
-                </div>
             </div>
+            <x-filtros-client-actions />
         </div>
 
         <div class="table-responsive">
@@ -384,6 +367,7 @@ document.addEventListener('DOMContentLoaded', function () {
     q?.addEventListener('keyup', filtrar);
     t?.addEventListener('change', filtrar);
     e?.addEventListener('change', filtrar);
+    document.getElementById('btnAplicarFiltros')?.addEventListener('click', filtrar);
 
     document.getElementById('btnLimpiarFiltros')?.addEventListener('click', function () {
         if (q) q.value = '';

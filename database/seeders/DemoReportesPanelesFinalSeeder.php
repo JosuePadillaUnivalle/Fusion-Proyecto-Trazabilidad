@@ -87,7 +87,7 @@ class DemoReportesPanelesFinalSeeder extends Seeder
         }
 
         $almacen = Almacen::where('nombre', self::ALMACEN_CENTRAL)->first();
-        $usuario = Usuario::where('email', 'almacen@agronexus.com')->first();
+        $usuario = Usuario::where('email', 'almacen@agrofusion.com')->first();
 
         if (! $almacen || ! $usuario) {
             return;
@@ -344,9 +344,9 @@ class DemoReportesPanelesFinalSeeder extends Seeder
      */
     private function seedPanelesRolesMinimos(): void
     {
-        $carlos = Usuario::where('email', 'transportista@agronexus.com')->first();
+        $carlos = Usuario::where('email', 'transportista@agrofusion.com')->first();
         $almacen = Almacen::where('nombre', self::ALMACEN_CENTRAL)->first();
-        $admin = Usuario::where('email', 'admin@agronexus.com')->first();
+        $admin = Usuario::where('email', 'admin@agrofusion.com')->first();
 
         if (Schema::hasTable('documento_entrega') && $carlos && $admin) {
             DocumentoEntrega::updateOrCreate(

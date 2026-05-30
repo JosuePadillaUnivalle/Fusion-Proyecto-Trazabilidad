@@ -1,5 +1,8 @@
 @extends('layouts.app')
 
+@section('title', 'Panel Almacén | AgroFusion')
+@section('page_title', 'Panel Almacén')
+
 @push('styles')
 <style>
 .panel-card{border:0;border-radius:14px;box-shadow:0 8px 24px rgba(18,38,63,.08)}
@@ -21,9 +24,7 @@
         <div class="row">
             <div class="col-md-6 col-lg-4"><div class="card metric-card bg-success panel-card"><div class="card-body"><i class="fas fa-inbox icon"></i><h3 class="mb-1">{{ $stats['envios_recibidos'] }}</h3><p class="mb-0">Envíos recibidos</p></div></div></div>
             <div class="col-md-6 col-lg-4"><div class="card metric-card bg-warning panel-card"><div class="card-body"><i class="fas fa-clock icon"></i><h3 class="mb-1">{{ $stats['por_recibir'] }}</h3><p class="mb-0">Por recibir</p></div></div></div>
-            <div class="col-md-6 col-lg-4"><div class="card metric-card bg-info panel-card"><div class="card-body"><i class="fas fa-boxes icon"></i><h3 class="mb-1">{{ $stats['inventario_total'] }}</h3><p class="mb-0">Inventario insumos</p></div></div></div>
-            <div class="col-md-6 col-lg-4"><div class="card metric-card bg-secondary panel-card"><div class="card-body"><i class="fas fa-dolly icon"></i><h3 class="mb-1">{{ number_format($stats['stock_productos_distribucion'] ?? 0, 2) }}</h3><p class="mb-0">Stock productos distribución</p></div></div></div>
-            <div class="col-md-6 col-lg-4"><div class="card metric-card bg-dark panel-card"><div class="card-body"><i class="fas fa-truck-loading icon"></i><h3 class="mb-1">{{ $stats['lineas_inventario_envio'] ?? 0 }}</h3><p class="mb-0">Líneas inventario por envío</p></div></div></div>
+            <div class="col-md-6 col-lg-4"><div class="card metric-card bg-info panel-card"><div class="card-body"><i class="fas fa-boxes icon"></i><h3 class="mb-1">{{ $stats['inventario_total'] }}</h3><p class="mb-0">Inventario total</p></div></div></div>
             <div class="col-md-6 col-lg-4"><div class="card metric-card bg-primary panel-card"><div class="card-body"><i class="fas fa-calendar-day icon"></i><h3 class="mb-1">{{ $stats['recibidos_hoy'] }}</h3><p class="mb-0">Recibidos hoy</p></div></div></div>
             <div class="col-md-6 col-lg-4"><div class="card metric-card bg-teal panel-card"><div class="card-body"><i class="fas fa-arrow-down icon"></i><h3 class="mb-1">{{ $stats['ingresos_mes'] ?? 0 }}</h3><p class="mb-0">Ingresos del mes</p></div></div></div>
             <div class="col-md-6 col-lg-4"><div class="card metric-card bg-orange panel-card"><div class="card-body"><i class="fas fa-arrow-up icon"></i><h3 class="mb-1">{{ $stats['salidas_mes'] ?? 0 }}</h3><p class="mb-0">Salidas del mes</p></div></div></div>
