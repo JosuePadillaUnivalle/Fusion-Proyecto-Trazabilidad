@@ -32,13 +32,13 @@
         <button type="button" class="close" data-dismiss="alert">&times;</button>
         <i class="fas fa-filter mr-1"></i>
         Filtro activo: <strong>{{ $filtroNaturaleza === 'ingreso' ? 'Ingresos' : 'Salidas' }}</strong>
-        <a href="{{ route('almacen-movimientos.index') }}" class="alert-link ml-2">Ver todos</a>
+        <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.movimientos.index') }}" class="alert-link ml-2">Ver todos</a>
     </div>
     @endif
 
     <div class="row mb-2">
         <div class="col-lg-4 col-md-4 col-12">
-            <a href="{{ route('almacen-movimientos.index', ['naturaleza' => 'ingreso']) }}"
+            <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.movimientos.index', ['naturaleza' => 'ingreso']) }}"
                class="mov-filter-card {{ $filtroNaturaleza === 'ingreso' ? 'active' : '' }}">
                 <div class="small-box small-box-green mb-0">
                     <div class="inner">
@@ -51,7 +51,7 @@
             </a>
         </div>
         <div class="col-lg-4 col-md-4 col-12">
-            <a href="{{ route('almacen-movimientos.index', ['naturaleza' => 'salida']) }}"
+            <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.movimientos.index', ['naturaleza' => 'salida']) }}"
                class="mov-filter-card {{ $filtroNaturaleza === 'salida' ? 'active' : '' }}">
                 <div class="small-box small-box-yellow mb-0">
                     <div class="inner">
@@ -64,7 +64,7 @@
             </a>
         </div>
         <div class="col-lg-4 col-md-4 col-12">
-            <a href="{{ route('almacen-movimientos.index') }}"
+            <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.movimientos.index') }}"
                class="mov-filter-card {{ $filtroNaturaleza === '' ? 'active' : '' }}">
                 <div class="small-box small-box-blue mb-0">
                     <div class="inner">
@@ -87,17 +87,22 @@
         >
             <x-slot:tools>
                 @can('almacen.ingresos.create')
-                <a class="btn btn-success btn-sm ml-1" href="{{ route('almacen-movimientos.create', ['naturaleza' => 'ingreso']) }}">
-                    <i class="fas fa-arrow-down mr-1"></i> Ingreso
+                <a class="btn btn-success btn-sm ml-1" href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.movimientos.create', ['naturaleza' => 'ingreso']) }}">
+                    <i class="fas fa-arrow-down mr-1"></i>
+                    @if(($ambito ?? '') === 'agricola')
+                        Ingreso manual
+                    @else
+                        Ingreso
+                    @endif
                 </a>
                 @endcan
                 @can('almacen.salidas.create')
-                <a class="btn btn-warning btn-sm" href="{{ route('almacen-movimientos.create', ['naturaleza' => 'salida']) }}">
+                <a class="btn btn-warning btn-sm" href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.movimientos.create', ['naturaleza' => 'salida']) }}">
                     <i class="fas fa-arrow-up mr-1"></i> Salida
                 </a>
                 @endcan
                 @can('almacen.reportes.view')
-                <a class="btn btn-info btn-sm" href="{{ route('almacen-movimientos.reportes') }}">
+                <a class="btn btn-info btn-sm" href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.movimientos.reportes') }}">
                     <i class="fas fa-chart-bar mr-1"></i> Reportes
                 </a>
                 @endcan
@@ -113,7 +118,7 @@
                             <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
                         </div>
                         <input type="text" id="movSearch" class="form-control"
-                            placeholder="Insumo, responsable o referencia...">
+                            placeholder="Producto, lote, responsable o referencia...">
                     </div>
                 </div>
                 <div class="col-lg-2 col-md-6 mb-2">
@@ -153,7 +158,7 @@
                         <th>Fecha</th>
                         <th>Tipo</th>
                         <th>Almacén</th>
-                        <th>Insumo</th>
+                        <th>Producto / detalle</th>
                         <th class="text-right">Cantidad</th>
                         <th>Responsable</th>
                         <th>Referencia</th>
@@ -161,35 +166,32 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($movimientos as $mov)
-                        @php
-                            $responsable = trim(($mov->usuario?->nombre ?? '') . ' ' . ($mov->usuario?->apellido ?? ''));
-                            $searchText = strtolower(trim(
-                                ($mov->insumo?->nombre ?? '') . ' ' . $responsable . ' ' . ($mov->referencia ?? '')
-                            ));
-                        @endphp
+                    @forelse($movimientos as $linea)
                         <tr class="mov-row"
-                            data-search="{{ $searchText }}"
-                            data-almacen="{{ strtolower($mov->almacen?->nombre ?? '') }}"
-                            data-tipo="{{ strtolower($mov->tipo?->nombre ?? '') }}"
-                            data-naturaleza="{{ strtolower($mov->tipo?->naturaleza ?? '') }}">
-                            <td>{{ optional($mov->fecha)->format('d/m/Y') }}</td>
+                            data-search="{{ $linea->search_text }}"
+                            data-almacen="{{ strtolower($linea->almacen_nombre) }}"
+                            data-tipo="{{ strtolower($linea->tipo_nombre) }}"
+                            data-naturaleza="{{ strtolower($linea->naturaleza) }}">
+                            <td>{{ $linea->fecha ? \Carbon\Carbon::parse($linea->fecha)->format('d/m/Y') : '—' }}</td>
                             <td>
-                                <span class="badge badge-{{ $mov->tipo?->naturaleza === 'ingreso' ? 'success' : 'warning' }}">
-                                    <i class="fas fa-arrow-{{ $mov->tipo?->naturaleza === 'ingreso' ? 'down' : 'up' }} mr-1"></i>
-                                    {{ $mov->tipo?->nombre ?? '—' }}
+                                <span class="badge badge-{{ $linea->naturaleza === 'ingreso' ? 'success' : 'warning' }}">
+                                    <i class="fas fa-arrow-{{ $linea->naturaleza === 'ingreso' ? 'down' : 'up' }} mr-1"></i>
+                                    {{ $linea->tipo_nombre }}
                                 </span>
+                                @if($linea->tipo_linea === 'cosecha')
+                                    <br><small class="text-muted"><i class="fas fa-seedling"></i> Desde registro de cosecha</small>
+                                @endif
                             </td>
-                            <td>{{ $mov->almacen?->nombre ?? '—' }}</td>
-                            <td><strong class="text-success">{{ $mov->insumo?->nombre ?? '—' }}</strong></td>
+                            <td>{{ $linea->almacen_nombre ?: '—' }}</td>
+                            <td><strong class="text-success">{{ $linea->producto }}</strong></td>
                             <td class="text-right">
-                                {{ number_format((float) $mov->cantidad, 3) }}
-                                <small class="text-muted">{{ $mov->insumo?->unidadMedida?->abreviatura }}</small>
+                                {{ number_format((float) $linea->cantidad, 2) }}
+                                <small class="text-muted">{{ $linea->unidad }}</small>
                             </td>
-                            <td>{{ $responsable ?: '—' }}</td>
-                            <td>{{ $mov->referencia ?: '—' }}</td>
+                            <td>{{ $linea->responsable ?: '—' }}</td>
+                            <td>{{ $linea->referencia ?: '—' }}</td>
                             <td class="text-center">
-                                <a href="{{ route('almacen-movimientos.show', ['almacenMovimiento' => $mov->almacen_movimientoid, 'naturaleza' => $filtroNaturaleza]) }}"
+                                <a href="{{ $linea->url_ver }}"
                                    class="btn btn-default btn-sm" title="Ver detalle">
                                     <i class="fas fa-eye text-info"></i>
                                 </a>

@@ -81,6 +81,7 @@
             :view-toggle="true"
             view-default="table"
             :nuevo-href="route('insumos.create')"
+            nuevo-text="Nuevo Insumo"
             nuevo-can="inventario.create"
         />
 

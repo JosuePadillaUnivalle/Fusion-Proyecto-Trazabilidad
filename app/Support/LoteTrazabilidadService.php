@@ -151,7 +151,7 @@ class LoteTrazabilidadService
                 'loteid' => $lote->loteid,
                 'return' => $return,
             ]),
-            'envio_almacen' => route('producciones_almacenamiento.create', [
+            'envio_almacen' => route('producciones.create', [
                 'loteid' => $lote->loteid,
                 'return' => $return,
             ]),

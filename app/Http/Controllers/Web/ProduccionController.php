@@ -10,16 +10,19 @@ use App\Models\UnidadMedida;
 use App\Models\EstadoLoteTipo;
 use App\Models\HistorialEstadoLote;
 use App\Models\Almacen;
+use App\Support\AlmacenAmbito;
 use App\Models\ProduccionAlmacenamiento;
 use App\Support\EstadoLoteCatalogo;
+use App\Services\AlmacenCapacidadService;
 use App\Services\OperacionAgricolaAutomaticaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ProduccionController extends Controller
 {
-    public function __construct()
-    {
+    public function __construct(
+        private readonly AlmacenCapacidadService $capacidadService,
+    ) {
         $this->middleware(function ($request, $next) {
             if ($request->user()?->hasRole('transportista')) {
                 abort(403, 'No tienes permiso para acceder al registro de producción.');
@@ -154,9 +157,10 @@ class ProduccionController extends Controller
         $lotes = $lotesQuery->orderBy('nombre')->get();
 
         $unidades = UnidadMedida::where('categoria', 'peso')->get();
-        $almacenes = Almacen::with(['tipoAlmacen', 'unidadMedida', 'almacenamientos'])
-            ->where('activo', true)
-            ->get();
+        $almacenes = AlmacenAmbito::scope(
+            Almacen::with(['tipoAlmacen', 'unidadMedida', 'almacenamientos'])->where('activo', true),
+            AlmacenAmbito::AGRICOLA
+        )->get();
         $lotePreseleccionado = $loteidParam
             ?? (old('loteid') ?: ($lotes->count() === 1 ? $lotes->first()->loteid : null));
         $lotePreseleccionadoLabel = null;
@@ -200,7 +204,7 @@ class ProduccionController extends Controller
 
             $destinoAlmacenamiento = DestinoProduccion::where('nombre', 'almacenamiento')->first();
             $unidadProduccion = UnidadMedida::find($data['unidadmedidaid']);
-            $cantidadBaseKg = $this->convertirAKg((float) $data['cantidad'], $unidadProduccion);
+            $cantidadBaseKg = $this->capacidadService->convertirAKg((float) $data['cantidad'], $unidadProduccion);
 
             $produccion = Produccion::create([
                 'loteid' => $data['loteid'],
@@ -213,26 +217,17 @@ class ProduccionController extends Controller
             ]);
 
             $mensajeAlmacen = '';
-            $almacen = Almacen::findOrFail($data['almacenid']);
+            $almacen = AlmacenAmbito::scope(Almacen::query(), AlmacenAmbito::AGRICOLA)
+                ->where('almacenid', $data['almacenid'])
+                ->firstOrFail();
 
             // ================================
             // 1) Capacidad del almacén en KG
             // ================================
                 $unidadAlmacen = $almacen->unidadMedida; // relación unidadMedida en modelo Almacen
-                $capacidadKg = $this->convertirAKg((float) ($almacen->capacidad ?? 0), $unidadAlmacen);
-
-                // ======================================
-                // 2) Ocupación actual del almacén en KG
-                // ======================================
-                $almacenamientos = ProduccionAlmacenamiento::with('unidadMedida')
-                    ->where('almacenid', $almacen->almacenid)
-                    ->whereNull('fechasalida')
-                    ->get();
-
-                $ocupadoKg = 0;
-                foreach ($almacenamientos as $alm) {
-                    $ocupadoKg += $this->convertirAKg((float) $alm->cantidad, $alm->unidadMedida);
-                }
+                $resumenAlmacen = $this->capacidadService->resumen($almacen);
+                $capacidadKg = $resumenAlmacen['capacidad_kg'];
+                $ocupadoKg = $resumenAlmacen['ocupado_kg'];
 
                 // =====================================
                 // 3) Nueva cantidad a ingresar en KG
@@ -290,7 +285,7 @@ class ProduccionController extends Controller
 
             $unidad = UnidadMedida::find($data['unidadmedidaid']);
             $mensaje = "¡Cosecha registrada! {$data['cantidad']} {$unidad->abreviatura} de {$lote->cultivo->nombre}"
-                . $mensajeAlmacen.' · Actividad de cosecha generada automáticamente.';
+                . $mensajeAlmacen.'. El ingreso aparece en Movimientos de almacén agrícola.';
 
             $returnUrl = $this->validReturnUrl($request->input('return'));
             if ($returnUrl) {

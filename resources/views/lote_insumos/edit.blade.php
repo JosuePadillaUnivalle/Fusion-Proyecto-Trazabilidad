@@ -86,20 +86,6 @@
                                 <small class="text-muted">Asignado por Lote</small>
                             </div>
                         </div>
-                         <div class="col-md-4">
-                            <div class="form-group">
-                                <label for="costototal" class="font-weight-bold">Costo Total (Est.)</label>
-                                <div class="input-group">
-                                    <div class="input-group-prepend">
-                                        <span class="input-group-text">Bs.</span>
-                                    </div>
-                                    <input type="number" step="0.01" name="costototal"
-                                           class="form-control"
-                                           value="{{ $loteInsumo->costototal }}" min="0" readonly>
-                                </div>
-                                <small class="text-muted">Se recalculará al guardar</small>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="row">

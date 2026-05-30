@@ -69,10 +69,6 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6 mb-4">
-                            <small class="text-uppercase text-muted font-weight-bold">Costo Total</small>
-                            <h4 class="text-dark font-weight-bold">Bs. {{ number_format($loteInsumo->costototal, 2) }}</h4>
-                        </div>
                     </div>
 
                     <div class="row">

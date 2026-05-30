@@ -11,12 +11,43 @@
 @push('styles')
 @include('partials.modulo-inventario-styles')
 <style>
-.page-lote-insumos .products-list .product-img {
-    width: 50px;
-    height: 50px;
-    display: flex;
+.page-lote-insumos .aplicacion-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    transition: box-shadow .2s, transform .2s;
+    overflow: hidden;
+}
+.page-lote-insumos .aplicacion-card:hover {
+    box-shadow: 0 6px 20px rgba(44, 85, 48, .12);
+    transform: translateY(-2px);
+}
+.page-lote-insumos .aplicacion-card .card-top {
+    background: linear-gradient(135deg, #f0f7f1, #fff);
+    padding: 1rem 1.1rem .75rem;
+    border-bottom: 1px solid #e8f0e9;
+}
+.page-lote-insumos .aplicacion-card .lote-nombre {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #2c5530;
+    margin: 0;
+}
+.page-lote-insumos .aplicacion-card .meta-chip {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
+    gap: .35rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: .35rem .6rem;
+    font-size: .8rem;
+    color: #475569;
+}
+.page-lote-insumos .aplicacion-card .meta-chip i { color: #2c5530; width: 14px; text-align: center; }
+.page-lote-insumos .aplicacion-card .card-actions {
+    border-top: 1px solid #eef2f6;
+    background: #fafbfc;
+    padding: .6rem 1rem;
 }
 </style>
 @endpush
@@ -58,11 +89,11 @@
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-yellow">
                 <div class="inner">
-                    <h3>Bs. {{ number_format($stats['costo_total'], 0) }}</h3>
-                    <p>Costo acumulado</p>
+                    <h3>{{ number_format($stats['cantidad_total'], 0) }}</h3>
+                    <p>Unidades aplicadas</p>
                 </div>
-                <div class="icon"><i class="fas fa-coins"></i></div>
-                <span class="small-box-footer">{{ number_format($stats['cantidad_total'], 2) }} u. aplicadas</span>
+                <div class="icon"><i class="fas fa-balance-scale"></i></div>
+                <span class="small-box-footer">Total histórico registrado</span>
             </div>
         </div>
     </div>
@@ -76,6 +107,7 @@
             :view-toggle="true"
             view-default="table"
             :nuevo-href="route('lote-insumos.create')"
+            nuevo-text="Nueva Aplicación de Insumos"
             nuevo-can="inventario.create"
         />
 
@@ -175,7 +207,8 @@
             </table>
         </div>
 
-        <div id="cardView" style="display: none;">
+        <div id="cardView" class="p-3" style="display: none;">
+            <div class="row">
             @forelse($loteInsumos as $li)
                 @php
                     $searchText = strtolower(trim(
@@ -183,56 +216,68 @@
                         ($li->insumo->nombre ?? '') . ' ' .
                         ($li->usuario->nombre ?? '')
                     ));
+                    $fechaTxt = $li->fechauo ? \Carbon\Carbon::parse($li->fechauo)->format('d/m/Y') : '—';
+                    $unidad = $li->insumo->unidadMedida->abreviatura ?? 'ud';
                 @endphp
-                <div class="search-item border-bottom"
+                <div class="col-md-6 col-xl-4 mb-3 search-item"
                     data-nombre="{{ $searchText }}"
                     data-estado="{{ strtolower($li->estado->nombre ?? '') }}"
                     data-encargado="{{ strtolower($li->usuario->nombre ?? '') }}">
-                    <ul class="products-list product-list-in-card pl-2 pr-2 mb-0">
-                        <li class="item">
-                            <div class="product-img bg-light rounded">
-                                <i class="fas fa-seedling text-success"></i>
+                    <div class="card aplicacion-card h-100 mb-0">
+                        <div class="card-top">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <p class="lote-nombre mb-1">
+                                        <i class="fas fa-map-marker-alt mr-1 text-success"></i>
+                                        {{ $li->lote->nombre ?? 'Sin lote' }}
+                                    </p>
+                                    <p class="mb-0 text-muted small">
+                                        <i class="fas fa-boxes mr-1"></i>{{ $li->insumo->nombre ?? 'Sin insumo' }}
+                                    </p>
+                                </div>
+                                <span class="badge badge-success">{{ $li->estado->nombre ?? 'Aplicado' }}</span>
                             </div>
-                            <div class="product-info">
-                                <a href="{{ route('lote-insumos.show', $li) }}" class="product-title">
-                                    {{ $li->lote->nombre ?? 'Sin lote' }}
-                                    <span class="badge badge-light border float-right">
-                                        {{ $li->estado->nombre ?? '—' }}
-                                    </span>
-                                </a>
-                                <span class="product-description">
-                                    <i class="fas fa-flask text-muted mr-1"></i>{{ $li->insumo->nombre ?? 'Sin insumo' }}
-                                    <span class="mx-2 text-muted">|</span>
-                                    <i class="fas fa-balance-scale text-muted mr-1"></i>{{ number_format((float) $li->cantidadusada, 2) }}
-                                    <span class="mx-2 text-muted">|</span>
-                                    <i class="fas fa-calendar text-muted mr-1"></i>
-                                    {{ $li->fechauo ? \Carbon\Carbon::parse($li->fechauo)->format('d/m/Y') : '—' }}
-                                    <span class="mx-2 text-muted">|</span>
-                                    <i class="fas fa-user text-muted mr-1"></i>{{ $li->usuario->nombre ?? '—' }}
-                                    @if($li->costototal)
-                                    <span class="mx-2 text-muted">|</span>
-                                    <i class="fas fa-coins text-muted mr-1"></i>Bs. {{ number_format((float) $li->costototal, 2) }}
-                                    @endif
-                                </span>
+                        </div>
+                        <div class="card-body py-3">
+                            <div class="row no-gutters text-center">
+                                <div class="col-4 mb-2">
+                                    <div class="meta-chip d-block w-100">
+                                        <i class="fas fa-balance-scale"></i>
+                                        <span>{{ number_format((float) $li->cantidadusada, 2) }} {{ $unidad }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-4 mb-2">
+                                    <div class="meta-chip d-block w-100">
+                                        <i class="fas fa-calendar-alt"></i>
+                                        <span>{{ $fechaTxt }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-4 mb-2">
+                                    <div class="meta-chip d-block w-100">
+                                        <i class="fas fa-user"></i>
+                                        <span>{{ $li->usuario->nombre ?? '—' }}</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="ml-2 text-nowrap">
-                                <a href="{{ route('lote-insumos.show', $li) }}" class="btn btn-xs btn-info" title="Ver"><i class="fas fa-eye"></i></a>
-                                @can('inventario.update')
-                                <a href="{{ route('lote-insumos.edit', $li) }}" class="btn btn-xs btn-warning" title="Editar"><i class="fas fa-edit"></i></a>
-                                @endcan
-                                @can('inventario.delete')
-                                <form action="{{ route('lote-insumos.destroy', $li) }}" method="POST" class="d-inline on-submit-confirm">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="btn btn-xs btn-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
-                                </form>
-                                @endcan
-                            </div>
-                        </li>
-                    </ul>
+                        </div>
+                        <div class="card-actions d-flex justify-content-end">
+                            <a href="{{ route('lote-insumos.show', $li) }}" class="btn btn-sm btn-outline-info mr-1" title="Ver"><i class="fas fa-eye"></i></a>
+                            @can('inventario.update')
+                            <a href="{{ route('lote-insumos.edit', $li) }}" class="btn btn-sm btn-outline-warning mr-1" title="Editar"><i class="fas fa-edit"></i></a>
+                            @endcan
+                            @can('inventario.delete')
+                            <form action="{{ route('lote-insumos.destroy', $li) }}" method="POST" class="d-inline on-submit-confirm">
+                                @csrf @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
+                            </form>
+                            @endcan
+                        </div>
+                    </div>
                 </div>
             @empty
-                <div class="text-center text-muted py-5">No hay aplicaciones registradas.</div>
+                <div class="col-12 text-center text-muted py-5">No hay aplicaciones registradas.</div>
             @endforelse
+            </div>
         </div>
 
         @if($loteInsumos->hasPages())

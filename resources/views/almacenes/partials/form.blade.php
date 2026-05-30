@@ -1,277 +1,277 @@
-@php
-    $campos = $guias['campos'] ?? [];
-    $tiposAyuda = $tiposAyuda ?? ($guias['tipos'] ?? []);
-    $esEdicion = isset($almacen);
-    $ubicacionValor = old('ubicacion', $almacen->ubicacion ?? '');
-    $dirLogId = old('direccionlogisticaid', $almacen->direccionlogisticaid ?? '');
-    $nombreValor = old('nombre', $almacen->nombre ?? '');
-    $descValor = old('descripcion', $almacen->descripcion ?? '');
-    $capValor = old('capacidad', $almacen->capacidad ?? '');
-    $tipoSel = old('tipoalmacenid', $almacen->tipoalmacenid ?? '');
-    $unidadSel = old('unidadmedidaid', $almacen->unidadmedidaid ?? '');
-    $activoChecked = old('activo', $esEdicion ? (bool) $almacen->activo : true);
-@endphp
-
-@if($errors->any())
-    <div class="alert alert-danger">
-        <strong>No se pudo guardar:</strong>
-        <ul class="mb-0 mt-2">
-            @foreach($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
-
-<div class="alert alert-info mb-3">
-    <i class="fas fa-info-circle mr-1"></i>
-    Elija la <strong>ubicación</strong> del catálogo cuando exista en logística u otros almacenes; así mantiene coherencia con envíos y pedidos.
-</div>
-
-<div class="card card-outline card-secondary collapsed-card mb-3">
-    <div class="card-header py-2">
-        <h3 class="card-title small mb-0">
-            <i class="fas fa-question-circle text-info mr-1"></i> Guía rápida de campos
-        </h3>
-        <div class="card-tools">
-            <button type="button" class="btn btn-tool" data-card-widget="collapse">
-                <i class="fas fa-plus"></i>
-            </button>
-        </div>
-    </div>
-    <div class="card-body py-2 small" style="display:none;">
-        <div class="row">
-            @foreach(['nombre', 'descripcion', 'ubicacion', 'capacidad', 'unidadmedidaid', 'tipoalmacenid', 'activo'] as $clave)
-                @if(!empty($campos[$clave]))
-                    <div class="col-md-6 mb-2">
-                        <strong class="text-capitalize">{{ str_replace('_', ' ', $clave === 'unidadmedidaid' ? 'unidad de capacidad' : $clave) }}:</strong>
-                        {{ $campos[$clave] }}
-                    </div>
-                @endif
-            @endforeach
-        </div>
-        @if($tiposAyuda !== [])
-            <hr class="my-2">
-            <p class="mb-1 font-weight-bold">Tipos de almacén:</p>
-            <ul class="mb-0 pl-3">
-                @foreach($tiposAyuda as $nombreTipo => $desc)
-                    <li><strong>{{ $nombreTipo }}:</strong> {{ $desc }}</li>
-                @endforeach
-            </ul>
-        @endif
-    </div>
-</div>
-
-<div class="form-group">
-    <label for="nombre">Nombre <span class="text-danger">*</span></label>
-    <input type="text" name="nombre" id="nombre" class="form-control @error('nombre') is-invalid @enderror"
-           maxlength="100" value="{{ $nombreValor }}" required>
-    @if(!empty($campos['nombre']))<p class="field-hint mb-0">{{ $campos['nombre'] }}</p>@endif
-    @error('nombre')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-</div>
-
-<div class="form-group">
-    <label for="descripcion">Descripción</label>
-    <input type="text" name="descripcion" id="descripcion" class="form-control @error('descripcion') is-invalid @enderror"
-           maxlength="250" value="{{ $descValor }}">
-    @if(!empty($campos['descripcion']))<p class="field-hint mb-0">{{ $campos['descripcion'] }}</p>@endif
-    @error('descripcion')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-</div>
-
-<div class="form-group">
-    <label for="ubicacion">Ubicación</label>
-    <div class="input-group">
-        <div class="input-group-prepend">
-            <span class="input-group-text"><i class="fas fa-map-marker-alt"></i></span>
-        </div>
-        <input type="text" name="ubicacion" id="ubicacion" class="form-control @error('ubicacion') is-invalid @enderror"
-               maxlength="200" value="{{ $ubicacionValor }}" placeholder="Dirección o referencia física">
-        <div class="input-group-append">
-            <button type="button" id="btn-abrir-selector-ubicacion" class="btn btn-outline-primary">
-                <i class="fas fa-external-link-alt mr-1"></i>Buscar en otra pantalla
-            </button>
-        </div>
-    </div>
-    <input type="hidden" name="direccionlogisticaid" id="direccionlogisticaid" value="{{ $dirLogId }}">
-    @if(!empty($campos['ubicacion']))<p class="field-hint mb-1">{{ $campos['ubicacion'] }}</p>@endif
-    <small id="ubicacion_detalle_hint" class="text-muted d-block mt-1">Use el botón para abrir el selector con filtros por categoría y texto.</small>
-    @error('ubicacion')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-    @error('direccionlogisticaid')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-</div>
-
-<div class="form-row">
-    <div class="form-group col-md-6">
-        <label for="capacidad">Capacidad</label>
-        <input type="number" step="0.01" min="0" name="capacidad" id="capacidad"
-               class="form-control @error('capacidad') is-invalid @enderror" value="{{ $capValor }}">
-        @if(!empty($campos['capacidad']))<p class="field-hint mb-0">{{ $campos['capacidad'] }}</p>@endif
-        @error('capacidad')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-    </div>
-    <div class="form-group col-md-6">
-        <label for="unidadmedidaid">Unidad de medida de capacidad</label>
-        <select name="unidadmedidaid" id="unidadmedidaid" class="form-control @error('unidadmedidaid') is-invalid @enderror">
-            <option value="">Seleccione...</option>
-            @foreach($unidades as $u)
-                <option value="{{ $u->unidadmedidaid }}" @selected((string) $unidadSel === (string) $u->unidadmedidaid)>
-                    {{ $u->nombre }}@if($u->abreviatura) ({{ $u->abreviatura }})@endif
-                </option>
-            @endforeach
-        </select>
-        @if(!empty($campos['unidadmedidaid']))<p class="field-hint mb-0">{{ $campos['unidadmedidaid'] }}</p>@endif
-        @error('unidadmedidaid')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-    </div>
-</div>
-
-<div class="form-group">
-    <label for="tipoalmacenid">Tipo de almacén</label>
-    <select name="tipoalmacenid" id="tipoalmacenid" class="form-control @error('tipoalmacenid') is-invalid @enderror">
-        <option value="">Seleccione...</option>
-        @foreach($tipos as $t)
-            <option value="{{ $t->tipoalmacenid }}"
-                    data-ayuda="{{ $tiposAyuda[$t->nombre] ?? '' }}"
-                    @selected((string) $tipoSel === (string) $t->tipoalmacenid)>{{ $t->nombre }}</option>
-        @endforeach
-    </select>
-    @if(!empty($campos['tipoalmacenid']))<p class="field-hint mb-1">{{ $campos['tipoalmacenid'] }}</p>@endif
-    <div id="tipo-almacen-ayuda" class="alert alert-light py-2 px-3 mb-0 small" style="display:none;"></div>
-    @error('tipoalmacenid')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-</div>
-
-<div class="form-group form-check">
-    <input type="checkbox" name="activo" value="1" class="form-check-input" id="activoCheck"
-           @checked($activoChecked)>
-    <label class="form-check-label" for="activoCheck">Activo</label>
-    @if(!empty($campos['activo']))<p class="field-hint mb-0">{{ $campos['activo'] }}</p>@endif
-</div>
-
-@push('styles')
-<style>
-.field-hint{font-size:.8rem;color:#6c757d;margin-top:.25rem}
-#tipo-almacen-ayuda{border-left:3px solid #17a2b8}
-</style>
-@endpush
-
-@push('scripts')
-<script>
-$(function () {
-    const inputUbic = document.getElementById('ubicacion');
-    const inputDir = document.getElementById('direccionlogisticaid');
-    const hint = document.getElementById('ubicacion_detalle_hint');
-    const btnSelector = document.getElementById('btn-abrir-selector-ubicacion');
-    const tipoSelect = document.getElementById('tipoalmacenid');
-    const tipoAyuda = document.getElementById('tipo-almacen-ayuda');
-
-    function aplicarUbicacionSeleccionada(payload) {
-        if (!payload || !inputUbic) return;
-        if (typeof payload.ubicacion === 'string') {
-            inputUbic.value = payload.ubicacion;
-        }
-        if (inputDir) inputDir.value = payload.direccionlogisticaid || '';
-        if (hint) hint.textContent = payload.direccionlogisticaid
-            ? 'Ubicación vinculada a dirección logística existente.'
-            : 'Ubicación seleccionada/manual sin vínculo de dirección logística.';
-    }
-
-    if (btnSelector) {
-        btnSelector.addEventListener('click', function () {
-            const url = @json(route('almacenes.selector-ubicacion'));
-            window.open(url, '_blank');
-        });
-    }
-
-    window.addEventListener('message', function (event) {
-        if (event.origin !== window.location.origin) return;
-        const data = event.data || {};
-        if (data.type === 'almacen-ubicacion-seleccionada') {
-            aplicarUbicacionSeleccionada(data.payload || {});
-        }
-    });
-
-    window.addEventListener('focus', function () {
-        try {
-            const raw = localStorage.getItem('almacen_ubicacion_selector');
-            if (!raw) return;
-            const payload = JSON.parse(raw);
-            aplicarUbicacionSeleccionada(payload);
-            localStorage.removeItem('almacen_ubicacion_selector');
-        } catch (e) {
-            // No interrumpir formulario si localStorage falla.
-        }
-    });
-
-    if (inputUbic) {
-        inputUbic.addEventListener('input', function () {
-            if (inputDir) inputDir.value = '';
-            if (hint) {
-                hint.textContent = inputUbic.value.trim() === ''
-                    ? 'Use el botón para abrir el selector con filtros por categoría y texto.'
-                    : 'Ubicación escrita manualmente.';
-            }
-        });
-    }
-
-    function actualizarAyudaTipo() {
-        if (!tipoSelect || !tipoAyuda) return;
-        const opt = tipoSelect.options[tipoSelect.selectedIndex];
-        const txt = opt ? (opt.getAttribute('data-ayuda') || '') : '';
-        if (txt) {
-            tipoAyuda.style.display = '';
-            tipoAyuda.innerHTML = '<i class="fas fa-warehouse text-info mr-1"></i>' + txt;
-        } else {
-            tipoAyuda.style.display = 'none';
-            tipoAyuda.innerHTML = '';
-        }
-    }
-    if (tipoSelect) {
-        tipoSelect.addEventListener('change', actualizarAyudaTipo);
-        actualizarAyudaTipo();
-    }
-
-    function checkSmartConversion() {
-        const cantidadInput = $('input[name="capacidad"]');
-        const unidadSelect = $('select[name="unidadmedidaid"]');
-        const cantidad = parseFloat(cantidadInput.val()) || 0;
-        const unidadNombre = unidadSelect.find('option:selected').text().toLowerCase();
-        $('#smartConversionAlert').remove();
-        if (unidadNombre.includes('kilo') || unidadNombre.includes('kg')) {
-            if (cantidad >= 1000) {
-                mostrarSugerenciaConversion(cantidadInput, 'Ton', cantidad / 1000, 'tonelada');
-            }
-        } else if (unidadNombre.includes('gramo') || unidadNombre.includes(' gr')) {
-            if (cantidad >= 1000) {
-                mostrarSugerenciaConversion(cantidadInput, 'Kg', cantidad / 1000, 'kilo');
-            }
-        }
-    }
-
-    function mostrarSugerenciaConversion(inputElement, nuevaUnidadTexto, nuevoValor, keywordNuevaUnidad) {
-        const alertHtml = `
-            <div id="smartConversionAlert" class="alert alert-info p-2 mt-2 shadow-sm d-flex justify-content-between align-items-center" style="border-radius: 8px;">
-                <div>
-                    <i class="fas fa-lightbulb text-info mr-2"></i>
-                    <strong>Sugerencia:</strong> ¿Convertir a <strong>${nuevoValor.toFixed(2)} ${nuevaUnidadTexto}</strong>?
-                </div>
-                <button type="button" class="btn btn-sm btn-light border font-weight-bold" id="btnAplicarConversion">
-                    Sí, cambiar
-                </button>
-            </div>`;
-        if ($('#smartConversionAlert').length === 0) {
-            inputElement.closest('.form-group, .form-row').first().append(alertHtml);
-        }
-        $('#btnAplicarConversion').off('click').on('click', function (e) {
-            e.preventDefault();
-            $('input[name="capacidad"]').val(nuevoValor.toFixed(2));
-            $('select[name="unidadmedidaid"] option').each(function () {
-                if ($(this).text().toLowerCase().includes(keywordNuevaUnidad)) {
-                    $(this).prop('selected', true);
-                    return false;
-                }
-            });
-            $('#smartConversionAlert').remove();
-        });
-    }
-
-    $('input[name="capacidad"], select[name="unidadmedidaid"]').on('change keyup blur', checkSmartConversion);
-});
-</script>
-@endpush
+@php
+    $campos = $guias['campos'] ?? [];
+    $esEdicion = isset($almacen);
+    $usarMapaUbicacion = ($ambito ?? '') === \App\Support\AlmacenAmbito::AGRICOLA;
+    $ubicacionValor = old('ubicacion', $almacen->ubicacion ?? '');
+    $dirLogId = old('direccionlogisticaid', $almacen->direccionlogisticaid ?? '');
+    $nombreValor = old('nombre', $almacen->nombre ?? '');
+    $descValor = old('descripcion', $almacen->descripcion ?? '');
+    $capValor = old('capacidad', $almacen->capacidad ?? '');
+@endphp
+
+@if($errors->any())
+    <div class="alert alert-danger">
+        <strong>No se pudo guardar:</strong>
+        <ul class="mb-0 mt-2">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
+@push('styles')
+<style>
+.page-almacen-form .form-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 14px rgba(0,0,0,.08);
+}
+.page-almacen-form .form-card .card-header {
+    background: linear-gradient(135deg, #2c5530, #4a7c59);
+    color: #fff;
+    border-radius: 12px 12px 0 0 !important;
+    padding: 1.1rem 1.25rem;
+}
+.page-almacen-form .guia-campo {
+    background: #f8fbf8;
+    border-left: 3px solid #2c5530;
+    border-radius: 0 8px 8px 0;
+    padding: 0.55rem 0.8rem;
+    margin-top: 0.4rem;
+    font-size: 0.84rem;
+    color: #495057;
+}
+.page-almacen-form .form-control {
+    border-radius: 8px;
+    border: 2px solid #dee2e6;
+    min-height: 44px;
+}
+.page-almacen-form .form-control:focus {
+    border-color: #2c5530;
+    box-shadow: 0 0 0 0.15rem rgba(44,85,48,.15);
+}
+.page-almacen-form .capacidad-addon {
+    background: #e8f5e9;
+    color: #2c5530;
+    font-weight: 600;
+    border: 2px solid #dee2e6;
+    border-left: none;
+}
+#mapaAlmacenUbicacion { height: 320px; border-radius: 8px; }
+</style>
+@if($usarMapaUbicacion)
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+@endif
+@endpush
+
+<div class="page-almacen-form">
+    <div class="alert alert-light border mb-3">
+        <i class="fas fa-warehouse text-success mr-1"></i>
+        @if($usarMapaUbicacion)
+            Registrá el depósito agrícola con su <strong>ubicación en mapa</strong> y capacidad en <strong>kilogramos</strong>.
+            Las cosechas que envíes aquí se verán en <strong>Movimientos</strong> y descontarán espacio disponible.
+        @else
+            Registrá el depósito de planta con ubicación de referencia y capacidad en <strong>kilogramos</strong>.
+        @endif
+    </div>
+
+    <div class="form-group">
+        <label for="nombre">Nombre <span class="text-danger">*</span></label>
+        <input type="text" name="nombre" id="nombre" class="form-control @error('nombre') is-invalid @enderror"
+               maxlength="100" value="{{ $nombreValor }}" required placeholder="Ej: Almacén Norte">
+        @if(!empty($campos['nombre']))<div class="guia-campo">{{ $campos['nombre'] }}</div>@endif
+        @error('nombre')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+    </div>
+
+    <div class="form-group">
+        <label for="descripcion">Descripción <span class="text-muted font-weight-normal">(opcional)</span></label>
+        <input type="text" name="descripcion" id="descripcion" class="form-control @error('descripcion') is-invalid @enderror"
+               maxlength="250" value="{{ $descValor }}" placeholder="Ej: Cámara para producto fresco">
+        @if(!empty($campos['descripcion']))<div class="guia-campo">{{ $campos['descripcion'] }}</div>@endif
+        @error('descripcion')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+    </div>
+
+    <div class="form-group">
+        <label for="ubicacion">Ubicación</label>
+        <div class="input-group">
+            <div class="input-group-prepend">
+                <span class="input-group-text"><i class="fas fa-map-marker-alt"></i></span>
+            </div>
+            <input type="text" name="ubicacion" id="ubicacion" class="form-control @error('ubicacion') is-invalid @enderror"
+                   maxlength="200" value="{{ $ubicacionValor }}" placeholder="Dirección o referencia física">
+            <div class="input-group-append">
+                @if($usarMapaUbicacion)
+                    <button type="button" id="btn-abrir-mapa-ubicacion" class="btn btn-outline-success">
+                        <i class="fas fa-map mr-1"></i>Buscar en mapa
+                    </button>
+                @else
+                    <button type="button" id="btn-abrir-selector-ubicacion" class="btn btn-outline-primary">
+                        <i class="fas fa-search mr-1"></i>Buscar ubicación
+                    </button>
+                @endif
+            </div>
+        </div>
+        <input type="hidden" name="direccionlogisticaid" id="direccionlogisticaid" value="{{ $dirLogId }}">
+        @if(!empty($campos['ubicacion']))<div class="guia-campo">{{ $campos['ubicacion'] }}</div>@endif
+        <small id="ubicacion_detalle_hint" class="text-muted d-block mt-1">
+            @if($usarMapaUbicacion)
+                Hacé clic en el mapa para fijar la ubicación o escribila manualmente.
+            @else
+                Podés elegir una ubicación del catálogo o escribir una nueva.
+            @endif
+        </small>
+        @error('ubicacion')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+        @error('direccionlogisticaid')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+    </div>
+
+    <div class="form-group">
+        <label for="capacidad">Capacidad máxima (kg)</label>
+        <div class="input-group">
+            <input type="number" step="0.01" min="0" name="capacidad" id="capacidad"
+                   class="form-control @error('capacidad') is-invalid @enderror"
+                   value="{{ $capValor }}" placeholder="Ej: 50000">
+            <div class="input-group-append">
+                <span class="input-group-text capacidad-addon">kg</span>
+            </div>
+        </div>
+        @if(!empty($campos['capacidad']))<div class="guia-campo">{{ $campos['capacidad'] }}</div>@endif
+        @error('capacidad')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+    </div>
+</div>
+
+@if($usarMapaUbicacion)
+<div class="modal fade" id="modalMapaAlmacen" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white py-2">
+                <h5 class="modal-title"><i class="fas fa-map mr-1"></i> Ubicación del almacén</h5>
+                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body p-2">
+                <p class="small text-muted mb-2 px-1">Hacé clic en el mapa para marcar el punto. Podés arrastrar el marcador.</p>
+                <div id="mapaAlmacenUbicacion"></div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-success btn-sm" id="btnConfirmarMapaAlmacen">Usar esta ubicación</button>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
+@push('scripts')
+@if($usarMapaUbicacion)
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+@endif
+<script>
+$(function () {
+    const inputUbic = document.getElementById('ubicacion');
+    const inputDir = document.getElementById('direccionlogisticaid');
+    const hint = document.getElementById('ubicacion_detalle_hint');
+    const btnSelector = document.getElementById('btn-abrir-selector-ubicacion');
+
+    function aplicarUbicacionSeleccionada(payload) {
+        if (!payload || !inputUbic) return;
+        if (typeof payload.ubicacion === 'string') {
+            inputUbic.value = payload.ubicacion;
+        }
+        if (inputDir) inputDir.value = payload.direccionlogisticaid || '';
+        if (hint) {
+            hint.textContent = payload.direccionlogisticaid
+                ? 'Ubicación vinculada a dirección logística existente.'
+                : 'Ubicación seleccionada.';
+        }
+    }
+
+    if (btnSelector) {
+        btnSelector.addEventListener('click', function () {
+            const url = @json(route(($rutaPrefijo ?? 'almacen-agricola').'.selector-ubicacion'));
+            window.open(url, '_blank');
+        });
+    }
+
+    window.addEventListener('message', function (event) {
+        if (event.origin !== window.location.origin) return;
+        const data = event.data || {};
+        if (data.type === 'almacen-ubicacion-seleccionada') {
+            aplicarUbicacionSeleccionada(data.payload || {});
+        }
+    });
+
+    window.addEventListener('focus', function () {
+        try {
+            const raw = localStorage.getItem('almacen_ubicacion_selector');
+            if (!raw) return;
+            aplicarUbicacionSeleccionada(JSON.parse(raw));
+            localStorage.removeItem('almacen_ubicacion_selector');
+        } catch (e) {}
+    });
+
+    if (inputUbic) {
+        inputUbic.addEventListener('input', function () {
+            if (inputDir) inputDir.value = '';
+            if (hint && inputUbic.value.trim() === '') {
+                hint.textContent = @json($usarMapaUbicacion
+                    ? 'Hacé clic en el mapa para fijar la ubicación o escribila manualmente.'
+                    : 'Podés elegir una ubicación del catálogo o escribir una nueva.');
+            }
+        });
+    }
+
+    @if($usarMapaUbicacion)
+    let mapaAlmacen = null;
+    let marcadorAlmacen = null;
+    let latPendiente = -17.7833;
+    let lngPendiente = -63.1821;
+
+    function initMapaAlmacen() {
+        if (mapaAlmacen) {
+            mapaAlmacen.invalidateSize();
+            return;
+        }
+        mapaAlmacen = L.map('mapaAlmacenUbicacion').setView([latPendiente, lngPendiente], 11);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(mapaAlmacen);
+
+        function colocarMarcador(lat, lng) {
+            latPendiente = lat;
+            lngPendiente = lng;
+            if (marcadorAlmacen) mapaAlmacen.removeLayer(marcadorAlmacen);
+            marcadorAlmacen = L.marker([lat, lng], { draggable: true }).addTo(mapaAlmacen);
+            marcadorAlmacen.on('dragend', function (e) {
+                const p = e.target.getLatLng();
+                latPendiente = p.lat;
+                lngPendiente = p.lng;
+            });
+        }
+
+        mapaAlmacen.on('click', function (e) {
+            colocarMarcador(e.latlng.lat, e.latlng.lng);
+        });
+
+        colocarMarcador(latPendiente, lngPendiente);
+    }
+
+    $('#btn-abrir-mapa-ubicacion').on('click', function () {
+        $('#modalMapaAlmacen').modal('show');
+    });
+
+    $('#modalMapaAlmacen').on('shown.bs.modal', function () {
+        setTimeout(initMapaAlmacen, 200);
+    });
+
+    $('#btnConfirmarMapaAlmacen').on('click', function () {
+        if (inputUbic) {
+            inputUbic.value = 'GPS ' + Number(latPendiente).toFixed(5) + ', ' + Number(lngPendiente).toFixed(5);
+        }
+        if (inputDir) inputDir.value = '';
+        if (hint) hint.textContent = 'Ubicación fijada desde el mapa.';
+        $('#modalMapaAlmacen').modal('hide');
+    });
+    @endif
+});
+</script>
+@endpush

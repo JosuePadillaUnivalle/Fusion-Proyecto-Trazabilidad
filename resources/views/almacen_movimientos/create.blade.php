@@ -22,7 +22,7 @@
         <div class="card-header">
             <h3 class="card-title mb-0">Registrar {{ $naturaleza === 'ingreso' ? 'ingreso' : 'salida' }}</h3>
         </div>
-        <form method="POST" action="{{ route('almacen-movimientos.store', ['naturaleza' => $naturaleza]) }}" id="form-movimiento">
+        <form method="POST" action="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.movimientos.store', ['naturaleza' => $naturaleza]) }}" id="form-movimiento">
             @csrf
             <div class="card-body">
                 @if($errors->any())
@@ -174,7 +174,7 @@
                 </div>
             </div>
             <div class="card-footer d-flex justify-content-between">
-                <a href="{{ route('almacen-movimientos.index', ['naturaleza' => $naturaleza]) }}" class="btn btn-secondary">Volver</a>
+                <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.movimientos.index', ['naturaleza' => $naturaleza]) }}" class="btn btn-secondary">Volver</a>
                 <button class="btn btn-primary" type="submit">Guardar</button>
             </div>
         </form>
@@ -196,7 +196,7 @@
     const destinoEstado = document.getElementById('destino_estado');
     const btnBuscarRef = document.getElementById('btn-abrir-buscador-ref');
     const btnBuscarDest = document.getElementById('btn-abrir-buscador-dest');
-    const urlReferencias = @json(route('almacen-movimientos.referencias'));
+    const urlReferencias = @json(route(($rutaPrefijo ?? 'almacen-agricola').'.movimientos.referencias'));
     const sugerenciasIniciales = @json($sugerenciasIniciales ?? ['grupos' => [], 'destinos' => []]);
     const LIMITE_FILAS = 80;
 

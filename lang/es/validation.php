@@ -45,7 +45,19 @@ return [
     'unique' => 'El valor de :attribute ya está en uso.',
     'url' => 'El campo :attribute debe ser una URL válida.',
 
+    'custom' => [
+        'insumoid' => [
+            'required' => 'Primero selecciona un insumo',
+        ],
+        'loteid' => [
+            'required' => 'Primero selecciona un lote',
+        ],
+    ],
+
     'attributes' => [
+        'insumoid' => 'insumo',
+        'loteid' => 'lote',
+        'cantidadusada' => 'cantidad',
         'nombre' => 'nombre',
         'apellido' => 'apellido',
         'email' => 'correo electrónico',

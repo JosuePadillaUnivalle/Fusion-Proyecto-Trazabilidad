@@ -297,7 +297,7 @@
                                         <div class="alert alert-info mb-0">
                                             <i class="fas fa-info-circle mr-2"></i>
                                             No hay almacenes registrados. 
-                                            <a href="{{ route('almacenes.create') }}">Crear uno</a>
+                                            <a href="{{ route('almacen-agricola.create') }}">Crear uno</a>
                                         </div>
                                     </div>
                                 @endforelse

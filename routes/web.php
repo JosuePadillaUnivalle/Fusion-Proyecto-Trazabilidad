@@ -27,7 +27,6 @@ use App\Http\Controllers\Web\UserProfileController;
 // 🔹 nuevos controladores web de almacenamiento
 use App\Http\Controllers\Web\TipoAlmacenController;
 use App\Http\Controllers\Web\AlmacenController;
-use App\Http\Controllers\Web\ProduccionAlmacenamientoController;
 
 
 
@@ -51,7 +50,6 @@ use App\Http\Controllers\Web\Envios\EnvioVehiculoController;
 use App\Http\Controllers\Web\ExternalApiProxyController;
 use App\Http\Controllers\Web\CertificacionController;
 use App\Http\Controllers\Web\ActorAbastecimientoController;
-use App\Http\Controllers\Web\RecursoProductivoController;
 use App\Http\Controllers\Web\ProcesoPlantaController;
 use App\Http\Controllers\Web\MaquinaPlantaController;
 use App\Http\Controllers\Web\AsignacionMultipleController;
@@ -139,7 +137,6 @@ Route::middleware('auth')->group(function () {
     Route::post('actores-abastecimiento', [ActorAbastecimientoController::class, 'store'])->name('actores-abastecimiento.store')->middleware('action.permission:inventario,update');
     Route::put('actores-abastecimiento/{actores_abastecimiento}', [ActorAbastecimientoController::class, 'update'])->name('actores-abastecimiento.update')->middleware('action.permission:inventario,update');
     Route::delete('actores-abastecimiento/{actores_abastecimiento}', [ActorAbastecimientoController::class, 'destroy'])->name('actores-abastecimiento.destroy')->middleware('action.permission:inventario,update');
-    Route::get('recursos-productivos', [RecursoProductivoController::class, 'index'])->name('recursos-productivos.index')->middleware('action.permission:inventario,read');
     Route::get('lotes/mapa', [LoteController::class, 'mapa'])->name('lotes.mapa')->middleware('action.permission:lotes,read');
     Route::get('lotes', [LoteController::class, 'index'])->name('lotes.index')->middleware('action.permission:lotes,read');
     Route::get('lotes/create', [LoteController::class, 'create'])->name('lotes.create')->middleware('action.permission:lotes,create');
@@ -188,38 +185,70 @@ Route::middleware('auth')->group(function () {
     Route::delete('ventas/{venta}', [VentaController::class, 'destroy'])->name('ventas.destroy')->middleware('action.permission:ventas,delete');
     Route::resource('tipoalmacenes', TipoAlmacenController::class)
         ->parameters(['tipoalmacenes' => 'tipoalmacen']);
-    // Evita conflicto /almacenes/create vs /almacenes/{almacen} (404 por model binding)
-    Route::get('almacenes', [AlmacenController::class, 'index'])->name('almacenes.index')->middleware('action.permission:inventario,read');
-    Route::get('almacenes/create', [AlmacenController::class, 'create'])->name('almacenes.create')->middleware('action.permission:inventario,create');
-    Route::get('almacenes/selector-ubicacion', [AlmacenController::class, 'selectorUbicacion'])->name('almacenes.selector-ubicacion')->middleware('action.permission:inventario,read');
-    Route::post('almacenes', [AlmacenController::class, 'store'])->name('almacenes.store')->middleware('action.permission:inventario,create');
-    Route::get('almacenes/{almacen}', [AlmacenController::class, 'show'])->name('almacenes.show')->middleware('action.permission:inventario,read');
-    Route::get('almacenes/{almacen}/edit', [AlmacenController::class, 'edit'])->name('almacenes.edit')->middleware('action.permission:inventario,update');
-    Route::put('almacenes/{almacen}', [AlmacenController::class, 'update'])->name('almacenes.update')->middleware('action.permission:inventario,update');
-    Route::delete('almacenes/{almacen}', [AlmacenController::class, 'destroy'])->name('almacenes.destroy')->middleware('action.permission:inventario,delete');
-    Route::resource('producciones_almacenamiento', ProduccionAlmacenamientoController::class)->only(['create', 'store'])->middleware('action.permission:inventario,create');
-    Route::resource('producciones_almacenamiento', ProduccionAlmacenamientoController::class)->only(['edit', 'update'])->middleware('action.permission:inventario,update');
-    Route::resource('producciones_almacenamiento', ProduccionAlmacenamientoController::class)->only(['destroy'])->middleware('action.permission:inventario,delete');
-    Route::resource('producciones_almacenamiento', ProduccionAlmacenamientoController::class)->only(['index', 'show'])->middleware('action.permission:inventario,read');
-    Route::get('almacen-movimientos', [AlmacenMovimientoController::class, 'index'])
-        ->name('almacen-movimientos.index')
-        ->middleware('action.permission:almacen_movimientos,read');
-    Route::get('almacen-movimientos/referencias-disponibles', [AlmacenMovimientoController::class, 'referenciasDisponibles'])
-        ->name('almacen-movimientos.referencias')
-        ->middleware('action.permission:almacen_movimientos,read');
-    Route::get('almacen-movimientos/{almacenMovimiento}', [AlmacenMovimientoController::class, 'show'])
-        ->whereNumber('almacenMovimiento')
-        ->name('almacen-movimientos.show')
-        ->middleware('action.permission:almacen_movimientos,read');
-    Route::get('almacen-movimientos/{naturaleza}/create', [AlmacenMovimientoController::class, 'create'])
-        ->name('almacen-movimientos.create')
-        ->middleware('action.permission:almacen_movimientos,read');
-    Route::post('almacen-movimientos/{naturaleza}', [AlmacenMovimientoController::class, 'store'])
-        ->name('almacen-movimientos.store')
-        ->middleware('action.permission:almacen_movimientos,read');
-    Route::get('almacen-reportes', [AlmacenMovimientoController::class, 'reportes'])
-        ->name('almacen-movimientos.reportes')
-        ->middleware('action.permission:almacen_reportes,read');
+    Route::redirect('almacenes', '/almacen-agricola');
+    Route::redirect('almacen-movimientos', '/almacen-agricola/movimientos');
+    Route::redirect('almacen-reportes', '/almacen-agricola/movimientos/reportes');
+
+    $registrarModuloAlmacen = function (string $prefijo, string $ambito) {
+        Route::prefix($prefijo)
+            ->name($prefijo.'.')
+            ->middleware(['almacen.ambito:'.$ambito])
+            ->group(function () use ($ambito) {
+                Route::get('/', [AlmacenController::class, 'index'])->name('index')->middleware('action.permission:inventario,read');
+                Route::get('/create', [AlmacenController::class, 'create'])->name('create')->middleware('action.permission:inventario,create');
+                Route::get('/selector-ubicacion', [AlmacenController::class, 'selectorUbicacion'])->name('selector-ubicacion')->middleware('action.permission:inventario,read');
+                Route::post('/', [AlmacenController::class, 'store'])->name('store')->middleware('action.permission:inventario,create');
+
+                Route::get('/movimientos/referencias-disponibles', [AlmacenMovimientoController::class, 'referenciasDisponibles'])
+                    ->name('movimientos.referencias')
+                    ->middleware('action.permission:almacen_movimientos,read');
+                Route::get('/movimientos/reportes', [AlmacenMovimientoController::class, 'reportes'])
+                    ->name('movimientos.reportes')
+                    ->middleware('action.permission:almacen_reportes,read');
+                Route::get('/movimientos', [AlmacenMovimientoController::class, 'index'])
+                    ->name('movimientos.index')
+                    ->middleware('action.permission:almacen_movimientos,read');
+                Route::get('/movimientos/cosecha/{produccionAlmacenamiento}', [AlmacenMovimientoController::class, 'showCosecha'])
+                    ->whereNumber('produccionAlmacenamiento')
+                    ->name('movimientos.cosecha.show')
+                    ->middleware('action.permission:almacen_movimientos,read');
+                Route::get('/movimientos/{almacenMovimiento}', [AlmacenMovimientoController::class, 'show'])
+                    ->whereNumber('almacenMovimiento')
+                    ->name('movimientos.show')
+                    ->middleware('action.permission:almacen_movimientos,read');
+                Route::get('/movimientos/{naturaleza}/create', [AlmacenMovimientoController::class, 'create'])
+                    ->whereIn('naturaleza', ['ingreso', 'salida'])
+                    ->name('movimientos.create')
+                    ->middleware('action.permission:almacen_movimientos,read');
+                Route::post('/movimientos/{naturaleza}', [AlmacenMovimientoController::class, 'store'])
+                    ->whereIn('naturaleza', ['ingreso', 'salida'])
+                    ->name('movimientos.store')
+                    ->middleware('action.permission:almacen_movimientos,read');
+
+                Route::get('/{almacen}', [AlmacenController::class, 'show'])
+                    ->whereNumber('almacen')
+                    ->name('show')
+                    ->middleware('action.permission:inventario,read');
+                Route::get('/{almacen}/edit', [AlmacenController::class, 'edit'])
+                    ->whereNumber('almacen')
+                    ->name('edit')
+                    ->middleware('action.permission:inventario,update');
+                Route::put('/{almacen}', [AlmacenController::class, 'update'])
+                    ->whereNumber('almacen')
+                    ->name('update')
+                    ->middleware('action.permission:inventario,update');
+                Route::delete('/{almacen}', [AlmacenController::class, 'destroy'])
+                    ->whereNumber('almacen')
+                    ->name('destroy')
+                    ->middleware('action.permission:inventario,delete');
+            });
+    };
+
+    Route::redirect('/almacen-agricola/almacenamiento-produccion', '/almacen-agricola/movimientos', 301);
+    Route::redirect('/almacen-agricola/almacenamiento-produccion/{any}', '/almacen-agricola/movimientos')->where('any', '.*');
+
+    $registrarModuloAlmacen('almacen-agricola', \App\Support\AlmacenAmbito::AGRICOLA);
+    $registrarModuloAlmacen('almacen-planta', \App\Support\AlmacenAmbito::PLANTA);
     Route::get('/certificaciones', [CertificacionController::class, 'index'])->name('certificaciones.index')->middleware('action.permission:certificaciones,read');
     Route::post('/certificaciones/masivo', [CertificacionController::class, 'storeBulk'])->name('certificaciones.store-bulk')->middleware('action.permission:certificaciones,create');
     Route::post('/certificaciones', [CertificacionController::class, 'store'])->name('certificaciones.store')->middleware('action.permission:certificaciones,create');

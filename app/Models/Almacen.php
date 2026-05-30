@@ -20,6 +20,7 @@ class Almacen extends Model
         'capacidad',
         'unidadmedidaid',
         'tipoalmacenid',
+        'ambito',
         'activo',
     ];
 

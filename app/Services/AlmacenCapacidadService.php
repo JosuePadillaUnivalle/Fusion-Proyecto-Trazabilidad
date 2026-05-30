@@ -1,0 +1,104 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Almacen;
+use App\Models\Insumo;
+use App\Models\ProduccionAlmacenamiento;
+use App\Models\UnidadMedida;
+
+class AlmacenCapacidadService
+{
+    public function convertirAKg(float $cantidad, ?UnidadMedida $unidad): float
+    {
+        if (! $unidad) {
+            return $cantidad;
+        }
+
+        $abbr = strtolower(trim($unidad->abreviatura ?? $unidad->nombre ?? ''));
+
+        $factores = [
+            'kg' => 1,
+            'kilogramo' => 1,
+            'kilogramos' => 1,
+            'g' => 0.001,
+            'gr' => 0.001,
+            'gramo' => 0.001,
+            't' => 1000,
+            'ton' => 1000,
+            'tonelada' => 1000,
+            'toneladas' => 1000,
+            'qq' => 46,
+            'quintal' => 46,
+            'quintales' => 46,
+            'lb' => 0.453592,
+            'libra' => 0.453592,
+        ];
+
+        foreach ($factores as $clave => $factor) {
+            if (str_contains($abbr, $clave)) {
+                return $cantidad * $factor;
+            }
+        }
+
+        return $cantidad;
+    }
+
+    public function convertirDesdeKg(float $cantidadKg, ?UnidadMedida $unidad): float
+    {
+        if (! $unidad || $cantidadKg <= 0) {
+            return $cantidadKg;
+        }
+
+        $factor = $this->convertirAKg(1.0, $unidad);
+
+        return $factor > 0 ? $cantidadKg / $factor : $cantidadKg;
+    }
+
+    public function ocupadoKg(Almacen $almacen): float
+    {
+        $almacen->loadMissing('unidadMedida');
+
+        $cosechaKg = (float) ProduccionAlmacenamiento::query()
+            ->with('unidadMedida')
+            ->where('almacenid', $almacen->almacenid)
+            ->whereNull('fechasalida')
+            ->get()
+            ->sum(fn (ProduccionAlmacenamiento $row) => $this->convertirAKg((float) $row->cantidad, $row->unidadMedida));
+
+        $insumoKg = (float) Insumo::query()
+            ->with('unidadMedida')
+            ->where('almacenid', $almacen->almacenid)
+            ->get()
+            ->sum(fn (Insumo $insumo) => $this->convertirAKg((float) $insumo->stock, $insumo->unidadMedida));
+
+        return $cosechaKg + $insumoKg;
+    }
+
+    public function capacidadKg(Almacen $almacen): float
+    {
+        $almacen->loadMissing('unidadMedida');
+
+        return $this->convertirAKg((float) ($almacen->capacidad ?? 0), $almacen->unidadMedida);
+    }
+
+    /**
+     * @return array{ocupado_kg: float, capacidad_kg: float, disponible_kg: float, porcentaje: float}
+     */
+    public function resumen(Almacen $almacen): array
+    {
+        $capacidadKg = $this->capacidadKg($almacen);
+        $ocupadoKg = $this->ocupadoKg($almacen);
+        $disponibleKg = max(0, $capacidadKg - $ocupadoKg);
+        $porcentaje = $capacidadKg > 0
+            ? min(100, round(($ocupadoKg / $capacidadKg) * 100, 1))
+            : 0;
+
+        return [
+            'ocupado_kg' => $ocupadoKg,
+            'capacidad_kg' => $capacidadKg,
+            'disponible_kg' => $disponibleKg,
+            'porcentaje' => $porcentaje,
+        ];
+    }
+}

@@ -7,13 +7,15 @@ use App\Models\ProduccionAlmacenamiento;
 use App\Models\Produccion;
 use App\Models\Almacen;
 use App\Models\UnidadMedida;
+use App\Support\AlmacenAmbito;
 use Illuminate\Http\Request;
 
 class ProduccionAlmacenamientoController extends Controller
 {
     public function index()
     {
-        $q = ProduccionAlmacenamiento::query();
+        $q = ProduccionAlmacenamiento::query()
+            ->whereHas('almacen', fn ($a) => AlmacenAmbito::scope($a, AlmacenAmbito::AGRICOLA));
 
         $stats = [
             'total' => (clone $q)->count(),
@@ -37,16 +39,19 @@ class ProduccionAlmacenamientoController extends Controller
             ->pluck('unidadmedida.nombre');
 
         $registros = ProduccionAlmacenamiento::with(['produccion.lote', 'almacen', 'unidadMedida'])
+            ->whereHas('almacen', fn ($a) => AlmacenAmbito::scope($a, AlmacenAmbito::AGRICOLA))
             ->orderByDesc('fechaentrada')
             ->orderByDesc('produccionalmacenamientoid')
             ->paginate(15);
 
-        return view('producciones_almacenamiento.index', compact(
+        $ctx = AlmacenAmbito::contexto();
+
+        return view('producciones_almacenamiento.index', array_merge(compact(
             'registros',
             'stats',
             'almacenesFiltro',
             'unidadesFiltro'
-        ));
+        ), $ctx));
     }
 
     public function create(Request $request)

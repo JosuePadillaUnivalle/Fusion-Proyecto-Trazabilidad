@@ -66,7 +66,7 @@
             </div>
         </div>
         <div class="card-footer">
-            <a href="{{ route('almacen-movimientos.index', array_filter(['naturaleza' => $filtroNaturaleza ?: null])) }}" class="btn btn-secondary">
+            <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.movimientos.index', array_filter(['naturaleza' => $filtroNaturaleza ?: null])) }}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left mr-1"></i> Volver al listado
             </a>
         </div>

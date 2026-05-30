@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Almacenes | AgroNexus')
-@section('page_title', 'Gestión de almacenes')
+@section('page_title', $tituloModulo ?? 'Almacén')
 
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
@@ -11,12 +11,42 @@
 @push('styles')
 @include('partials.modulo-inventario-styles')
 <style>
-.page-almacenes .products-list .product-img {
-    width: 50px;
-    height: 50px;
-    display: flex;
+.page-almacenes .almacen-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    transition: box-shadow .2s, transform .2s;
+    overflow: hidden;
+}
+.page-almacenes .almacen-card:hover {
+    box-shadow: 0 6px 20px rgba(44, 85, 48, .12);
+    transform: translateY(-2px);
+}
+.page-almacenes .almacen-card .card-top {
+    background: linear-gradient(135deg, #f0f7f1, #fff);
+    padding: 1rem 1.1rem .75rem;
+    border-bottom: 1px solid #e8f0e9;
+}
+.page-almacenes .almacen-card .meta-chip {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
+    gap: .35rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: .35rem .6rem;
+    font-size: .8rem;
+    color: #475569;
+}
+.page-almacenes .almacen-card .meta-chip i { color: #2c5530; width: 14px; text-align: center; }
+.page-almacenes .ocupacion-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: #e9ecef;
+    overflow: hidden;
+}
+.page-almacenes .ocupacion-bar .fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4a7c59, #2c5530);
 }
 </style>
 @endpush
@@ -42,44 +72,40 @@
                     <p>Capacidad combinada</p>
                 </div>
                 <div class="icon"><i class="fas fa-balance-scale"></i></div>
-                <span class="small-box-footer">Suma de capacidades</span>
+                <span class="small-box-footer">Capacidad en kg (página)</span>
             </div>
         </div>
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-blue">
                 <div class="inner">
-                    <h3>{{ $stats['activos'] }}</h3>
-                    <p>Almacenes activos</p>
+                    <h3>{{ number_format($stats['ocupado_total'] ?? 0, 0) }}</h3>
+                    <p>kg ocupados (cosecha)</p>
                 </div>
-                <div class="icon"><i class="fas fa-check-circle"></i></div>
-                <a href="#" class="small-box-footer" id="linkActivos">
-                    Ver activos <i class="fas fa-arrow-circle-right"></i>
-                </a>
+                <div class="icon"><i class="fas fa-seedling"></i></div>
+                <span class="small-box-footer">En esta página</span>
             </div>
         </div>
         <div class="col-lg-3 col-6">
-            <div class="small-box small-box-red">
+            <div class="small-box small-box-purple">
                 <div class="inner">
-                    <h3>{{ $stats['inactivos'] }}</h3>
-                    <p>Inactivos</p>
+                    <h3>{{ $stats['ocupacion_promedio'] ?? 0 }}%</h3>
+                    <p>Ocupación promedio</p>
                 </div>
-                <div class="icon"><i class="fas fa-ban"></i></div>
-                <a href="#" class="small-box-footer" id="linkInactivos">
-                    Ver inactivos <i class="fas fa-arrow-circle-right"></i>
-                </a>
+                <div class="icon"><i class="fas fa-chart-pie"></i></div>
+                <span class="small-box-footer">Capacidad utilizada</span>
             </div>
         </div>
     </div>
 
     <div class="card card-outline card-success card-modulo-main elevation-1">
         <x-modulo-index-header
-            titulo="Almacenes"
+            :titulo="$tituloModulo ?? 'Almacenes'"
             icono="fa-warehouse"
             :registros="$almacenes->total()"
             filtros-target="#filtrosAlmacenesPanel"
             :view-toggle="true"
             view-default="table"
-            :nuevo-href="route('almacenes.create')"
+            :nuevo-href="route(($rutaPrefijo ?? 'almacen-agricola').'.create')"
             nuevo-can="inventario.create"
         />
 
@@ -95,20 +121,12 @@
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-3 mb-2">
-                    <label class="small text-muted mb-1">Tipo</label>
-                    <select id="filterTipo" class="form-control form-control-sm">
-                        <option value="">Todos los tipos</option>
-                        @foreach($tiposFiltro as $tipoNombre)
-                            <option value="{{ strtolower($tipoNombre) }}">{{ $tipoNombre }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-lg-3 col-md-3 mb-2">
-                    <label class="small text-muted mb-1">Estado</label>
-                    <select id="filterEstado" class="form-control form-control-sm">
-                        <option value="">Todos los estados</option>
-                        <option value="active">Activos</option>
-                        <option value="inactive">Inactivos</option>
+                    <label class="small text-muted mb-1">Ocupación</label>
+                    <select id="filterOcupacion" class="form-control form-control-sm">
+                        <option value="">Todas</option>
+                        <option value="baja">Baja (&lt; 50%)</option>
+                        <option value="media">Media (50–85%)</option>
+                        <option value="alta">Alta (&gt; 85%)</option>
                     </select>
                 </div>
             </div>
@@ -120,48 +138,45 @@
                 <thead>
                     <tr>
                         <th>Nombre</th>
-                        <th>Tipo</th>
-                        <th>Capacidad</th>
-                        <th>Unidad</th>
-                        <th>Estado</th>
+                        <th>Ubicación</th>
+                        <th>Capacidad (kg)</th>
+                        <th>Ocupación</th>
                         <th class="text-center" style="width: 110px;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($almacenes as $a)
                         @php
-                            $searchText = strtolower(trim(
-                                ($a->nombre ?? '') . ' ' . ($a->tipoAlmacen->nombre ?? '')
-                            ));
+                            $oc = $ocupacionPorId[$a->almacenid] ?? ['porcentaje' => 0, 'ocupado_kg' => 0, 'capacidad_kg' => 0];
+                            $pct = $oc['porcentaje'];
+                            $ocupacionFiltro = $pct > 85 ? 'alta' : ($pct >= 50 ? 'media' : 'baja');
+                            $searchText = strtolower(trim(($a->nombre ?? '') . ' ' . ($a->ubicacion ?? '')));
                         @endphp
                         <tr class="search-item-row"
                             data-nombre="{{ $searchText }}"
-                            data-tipo="{{ strtolower($a->tipoAlmacen->nombre ?? '') }}"
-                            data-estado="{{ $a->activo ? 'active' : 'inactive' }}">
+                            data-ocupacion="{{ $ocupacionFiltro }}">
                             <td>
                                 <strong class="text-success">{{ $a->nombre }}</strong>
-                                @if($a->codigo)
-                                <br><small class="text-muted">{{ $a->codigo }}</small>
+                                @if($a->descripcion)
+                                <br><small class="text-muted">{{ Str::limit($a->descripcion, 40) }}</small>
                                 @endif
                             </td>
-                            <td>{{ $a->tipoAlmacen->nombre ?? '—' }}</td>
-                            <td>{{ number_format((float) $a->capacidad, 2) }}</td>
-                            <td>{{ $a->unidadMedida->nombre ?? '—' }}</td>
+                            <td>{{ $a->ubicacion ?: '—' }}</td>
+                            <td>{{ number_format((float) $a->capacidad, 0) }} kg</td>
                             <td>
-                                @if($a->activo)
-                                    <span class="badge badge-success">Activo</span>
-                                @else
-                                    <span class="badge badge-secondary">Inactivo</span>
-                                @endif
+                                <div class="ocupacion-bar mb-1" style="max-width:120px">
+                                    <div class="fill" style="width:{{ min(100, $pct) }}%"></div>
+                                </div>
+                                <small>{{ number_format($oc['ocupado_kg'], 0) }} / {{ number_format($oc['capacidad_kg'], 0) }} kg ({{ $pct }}%)</small>
                             </td>
                             <td class="text-center">
                                 <div class="btn-group btn-group-sm btn-actions">
-                                    <a href="{{ route('almacenes.show', $a) }}" class="btn btn-default" title="Ver"><i class="fas fa-eye text-info"></i></a>
+                                    <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.show', $a) }}" class="btn btn-default" title="Ver"><i class="fas fa-eye text-info"></i></a>
                                     @can('inventario.update')
-                                    <a href="{{ route('almacenes.edit', $a) }}" class="btn btn-default" title="Editar"><i class="fas fa-edit text-warning"></i></a>
+                                    <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.edit', $a) }}" class="btn btn-default" title="Editar"><i class="fas fa-edit text-warning"></i></a>
                                     @endcan
                                     @can('inventario.delete')
-                                    <form action="{{ route('almacenes.destroy', $a) }}" method="POST" class="d-inline on-submit-confirm">
+                                    <form action="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.destroy', $a) }}" method="POST" class="d-inline on-submit-confirm">
                                         @csrf @method('DELETE')
                                         <button type="submit" class="btn btn-default" title="Eliminar"><i class="fas fa-trash text-danger"></i></button>
                                     </form>
@@ -171,11 +186,11 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-5">
+                            <td colspan="5" class="text-center text-muted py-5">
                                 <i class="fas fa-warehouse fa-2x mb-2 text-light d-block"></i>
                                 No hay almacenes registrados.
                                 @can('inventario.create')
-                                <a href="{{ route('almacenes.create') }}" class="d-block mt-2">Crear primer almacén</a>
+                                <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.create') }}" class="d-block mt-2">Crear primer almacén</a>
                                 @endcan
                             </td>
                         </tr>
@@ -184,62 +199,69 @@
             </table>
         </div>
 
-        <div id="cardView" style="display: none;">
+        <div id="cardView" class="p-3" style="display: none;">
+            <div class="row">
             @forelse($almacenes as $a)
                 @php
-                    $searchText = strtolower(trim(
-                        ($a->nombre ?? '') . ' ' . ($a->tipoAlmacen->nombre ?? '')
-                    ));
+                    $oc = $ocupacionPorId[$a->almacenid] ?? ['porcentaje' => 0, 'ocupado_kg' => 0, 'capacidad_kg' => 0, 'disponible_kg' => 0];
+                    $pct = $oc['porcentaje'];
+                    $ocupacionFiltro = $pct > 85 ? 'alta' : ($pct >= 50 ? 'media' : 'baja');
+                    $searchText = strtolower(trim(($a->nombre ?? '') . ' ' . ($a->ubicacion ?? '')));
                 @endphp
-                <div class="search-item border-bottom"
+                <div class="col-md-6 col-xl-4 mb-3 search-item"
                     data-nombre="{{ $searchText }}"
-                    data-tipo="{{ strtolower($a->tipoAlmacen->nombre ?? '') }}"
-                    data-estado="{{ $a->activo ? 'active' : 'inactive' }}">
-                    <ul class="products-list product-list-in-card pl-2 pr-2 mb-0">
-                        <li class="item">
-                            <div class="product-img bg-light rounded">
-                                <i class="fas fa-warehouse text-{{ $a->activo ? 'success' : 'secondary' }}"></i>
-                            </div>
-                            <div class="product-info">
-                                <a href="{{ route('almacenes.show', $a) }}" class="product-title">
-                                    {{ $a->nombre }}
-                                    @if($a->codigo)
-                                    <small class="text-muted ml-1">({{ $a->codigo }})</small>
-                                    @endif
-                                    <span class="badge badge-{{ $a->activo ? 'success' : 'secondary' }} float-right">
-                                        {{ $a->activo ? 'Activo' : 'Inactivo' }}
-                                    </span>
-                                </a>
-                                <span class="product-description">
-                                    <i class="fas fa-cubes text-muted mr-1"></i>{{ $a->tipoAlmacen->nombre ?? 'Sin tipo' }}
-                                    <span class="mx-2 text-muted">|</span>
-                                    <i class="fas fa-balance-scale text-muted mr-1"></i>
-                                    {{ number_format((float) $a->capacidad, 2) }}
-                                    {{ $a->unidadMedida->abreviatura ?? $a->unidadMedida->nombre ?? '' }}
-                                    @if($a->ubicacion)
-                                    <span class="mx-2 text-muted">|</span>
-                                    <i class="fas fa-map-marker-alt text-muted mr-1"></i>{{ $a->ubicacion }}
-                                    @endif
+                    data-ocupacion="{{ $ocupacionFiltro }}">
+                    <div class="card almacen-card h-100 mb-0">
+                        <div class="card-top">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <p class="mb-1 font-weight-bold text-success" style="font-size:1.05rem">
+                                    <i class="fas fa-warehouse mr-1"></i>{{ $a->nombre }}
+                                </p>
+                                <span class="badge badge-{{ $pct > 85 ? 'danger' : ($pct >= 50 ? 'warning' : 'success') }}">
+                                    {{ $pct }}% ocupado
                                 </span>
                             </div>
-                            <div class="ml-2 text-nowrap">
-                                <a href="{{ route('almacenes.show', $a) }}" class="btn btn-xs btn-info" title="Ver"><i class="fas fa-eye"></i></a>
-                                @can('inventario.update')
-                                <a href="{{ route('almacenes.edit', $a) }}" class="btn btn-xs btn-warning" title="Editar"><i class="fas fa-edit"></i></a>
-                                @endcan
-                                @can('inventario.delete')
-                                <form action="{{ route('almacenes.destroy', $a) }}" method="POST" class="d-inline on-submit-confirm">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="btn btn-xs btn-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
-                                </form>
-                                @endcan
+                            @if($a->ubicacion)
+                            <p class="mb-0 small text-muted"><i class="fas fa-map-marker-alt mr-1"></i>{{ Str::limit($a->ubicacion, 50) }}</p>
+                            @endif
+                        </div>
+                        <div class="card-body py-3">
+                            <div class="ocupacion-bar mb-2">
+                                <div class="fill" style="width:{{ min(100, $pct) }}%"></div>
                             </div>
-                        </li>
-                    </ul>
+                            <div class="row no-gutters text-center">
+                                <div class="col-6 mb-2">
+                                    <div class="meta-chip d-block w-100">
+                                        <i class="fas fa-balance-scale"></i>
+                                        <span>{{ number_format((float) $a->capacidad, 0) }} kg máx.</span>
+                                    </div>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <div class="meta-chip d-block w-100">
+                                        <i class="fas fa-box-open"></i>
+                                        <span>{{ number_format($oc['disponible_kg'], 0) }} kg libres</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-light d-flex justify-content-end py-2">
+                            <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.show', $a) }}" class="btn btn-sm btn-outline-info mr-1"><i class="fas fa-eye"></i></a>
+                            @can('inventario.update')
+                            <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.edit', $a) }}" class="btn btn-sm btn-outline-warning mr-1"><i class="fas fa-edit"></i></a>
+                            @endcan
+                            @can('inventario.delete')
+                            <form action="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.destroy', $a) }}" method="POST" class="d-inline on-submit-confirm">
+                                @csrf @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                            </form>
+                            @endcan
+                        </div>
+                    </div>
                 </div>
             @empty
-                <div class="text-center text-muted py-5">No hay almacenes registrados.</div>
+                <div class="col-12 text-center text-muted py-5">No hay almacenes registrados.</div>
             @endforelse
+            </div>
         </div>
 
         @if($almacenes->hasPages())
@@ -269,45 +291,23 @@ $(function () {
 
     function aplicarFiltros() {
         var val = ($('#searchInput').val() || '').toLowerCase();
-        var tipo = ($('#filterTipo').val() || '').toLowerCase();
-        var estado = ($('#filterEstado').val() || '').toLowerCase();
+        var ocupacion = ($('#filterOcupacion').val() || '').toLowerCase();
 
-        $('.search-item').each(function () {
+        $('.search-item, .search-item-row').each(function () {
             var matchNombre = (($(this).data('nombre') || '').indexOf(val) > -1);
-            var matchTipo = !tipo || ($(this).data('tipo') || '') === tipo;
-            var matchEstado = !estado || ($(this).data('estado') || '') === estado;
-            $(this).toggle(matchNombre && matchTipo && matchEstado);
-        });
-        $('.search-item-row').each(function () {
-            var matchNombre = (($(this).data('nombre') || '').indexOf(val) > -1);
-            var matchTipo = !tipo || ($(this).data('tipo') || '') === tipo;
-            var matchEstado = !estado || ($(this).data('estado') || '') === estado;
-            $(this).toggle(matchNombre && matchTipo && matchEstado);
+            var matchOcup = !ocupacion || ($(this).data('ocupacion') || '') === ocupacion;
+            $(this).toggle(matchNombre && matchOcup);
         });
     }
 
     $('#searchInput').on('keyup', aplicarFiltros);
-    $('#filterTipo, #filterEstado').on('change', aplicarFiltros);
+    $('#filterOcupacion').on('change', aplicarFiltros);
     $('#btnAplicarFiltros').on('click', aplicarFiltros);
 
     $('#btnLimpiarFiltros').on('click', function () {
         $('#searchInput').val('');
-        $('#filterTipo, #filterEstado').val('');
+        $('#filterOcupacion').val('');
         aplicarFiltros();
-    });
-
-    $('#linkActivos').on('click', function (e) {
-        e.preventDefault();
-        $('#filterEstado').val('active');
-        aplicarFiltros();
-        $('#filtrosAlmacenesPanel').collapse('show');
-    });
-
-    $('#linkInactivos').on('click', function (e) {
-        e.preventDefault();
-        $('#filterEstado').val('inactive');
-        aplicarFiltros();
-        $('#filtrosAlmacenesPanel').collapse('show');
     });
 
     $('.on-submit-confirm').on('submit', function (e) {

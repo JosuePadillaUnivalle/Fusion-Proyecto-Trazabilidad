@@ -154,4 +154,45 @@ class InsumoCatalogo
 
         return 'high';
     }
+
+    /** IDs de tipos válidos (solo los cuatro del catálogo oficial). */
+    public static function tiposValidosIds(): array
+    {
+        self::asegurarCatalogosBase();
+
+        return self::tiposOrdenados()->pluck('tipoinsumoid')->map(fn ($id) => (int) $id)->all();
+    }
+
+    /**
+     * Elimina insumos cuyo tipo no es uno de los cuatro oficiales y sus aplicaciones en lote.
+     */
+    public static function purgarInsumosConTipoInvalido(): int
+    {
+        self::asegurarCatalogosBase();
+        $validIds = self::tiposValidosIds();
+
+        if ($validIds === []) {
+            return 0;
+        }
+
+        $invalidIds = \App\Models\Insumo::query()
+            ->whereNotIn('tipoinsumoid', $validIds)
+            ->pluck('insumoid');
+
+        if ($invalidIds->isEmpty()) {
+            return 0;
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('loteinsumo')) {
+            \App\Models\LoteInsumo::query()->whereIn('insumoid', $invalidIds)->delete();
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('almacen_movimiento')) {
+            \Illuminate\Support\Facades\DB::table('almacen_movimiento')
+                ->whereIn('insumoid', $invalidIds)
+                ->delete();
+        }
+
+        return \App\Models\Insumo::query()->whereIn('insumoid', $invalidIds)->delete();
+    }
 }

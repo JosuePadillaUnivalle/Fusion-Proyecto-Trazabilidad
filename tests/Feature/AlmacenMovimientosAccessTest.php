@@ -40,8 +40,8 @@ class AlmacenMovimientosAccessTest extends TestCase
         $admin = $this->createUser('admin');
         $this->actingAs($admin);
 
-        $this->get(route('almacen-movimientos.index'))->assertOk();
-        $this->get(route('almacen-movimientos.create', ['naturaleza' => 'ingreso']))->assertOk();
+        $this->get(route('almacen-agricola.movimientos.index'))->assertOk();
+        $this->get(route('almacen-agricola.movimientos.create', ['naturaleza' => 'ingreso']))->assertOk();
     }
 
     public function test_agricultor_puede_ver_y_crear_movimientos(): void
@@ -49,8 +49,8 @@ class AlmacenMovimientosAccessTest extends TestCase
         $agricultor = $this->createUser('agricultor');
         $this->actingAs($agricultor);
 
-        $this->get(route('almacen-movimientos.index'))->assertOk();
-        $this->get(route('almacen-movimientos.create', ['naturaleza' => 'salida']))->assertOk();
+        $this->get(route('almacen-agricola.movimientos.index'))->assertOk();
+        $this->get(route('almacen-agricola.movimientos.create', ['naturaleza' => 'salida']))->assertOk();
     }
 
     public function test_transportista_no_accede_a_movimientos_internos(): void
@@ -58,6 +58,6 @@ class AlmacenMovimientosAccessTest extends TestCase
         $transportista = $this->createUser('transportista');
         $this->actingAs($transportista);
 
-        $this->get(route('almacen-movimientos.index'))->assertForbidden();
+        $this->get(route('almacen-agricola.movimientos.index'))->assertForbidden();
     }
 }

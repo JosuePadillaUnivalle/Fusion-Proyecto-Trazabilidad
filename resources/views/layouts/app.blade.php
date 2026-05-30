@@ -251,6 +251,19 @@
         }
 
         .ag-subnav.open { max-height: 600px; }
+        .ag-subnav-nested {
+            padding-left: 12px;
+            margin-top: 2px;
+        }
+        .ag-subnav-nested.open { max-height: 220px; }
+        .ag-sub-a[data-toggle-sub] { justify-content: space-between; }
+        .ag-sub-a .ag-sub-arrow {
+            font-size: .62rem;
+            opacity: .45;
+            margin-left: auto;
+            transition: transform .2s;
+        }
+        .ag-sub-a.group-open .ag-sub-arrow { transform: rotate(90deg); opacity: .7; }
         .ag-sidebar.mini .ag-subnav { display: none; }
 
         .ag-sub-li { margin: 1px 8px 1px 0; }
@@ -981,6 +994,43 @@
                     </a>
                 </li>
 
+                @php
+                    $puedeAlmacenAgricola = $isAdmin || ($authUser && $authUser->hasRole('agricultor'));
+                    $puedeAlmacenPlanta = $isAdmin || ($authUser && $authUser->hasRole('planta'));
+                    $almAgrOpen = request()->routeIs('almacen-agricola.*');
+                    $almPlaOpen = request()->routeIs('almacen-planta.*');
+                    $prodAgrOpen = request()->routeIs('producciones.*', 'climas.*');
+                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'maquinas-planta.*', 'registro-planta.*', 'almacen-planta.*');
+                    $puedeProdPlanta = $isAdmin || ($authUser && ! $authUser->hasRole('agricultor') && ! $authUser->hasRole('transportista'));
+                    $showProdAgricola = $isAdmin
+                        || auth()->user()?->canany(['lotes.view','lotes.create','lotes.update','lotes.delete'])
+                        || auth()->user()?->can('certificaciones.view')
+                        || auth()->user()?->canany(['inventario.view','inventario.create','inventario.update','inventario.delete'])
+                        || $puedeAlmacenAgricola
+                        || ! auth()->user()?->hasRole('transportista');
+                    $envPerm = [
+                        'envios.view', 'envios.create', 'envios.admin.view',
+                        'vehiculos.view', 'transportistas.view', 'direcciones.view',
+                        'reportes.view', 'pedidos.view',
+                        'asignaciones.view', 'rutas_multi.view', 'rutas_multi.create',
+                        'documentos.view', 'incidentes.view',
+                    ];
+                    $envOpen = request()->routeIs(
+                        'envios.*',
+                        'logistica.asignaciones.*',
+                        'logistica.rutas.*',
+                        'logistica.documentos.*',
+                        'logistica.incidentes.*'
+                    );
+                    $puedeEnvios = $isAdmin || ($authUser && $authUser->hasAnyPermission($envPerm));
+                    $showOperLogistica = auth()->user()?->can('panel_transportista.view') || $puedeEnvios;
+                    $showProdPlantaSection = auth()->user()?->can('panel_planta.view') || $puedeProdPlanta || $puedeAlmacenPlanta;
+                @endphp
+
+                @if($showProdAgricola)
+                <span class="ag-nav-label">Producción agrícola</span>
+                @endif
+
                 {{-- Lotes & Actividades --}}
                 @canany(['lotes.view','lotes.create','lotes.update','lotes.delete'])
                 @php $lotesOpen = request()->routeIs('lotes.*','actividades.*'); @endphp
@@ -1011,34 +1061,24 @@
                 </li>
                 @endcan
 
-                {{-- Producción --}}
-                @php $prodOpen = request()->routeIs('producciones.*','climas.*','procesos-planta.*','maquinas-planta.*','registro-planta.*'); @endphp
+                {{-- Producción agrícola (cosechas y clima) --}}
                 <li class="ag-nav-li">
-                    <a href="#" class="ag-nav-a {{ $prodOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-prod">
+                    <a href="#" class="ag-nav-a {{ $prodAgrOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-prod-agr">
                         <i class="ag-nav-icon fas fa-seedling"></i>
                         <span class="ag-nav-text">Producción</span>
                         <i class="ag-nav-arrow fas fa-chevron-right"></i>
                     </a>
-                    <ul class="ag-subnav {{ $prodOpen ? 'open' : '' }}" id="sub-prod">
+                    <ul class="ag-subnav {{ $prodAgrOpen ? 'open' : '' }}" id="sub-prod-agr">
                         @unless(auth()->user()?->hasRole('transportista'))
                         <li class="ag-sub-li"><a href="{{ route('producciones.index') }}" class="ag-sub-a {{ request()->routeIs('producciones.*') ? 'active' : '' }}">Cosechas</a></li>
                         @endunless
                         <li class="ag-sub-li"><a href="{{ route('climas.index') }}" class="ag-sub-a {{ request()->routeIs('climas.*') ? 'active' : '' }}">Clima</a></li>
-                        @unless(auth()->user()?->hasRole('agricultor') || auth()->user()?->hasRole('transportista'))
-                        <li class="ag-sub-li">
-                            <a href="{{ route('registro-planta.index') }}" class="ag-sub-a {{ request()->routeIs('registro-planta.*') ? 'active' : '' }}" style="{{ request()->routeIs('registro-planta.*') ? '' : '' }}">
-                                <i class="fas fa-industry" style="font-size:.72rem; margin-right:4px;"></i>Registro a Planta
-                            </a>
-                        </li>
-                        <li class="ag-sub-li"><a href="{{ route('procesos-planta.index') }}" class="ag-sub-a {{ request()->routeIs('procesos-planta.*') ? 'active' : '' }}">Procesos de planta</a></li>
-                        <li class="ag-sub-li"><a href="{{ route('maquinas-planta.index') }}" class="ag-sub-a {{ request()->routeIs('maquinas-planta.*') ? 'active' : '' }}">Máquinas de planta</a></li>
-                        @endunless
                     </ul>
                 </li>
 
                 {{-- Inventario --}}
                 @canany(['inventario.view','inventario.create','inventario.update','inventario.delete'])
-                @php $invOpen = request()->routeIs('insumos.*','lote-insumos.*','almacenes.*','actores-abastecimiento.*','recursos-productivos.*','almacen-movimientos.*','producciones_almacenamiento.*','almacen-movimientos.reportes'); @endphp
+                @php $invOpen = request()->routeIs('insumos.*','lote-insumos.*'); @endphp
                 <li class="ag-nav-li">
                     <a href="#" class="ag-nav-a {{ $invOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-inv">
                         <i class="ag-nav-icon fas fa-warehouse"></i>
@@ -1047,41 +1087,40 @@
                     </a>
                     <ul class="ag-subnav {{ $invOpen ? 'open' : '' }}" id="sub-inv">
                         <li class="ag-sub-li"><a href="{{ route('insumos.index') }}" class="ag-sub-a {{ request()->routeIs('insumos.*') ? 'active' : '' }}">Insumos</a></li>
-                        <li class="ag-sub-li"><a href="{{ route('actores-abastecimiento.index') }}" class="ag-sub-a {{ request()->routeIs('actores-abastecimiento.*') ? 'active' : '' }}">Actores de abastecimiento</a></li>
-                        <li class="ag-sub-li"><a href="{{ route('recursos-productivos.index') }}" class="ag-sub-a {{ request()->routeIs('recursos-productivos.*') ? 'active' : '' }}">Vista consolidada de recursos</a></li>
                         <li class="ag-sub-li"><a href="{{ route('lote-insumos.index') }}" class="ag-sub-a {{ request()->routeIs('lote-insumos.*') ? 'active' : '' }}">Aplicación de insumos</a></li>
-                        <li class="ag-sub-li"><a href="{{ route('almacenes.index') }}" class="ag-sub-a {{ request()->routeIs('almacenes.*') ? 'active' : '' }}">Almacenes</a></li>
-                        @canany(['inventario.view','inventario.create'])
-                        <li class="ag-sub-li"><a href="{{ route('producciones_almacenamiento.index') }}" class="ag-sub-a {{ request()->routeIs('producciones_almacenamiento.*') ? 'active' : '' }}">Almacenamiento de producción</a></li>
-                        @endcanany
-                        @can('almacen.movimientos.view')
-                        <li class="ag-sub-li"><a href="{{ route('almacen-movimientos.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-movimientos.*') && !request()->routeIs('almacen-movimientos.reportes') ? 'active' : '' }}">Movimientos de almacén</a></li>
-                        @endcan
-                        @can('almacen.reportes.view')
-                        <li class="ag-sub-li"><a href="{{ route('almacen-movimientos.reportes') }}" class="ag-sub-a {{ request()->routeIs('almacen-movimientos.reportes') ? 'active' : '' }}">Reportes de almacén</a></li>
-                        @endcan
                     </ul>
                 </li>
                 @endcanany
 
-                {{-- Envíos (incluye operación logística: rutas, asignaciones, mapa, etc.) --}}
-                @php
-                    $envPerm = [
-                        'envios.view', 'envios.create', 'envios.admin.view',
-                        'vehiculos.view', 'transportistas.view', 'direcciones.view',
-                        'reportes.view', 'pedidos.view',
-                        'asignaciones.view', 'rutas_multi.view', 'rutas_multi.create',
-                        'documentos.view', 'incidentes.view',
-                    ];
-                    $envOpen = request()->routeIs(
-                        'envios.*',
-                        'logistica.asignaciones.*',
-                        'logistica.rutas.*',
-                        'logistica.documentos.*',
-                        'logistica.incidentes.*'
-                    );
-                @endphp
-                @if($isAdmin || ($authUser && $authUser->hasAnyPermission($envPerm)))
+                @if($puedeAlmacenAgricola)
+                <li class="ag-nav-li">
+                    <a href="#" class="ag-nav-a {{ $almAgrOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-alm-agr">
+                        <i class="ag-nav-icon fas fa-tractor"></i>
+                        <span class="ag-nav-text">Almacén agrícola</span>
+                        <i class="ag-nav-arrow fas fa-chevron-right"></i>
+                    </a>
+                    <ul class="ag-subnav {{ $almAgrOpen ? 'open' : '' }}" id="sub-alm-agr">
+                        <li class="ag-sub-li"><a href="{{ route('almacen-agricola.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-agricola.index', 'almacen-agricola.show', 'almacen-agricola.create', 'almacen-agricola.edit') ? 'active' : '' }}">Almacenes</a></li>
+                        @can('almacen.movimientos.view')
+                        <li class="ag-sub-li"><a href="{{ route('almacen-agricola.movimientos.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-agricola.movimientos.*') && !request()->routeIs('almacen-agricola.movimientos.reportes') ? 'active' : '' }}">Movimientos</a></li>
+                        @endcan
+                        @can('almacen.reportes.view')
+                        <li class="ag-sub-li"><a href="{{ route('almacen-agricola.movimientos.reportes') }}" class="ag-sub-a {{ request()->routeIs('almacen-agricola.movimientos.reportes') ? 'active' : '' }}">Reportes</a></li>
+                        @endcan
+                    </ul>
+                </li>
+                @endif
+
+                @if($showOperLogistica)
+                <span class="ag-nav-label">Operación logística</span>
+                @endif
+
+                @can('panel_transportista.view')
+                <li class="ag-nav-li"><a href="{{ route('dashboard.panel-transportista') }}" class="ag-nav-a {{ request()->routeIs('dashboard.panel-transportista') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-truck-moving"></i><span class="ag-nav-text">Panel Transportista</span></a></li>
+                @endcan
+
+                {{-- Envíos --}}
+                @if($puedeEnvios)
                 <li class="ag-nav-li">
                     <a href="#" class="ag-nav-a {{ $envOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-env">
                         <i class="ag-nav-icon fas fa-truck"></i>
@@ -1132,16 +1171,47 @@
                 </li>
                 @endif
 
-                {{-- Paneles por rol (planta, transportista, almacén) --}}
-                @canany(['panel_planta.view','panel_transportista.view'])
-                <span class="ag-nav-label">Operación logística</span>
+                @if($showProdPlantaSection)
+                <span class="ag-nav-label">Producción planta</span>
+                @endif
+
                 @can('panel_planta.view')
                 <li class="ag-nav-li"><a href="{{ route('dashboard.panel-planta') }}" class="ag-nav-a {{ request()->routeIs('dashboard.panel-planta') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-industry"></i><span class="ag-nav-text">Panel Planta</span></a></li>
                 @endcan
-                @can('panel_transportista.view')
-                <li class="ag-nav-li"><a href="{{ route('dashboard.panel-transportista') }}" class="ag-nav-a {{ request()->routeIs('dashboard.panel-transportista') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-truck-moving"></i><span class="ag-nav-text">Panel Transportista</span></a></li>
-                @endcan
-                @endcanany
+
+                @if($puedeProdPlanta || $puedeAlmacenPlanta)
+                <li class="ag-nav-li">
+                    <a href="#" class="ag-nav-a {{ $prodPlaMenuOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-prod-pla">
+                        <i class="ag-nav-icon fas fa-cogs"></i>
+                        <span class="ag-nav-text">Producción</span>
+                        <i class="ag-nav-arrow fas fa-chevron-right"></i>
+                    </a>
+                    <ul class="ag-subnav {{ $prodPlaMenuOpen ? 'open' : '' }}" id="sub-prod-pla">
+                        @if($puedeProdPlanta)
+                        <li class="ag-sub-li"><a href="{{ route('registro-planta.index') }}" class="ag-sub-a {{ request()->routeIs('registro-planta.*') ? 'active' : '' }}">Registro a Planta</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('procesos-planta.index') }}" class="ag-sub-a {{ request()->routeIs('procesos-planta.*') ? 'active' : '' }}">Procesos de planta</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('maquinas-planta.index') }}" class="ag-sub-a {{ request()->routeIs('maquinas-planta.*') ? 'active' : '' }}">Máquinas de planta</a></li>
+                        @endif
+                        @if($puedeAlmacenPlanta)
+                        <li class="ag-sub-li">
+                            <a href="#" class="ag-sub-a {{ $almPlaOpen ? 'group-open' : '' }}" data-toggle-sub="sub-alm-pla">
+                                Almacén de planta
+                                <i class="fas fa-chevron-right ag-sub-arrow"></i>
+                            </a>
+                            <ul class="ag-subnav ag-subnav-nested {{ $almPlaOpen ? 'open' : '' }}" id="sub-alm-pla">
+                                <li class="ag-sub-li"><a href="{{ route('almacen-planta.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-planta.index', 'almacen-planta.show', 'almacen-planta.create', 'almacen-planta.edit') ? 'active' : '' }}">Almacenes</a></li>
+                                @can('almacen.movimientos.view')
+                                <li class="ag-sub-li"><a href="{{ route('almacen-planta.movimientos.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-planta.movimientos.*') && !request()->routeIs('almacen-planta.movimientos.reportes') ? 'active' : '' }}">Movimientos</a></li>
+                                @endcan
+                                @can('almacen.reportes.view')
+                                <li class="ag-sub-li"><a href="{{ route('almacen-planta.movimientos.reportes') }}" class="ag-sub-a {{ request()->routeIs('almacen-planta.movimientos.reportes') ? 'active' : '' }}">Reportes</a></li>
+                                @endcan
+                            </ul>
+                        </li>
+                        @endif
+                    </ul>
+                </li>
+                @endif
 
                 {{-- Ventas / Reportes (no-admin) --}}
                 @if(!$isAdmin)
