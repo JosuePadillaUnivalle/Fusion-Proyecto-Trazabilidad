@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Support\UsuarioAvatar;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -24,34 +23,39 @@ class UserProfileController extends Controller
     {
         $user = auth()->user();
 
+        $rules = [
+            'imagen' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:2048',
+        ];
+
+        if (! $user->nombreusuario_editado) {
+            $rules['nombreusuario'] = [
+                'required',
+                'string',
+                'max:100',
+                'regex:/^[a-zA-Z0-9._-]+$/',
+                Rule::unique('usuario', 'nombreusuario')->ignore($user->usuarioid, 'usuarioid'),
+            ];
+        }
+
         $data = $request->validate(
+            $rules,
             [
-                'nombre' => 'required|string|max:100',
-                'apellido' => 'required|string|max:100',
-                'email' => ['required', 'email', 'max:100', Rule::unique('usuario', 'email')->ignore($user->usuarioid, 'usuarioid')],
-                'telefono' => 'nullable|string|max:20',
-                'password' => 'nullable|string|min:6|confirmed',
-                'imagen' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:2048',
+                'nombreusuario.regex' => 'El nombre de usuario solo puede contener letras, números, puntos, guiones y guiones bajos.',
+                'nombreusuario.unique' => 'Ese nombre de usuario ya está en uso.',
             ],
             [
-                'password.confirmed' => 'La confirmación de la contraseña no coincide.',
-                'password.min' => 'La contraseña debe tener al menos :min caracteres.',
-            ],
-            [
-                'nombre' => 'nombre',
-                'apellido' => 'apellido',
-                'email' => 'correo electrónico',
-                'telefono' => 'teléfono',
-                'password' => 'contraseña',
-                'password_confirmation' => 'confirmación de la contraseña',
+                'nombreusuario' => 'nombre de usuario',
                 'imagen' => 'foto de perfil',
             ]
         );
 
-        $user->nombre = $data['nombre'];
-        $user->apellido = $data['apellido'];
-        $user->email = $data['email'];
-        $user->telefono = $data['telefono'];
+        if (! $user->nombreusuario_editado && isset($data['nombreusuario'])) {
+            $nuevo = trim($data['nombreusuario']);
+            if ($nuevo !== $user->nombreusuario) {
+                $user->nombreusuario = $nuevo;
+                $user->nombreusuario_editado = true;
+            }
+        }
 
         if ($request->hasFile('imagen')) {
             $user->imagenurl = UsuarioAvatar::storeUpload($user, $request->file('imagen'));
@@ -60,15 +64,20 @@ class UserProfileController extends Controller
             $user->imagenurl = null;
         }
 
-        if ($request->filled('password')) {
-            $user->passwordhash = Hash::make($data['password']);
-        }
-
         $user->fechamodificacion = now();
         $user->save();
 
         return redirect()
             ->route('profile.show')
             ->with('success', 'Perfil actualizado correctamente.');
+    }
+
+    public function marcarBienvenidaVista(): RedirectResponse
+    {
+        $user = auth()->user();
+        $user->bienvenida_vista = true;
+        $user->save();
+
+        return redirect()->back()->with('success', '¡Bienvenido a AgroFusion!');
     }
 }

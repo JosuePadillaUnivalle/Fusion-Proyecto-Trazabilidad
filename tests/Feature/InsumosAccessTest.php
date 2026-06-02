@@ -35,18 +35,15 @@ class InsumosAccessTest extends TestCase
         return $user;
     }
 
-    public function test_admin_y_agricultor_ven_api_insumos(): void
+    public function test_admin_ve_api_insumos(): void
     {
         $admin = $this->createUser('admin');
         Sanctum::actingAs($admin);
         $this->getJson('/api/insumos')->assertOk();
 
-        $agricultor = $this->createUser('agricultor');
-        Sanctum::actingAs($agricultor);
-        $this->getJson('/api/insumos')->assertOk();
     }
 
-    public function test_agricultor_puede_ver_api_insumos(): void
+    public function test_agricultor_ve_api_insumos(): void
     {
         $agricultor = $this->createUser('agricultor');
         Sanctum::actingAs($agricultor);

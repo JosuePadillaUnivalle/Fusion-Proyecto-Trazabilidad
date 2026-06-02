@@ -274,6 +274,20 @@ return [
 
         ],
 
+        'panel_agricultor' => [
+
+            'read' => 'panel_agricultor.view',
+
+        ],
+
+        'solicitudes' => [
+
+            'read' => 'solicitudes.view',
+
+            'approve' => 'solicitudes.approve',
+
+        ],
+
     ],
 
 
@@ -284,13 +298,15 @@ return [
 
         'agricultor' => [
 
-            'reportes.view',
+            'panel_agricultor.view',
 
             'lotes.view',
 
-            'lotes.create',
-
             'lotes.update',
+
+            'certificaciones.view',
+
+            'certificaciones.create',
 
             'inventario.view',
 
@@ -298,85 +314,15 @@ return [
 
             'inventario.update',
 
-            'certificaciones.view',
-
-            'certificaciones.create',
-
-            'catalogos.view',
-
-            'envios.create',
-
-            'envios.view',
-
-            'envios.update',
-
-            'vehiculos.view',
-
-            'vehiculos.create',
-
-            'vehiculos.update',
-
-            'vehiculos.delete',
-
-            'transportistas.view',
-
-            'transportistas.create',
-
-            'transportistas.update',
-
-            'transportistas.delete',
-
-            'direcciones.view',
-
-            'direcciones.create',
-
-            'direcciones.update',
-
-            'direcciones.delete',
-
             'pedidos.view',
 
             'pedidos.update',
 
-            'ventas.view',
-
-            'ventas.update',
-
-            'asignaciones.view',
-
-            'asignaciones.create',
-
-            'asignaciones.multiple',
-
-            'rutas_multi.view',
-
-            'rutas_multi.create',
-
-            'rutas_multi.update',
-
-            'documentos.view',
-
-            'documentos.create',
-
-            'incidentes.view',
-
-            'incidentes.create',
-
-            'incidentes.update',
-
-            'incidentes.resolve',
-
-            'monitoreo.view',
-
-            'almacen.ingresos.view',
+            'almacen.movimientos.view',
 
             'almacen.ingresos.create',
 
-            'almacen.salidas.view',
-
             'almacen.salidas.create',
-
-            'almacen.movimientos.view',
 
             'almacen.reportes.view',
 
@@ -386,43 +332,19 @@ return [
 
             'panel_planta.view',
 
-            'lotes.view',
-
             'inventario.view',
 
-            'envios.create',
+            'inventario.create',
 
-            'envios.view',
-
-            'envios.update',
-
-            'asignaciones.view',
-
-            'asignaciones.create',
-
-            'asignaciones.multiple',
-
-            'rutas_multi.view',
-
-            'rutas_multi.create',
-
-            'rutas_multi.update',
-
-            'documentos.view',
-
-            'documentos.create',
-
-            'incidentes.view',
-
-            'incidentes.create',
-
-            'incidentes.resolve',
-
-            'reportes.view',
-
-            'ventas.view',
+            'inventario.update',
 
             'almacen.movimientos.view',
+
+            'almacen.ingresos.create',
+
+            'almacen.salidas.create',
+
+            'almacen.reportes.view',
 
         ],
 

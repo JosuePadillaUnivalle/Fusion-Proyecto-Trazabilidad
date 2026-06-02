@@ -44,10 +44,10 @@ class AlmacenMovimientosAccessTest extends TestCase
         $this->get(route('almacen-agricola.movimientos.create', ['naturaleza' => 'ingreso']))->assertOk();
     }
 
-    public function test_agricultor_puede_ver_y_crear_movimientos(): void
+    public function test_admin_tambien_puede_ver_y_crear_movimientos_salida(): void
     {
-        $agricultor = $this->createUser('agricultor');
-        $this->actingAs($agricultor);
+        $admin = $this->createUser('admin');
+        $this->actingAs($admin);
 
         $this->get(route('almacen-agricola.movimientos.index'))->assertOk();
         $this->get(route('almacen-agricola.movimientos.create', ['naturaleza' => 'salida']))->assertOk();

@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'action.permission' => \App\Http\Middleware\ActionPermissionMiddleware::class,
             'almacen.ambito' => \App\Http\Middleware\AlmacenAmbitoMiddleware::class,
+            'cuenta.aprobada' => \App\Http\Middleware\EnsureCuentaAprobada::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

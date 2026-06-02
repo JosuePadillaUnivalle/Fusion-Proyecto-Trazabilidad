@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Usuario;
+use App\Support\CuentaEstado;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
@@ -66,6 +67,7 @@ class CreateOperationalRoleUsersSeeder extends Seeder
                     'passwordhash' => Hash::make($entry['password']),
                     'role' => $roleName,
                     'activo' => true,
+                    'estado_cuenta' => CuentaEstado::APROBADO,
                     'fecharegistro' => now(),
                     'fechamodificacion' => now(),
                 ]

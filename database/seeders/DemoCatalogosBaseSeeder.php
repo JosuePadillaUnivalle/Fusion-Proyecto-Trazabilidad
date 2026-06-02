@@ -10,6 +10,7 @@ use App\Models\TipoActividad;
 use App\Models\TipoInsumo;
 use App\Models\TipoMovimientoAlmacen;
 use App\Models\UnidadMedida;
+use App\Support\CultivoCatalogo;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Schema;
 
@@ -65,8 +66,11 @@ class DemoCatalogosBaseSeeder extends Seeder
             return;
         }
 
-        foreach (['Tomate', 'Papa', 'Lechuga', 'Cebolla', 'Maíz'] as $nombre) {
-            Cultivo::firstOrCreate(['nombre' => $nombre], ['nombre' => $nombre]);
+        foreach (CultivoCatalogo::variantes() as $cultivo) {
+            Cultivo::updateOrCreate(
+                ['nombre' => $cultivo['nombre']],
+                ['nombre' => $cultivo['nombre']]
+            );
         }
     }
 

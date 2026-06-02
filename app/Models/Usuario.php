@@ -37,15 +37,25 @@ class Usuario extends Authenticatable
         'email',
         'nombreusuario',
         'telefono',
+        'ci_nit',
+        'tipo_licencia',
         'passwordhash',
         'role',
         'imagenurl',
         'informacionadicional',
+        'carta_motivacion',
+        'rol_solicitado',
+        'motivo_rechazo',
+        'revisado_por',
+        'fecha_revision',
+        'estado_cuenta',
         'fecharegistro',
         'fechamodificacion',
         'ultimologin',
         'activo',
         'almacenid',
+        'bienvenida_vista',
+        'nombreusuario_editado',
     ];
 
     protected $hidden = [
@@ -56,11 +66,33 @@ class Usuario extends Authenticatable
         'usuarioid' => 'integer',
         'almacenid' => 'integer',
         'activo' => 'boolean',
+        'bienvenida_vista' => 'boolean',
+        'nombreusuario_editado' => 'boolean',
         'role' => 'string',
         'fecharegistro' => 'datetime',
         'fechamodificacion' => 'datetime',
         'ultimologin' => 'datetime',
+        'fecha_revision' => 'datetime',
+        'revisado_por' => 'integer',
     ];
+
+    public function notificaciones()
+    {
+        return $this->hasMany(UsuarioNotificacion::class, 'usuarioid', 'usuarioid');
+    }
+
+    public function revisadoPor()
+    {
+        return $this->belongsTo(self::class, 'revisado_por', 'usuarioid');
+    }
+
+    public function cuentaAprobada(): bool
+    {
+        return \App\Support\CuentaEstado::puedeIniciarSesion(
+            $this->estado_cuenta ?? \App\Support\CuentaEstado::APROBADO,
+            (bool) $this->activo
+        );
+    }
 
     public function getAuthPassword()
     {

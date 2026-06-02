@@ -23,7 +23,9 @@ use App\Models\InventarioAlmacenEnvio;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schema;
+use App\Models\UsuarioNotificacion;
+use App\Services\NotificacionUsuarioService;
+use App\Support\UsuarioRol;
 
 class DashboardController extends Controller
 {
@@ -32,16 +34,27 @@ class DashboardController extends Controller
         return (bool) ($user && ($user->hasRole('admin') || $user->hasRole('Admin')));
     }
 
-    public function index()
+    public function index(NotificacionUsuarioService $notificaciones)
     {
         $user = auth()->user();
+        $alertas = $notificaciones->noLeidasPara((int) $user->usuarioid, 8);
+        $totalAlertas = $notificaciones->contarNoLeidas((int) $user->usuarioid);
+        $extras = compact('alertas', 'totalAlertas');
+
+        if (UsuarioRol::debeAcotarPorAsignacion($user)) {
+            return view('dashboard.roles.agricultor', array_merge($this->buildAgricultorData($user), $extras));
+        }
+
+        if (! $this->isAdmin($user) && $user?->can('panel_transportista.view')) {
+            return view('dashboard.roles.transportista', array_merge($this->buildTransportistaData($user), $extras));
+        }
+
+        if (! $this->isAdmin($user) && $user?->can('panel_planta.view')) {
+            return view('dashboard.roles.planta', array_merge($this->buildPlantaData(), $extras));
+        }
+
         if ($this->isAdmin($user)) {
-            // El admin siempre debe ver el dashboard principal ejecutivo.
-            // Evita que caiga en paneles operativos por permisos comodín (*).
-        } elseif ($user && $user->can('panel_planta.view')) {
-            return view('dashboard.roles.planta', $this->buildPlantaData());
-        } elseif ($user && $user->can('panel_transportista.view')) {
-            return view('dashboard.roles.transportista', $this->buildTransportistaData($user));
+            // Dashboard ejecutivo / operativo agrícola.
         }
 
         // ========================================
@@ -185,8 +198,21 @@ class DashboardController extends Controller
             'insumosStockBajo',
             'lotesPorEstado',
             'topCultivos',
-            'resumenEstadistico'
+            'resumenEstadistico',
+            'alertas',
+            'totalAlertas'
         ));
+    }
+
+    public function marcarNotificacionLeida(UsuarioNotificacion $notificacion, NotificacionUsuarioService $notificaciones)
+    {
+        $notificaciones->marcarLeida($notificacion, (int) auth()->id());
+
+        if ($notificacion->enlace) {
+            return redirect($notificacion->enlace);
+        }
+
+        return back();
     }
 
     public function panelPlanta()
@@ -363,6 +389,26 @@ class DashboardController extends Controller
             ],
             'ultimas_asignaciones' => EnvioAsignacionMultiple::query()->latest()->take(8)->get(),
             'rutas_recientes' => RutaMultiEntrega::query()->latest()->take(6)->get(),
+        ];
+    }
+
+    private function buildAgricultorData($user): array
+    {
+        $uid = (int) $user->usuarioid;
+        $lotes = Lote::query()->where('usuarioid', $uid);
+        $actividades = Actividad::query()->where('usuarioid', $uid);
+
+        return [
+            'stats' => [
+                'lotes_asignados' => (clone $lotes)->count(),
+                'actividades_pendientes' => (clone $actividades)->whereNull('fechafin')->count(),
+                'actividades_hoy' => (clone $actividades)->whereDate('fechainicio', now()->toDateString())->count(),
+                'completadas_mes' => (clone $actividades)->whereNotNull('fechafin')
+                    ->whereMonth('fechafin', now()->month)->count(),
+            ],
+            'lotesRecientes' => (clone $lotes)->with(['cultivo', 'estadoTipo'])->orderByDesc('loteid')->limit(5)->get(),
+            'actividadesPendientes' => (clone $actividades)->with(['lote', 'tipoActividad'])
+                ->whereNull('fechafin')->orderBy('fechainicio')->limit(8)->get(),
         ];
     }
 

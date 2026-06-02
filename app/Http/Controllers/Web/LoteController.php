@@ -12,7 +12,8 @@ use App\Support\EstadoLoteCatalogo;
 use App\Support\LoteDefaults;
 use App\Support\LoteEstadoPorActividad;
 use App\Support\LoteTrazabilidadService;
-use App\Services\OperacionAgricolaAutomaticaService;
+use App\Services\NotificacionUsuarioService;
+use App\Support\UsuarioRol;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -27,12 +28,17 @@ class LoteController extends Controller
     public function __construct(
         private LoteTrazabilidadService $trazabilidadService,
         private LoteEstadoPorActividad $loteEstadoPorActividad,
+        private NotificacionUsuarioService $notificaciones,
     ) {}
 
     public function index(Request $request)
     {
         $query = Lote::query()
             ->with(['usuario', 'cultivo', 'estadoTipo']);
+
+        if (UsuarioRol::debeAcotarPorAsignacion($request->user())) {
+            $query->where('usuarioid', (int) $request->user()->usuarioid);
+        }
 
         if ($request->filled('q')) {
             $term = '%'.trim((string) $request->q).'%';
@@ -255,6 +261,7 @@ class LoteController extends Controller
         $data = LoteDefaults::enrich($data, true);
         $lote = Lote::create($data);
         LoteDefaults::registrarHistorialInicial($lote);
+        $this->notificaciones->loteAsignado($lote);
 
         return redirect()->route('lotes.index')->with('success', 'Lote creado exitosamente.');
     }
@@ -283,8 +290,10 @@ class LoteController extends Controller
             ));
     }
 
-    public function show(Lote $lote)
+    public function show(Lote $lote, Request $request)
     {
+        $this->autorizarLoteAsignado($request, $lote);
+
         return view('lotes.show', $this->trazabilidadService->buildLoteDetalleBase($lote));
     }
 
@@ -364,6 +373,8 @@ class LoteController extends Controller
 
     public function update(Request $request, Lote $lote)
     {
+        $this->autorizarLoteAsignado($request, $lote);
+
         $data = $request->validate([
             'usuarioid' => ['required', 'exists:usuario,usuarioid', $this->reglaResponsableLote()],
             'nombre' => 'required|string|max:100',
@@ -374,7 +385,10 @@ class LoteController extends Controller
             'longitud' => 'nullable|numeric|between:-180,180',
         ]);
 
+        $anteriorUsuarioid = (int) $lote->usuarioid;
         $lote->update(LoteDefaults::enrich($data, false));
+        $lote->refresh();
+        $this->notificaciones->loteAsignado($lote, $anteriorUsuarioid);
 
         return redirect()->route('lotes.index')->with('success', 'Lote actualizado.');
     }
@@ -415,13 +429,28 @@ class LoteController extends Controller
             return false;
         }
 
+        if ($usuario->hasRole('agricultor')) {
+            return true;
+        }
+
         return in_array(strtolower((string) ($usuario->role ?? '')), self::ROLES_RESPONSABLE_LOTE, true);
     }
 
     private function usuarioEsAdmin(Usuario $usuario): bool
     {
-        return $usuario->hasRole('admin')
+        return UsuarioRol::esAdminGlobal($usuario)
             || in_array(strtolower((string) ($usuario->role ?? '')), ['admin'], true);
+    }
+
+    private function autorizarLoteAsignado(Request $request, Lote $lote): void
+    {
+        if (! UsuarioRol::debeAcotarPorAsignacion($request->user())) {
+            return;
+        }
+
+        if ((int) $lote->usuarioid !== (int) $request->user()->usuarioid) {
+            abort(403, 'No tienes acceso a este lote.');
+        }
     }
 
     private function responsableLotePorDefecto(?Usuario $user): ?int

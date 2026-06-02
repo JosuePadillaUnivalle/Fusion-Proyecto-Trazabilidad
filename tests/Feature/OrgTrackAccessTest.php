@@ -35,14 +35,12 @@ class OrgTrackAccessTest extends TestCase
         return $user;
     }
 
-    public function test_agricultor_puede_acceder_modulos_envios_vehiculos_reportes(): void
+    public function test_agricultor_no_accede_modulos_envios(): void
     {
         $agricultor = $this->createUserWithRole('agricultor');
         $this->actingAs($agricultor);
 
-        $this->get(route('envios.seguimiento'))->assertOk();
-        $this->get(route('envios.vehiculos'))->assertOk();
-        $this->get(route('envios.reportes-distribucion'))->assertOk();
+        $this->get(route('envios.seguimiento'))->assertForbidden();
     }
 
     public function test_agricultor_no_puede_acceder_dashboard_admin_logistico(): void
@@ -72,8 +70,8 @@ class OrgTrackAccessTest extends TestCase
 
     public function test_proxy_envia_bearer_token_a_orgtrack(): void
     {
-        $agricultor = $this->createUserWithRole('agricultor');
-        $this->actingAs($agricultor);
+        $admin = $this->createUserWithRole('admin');
+        $this->actingAs($admin);
 
         config()->set('services.orgtrack.url', 'https://orgtrack.example');
         config()->set('services.orgtrack.token', 'token-prueba');
@@ -92,8 +90,8 @@ class OrgTrackAccessTest extends TestCase
 
     public function test_orgtrack_sin_url_no_llama_http_y_devuelve_payload_local(): void
     {
-        $agricultor = $this->createUserWithRole('agricultor');
-        $this->actingAs($agricultor);
+        $admin = $this->createUserWithRole('admin');
+        $this->actingAs($admin);
 
         Http::fake();
 

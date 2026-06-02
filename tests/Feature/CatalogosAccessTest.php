@@ -35,10 +35,10 @@ class CatalogosAccessTest extends TestCase
         return $user;
     }
 
-    public function test_agricultor_puede_ver_catalogos_api(): void
+    public function test_admin_puede_ver_catalogos_api(): void
     {
-        $agricultor = $this->createUser('agricultor');
-        Sanctum::actingAs($agricultor);
+        $admin = $this->createUser('admin');
+        Sanctum::actingAs($admin);
 
         $this->getJson('/api/cultivos')->assertOk();
         $this->getJson('/api/tipoinsumos')->assertOk();

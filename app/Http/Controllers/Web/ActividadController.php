@@ -12,17 +12,23 @@ use App\Support\LoteEstadoPorActividad;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use App\Services\NotificacionUsuarioService;
+use App\Support\UsuarioRol;
 
 class ActividadController extends Controller
 {
     public function __construct(
-        private LoteEstadoPorActividad $loteEstadoPorActividad
+        private LoteEstadoPorActividad $loteEstadoPorActividad,
+        private NotificacionUsuarioService $notificaciones,
     ) {}
 
     public function index(Request $request)
     {
         $query = Actividad::query()->with(['lote.cultivo', 'usuario', 'tipoActividad', 'prioridad']);
+
+        if (UsuarioRol::debeAcotarPorAsignacion($request->user())) {
+            $query->where('usuarioid', (int) $request->user()->usuarioid);
+        }
 
         if ($request->filled('q')) {
             $term = '%'.trim((string) $request->q).'%';
@@ -175,6 +181,9 @@ class ActividadController extends Controller
             'observaciones' => $data['observaciones'] ?? null,
         ]);
 
+        $actividad->load('lote');
+        $this->notificaciones->actividadAsignada($actividad);
+
         $msgEstado = '';
         if (! empty($data['fechafin'])) {
             $estadoAplicado = $this->loteEstadoPorActividad->aplicarDesdeActividad($actividad);
@@ -209,6 +218,7 @@ class ActividadController extends Controller
 
     public function show(Actividad $actividad)
     {
+        $this->autorizarActividadAsignada(request(), $actividad);
         $actividad->load(['lote', 'usuario', 'tipoActividad', 'prioridad']);
         return view('actividades.show', compact('actividad'));
     }
@@ -265,6 +275,8 @@ class ActividadController extends Controller
      */
     public function marcarRealizada(Actividad $actividad)
     {
+        $this->autorizarActividadAsignada(request(), $actividad);
+
         DB::beginTransaction();
 
         try {
@@ -283,6 +295,17 @@ class ActividadController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Error: '.$e->getMessage());
+        }
+    }
+
+    private function autorizarActividadAsignada(Request $request, Actividad $actividad): void
+    {
+        if (! UsuarioRol::debeAcotarPorAsignacion($request->user())) {
+            return;
+        }
+
+        if ((int) $actividad->usuarioid !== (int) $request->user()->usuarioid) {
+            abort(403, 'No tienes acceso a esta actividad.');
         }
     }
 

@@ -12,6 +12,7 @@ use App\Models\MaquinaPlanta;
 use App\Models\ProcesoPlanta;
 use App\Models\Produccion;
 use App\Models\Usuario;
+use App\Support\CultivoCatalogo;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -58,7 +59,7 @@ class CatalogoSelectorController extends Controller
             return [
                 'id' => $c->cultivoid,
                 'label' => $c->nombre,
-                'meta' => null,
+                'meta' => CultivoCatalogo::detallePorNombre($c->nombre),
             ];
         });
     }

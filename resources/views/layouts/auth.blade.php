@@ -15,15 +15,87 @@
             font-family: 'Inter', system-ui, sans-serif;
             min-height: 100vh;
             background: #080d0f;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             -webkit-font-smoothing: antialiased;
-            overflow: hidden;
             position: relative;
         }
 
-        /* ── Animated background ── */
+        .auth-layout {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: minmax(360px, 58%) minmax(360px, 42%);
+            position: relative;
+            z-index: 2;
+        }
+
+        .auth-left {
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 56px 48px;
+            border-top-right-radius: 24px;
+            border-bottom-right-radius: 24px;
+            background:
+                linear-gradient(180deg, rgba(7, 47, 24, 0.48) 0%, rgba(4, 28, 16, 0.78) 54%, rgba(3, 14, 9, 0.9) 100%),
+                url('https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1800&q=80');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .auth-left-content {
+            width: 100%;
+            max-width: 520px;
+            color: #ecfdf5;
+            text-align: center;
+            z-index: 2;
+        }
+
+        .left-logo-ring {
+            width: 96px;
+            height: 96px;
+            margin: 0 auto 20px;
+            border-radius: 50%;
+            border: 2px solid rgba(110, 231, 183, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(5, 56, 36, 0.35);
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.18);
+        }
+
+        .left-logo-ring i {
+            font-size: 2rem;
+            color: #a7f3d0;
+        }
+
+        .auth-left h1 {
+            font-size: clamp(1.8rem, 4vw, 2.7rem);
+            line-height: 1.1;
+            font-weight: 800;
+            margin-bottom: 10px;
+            letter-spacing: -.01em;
+        }
+
+        .auth-left p {
+            font-size: clamp(.95rem, 1.6vw, 1.18rem);
+            line-height: 1.5;
+            color: rgba(236, 253, 245, .9);
+            margin-bottom: 26px;
+        }
+
+        .auth-right {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 26px 26px 32px;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        /* ── Animated background (Fusion identity) ── */
         .auth-bg {
             position: fixed;
             inset: 0;
@@ -49,7 +121,6 @@
             background-size: 48px 48px;
         }
 
-        /* Glowing orbs */
         .orb {
             position: absolute;
             border-radius: 50%;
@@ -93,9 +164,10 @@
             background: rgba(255, 255, 255, .035);
             border: 1px solid rgba(255, 255, 255, .08);
             border-radius: 20px;
-            padding: 40px 36px;
+            padding: 40px 36px 28px;
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
+            overflow: visible;
             box-shadow:
                 0 0 0 1px rgba(16, 185, 129, .08),
                 0 32px 64px rgba(0, 0, 0, .5),
@@ -300,16 +372,42 @@
 
         /* ── Bottom copyright ── */
         .auth-copy {
-            position: fixed;
-            bottom: 20px;
-            left: 0; right: 0;
+            width: 100%;
+            max-width: 420px;
+            margin: 18px auto 0;
+            padding-top: 16px;
             text-align: center;
             font-size: .72rem;
-            color: #1e293b;
-            z-index: 5;
+            color: #64748b;
+            line-height: 1.5;
+            flex-shrink: 0;
         }
 
         /* ── Responsive ── */
+        @media (max-width: 1100px) {
+            .auth-layout {
+                grid-template-columns: 1fr;
+                min-height: 100vh;
+            }
+            .auth-left {
+                min-height: 280px;
+                border-radius: 0 0 24px 24px;
+                padding: 36px 20px 28px;
+            }
+            .auth-right {
+                justify-content: flex-start;
+                padding: 20px 14px 28px;
+            }
+            .auth-card {
+                width: 100%;
+                max-width: 480px;
+            }
+            .auth-copy {
+                max-width: 480px;
+                margin-top: 16px;
+            }
+        }
+
         @media (max-width: 480px) {
             .auth-card { padding: 30px 22px; }
             .auth-heading h2 { font-size: 1.15rem; }
@@ -354,6 +452,40 @@
             font-family: 'Inter', sans-serif;
             transition: border .15s, box-shadow .15s, background .15s;
             outline: none;
+        }
+
+        select.form-control {
+            appearance: none;
+            -webkit-appearance: none;
+            padding-right: 38px;
+            cursor: pointer;
+            background-color: rgba(255,255,255,.04);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            background-size: 12px 8px;
+        }
+
+        select.form-control:focus {
+            background-color: rgba(255,255,255,.06);
+        }
+
+        select.form-control option {
+            color: #0f172a;
+            background-color: #ffffff;
+        }
+
+        select.form-control option:checked,
+        select.form-control option:hover {
+            color: #ffffff;
+            background-color: #059669;
+        }
+
+        textarea.form-control {
+            padding: 11px 14px;
+            min-height: 110px;
+            resize: vertical;
+            line-height: 1.5;
         }
 
         .form-control::placeholder { color: #334155; }
@@ -430,6 +562,8 @@
         .form-footer a  { color: #10b981; font-weight: 600; text-decoration: none; }
         .form-footer a:hover { color: #6ee7b7; }
 
+        .text-muted { color: #64748b !important; }
+
         .alert {
             display: flex;
             align-items: flex-start;
@@ -454,13 +588,6 @@
         }
 
         .alert i { flex-shrink: 0; }
-
-        .copyright {
-            text-align: center;
-            margin-top: 26px;
-            font-size: .72rem;
-            color: #1e293b;
-        }
     </style>
 
     @stack('styles')
@@ -477,25 +604,39 @@
 </div>
 
 <!-- Card -->
-<div class="auth-card">
-
-    <!-- Brand -->
-    <div class="auth-brand">
-        <div class="auth-logo">
-            <i class="fas fa-seedling"></i>
+<div class="auth-layout">
+    <section class="auth-left" aria-hidden="true">
+        <div class="auth-left-content">
+            <div class="left-logo-ring">
+                <i class="fas fa-seedling"></i>
+            </div>
+            <h1>Bienvenido a AgroFusion</h1>
+            <p>Controla y da seguimiento a toda la trazabilidad agrícola desde un solo lugar.</p>
         </div>
-        <span class="auth-app-name">AgroFusion</span>
-        <span class="auth-tagline">Sistema integral de gestión agrícola</span>
-    </div>
+    </section>
 
-    <!-- Content (login/register views inject here) -->
-    @yield('content')
+    <section class="auth-right">
+        <div class="auth-card">
 
+            <!-- Brand -->
+            <div class="auth-brand">
+                <div class="auth-logo">
+                    <i class="fas fa-seedling"></i>
+                </div>
+                <span class="auth-app-name">AgroFusion</span>
+                <span class="auth-tagline">Sistema integral de gestión agrícola</span>
+            </div>
+
+            <!-- Content (login/register views inject here) -->
+            @yield('content')
+
+        </div>
+
+        <p class="auth-copy">
+            &copy; {{ date('Y') }} AgroFusion &middot; Tecnología para el campo
+        </p>
+    </section>
 </div>
-
-<p class="auth-copy">
-    &copy; {{ date('Y') }} AgroFusion &middot; Tecnología para el campo
-</p>
 
 <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
 @stack('scripts')

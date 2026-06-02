@@ -76,19 +76,22 @@ Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 
 Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
 Route::post('/register', [AuthController::class, 'register'])->name('register.post');
+Route::get('/registro-enviado', [AuthController::class, 'registroEnviado'])->name('register.enviado');
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 
 // RUTAS PROTEGIDAS (REQUIEREN ESTAR LOGUEADO)
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
 
     // Perfil de Usuario
     Route::get('/perfil', [UserProfileController::class, 'show'])->name('profile.show');
     Route::put('/perfil', [UserProfileController::class, 'update'])->name('profile.update');
+    Route::post('/perfil/bienvenida-vista', [UserProfileController::class, 'marcarBienvenidaVista'])->name('profile.bienvenida.vista');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/notificaciones/{notificacion}/leer', [DashboardController::class, 'marcarNotificacionLeida'])->name('notificaciones.leer');
     Route::get('/dashboard/panel-planta', [DashboardController::class, 'panelPlanta'])->name('dashboard.panel-planta');
     Route::get('/dashboard/panel-transportista', [DashboardController::class, 'panelTransportista'])->name('dashboard.panel-transportista');
     Route::get('/dashboard/panel-almacen', [DashboardController::class, 'panelAlmacen'])->name('dashboard.panel-almacen');
@@ -304,6 +307,14 @@ Route::middleware('auth')->group(function () {
     Route::delete('/gestion-usuarios/usuario/{usuario}', [GestionUsuariosController::class, 'destroyUsuario'])
         ->middleware('action.permission:usuarios,delete')
         ->name('gestion.usuario.destroy');
+
+    Route::post('/gestion-usuarios/{usuario}/aprobar', [GestionUsuariosController::class, 'aprobarSolicitud'])
+        ->middleware('action.permission:solicitudes,approve')
+        ->name('gestion.solicitud.aprobar');
+
+    Route::post('/gestion-usuarios/{usuario}/rechazar', [GestionUsuariosController::class, 'rechazarSolicitud'])
+        ->middleware('action.permission:solicitudes,approve')
+        ->name('gestion.solicitud.rechazar');
 
     // CRUD Roles
     Route::post('/gestion-usuarios/rol', [GestionUsuariosController::class, 'storeRol'])

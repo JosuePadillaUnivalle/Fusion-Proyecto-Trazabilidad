@@ -101,7 +101,7 @@
     flex-shrink: 0;
 }
 .modulo-usu .avatar-circle.activo { background: #2c5530; }
-.modulo-usu .avatar-circle.inactivo { background: #6c757d; }
+.modulo-usu .avatar-circle.pendiente { background: #e0a800; }
 .modulo-usu .guia-campo {
     background: #f8fbf8;
     border-left: 3px solid #2c5530;

@@ -947,6 +947,12 @@
     $userImgFallback = \App\Support\UsuarioAvatar::placeholder();
     $userRole    = $authUser ? ($authUser->getRoleNames()->first() ?? 'sin rol') : 'invitado';
     $isAdmin     = $authUser && ($authUser->hasRole('Admin') || $authUser->hasRole('admin'));
+    $esAgricultorOperativo = $authUser && \App\Support\UsuarioRol::debeAcotarPorAsignacion($authUser);
+    $esPlantaOperativo = $authUser && \App\Support\UsuarioRol::esPlantaOperativo($authUser) && ! $isAdmin;
+    $esTransportistaOperativo = $authUser && \App\Support\UsuarioRol::esTransportista($authUser) && ! $isAdmin;
+    $pendientesSolicitudes = $isAdmin
+        ? \App\Models\Usuario::where('estado_cuenta', \App\Support\CuentaEstado::PENDIENTE)->count()
+        : 0;
     $roleCss     = strtolower($userRole);
 @endphp
 
@@ -996,18 +1002,20 @@
 
                 @php
                     $puedeAlmacenAgricola = $isAdmin || ($authUser && $authUser->hasRole('agricultor'));
-                    $puedeAlmacenPlanta = $isAdmin || ($authUser && $authUser->hasRole('planta'));
+                    $puedeAlmacenPlanta = $isAdmin || $esPlantaOperativo;
                     $almAgrOpen = request()->routeIs('almacen-agricola.*');
                     $almPlaOpen = request()->routeIs('almacen-planta.*');
                     $prodAgrOpen = request()->routeIs('producciones.*', 'climas.*', 'agricola.pedidos.*');
                     $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'maquinas-planta.*', 'registro-planta.*', 'almacen-planta.*');
-                    $puedeProdPlanta = $isAdmin || ($authUser && ! $authUser->hasRole('agricultor') && ! $authUser->hasRole('transportista'));
-                    $showProdAgricola = $isAdmin
+                    $puedeProdPlanta = $isAdmin || $esPlantaOperativo;
+                    $showProdAgricola = ! $esPlantaOperativo && ! $esTransportistaOperativo && (
+                        $isAdmin
+                        || $esAgricultorOperativo
                         || auth()->user()?->canany(['lotes.view','lotes.create','lotes.update','lotes.delete'])
                         || auth()->user()?->can('certificaciones.view')
                         || auth()->user()?->canany(['inventario.view','inventario.create','inventario.update','inventario.delete'])
                         || $puedeAlmacenAgricola
-                        || ! auth()->user()?->hasRole('transportista');
+                    );
                     $envPerm = [
                         'envios.view', 'envios.create', 'envios.admin.view',
                         'vehiculos.view', 'transportistas.view', 'direcciones.view',
@@ -1024,13 +1032,14 @@
                         'logistica.incidentes.*'
                     );
                     $puedeEnvios = $isAdmin || ($authUser && $authUser->hasAnyPermission($envPerm));
-                    $showOperLogistica = auth()->user()?->can('panel_transportista.view') || $puedeEnvios;
-                    $showProdPlantaSection = auth()->user()?->can('panel_planta.view') || $puedeProdPlanta || $puedeAlmacenPlanta;
+                    $showOperLogistica = $isAdmin || $esTransportistaOperativo || (
+                        $puedeEnvios && ! $esPlantaOperativo && ! $esAgricultorOperativo
+                    );
+                    $showProdPlantaSection = $isAdmin || $esPlantaOperativo;
                 @endphp
 
                 @if($showProdAgricola)
                 <span class="ag-nav-label">Producción agrícola</span>
-                @endif
 
                 {{-- Lotes & Actividades --}}
                 @canany(['lotes.view','lotes.create','lotes.update','lotes.delete'])
@@ -1114,10 +1123,10 @@
                     </ul>
                 </li>
                 @endif
+                @endif
 
                 @if($showOperLogistica)
                 <span class="ag-nav-label">Operación logística</span>
-                @endif
 
                 @can('panel_transportista.view')
                 <li class="ag-nav-li"><a href="{{ route('dashboard.panel-transportista') }}" class="ag-nav-a {{ request()->routeIs('dashboard.panel-transportista') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-truck-moving"></i><span class="ag-nav-text">Panel Transportista</span></a></li>
@@ -1159,10 +1168,10 @@
                     </ul>
                 </li>
                 @endif
+                @endif
 
                 @if($showProdPlantaSection)
                 <span class="ag-nav-label">Producción planta</span>
-                @endif
 
                 @can('panel_planta.view')
                 <li class="ag-nav-li"><a href="{{ route('dashboard.panel-planta') }}" class="ag-nav-a {{ request()->routeIs('dashboard.panel-planta') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-industry"></i><span class="ag-nav-text">Panel Planta</span></a></li>
@@ -1201,20 +1210,45 @@
                     </ul>
                 </li>
                 @endif
+                @endif
 
-                {{-- Ventas / Reportes (no-admin) --}}
+                {{-- Ventas / Reportes (no-admin global) --}}
                 @if(!$isAdmin)
                     @can('ventas.view')
                     <li class="ag-nav-li"><a href="{{ route('ventas.index') }}" class="ag-nav-a {{ request()->routeIs('ventas.*') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-dollar-sign"></i><span class="ag-nav-text">Ventas</span></a></li>
                     @endcan
+                    @if(!$esTransportistaOperativo)
                     @can('reportes.view')
                     <li class="ag-nav-li"><a href="{{ route('reportes.index') }}" class="ag-nav-a {{ request()->routeIs('reportes.*') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-chart-pie"></i><span class="ag-nav-text">Reportes</span></a></li>
                     @endcan
+                    @endif
                 @endif
 
-                {{-- Admin-only --}}
-                @if($isAdmin)
+                @if($isAdmin || auth()->user()?->can('usuarios.view'))
                 <span class="ag-nav-label">Administración</span>
+
+                @if($pendientesSolicitudes > 0)
+                <li class="ag-nav-li">
+                    <a href="{{ route('gestion.index', ['estado' => 'pendiente']) }}" class="ag-nav-a {{ request('estado') === 'pendiente' ? 'active' : '' }}">
+                        <i class="ag-nav-icon fas fa-user-clock"></i>
+                        <span class="ag-nav-text">Solicitudes pendientes</span>
+                        <span class="badge badge-warning ml-auto">{{ $pendientesSolicitudes }}</span>
+                    </a>
+                </li>
+                @endif
+
+                @if($isAdmin || auth()->user()?->can('usuarios.view'))
+                <li class="ag-nav-li">
+                    <a href="{{ route('gestion.index') }}" class="ag-nav-a {{ request()->routeIs('gestion.*') ? 'active' : '' }}">
+                        <i class="ag-nav-icon fas fa-users-cog"></i>
+                        <span class="ag-nav-text">Gestión de usuarios</span>
+                    </a>
+                </li>
+                @endif
+                @endif
+
+                @if($isAdmin)
+                <span class="ag-nav-label">Administración global</span>
 
                 @can('ventas.view')
                 <li class="ag-nav-li"><a href="{{ route('ventas.index') }}" class="ag-nav-a {{ request()->routeIs('ventas.*') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-dollar-sign"></i><span class="ag-nav-text">Ventas</span></a></li>
@@ -1237,16 +1271,6 @@
                         <li class="ag-sub-li"><a href="{{ route('reportes.actividades') }}" class="ag-sub-a {{ request()->routeIs('reportes.actividades') ? 'active' : '' }}">Actividades</a></li>
                     </ul>
                 </li>
-
-                {{-- Usuarios admin --}}
-                @if($isAdmin || auth()->user()?->can('usuarios.view'))
-                <li class="ag-nav-li">
-                    <a href="{{ route('gestion.index') }}" class="ag-nav-a {{ request()->routeIs('gestion.*') ? 'active' : '' }}">
-                        <i class="ag-nav-icon fas fa-users-cog"></i>
-                        <span class="ag-nav-text">Gestión de usuarios</span>
-                    </a>
-                </li>
-                @endif
 
                 @endif {{-- end isAdmin --}}
 
@@ -1343,6 +1367,8 @@
 
             @yield('content')
         </main>
+
+        @include('partials.modal-bienvenida')
 
         {{-- FOOTER --}}
         <footer class="ag-footer">

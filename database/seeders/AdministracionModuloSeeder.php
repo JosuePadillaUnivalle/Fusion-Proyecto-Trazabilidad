@@ -155,16 +155,6 @@ class AdministracionModuloSeeder extends Seeder
                 'activo' => true,
                 'info' => self::MARK.' Auditor interno de procesos.',
             ],
-            [
-                'nombre' => 'Ana',
-                'apellido' => 'Inactiva',
-                'nombreusuario' => 'ana_inactiva',
-                'email' => 'inactiva@agrofusion.com',
-                'role' => 'agricultor',
-                'telefono' => '700000203',
-                'activo' => false,
-                'info' => self::MARK.' Usuario desactivado para pruebas de listado.',
-            ],
         ];
 
         foreach ($extras as $item) {

@@ -45,14 +45,21 @@ class ApiAccessTest extends TestCase
         $this->getJson('/api/certificaciones')->assertOk();
     }
 
-    public function test_agricultor_accede_api_campo_logistica_y_certificaciones(): void
+    public function test_admin_accede_api_campo(): void
+    {
+        $admin = $this->createUserWithRole('admin');
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/certificaciones')->assertOk();
+        $this->getJson('/api/pedidos')->assertOk();
+    }
+
+    public function test_agricultor_accede_certificaciones_api(): void
     {
         $agricultor = $this->createUserWithRole('agricultor');
         Sanctum::actingAs($agricultor);
 
         $this->getJson('/api/certificaciones')->assertOk();
-        $this->getJson('/api/pedidos')->assertOk();
-        $this->getJson('/api/ventas')->assertOk();
     }
 }
 

@@ -32,6 +32,6 @@ class AlmacenDashboardScopeTest extends TestCase
         $this->actingAs($agricultor);
         $this->get(route('dashboard'))
             ->assertOk()
-            ->assertViewIs('home');
+            ->assertViewIs('dashboard.roles.agricultor');
     }
 }

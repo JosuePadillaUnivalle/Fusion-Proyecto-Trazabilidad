@@ -3,7 +3,16 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Lote;
+use App\Models\PerfilTransportista;
 use App\Models\Usuario;
+use App\Services\UsuarioEliminacionService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use App\Services\UsuarioUsernameService;
+use App\Support\CuentaEstado;
+use App\Support\UsuarioRol;
+use App\Support\UsuarioSolicitud;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -17,15 +26,21 @@ class GestionUsuariosController extends Controller
 
         $stats = [
             'total' => Usuario::query()->count(),
-            'activos' => Usuario::query()->where('activo', true)->count(),
-            'inactivos' => Usuario::query()->where('activo', false)->count(),
+            'activos' => Usuario::query()->where(function ($q) {
+                $q->whereNull('estado_cuenta')->orWhere('estado_cuenta', CuentaEstado::APROBADO);
+            })->count(),
+            'pendientes' => Usuario::query()->where('estado_cuenta', CuentaEstado::PENDIENTE)->count(),
             'roles' => count($this->rolesCanonicos()),
         ];
 
         $usuarios = $query->orderByDesc('usuarioid')->paginate(15)->withQueryString();
         $roles = $this->rolesCanonicos();
+        $lotes = Lote::query()->orderBy('nombre')->get(['loteid', 'nombre']);
+        $loteSeleccionado = $request->filled('lote')
+            ? $lotes->firstWhere('loteid', (int) $request->lote)
+            : null;
 
-        return view('usuarios.index', compact('usuarios', 'roles', 'stats'));
+        return view('usuarios.index', compact('usuarios', 'roles', 'stats', 'lotes', 'loteSeleccionado'));
     }
 
     public function create()
@@ -37,7 +52,7 @@ class GestionUsuariosController extends Controller
 
     public function show(Usuario $usuario)
     {
-        $usuario->load(['roles', 'almacen']);
+        $usuario->load(['roles', 'almacen', 'perfilTransportista']);
 
         $stats = [
             'lotes' => $usuario->lotes()->count(),
@@ -55,6 +70,12 @@ class GestionUsuariosController extends Controller
 
     public function edit(Usuario $usuario)
     {
+        if (UsuarioSolicitud::adminSoloPuedeRevisar($usuario)) {
+            return redirect()
+                ->route('gestion.show', $usuario)
+                ->with('error', 'Las solicitudes pendientes solo pueden revisarse (aprobar o rechazar), no editarse.');
+        }
+
         $usuario->load('roles');
         $roles = $this->rolesCanonicos();
 
@@ -77,6 +98,7 @@ class GestionUsuariosController extends Controller
 
         $data['passwordhash'] = Hash::make($data['passwordhash']);
         $data['activo'] = true;
+        $data['estado_cuenta'] = CuentaEstado::APROBADO;
 
         $usuario = Usuario::create($data);
 
@@ -92,25 +114,22 @@ class GestionUsuariosController extends Controller
 
     public function updateUsuario(Request $request, Usuario $usuario)
     {
+        if (UsuarioSolicitud::adminSoloPuedeRevisar($usuario)) {
+            abort(403, 'Las solicitudes pendientes no pueden editarse.');
+        }
+
         $data = $request->validate([
             'nombre' => 'required|string|max:100',
             'apellido' => 'required|string|max:100',
             'email' => 'required|email|max:100|unique:usuario,email,'.$usuario->usuarioid.',usuarioid',
             'nombreusuario' => 'required|string|max:100|unique:usuario,nombreusuario,'.$usuario->usuarioid.',usuarioid',
             'telefono' => 'nullable|string|max:20',
-            'passwordhash' => 'nullable|string|max:250',
             'imagenurl' => 'nullable|string|max:250',
             'informacionadicional' => 'nullable|string',
             'rolid' => 'nullable|exists:roles,id',
         ]);
 
         unset($data['activo']);
-
-        if ($request->filled('passwordhash')) {
-            $data['passwordhash'] = Hash::make($data['passwordhash']);
-        } else {
-            unset($data['passwordhash']);
-        }
 
         $usuario->update($data);
 
@@ -128,7 +147,27 @@ class GestionUsuariosController extends Controller
 
     public function destroyUsuario(Usuario $usuario)
     {
-        $usuario->delete();
+        if (UsuarioSolicitud::adminSoloPuedeRevisar($usuario)) {
+            abort(403, 'Las solicitudes pendientes no pueden eliminarse. Usa Rechazar en el detalle.');
+        }
+
+        $eliminacion = app(UsuarioEliminacionService::class);
+
+        if (! $eliminacion->puedeEliminar($usuario)) {
+            return redirect()
+                ->route('gestion.index')
+                ->with('error', 'Este usuario es esencial del sistema y no puede eliminarse.');
+        }
+
+        try {
+            $eliminacion->eliminar($usuario);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()
+                ->back()
+                ->with('error', 'No se pudo eliminar el usuario porque tiene datos vinculados. Contacta al administrador.');
+        }
 
         return redirect()->route('gestion.index')->with('success', 'Usuario eliminado correctamente.');
     }
@@ -164,7 +203,7 @@ class GestionUsuariosController extends Controller
 
     private function usuariosFilteredQuery(Request $request)
     {
-        $query = Usuario::query()->with(['roles']);
+        $query = Usuario::query()->with(['roles'])->withCount('lotes');
 
         if ($request->filled('buscar')) {
             $buscar = '%'.trim((string) $request->buscar).'%';
@@ -183,13 +222,109 @@ class GestionUsuariosController extends Controller
 
         if ($request->filled('estado')) {
             if ($request->estado === 'activo') {
-                $query->where('activo', true);
-            } elseif ($request->estado === 'inactivo') {
-                $query->where('activo', false);
+                $query->where(function ($q) {
+                    $q->whereNull('estado_cuenta')->orWhere('estado_cuenta', CuentaEstado::APROBADO);
+                });
+            } elseif ($request->estado === 'pendiente') {
+                $query->where('estado_cuenta', CuentaEstado::PENDIENTE);
             }
         }
 
+        if ($request->filled('lote')) {
+            $loteId = (int) $request->lote;
+            $query->whereHas('lotes', fn ($q) => $q->where('loteid', $loteId));
+        }
+
         return $query;
+    }
+
+    public function aprobarSolicitud(Request $request, Usuario $usuario)
+    {
+        $this->authorizeAprobar($usuario);
+
+        $rolNombre = $usuario->rol_solicitado;
+        if (! $rolNombre || ! in_array($rolNombre, CuentaEstado::rolesRegistroPublico(), true)) {
+            return back()->withErrors(['rol' => 'La solicitud no tiene un rol válido.']);
+        }
+
+        Role::firstOrCreate(['name' => $rolNombre, 'guard_name' => 'web']);
+
+        $usernameService = app(UsuarioUsernameService::class);
+        $nombreusuario = $usernameService->generarDesdeNombreApellido(
+            (string) $usuario->nombre,
+            (string) $usuario->apellido
+        );
+
+        $usuario->update([
+            'estado_cuenta' => CuentaEstado::APROBADO,
+            'activo' => true,
+            'role' => $rolNombre,
+            'nombreusuario' => $nombreusuario,
+            'nombreusuario_editado' => false,
+            'bienvenida_vista' => false,
+            'motivo_rechazo' => null,
+            'revisado_por' => auth()->id(),
+            'fecha_revision' => now(),
+            'fechamodificacion' => now(),
+        ]);
+        $usuario->syncRoles([$rolNombre]);
+
+        if ($rolNombre === 'transportista') {
+            $this->crearPerfilTransportistaDesdeSolicitud($usuario);
+        }
+
+        return redirect()->route('gestion.show', $usuario)->with(
+            'success',
+            'Solicitud aprobada. Se asignó el usuario «'.$nombreusuario.'»; el usuario ya puede iniciar sesión.'
+        );
+    }
+
+    private function crearPerfilTransportistaDesdeSolicitud(Usuario $usuario): void
+    {
+        if (! Schema::hasTable('perfil_transportista')) {
+            return;
+        }
+
+        $estadoId = null;
+        if (Schema::hasTable('estado_transportista')) {
+            $estadoId = DB::table('estado_transportista')
+                ->where('nombre', 'disponible')
+                ->value('estadotransportistaid');
+        }
+
+        PerfilTransportista::updateOrCreate(
+            ['usuarioid' => $usuario->usuarioid],
+            [
+                'tipo_licencia' => $usuario->tipo_licencia,
+                'licencia' => $usuario->ci_nit,
+                'estadotransportistaid' => $estadoId,
+                'disponible' => true,
+            ]
+        );
+    }
+
+    public function rechazarSolicitud(Request $request, Usuario $usuario)
+    {
+        $this->authorizeAprobar($usuario);
+
+        $nombre = trim($usuario->nombre.' '.$usuario->apellido);
+        app(UsuarioEliminacionService::class)->eliminar($usuario);
+
+        return redirect()->route('gestion.index')->with(
+            'success',
+            'Solicitud de '.$nombre.' rechazada y eliminada del sistema.'
+        );
+    }
+
+    private function authorizeAprobar(Usuario $usuario): void
+    {
+        if (($usuario->estado_cuenta ?? CuentaEstado::APROBADO) !== CuentaEstado::PENDIENTE) {
+            abort(403, 'Esta solicitud ya fue procesada.');
+        }
+
+        if (! UsuarioRol::puedeAprobarSolicitud(auth()->user(), $usuario->rol_solicitado)) {
+            abort(403, 'No tienes permiso para aprobar esta solicitud.');
+        }
     }
 
     /** @return \Illuminate\Support\Collection<int, Role> */

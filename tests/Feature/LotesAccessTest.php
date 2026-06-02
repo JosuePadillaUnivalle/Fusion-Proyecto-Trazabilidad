@@ -44,13 +44,13 @@ class LotesAccessTest extends TestCase
         $this->get(route('lotes.create'))->assertOk();
     }
 
-    public function test_agricultor_puede_gestionar_lotes(): void
+    public function test_agricultor_ve_sus_lotes_y_actividades_sin_crear_lotes(): void
     {
         $agricultor = $this->createUser('agricultor');
         $this->actingAs($agricultor);
 
         $this->get(route('lotes.index'))->assertOk();
-        $this->get(route('lotes.create'))->assertOk();
+        $this->get(route('lotes.create'))->assertForbidden();
         $this->get(route('actividades.index'))->assertOk();
         $this->get(route('actividades.calendario'))->assertOk();
     }
