@@ -56,14 +56,6 @@ return [
 
         ],
 
-        'reportes' => [
-
-            'read' => 'reportes.view',
-
-            'export' => 'reportes.export',
-
-        ],
-
         'lotes' => [
 
             'create' => 'lotes.create',
@@ -240,6 +232,22 @@ return [
 
         ],
 
+        'recepcion_planta' => [
+
+            'read' => 'recepcion_planta.view',
+
+            'confirm' => 'recepcion_planta.confirm',
+
+        ],
+
+        'lote_produccion' => [
+
+            'read' => 'lote_produccion.view',
+
+            'create' => 'lote_produccion.create',
+
+        ],
+
         'panel_transportista' => [
 
             'read' => 'panel_transportista.view',
@@ -332,6 +340,42 @@ return [
 
             'panel_planta.view',
 
+            'recepcion_planta.view',
+
+            'recepcion_planta.confirm',
+
+            'lote_produccion.view',
+
+            'lote_produccion.create',
+
+            'inventario.view',
+
+            'inventario.create',
+
+            'inventario.update',
+
+            'almacen.movimientos.view',
+
+            'almacen.ingresos.create',
+
+            'almacen.salidas.create',
+
+            'almacen.reportes.view',
+
+        ],
+
+        'jefe_planta' => [
+
+            'panel_planta.view',
+
+            'recepcion_planta.view',
+
+            'recepcion_planta.confirm',
+
+            'lote_produccion.view',
+
+            'lote_produccion.create',
+
             'inventario.view',
 
             'inventario.create',
@@ -369,8 +413,6 @@ return [
             'incidentes.create',
 
             'monitoreo.view',
-
-            'reportes.view',
 
         ],
 

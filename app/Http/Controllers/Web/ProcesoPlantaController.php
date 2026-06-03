@@ -99,7 +99,7 @@ class ProcesoPlantaController extends Controller
 
     private function filteredQuery(Request $request)
     {
-        $query = ProcesoPlanta::query();
+        $query = \App\Support\ProcesoPlantaCatalogo::queryActivos();
 
         if ($request->filled('estado')) {
             if ($request->estado === 'activo') {

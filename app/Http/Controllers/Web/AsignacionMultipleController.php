@@ -179,18 +179,35 @@ class AsignacionMultipleController extends Controller
             ->with('success', 'Los envíos se asignaron correctamente al chofer seleccionado.');
     }
 
-    public function markDelivered(EnvioAsignacionMultiple $asignacion): RedirectResponse
+    public function markEnTransportePlanta(EnvioAsignacionMultiple $asignacion): RedirectResponse
     {
+        $user = auth()->user();
+        if (! $user?->can('asignaciones.update') && (int) $asignacion->transportista_usuarioid !== (int) $user?->usuarioid) {
+            abort(403);
+        }
+
+        if (! in_array($asignacion->estado, ['asignado', 'pendiente', 'asignada', 'creada'], true)) {
+            return back()->with('error', 'Solo puede iniciar el transporte cuando el envío está asignado.');
+        }
+
         if (! $this->envioListoParaLogistica($asignacion)) {
             return back()->with('error', 'No se puede avanzar el envío hasta que producción agrícola acepte el pedido y reserve stock.');
         }
 
         $asignacion->update(EnvioAsignacionEstadoCatalogo::applyToAttributes([
-            'estado' => 'entregado',
+            'estado' => 'en_transporte_planta',
             'fecha_asignacion' => now(),
         ]));
 
-        return back()->with('success', 'Recepción registrada correctamente.');
+        return back()->with('success', 'El envío quedó en transporte hacia planta.');
+    }
+
+    /** @deprecated La recepción final la confirma planta en recepcion-planta.confirmar */
+    public function markDelivered(EnvioAsignacionMultiple $asignacion): RedirectResponse
+    {
+        return redirect()
+            ->route('recepcion-planta.index')
+            ->with('warning', 'La recepción en planta debe confirmarla un usuario con rol Planta o Jefe de Planta.');
     }
 
     /**

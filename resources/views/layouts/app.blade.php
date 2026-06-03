@@ -1006,7 +1006,7 @@
                     $almAgrOpen = request()->routeIs('almacen-agricola.*');
                     $almPlaOpen = request()->routeIs('almacen-planta.*');
                     $prodAgrOpen = request()->routeIs('producciones.*', 'climas.*', 'agricola.pedidos.*');
-                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'maquinas-planta.*', 'registro-planta.*', 'almacen-planta.*');
+                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'maquinas-planta.*', 'registro-planta.*', 'procesamiento.*', 'recepcion-planta.*', 'almacen-planta.*');
                     $puedeProdPlanta = $isAdmin || $esPlantaOperativo;
                     $showProdAgricola = ! $esPlantaOperativo && ! $esTransportistaOperativo && (
                         $isAdmin
@@ -1019,7 +1019,7 @@
                     $envPerm = [
                         'envios.view', 'envios.create', 'envios.admin.view',
                         'vehiculos.view', 'transportistas.view', 'direcciones.view',
-                        'reportes.view', 'pedidos.view',
+                        'pedidos.view',
                         'asignaciones.view', 'rutas_multi.view', 'rutas_multi.create',
                         'documentos.view', 'incidentes.view',
                     ];
@@ -1159,7 +1159,7 @@
                         @can('incidentes.view')
                         <li class="ag-sub-li"><a href="{{ route('logistica.incidentes.index') }}" class="ag-sub-a {{ request()->routeIs('logistica.incidentes.*') ? 'active' : '' }}">Incidentes</a></li>
                         @endcan
-                        @if($isAdmin || auth()->user()?->can('reportes.view'))
+                        @if($isAdmin || auth()->user()?->can('envios.view'))
                         <li class="ag-sub-li"><a href="{{ route('envios.reportes-distribucion') }}" class="ag-sub-a {{ request()->routeIs('envios.reportes-distribucion') ? 'active' : '' }}">Reportes distribución</a></li>
                         @endif
                         @can('pedidos.view')
@@ -1187,6 +1187,12 @@
                     <ul class="ag-subnav {{ $prodPlaMenuOpen ? 'open' : '' }}" id="sub-prod-pla">
                         @if($puedeProdPlanta)
                         <li class="ag-sub-li"><a href="{{ route('registro-planta.index') }}" class="ag-sub-a {{ request()->routeIs('registro-planta.*') ? 'active' : '' }}">Registro a Planta</a></li>
+                        @can('recepcion_planta.view')
+                        <li class="ag-sub-li"><a href="{{ route('recepcion-planta.index') }}" class="ag-sub-a {{ request()->routeIs('recepcion-planta.*') ? 'active' : '' }}">Recepción en planta</a></li>
+                        @endcan
+                        @can('lote_produccion.view')
+                        <li class="ag-sub-li"><a href="{{ route('procesamiento.index') }}" class="ag-sub-a {{ request()->routeIs('procesamiento.*') ? 'active' : '' }}">Procesamiento de Lote</a></li>
+                        @endcan
                         <li class="ag-sub-li"><a href="{{ route('procesos-planta.index') }}" class="ag-sub-a {{ request()->routeIs('procesos-planta.*') ? 'active' : '' }}">Procesos de planta</a></li>
                         <li class="ag-sub-li"><a href="{{ route('maquinas-planta.index') }}" class="ag-sub-a {{ request()->routeIs('maquinas-planta.*') ? 'active' : '' }}">Máquinas de planta</a></li>
                         @endif
@@ -1212,16 +1218,11 @@
                 @endif
                 @endif
 
-                {{-- Ventas / Reportes (no-admin global) --}}
+                {{-- Ventas (no-admin global) --}}
                 @if(!$isAdmin)
                     @can('ventas.view')
                     <li class="ag-nav-li"><a href="{{ route('ventas.index') }}" class="ag-nav-a {{ request()->routeIs('ventas.*') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-dollar-sign"></i><span class="ag-nav-text">Ventas</span></a></li>
                     @endcan
-                    @if(!$esTransportistaOperativo)
-                    @can('reportes.view')
-                    <li class="ag-nav-li"><a href="{{ route('reportes.index') }}" class="ag-nav-a {{ request()->routeIs('reportes.*') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-chart-pie"></i><span class="ag-nav-text">Reportes</span></a></li>
-                    @endcan
-                    @endif
                 @endif
 
                 @if($isAdmin || auth()->user()?->can('usuarios.view'))
@@ -1253,24 +1254,6 @@
                 @can('ventas.view')
                 <li class="ag-nav-li"><a href="{{ route('ventas.index') }}" class="ag-nav-a {{ request()->routeIs('ventas.*') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-dollar-sign"></i><span class="ag-nav-text">Ventas</span></a></li>
                 @endcan
-
-                {{-- Reportes admin --}}
-                @php $repOpen = request()->routeIs('reportes.*'); @endphp
-                <li class="ag-nav-li">
-                    <a href="#" class="ag-nav-a {{ $repOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-rep">
-                        <i class="ag-nav-icon fas fa-chart-bar"></i>
-                        <span class="ag-nav-text">Reportes</span>
-                        <i class="ag-nav-arrow fas fa-chevron-right"></i>
-                    </a>
-                    <ul class="ag-subnav {{ $repOpen ? 'open' : '' }}" id="sub-rep">
-                        <li class="ag-sub-li"><a href="{{ route('reportes.index') }}" class="ag-sub-a {{ request()->routeIs('reportes.index') ? 'active' : '' }}">Centro de reportes</a></li>
-                        <li class="ag-sub-li"><a href="{{ route('reportes.ventas') }}" class="ag-sub-a {{ request()->routeIs('reportes.ventas') ? 'active' : '' }}">Ventas</a></li>
-                        <li class="ag-sub-li"><a href="{{ route('reportes.inventario') }}" class="ag-sub-a {{ request()->routeIs('reportes.inventario') ? 'active' : '' }}">Inventario</a></li>
-                        <li class="ag-sub-li"><a href="{{ route('reportes.produccion') }}" class="ag-sub-a {{ request()->routeIs('reportes.produccion') ? 'active' : '' }}">Producción</a></li>
-                        <li class="ag-sub-li"><a href="{{ route('reportes.climatico') }}" class="ag-sub-a {{ request()->routeIs('reportes.climatico') ? 'active' : '' }}">Climático</a></li>
-                        <li class="ag-sub-li"><a href="{{ route('reportes.actividades') }}" class="ag-sub-a {{ request()->routeIs('reportes.actividades') ? 'active' : '' }}">Actividades</a></li>
-                    </ul>
-                </li>
 
                 @endif {{-- end isAdmin --}}
 

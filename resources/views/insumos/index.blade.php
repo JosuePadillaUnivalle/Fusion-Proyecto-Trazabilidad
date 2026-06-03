@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Gestión de Insumos | AgroNexus')
+@section('title', 'Gestión de Insumos | AgroFusion')
 @section('page_title', 'Inventario de Insumos')
 
 @section('breadcrumbs')

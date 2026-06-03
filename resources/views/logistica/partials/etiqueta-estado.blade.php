@@ -1,13 +1,12 @@
 @php
-    $etiquetas = [
-        'planificada' => 'Planificada',
-        'en_ruta' => 'En camino',
-        'completada' => 'Completada',
-        'cancelada' => 'Cancelada',
-        'asignado' => 'Asignado',
-        'entregado' => 'Entregado',
-        'pendiente' => 'Pendiente',
-    ];
-    $texto = $etiquetas[$estado ?? ''] ?? ucfirst(str_replace('_', ' ', (string) ($estado ?? '')));
+    $texto = \App\Support\EnvioAsignacionEstadoCatalogo::etiqueta($estado ?? '');
+    if ($texto === '' || $texto === ucfirst(str_replace('_', ' ', (string) ($estado ?? '')))) {
+        $etiquetas = [
+            'planificada' => 'Planificada',
+            'completada' => 'Completada',
+            'cancelada' => 'Cancelada',
+        ];
+        $texto = $etiquetas[$estado ?? ''] ?? $texto;
+    }
 @endphp
 <span class="badge badge-pill {{ $clase ?? 'badge-secondary' }}">{{ $texto }}</span>

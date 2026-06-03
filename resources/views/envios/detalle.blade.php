@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Detalle de envío | AgroNexus')
+@section('title', 'Detalle de envío | AgroFusion')
 
 @section('page_title', 'Detalle de envío')
 
@@ -69,7 +69,7 @@
         (function () {
             const LOCAL_API_URL = '{{ url('/envios/api') }}';
             const envioId = {{ $id ?? 0 }};
-            const CACHE_KEY = `agronexus_envio_${envioId}`;
+            const CACHE_KEY = `AgroFusion_envio_${envioId}`;
             const TIENE_DETALLE_SERVIDOR = @json($tieneDetalle ?? false);
             const envioServidor = @json($envioInicial ?? null);
             const FETCH_OPTS = { credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } };

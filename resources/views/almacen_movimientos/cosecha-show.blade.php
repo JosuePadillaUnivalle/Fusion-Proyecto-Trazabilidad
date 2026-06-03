@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Movimiento por cosecha | AgroNexus')
+@section('title', 'Movimiento por cosecha | AgroFusion')
 @section('page_title', 'Ingreso por cosecha')
 
 @section('breadcrumbs')

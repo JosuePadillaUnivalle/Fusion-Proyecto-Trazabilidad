@@ -40,7 +40,9 @@
             <div class="fase-pipeline">
                 @foreach($fases_pipeline as $step)
                     @php
-                        $titulo = $step['eventos'].' evento(s)';
+                        $titulo = !empty($step['fase_unica'])
+                            ? ($step['completada'] ? 'Completada' : 'Pendiente — ocurre una sola vez')
+                            : ($step['eventos'].' evento(s)');
                         if (!empty($step['url'])) {
                             $titulo = 'Ir a '.$step['label'].' — '.$titulo;
                         }
@@ -52,7 +54,9 @@
                             @if($step['estado'] === 'next')
                                 <span class="d-block small mt-1"><i class="fas fa-arrow-right"></i> Siguiente</span>
                             @endif
-                            @if($step['eventos'] > 0)
+                            @if(!empty($step['fase_unica']) && !empty($step['completada']))
+                                <span class="d-block small mt-1"><i class="fas fa-check"></i></span>
+                            @elseif($step['eventos'] > 0)
                                 <span class="badge badge-light">{{ $step['eventos'] }}</span>
                             @endif
                         </a>
@@ -60,7 +64,9 @@
                         <div class="fase-step {{ $step['estado'] }}" title="{{ $titulo }}">
                             <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
                             {{ $step['label'] }}
-                            @if($step['eventos'] > 0)
+                            @if(!empty($step['fase_unica']) && !empty($step['completada']))
+                                <span class="d-block small mt-1"><i class="fas fa-check"></i></span>
+                            @elseif($step['eventos'] > 0)
                                 <span class="badge badge-light">{{ $step['eventos'] }}</span>
                             @endif
                         </div>

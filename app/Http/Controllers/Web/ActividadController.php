@@ -9,6 +9,7 @@ use App\Models\TipoActividad;
 use App\Models\Prioridad;
 use App\Models\Usuario;
 use App\Support\LoteEstadoPorActividad;
+use App\Support\LoteTrazabilidadService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ class ActividadController extends Controller
     public function __construct(
         private LoteEstadoPorActividad $loteEstadoPorActividad,
         private NotificacionUsuarioService $notificaciones,
+        private LoteTrazabilidadService $trazabilidad,
     ) {}
 
     public function index(Request $request)
@@ -152,8 +154,13 @@ class ActividadController extends Controller
         ]);
 
         // Obtener el lote para asignar usuario automáticamente
-        $lote = Lote::findOrFail($data['loteid']);
+        $lote = Lote::with('actividades.tipoActividad')->findOrFail($data['loteid']);
         $tipo = TipoActividad::find($data['tipoactividadid']);
+
+        $duplicada = $this->trazabilidad->mensajeActividadDuplicada($lote, $tipo->nombre ?? null);
+        if ($duplicada !== null) {
+            return back()->withInput()->with('error', $duplicada);
+        }
 
         // Si no hay descripción, usar el tipo de actividad
         if (empty($data['descripcion'])) {

@@ -472,11 +472,6 @@
                         <i class="fas fa-warehouse mr-2"></i>Gestionar Inventario
                     </a>
                     @endcan
-                    @can('reportes.view')
-                    <a href="{{ route('reportes.index') }}" class="btn btn-warning btn-block">
-                        <i class="fas fa-chart-bar mr-2"></i>Ver Reportes
-                    </a>
-                    @endcan
                 </div>
             </div>
         </div>

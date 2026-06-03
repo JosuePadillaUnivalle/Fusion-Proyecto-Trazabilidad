@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Almacen;
+use App\Models\AlmacenajeLoteProduccion;
 use App\Models\Insumo;
 use App\Models\ProduccionAlmacenamiento;
 use App\Models\UnidadMedida;
@@ -72,7 +73,29 @@ class AlmacenCapacidadService
             ->get()
             ->sum(fn (Insumo $insumo) => $this->convertirAKg((float) $insumo->stock, $insumo->unidadMedida));
 
-        return $cosechaKg + $insumoKg;
+        $productoPlantaKg = $this->productoPlantaKgEnAlmacen($almacen);
+
+        return $cosechaKg + $insumoKg + $productoPlantaKg;
+    }
+
+    public function productoPlantaKgEnAlmacen(Almacen $almacen): float
+    {
+        return (float) AlmacenajeLoteProduccion::query()
+            ->with(['loteProduccionPedido.unidadMedida'])
+            ->whereNull('fecha_retiro')
+            ->where(function ($q) use ($almacen) {
+                $q->where('almacenid', $almacen->almacenid)
+                    ->orWhere(function ($q2) use ($almacen) {
+                        $q2->whereNull('almacenid')->where('ubicacion', $almacen->nombre);
+                    });
+            })
+            ->get()
+            ->sum(function (AlmacenajeLoteProduccion $row) {
+                return $this->convertirAKg(
+                    (float) $row->cantidad,
+                    $row->loteProduccionPedido?->unidadMedida
+                );
+            });
     }
 
     public function capacidadKg(Almacen $almacen): float

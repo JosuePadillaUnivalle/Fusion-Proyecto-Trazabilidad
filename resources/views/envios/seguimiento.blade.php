@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Seguimiento de Envíos | AgroNexus')
+@section('title', 'Seguimiento de Envíos | AgroFusion')
 @section('page_title', 'Seguimiento de envíos')
 
 @section('breadcrumbs')
@@ -196,7 +196,7 @@
 <script>
 (function () {
     const LOCAL_API_URL = '{{ url('/envios/api') }}';
-    const CACHE_KEY = 'agronexus_envios_cache_v2';
+    const CACHE_KEY = 'AgroFusion_envios_cache_v2';
     const FETCH_LIMIT = 150;
     const ENVIOS_TIMEOUT_MS = 8000;
     const TIENE_DATOS_SERVIDOR = @json(count($enviosIniciales ?? []) > 0);
@@ -368,7 +368,7 @@
 
     function cargarEnviosLocales() {
         try {
-            const stored = localStorage.getItem('agronexus_envios_pendientes');
+            const stored = localStorage.getItem('AgroFusion_envios_pendientes');
             enviosLocales = stored ? JSON.parse(stored) : [];
         } catch (e) {
             enviosLocales = [];

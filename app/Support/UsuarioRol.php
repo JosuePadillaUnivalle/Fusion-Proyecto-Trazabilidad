@@ -18,7 +18,12 @@ final class UsuarioRol
 
     public static function esPlantaOperativo(?Usuario $user): bool
     {
-        return (bool) ($user && $user->hasRole('planta'));
+        return (bool) ($user && $user->hasAnyRole(['planta', 'jefe_planta']));
+    }
+
+    public static function puedeConfirmarRecepcionPlanta(?Usuario $user): bool
+    {
+        return (bool) ($user && ($user->hasAnyRole(['planta', 'jefe_planta']) || $user->hasRole('admin')));
     }
 
     public static function esTransportista(?Usuario $user): bool

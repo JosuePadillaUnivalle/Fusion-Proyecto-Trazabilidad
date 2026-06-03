@@ -13,12 +13,15 @@ class LoteProduccionPedido extends Model
 
     protected $fillable = [
         'pedidoid',
+        'procesoplantaid',
         'codigo_lote',
         'nombre',
+        'producto',
         'fecha_creacion',
         'hora_inicio',
         'hora_fin',
         'cantidad_objetivo',
+        'unidadmedidaid',
         'cantidad_producida',
         'observaciones',
     ];
@@ -29,11 +32,27 @@ class LoteProduccionPedido extends Model
         'hora_fin'            => 'datetime',
         'cantidad_objetivo'   => 'float',
         'cantidad_producida'  => 'float',
+        'unidadmedidaid'      => 'integer',
     ];
+
+    public function unidadMedida(): BelongsTo
+    {
+        return $this->belongsTo(UnidadMedida::class, 'unidadmedidaid', 'unidadmedidaid');
+    }
 
     public function pedido(): BelongsTo
     {
         return $this->belongsTo(Pedido::class, 'pedidoid', 'pedidoid');
+    }
+
+    public function procesoPlanta(): BelongsTo
+    {
+        return $this->belongsTo(ProcesoPlanta::class, 'procesoplantaid', 'procesoplantaid');
+    }
+
+    public function registrosProceso(): HasMany
+    {
+        return $this->hasMany(RegistroProcesoMaquinaPlanta::class, 'loteproduccionpedidoid', 'loteproduccionpedidoid');
     }
 
     public function materiasPrimas(): HasMany

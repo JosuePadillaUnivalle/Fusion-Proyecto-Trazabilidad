@@ -51,14 +51,17 @@
                 <div class="row">
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-primary btn-block quick-link" href="{{ route('envios.mandar') }}"><i class="fas fa-plus-circle"></i>Crear envío</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-info btn-block quick-link" href="{{ route('envios.seguimiento') }}"><i class="fas fa-truck"></i>Mis envíos</a></div>
+                    @can('recepcion_planta.view')
+                    <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-success btn-block quick-link" href="{{ route('recepcion-planta.index') }}"><i class="fas fa-warehouse"></i>Recepción en planta</a></div>
+                    @endcan
+                    @can('lote_produccion.view')
+                    <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-primary btn-block quick-link" href="{{ route('procesamiento.index') }}"><i class="fas fa-industry"></i>Procesamiento de Lote</a></div>
+                    @endcan
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-warning btn-block quick-link" href="{{ route('logistica.asignaciones.index') }}"><i class="fas fa-user-tag"></i>Asignaciones</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-success btn-block quick-link" href="{{ route('logistica.rutas.index') }}"><i class="fas fa-route"></i>Rutas de entrega</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-secondary btn-block quick-link" href="{{ route('logistica.documentos.index') }}"><i class="fas fa-file-alt"></i>Documentos</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-danger btn-block quick-link" href="{{ route('logistica.incidentes.index') }}"><i class="fas fa-exclamation-circle"></i>Incidentes</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-dark btn-block quick-link" href="{{ route('ventas.index') }}"><i class="fas fa-receipt"></i>Notas de venta</a></div>
-                @can('reportes.view')
-                    <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-outline-primary btn-block quick-link" href="{{ route('reportes.index') }}"><i class="fas fa-chart-line"></i>Reportes</a></div>
-                @endcan
                 </div>
             </div>
         </div>

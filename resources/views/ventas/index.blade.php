@@ -243,7 +243,6 @@
     <div class="guia-venta mt-2">
         <strong><i class="fas fa-lightbulb mr-1"></i> Guía rápida</strong>
         Las ventas descuentan stock del almacén automáticamente. Usa los filtros para buscar por cliente, cultivo o fechas.
-        El reporte analítico está en <a href="{{ route('reportes.ventas') }}">Reportes → Ventas</a>.
     </div>
 </div>
 @endsection

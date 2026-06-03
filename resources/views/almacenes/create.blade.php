@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Registrar Almacén | AgroNexus')
+@section('title', 'Registrar Almacén | AgroFusion')
 @section('page_title', 'Registrar Almacén')
 
 @section('content')

@@ -10,8 +10,10 @@ use App\Models\Insumo;
 use App\Models\Lote;
 use App\Models\MaquinaPlanta;
 use App\Models\ProcesoPlanta;
+use App\Models\Pedido;
 use App\Models\Produccion;
 use App\Models\Usuario;
+use App\Support\AlmacenAmbito;
 use App\Support\CultivoCatalogo;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -117,28 +119,92 @@ class CatalogoSelectorController extends Controller
 
     public function insumos(Request $request): JsonResponse
     {
-        $query = Insumo::query()->with('unidadMedida');
+        AlmacenAmbito::asegurarAmbitosEnRegistros();
+
+        $query = Insumo::query()->with(['unidadMedida', 'almacen']);
 
         if ($request->boolean('solo_con_stock')) {
             $query->where('stock', '>', 0);
         }
 
+        if ($request->boolean('ambito_planta')) {
+            $almacenIds = AlmacenAmbito::scope(Almacen::query()->where('activo', true), AlmacenAmbito::PLANTA)
+                ->pluck('almacenid');
+
+            if ($almacenIds->isNotEmpty()) {
+                $query->whereIn('almacenid', $almacenIds);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        if ($request->filled('almacenid')) {
+            $query->where('almacenid', (int) $request->almacenid);
+        }
+
         $this->aplicarBusqueda($query, (string) $request->q, ['nombre', 'descripcion']);
 
         return $this->respuestaPaginada($request, $query->orderBy('nombre'), function (Insumo $i) {
-            $unidad = $i->unidadMedida?->abreviatura ?? 'ud';
+            $unidad = $i->unidadMedida?->abreviatura ?? $i->unidadMedida?->nombre ?? 'ud';
+            $alm = $i->almacen?->nombre;
+            $stock = (float) ($i->stock ?? 0);
 
             return [
                 'id' => $i->insumoid,
                 'label' => $i->nombre,
-                'meta' => 'Stock: '.($i->stock ?? 0).' '.$unidad,
+                'meta' => trim(
+                    ($alm ? $alm.' · ' : '')
+                    .'Stock: '.number_format($stock, 2).' '.$unidad
+                ),
                 'extra' => [
-                    'stock' => $i->stock,
+                    'stock' => $stock,
                     'unidad' => $unidad,
+                    'almacen' => $alm,
                     'precio' => $i->preciounitario ?? 0,
+                    'sin_stock' => $stock <= 0,
                 ],
             ];
         });
+    }
+
+    public function pedidos(Request $request): JsonResponse
+    {
+        $query = Pedido::query();
+
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->estado);
+        }
+
+        $this->aplicarBusqueda($query, (string) $request->q, [
+            'numero_solicitud',
+            'nombre_planta',
+            'direccion_texto',
+            'observaciones',
+        ]);
+
+        return $this->respuestaPaginada(
+            $request,
+            $query->orderByDesc('fechapedido'),
+            function (Pedido $p) {
+                $fecha = $p->fechapedido
+                    ? (\Carbon\Carbon::parse($p->fechapedido)->format('d/m/Y'))
+                    : null;
+
+                return [
+                    'id' => $p->pedidoid,
+                    'label' => $p->numero_solicitud,
+                    'meta' => trim(
+                        ($p->nombre_planta ?? '')
+                        .($fecha ? ' · '.$fecha : '')
+                        .($p->estado ? ' · '.ucfirst(str_replace('_', ' ', (string) $p->estado)) : '')
+                    ),
+                    'extra' => [
+                        'estado' => $p->estado,
+                        'planta' => $p->nombre_planta,
+                    ],
+                ];
+            }
+        );
     }
 
     public function actores(Request $request): JsonResponse
@@ -204,11 +270,9 @@ class CatalogoSelectorController extends Controller
 
     public function procesosPlanta(Request $request): JsonResponse
     {
-        $query = ProcesoPlanta::query();
-
-        if ($request->filled('activo')) {
-            $query->where('activo', $request->boolean('activo'));
-        }
+        $query = $request->boolean('activo', true)
+            ? \App\Support\ProcesoPlantaCatalogo::queryActivos()
+            : ProcesoPlanta::query();
 
         $this->aplicarBusqueda($query, (string) $request->q, ['nombre', 'descripcion']);
 

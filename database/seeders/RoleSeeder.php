@@ -8,7 +8,7 @@ use Spatie\Permission\Models\Role;
 
 class RoleSeeder extends Seeder
 {
-    public const ROLES_CANONICOS = ['admin', 'agricultor', 'planta', 'transportista'];
+    public const ROLES_CANONICOS = ['admin', 'agricultor', 'planta', 'jefe_planta', 'transportista'];
 
     public const ROLES_LEGACY = ['operador', 'almacen', 'Operador', 'Almacen', 'Admin', 'Agricultor'];
 

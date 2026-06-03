@@ -19,6 +19,8 @@ class EnvioAsignacionMultiple extends Model
         'vehiculo_ref',
         'estado',
         'fecha_asignacion',
+        'fecha_recepcion_planta',
+        'recepcion_usuarioid',
         'almacenid',
         'tipotransporteid',
         'recogidaentregaid',
@@ -34,6 +36,8 @@ class EnvioAsignacionMultiple extends Model
         'tipotransporteid' => 'integer',
         'recogidaentregaid' => 'integer',
         'fecha_asignacion' => 'datetime',
+        'fecha_recepcion_planta' => 'datetime',
+        'recepcion_usuarioid' => 'integer',
         'detalles_productos' => 'array',
     ];
 
@@ -60,6 +64,11 @@ class EnvioAsignacionMultiple extends Model
     public function almacen(): BelongsTo
     {
         return $this->belongsTo(Almacen::class, 'almacenid', 'almacenid');
+    }
+
+    public function recepcionConfirmadaPor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'recepcion_usuarioid', 'usuarioid');
     }
 
     public function tipoTransporte(): BelongsTo

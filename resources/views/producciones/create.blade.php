@@ -11,6 +11,7 @@
 
 @push('styles')
 @include('partials.modulo-produccion-styles')
+@include('partials.almacen-envio-styles')
 <style>
     .form-card {
         border: none;
@@ -39,70 +40,6 @@
     select.form-control {
         padding-right: 35px;
     }
-
-    /* Sección de almacenamiento */
-    .almacen-section {
-        background: #f8f9fc;
-        border-radius: 12px;
-        padding: 20px;
-        border: 2px dashed #6c757d;
-        margin-top: 20px;
-        transition: all 0.3s ease;
-    }
-    .almacen-section.active {
-        border-color: #28a745;
-        border-style: solid;
-        background: linear-gradient(135deg, #d4edda, #c3e6cb);
-    }
-
-    .almacen-card {
-        background: white;
-        border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 10px;
-        border: 2px solid #dee2e6;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-    .almacen-card:hover {
-        border-color: #28a745;
-        box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
-    }
-    .almacen-card.selected {
-        border-color: #28a745;
-        background: #d4edda;
-    }
-    .almacen-card .almacen-icon {
-        font-size: 1.8rem;
-        color: #6c757d;
-        width: 45px;
-    }
-    .almacen-card.selected .almacen-icon {
-        color: #28a745;
-    }
-    .almacen-card .almacen-nombre {
-        font-weight: 600;
-        color: #1a252f;
-    }
-    .almacen-card .almacen-tipo {
-        font-size: 0.8rem;
-        color: #6c757d;
-    }
-    .capacidad-bar {
-        height: 6px;
-        background: #e9ecef;
-        border-radius: 3px;
-        overflow: hidden;
-        margin-top: 8px;
-    }
-    .capacidad-bar .fill {
-        height: 100%;
-        border-radius: 3px;
-    }
-    .capacidad-bar .fill.low { background: #28a745; }
-    .capacidad-bar .fill.medium { background: #ffc107; }
-    .capacidad-bar .fill.high { background: #dc3545; }
-
     .info-panel {
         background: #f8f9fa;
         border-radius: 10px;
@@ -130,6 +67,7 @@
         color: #495057;
     }
     .guia-campo strong { color: #2c5530; }
+    .almacen-section { margin-top: 20px; }
 </style>
 @endpush
 

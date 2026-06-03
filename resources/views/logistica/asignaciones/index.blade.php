@@ -152,9 +152,7 @@
                             <th>Vehículo</th>
                             <th>Situación</th>
                             <th>Fecha</th>
-                            @can('asignaciones.create')
                             <th>Acción</th>
-                            @endcan
                         </tr>
                     </thead>
                     <tbody>
@@ -175,25 +173,29 @@
                                 <td>{{ $asignacion->vehiculo_ref ?? '—' }}</td>
                                 <td>@include('logistica.partials.etiqueta-estado', ['estado' => $asignacion->estado, 'clase' => $badgeClass])</td>
                                 <td>{{ optional($asignacion->fecha_asignacion)->format('d/m/Y H:i') }}</td>
-                                @can('asignaciones.create')
                                 <td>
-                                    @if($asignacion->estado !== 'entregado')
-                                        <form method="POST" action="{{ route('logistica.asignaciones.mark-delivered', $asignacion) }}">
+                                    @if(in_array($asignacion->estado, ['recibido_planta', 'entregado', 'entregada'], true) || $asignacion->fecha_recepcion_planta)
+                                        <span class="text-success small"><i class="fas fa-check mr-1"></i>Recibido en planta</span>
+                                    @elseif(in_array($asignacion->estado, ['en_transporte_planta', 'en_ruta', 'en_transito'], true))
+                                        <span class="text-info small">En transporte hacia planta</span>
+                                    @elseif(in_array($asignacion->estado, ['asignado', 'asignada', 'pendiente'], true))
+                                        @can('asignaciones.update')
+                                        <form method="POST" action="{{ route('logistica.asignaciones.en-transporte', $asignacion) }}" class="d-inline">
                                             @csrf
                                             @method('PATCH')
-                                            <button type="submit" class="btn btn-sm btn-success">
-                                                <i class="fas fa-check-circle mr-1"></i>Confirmar entrega
+                                            <button type="submit" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-shipping-fast mr-1"></i>Iniciar transporte a planta
                                             </button>
                                         </form>
+                                        @endcan
                                     @else
-                                        <span class="text-success small"><i class="fas fa-check mr-1"></i>Entregado</span>
+                                        —
                                     @endif
                                 </td>
-                                @endcan
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ auth()->user()?->can('asignaciones.create') ? 7 : 6 }}" class="x-empty">
+                                <td colspan="7" class="x-empty">
                                     Aún no hay envíos asignados.
                                 </td>
                             </tr>

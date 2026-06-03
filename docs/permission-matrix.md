@@ -27,8 +27,6 @@ Esta matriz se define en `config/permission_matrix.php` y se aplica con:
 | Direcciones | Leer | `direcciones.view` |
 | Direcciones | Actualizar | `direcciones.update` |
 | Direcciones | Eliminar | `direcciones.delete` |
-| Reportes | Leer | `reportes.view` |
-| Reportes | Exportar | `reportes.export` |
 | Lotes | Crear | `lotes.create` |
 | Lotes | Leer | `lotes.view` |
 | Lotes | Actualizar | `lotes.update` |

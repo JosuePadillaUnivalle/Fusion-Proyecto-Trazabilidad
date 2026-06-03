@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Crear envío | AgroNexus')
+@section('title', 'Crear envío | AgroFusion')
 
 @section('page_title', 'Crear envío')
 
@@ -565,7 +565,7 @@
                 };
 
                 this.colaLocal.push(envio);
-                localStorage.setItem('agronexus_envios_pendientes', JSON.stringify(this.colaLocal));
+                localStorage.setItem('AgroFusion_envios_pendientes', JSON.stringify(this.colaLocal));
                 this.actualizarIndicador();
 
                 return envio;
@@ -573,7 +573,7 @@
 
             cargarColaLocal: function () {
                 try {
-                    const stored = localStorage.getItem('agronexus_envios_pendientes');
+                    const stored = localStorage.getItem('AgroFusion_envios_pendientes');
                     this.colaLocal = stored ? JSON.parse(stored) : [];
                 } catch (e) {
                     this.colaLocal = [];
@@ -624,7 +624,7 @@
                 }
 
                 this.colaLocal = this.colaLocal.filter(e => e.estado !== 'enviado');
-                localStorage.setItem('agronexus_envios_pendientes', JSON.stringify(this.colaLocal));
+                localStorage.setItem('AgroFusion_envios_pendientes', JSON.stringify(this.colaLocal));
                 this.actualizarIndicador();
 
                 Swal.fire({

@@ -10,6 +10,8 @@ use App\Http\Controllers\Controller;
 
 use App\Models\Almacen;
 
+use App\Models\AlmacenajeLoteProduccion;
+
 use App\Models\Insumo;
 
 use App\Models\ProduccionAlmacenamiento;
@@ -515,6 +517,45 @@ class AlmacenController extends Controller
                 'unidad' => $c->unidadMedida?->abreviatura ?? 'kg',
                 'kg' => $kg,
                 'search' => strtolower(trim($nombre.' cosecha '.$cultivo)),
+            ]);
+        }
+
+        $productosPlanta = AlmacenajeLoteProduccion::query()
+            ->with(['loteProduccionPedido.unidadMedida'])
+            ->whereNull('fecha_retiro')
+            ->where(function ($q) use ($almacen) {
+                $q->where('almacenid', $almacen->almacenid)
+                    ->orWhere(function ($q2) use ($almacen) {
+                        $q2->whereNull('almacenid')->where('ubicacion', $almacen->nombre);
+                    });
+            })
+            ->orderByDesc('fecha_almacenaje')
+            ->get();
+
+        foreach ($productosPlanta as $ingreso) {
+            $lote = $ingreso->loteProduccionPedido;
+            if (! $lote) {
+                continue;
+            }
+
+            $producto = $lote->producto ?: $lote->nombre;
+            $nombre = $producto.' · '.$lote->nombre;
+            $kg = $this->capacidadService->convertirAKg((float) $ingreso->cantidad, $lote->unidadMedida);
+            $unidad = $lote->unidadMedida?->abreviatura ?? $lote->unidadMedida?->nombre ?? 'kg';
+            $detalle = trim(($ingreso->condicion ? $ingreso->condicion.' · ' : '').($ingreso->fecha_almacenaje
+                ? \Carbon\Carbon::parse($ingreso->fecha_almacenaje)->format('d/m/Y H:i')
+                : ''));
+
+            $items->push((object) [
+                'categoria' => 'producto_planta',
+                'tipo_label' => 'Producto terminado',
+                'tipo_filtro' => 'producto terminado',
+                'nombre' => $nombre,
+                'detalle' => $detalle !== '' ? \Illuminate\Support\Str::limit($detalle, 80) : ($lote->codigo_lote ?? '—'),
+                'cantidad' => (float) $ingreso->cantidad,
+                'unidad' => $unidad,
+                'kg' => $kg,
+                'search' => strtolower(trim($nombre.' producto planta '.$producto.' '.$lote->codigo_lote)),
             ]);
         }
 

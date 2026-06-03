@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Actores de abastecimiento | AgroNexus')
+@section('title', 'Actores de abastecimiento | AgroFusion')
 @section('page_title', 'Actores de abastecimiento')
 
 @section('breadcrumbs')

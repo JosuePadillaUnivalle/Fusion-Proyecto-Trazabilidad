@@ -11,7 +11,7 @@ class RegistroProcesoMaquinaPlanta extends Model
     protected $primaryKey = 'registroprocesomaquinaplantaid';
 
     protected $fillable = [
-        'procesomaquinaplantaid', 'loteid', 'usuarioid', 'variables_ingresadas', 'cumple_estandar',
+        'procesomaquinaplantaid', 'loteid', 'loteproduccionpedidoid', 'usuarioid', 'variables_ingresadas', 'cumple_estandar',
         'observaciones', 'hora_inicio', 'hora_fin', 'fecha_registro',
     ];
 
@@ -30,6 +30,11 @@ class RegistroProcesoMaquinaPlanta extends Model
     public function lote(): BelongsTo
     {
         return $this->belongsTo(Lote::class, 'loteid', 'loteid');
+    }
+
+    public function loteProduccionPedido(): BelongsTo
+    {
+        return $this->belongsTo(LoteProduccionPedido::class, 'loteproduccionpedidoid', 'loteproduccionpedidoid');
     }
 
     public function usuario(): BelongsTo

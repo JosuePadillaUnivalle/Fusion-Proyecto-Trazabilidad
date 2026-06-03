@@ -80,6 +80,18 @@
             window.jQuery(this.modalEl).on('hidden.bs.modal', () => {
                 this.activeId = null;
             });
+
+            window.jQuery(this.modalEl).on('show.bs.modal', () => {
+                const visibleCount = document.querySelectorAll('.modal.show').length;
+                const zIndex = 1050 + (10 * visibleCount);
+                this.modalEl.style.zIndex = String(zIndex);
+                setTimeout(() => {
+                    const backdrops = document.querySelectorAll('.modal-backdrop');
+                    if (backdrops.length) {
+                        backdrops[backdrops.length - 1].style.zIndex = String(zIndex - 1);
+                    }
+                }, 0);
+            });
         },
 
         register(id, config) {
@@ -208,6 +220,13 @@
             }
 
             const cfg = this.instances[id];
+
+            if (typeof cfg.onSelect === 'function') {
+                cfg.onSelect(item);
+                window.jQuery(this.modalEl).modal('hide');
+                return;
+            }
+
             const wrapper = document.getElementById('selector_wrap_' + id);
             if (!wrapper) {
                 return;

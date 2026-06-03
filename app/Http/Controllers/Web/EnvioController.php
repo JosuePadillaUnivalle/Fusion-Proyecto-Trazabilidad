@@ -72,7 +72,7 @@ class EnvioController extends Controller
             'fecha_recogida' => $request->fecha_recogida,
             'hora_recogida' => $request->hora_recogida ?? '08:00',
             'observaciones' => $request->observaciones,
-            'origen_sistema' => 'AgroNexus',
+            'origen_sistema' => 'AgroFusion',
             'produccion_id' => $request->produccion_id,
         ];
 

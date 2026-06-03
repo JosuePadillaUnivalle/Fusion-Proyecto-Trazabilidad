@@ -13,6 +13,7 @@ class LoteProduccionMateriaPrima extends Model
     protected $fillable = [
         'loteproduccionpedidoid',
         'materiaprimaloteid',
+        'insumoid',
         'cantidad_planificada',
         'cantidad_usada',
     ];
@@ -30,5 +31,10 @@ class LoteProduccionMateriaPrima extends Model
     public function materiaPrimaLote(): BelongsTo
     {
         return $this->belongsTo(MateriaPrimaLote::class, 'materiaprimaloteid', 'materiaprimaloteid');
+    }
+
+    public function insumo(): BelongsTo
+    {
+        return $this->belongsTo(Insumo::class, 'insumoid', 'insumoid');
     }
 }

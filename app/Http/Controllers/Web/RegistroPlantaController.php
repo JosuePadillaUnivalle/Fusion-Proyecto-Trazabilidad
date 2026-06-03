@@ -49,7 +49,7 @@ class RegistroPlantaController extends Controller
                 return $lote;
             });
 
-        $procesos  = ProcesoPlanta::where('activo', true)->get();
+        $procesos  = \App\Support\ProcesoPlantaCatalogo::activosOrdenados();
         $lotesPend = Lote::with('cultivo')
             ->orderByDesc('loteid')
             ->get();

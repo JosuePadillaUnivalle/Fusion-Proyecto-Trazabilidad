@@ -477,18 +477,25 @@ class DashboardController extends Controller
 
         return [
             'stats' => [
-                'envios_recibidos' => (clone $asignaciones)->where('estado', 'entregado')->count(),
-                'por_recibir' => (clone $asignaciones)->whereIn('estado', ['asignado', 'en_ruta'])->count(),
+                'envios_recibidos' => (clone $asignaciones)->whereIn('estado', ['entregado', 'recibido_planta'])->count(),
+                'por_recibir' => (clone $asignaciones)->whereIn('estado', ['asignado', 'en_ruta', 'en_transporte_planta', 'en_transito'])->count(),
                 'inventario_total' => (float) Insumo::query()->where('almacenid', $almacenId)->sum('stock'),
                 'stock_productos_distribucion' => $stockProductos,
                 'lineas_inventario_envio' => $lineasInvEnvio,
-                'recibidos_hoy' => (clone $asignaciones)->whereDate('updated_at', now()->toDateString())->where('estado', 'entregado')->count(),
+                'recibidos_hoy' => (clone $asignaciones)->whereDate('fecha_recepcion_planta', now()->toDateString())->count(),
                 'incidentes_abiertos' => (clone $incidentes)->where('estado', 'abierto')->count(),
                 'notas_entrega' => $documentos->count(),
                 'ingresos_mes' => (clone $movimientos)->whereMonth('fecha', now()->month)->whereHas('tipo', fn($q) => $q->where('naturaleza', 'ingreso'))->count(),
                 'salidas_mes' => (clone $movimientos)->whereMonth('fecha', now()->month)->whereHas('tipo', fn($q) => $q->where('naturaleza', 'salida'))->count(),
             ],
-            'ultimas_recepciones' => (clone $asignaciones)->where('estado', 'entregado')->latest()->take(10)->get(),
+            'ultimas_recepciones' => (clone $asignaciones)
+                ->where(function ($q) {
+                    $q->whereIn('estado', ['entregado', 'recibido_planta'])
+                        ->orWhereNotNull('fecha_recepcion_planta');
+                })
+                ->orderByDesc('fecha_recepcion_planta')
+                ->take(10)
+                ->get(),
         ];
     }
 }

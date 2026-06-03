@@ -7,6 +7,7 @@ use App\Models\DestinoProduccion;
 use App\Models\Lote;
 use App\Models\MaquinaPlanta;
 use App\Models\ProcesoPlanta;
+use App\Support\ProcesoPlantaCatalogo;
 use App\Models\Produccion;
 use App\Models\UnidadMedida;
 use Illuminate\Database\Seeder;
@@ -55,11 +56,11 @@ class ProduccionModuloSeeder extends Seeder
         ];
 
         $procesoMaquinaMap = [
-            'Tomate' => ['proceso' => 'Lavado y selección', 'maquina' => 'Lavadora Industrial L-100'],
-            'Papa' => ['proceso' => 'Clasificación por calidad', 'maquina' => 'Banda Clasificadora BC-20'],
-            'Lechuga' => ['proceso' => 'Empaque', 'maquina' => 'Selladora de Empaque SE-10'],
-            'Cebolla' => ['proceso' => 'Control de calidad', 'maquina' => 'Balanza Digital BD-500'],
-            'Maíz' => ['proceso' => 'Clasificación por calidad', 'maquina' => 'Banda Clasificadora BC-20'],
+            'Tomate' => ['proceso' => 'Preparación de Materias Primas', 'maquina' => 'Lavadora Industrial L-100'],
+            'Papa' => ['proceso' => 'Control de Calidad', 'maquina' => 'Banda Clasificadora BC-20'],
+            'Lechuga' => ['proceso' => 'Empaquetado', 'maquina' => 'Selladora de Empaque SE-10'],
+            'Cebolla' => ['proceso' => 'Control de Calidad', 'maquina' => 'Balanza Digital BD-500'],
+            'Maíz' => ['proceso' => 'Control de Calidad', 'maquina' => 'Banda Clasificadora BC-20'],
         ];
 
         DB::transaction(function () use ($produccionesDefs, $procesos, $maquinas, $procesoMaquinaMap, $kgId, $qqId) {
@@ -131,19 +132,12 @@ class ProduccionModuloSeeder extends Seeder
             return $out;
         }
 
-        foreach (
-            [
-                ['nombre' => 'Lavado y selección', 'descripcion' => 'Limpieza inicial y selección de productos agrícolas.'],
-                ['nombre' => 'Clasificación por calidad', 'descripcion' => 'Separación por tamaño, madurez y estado.'],
-                ['nombre' => 'Empaque', 'descripcion' => 'Empaquetado para almacenamiento o distribución.'],
-                ['nombre' => 'Control de calidad', 'descripcion' => 'Verificación antes de certificación o envío.'],
-            ] as $d
-        ) {
-            $p = ProcesoPlanta::updateOrCreate(
-                ['nombre' => $d['nombre']],
-                ['descripcion' => $d['descripcion'].' '.self::MARK, 'activo' => true]
+        foreach (ProcesoPlantaCatalogo::CANONICOS as $nombre) {
+            $p = ProcesoPlanta::firstOrCreate(
+                ['nombre' => $nombre],
+                ['descripcion' => 'Proceso de planta · '.self::MARK, 'activo' => true]
             );
-            $out[$d['nombre']] = $p;
+            $out[$nombre] = $p;
         }
 
         return $out;

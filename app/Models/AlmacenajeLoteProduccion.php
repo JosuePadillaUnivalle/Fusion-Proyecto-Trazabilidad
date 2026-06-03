@@ -12,6 +12,7 @@ class AlmacenajeLoteProduccion extends Model
 
     protected $fillable = [
         'loteproduccionpedidoid',
+        'almacenid',
         'ubicacion',
         'condicion',
         'cantidad',
@@ -25,6 +26,7 @@ class AlmacenajeLoteProduccion extends Model
     ];
 
     protected $casts = [
+        'almacenid'         => 'integer',
         'cantidad'          => 'float',
         'latitud_recojo'    => 'float',
         'longitud_recojo'   => 'float',
@@ -35,5 +37,10 @@ class AlmacenajeLoteProduccion extends Model
     public function loteProduccionPedido(): BelongsTo
     {
         return $this->belongsTo(LoteProduccionPedido::class, 'loteproduccionpedidoid', 'loteproduccionpedidoid');
+    }
+
+    public function almacen(): BelongsTo
+    {
+        return $this->belongsTo(Almacen::class, 'almacenid', 'almacenid');
     }
 }

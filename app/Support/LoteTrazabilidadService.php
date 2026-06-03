@@ -22,6 +22,9 @@ class LoteTrazabilidadService
         'envio_almacen' => ['label' => 'Envío al almacén', 'orden' => 5, 'color' => '#6f42c1', 'icon' => 'warehouse'],
     ];
 
+    /** Fases que ocurren una sola vez por lote (no muestran contador de eventos). */
+    private const FASES_UNICAS = ['preparacion', 'siembra'];
+
     /** Fases internas de eventos (historial) que se agrupan en «En crecimiento» en el pipeline. */
     private const FASES_EVENTO_EXTRA = [
         'regado' => ['label' => 'Regado', 'color' => '#28a745', 'icon' => 'tint'],
@@ -84,7 +87,7 @@ class LoteTrazabilidadService
             return 'envio_almacen';
         }
         if ($this->milestoneCosecha($lote)) {
-            return 'envio_almacen';
+            return 'cosecha';
         }
         if ($this->milestoneFumigacion($lote) || $this->milestoneRegado($lote)) {
             return 'en_crecimiento';
@@ -92,8 +95,40 @@ class LoteTrazabilidadService
         if ($this->milestoneSiembra($lote)) {
             return 'en_crecimiento';
         }
+        if ($this->milestonePreparacion($lote)) {
+            return 'siembra';
+        }
 
         return 'preparacion';
+    }
+
+    /**
+     * Impide registrar dos veces actividades de fases únicas (preparación / siembra).
+     */
+    public function mensajeActividadDuplicada(Lote $lote, ?string $tipoNombre): ?string
+    {
+        if ($tipoNombre === null || trim($tipoNombre) === '') {
+            return null;
+        }
+
+        $lote->loadMissing('actividades.tipoActividad');
+        $nombre = mb_strtolower(trim($tipoNombre));
+
+        if (str_contains($nombre, 'siembra') && $this->milestoneSiembra($lote)) {
+            return 'Este lote ya tiene siembra registrada. Solo puede realizarse una vez.';
+        }
+
+        if ((str_contains($nombre, 'labranza') || str_contains($nombre, 'prepar'))
+            && $this->milestonePreparacion($lote)) {
+            return 'La preparación del lote ya fue registrada. Solo puede realizarse una vez.';
+        }
+
+        return null;
+    }
+
+    private function milestonePreparacion(Lote $lote): bool
+    {
+        return $this->actividadCompletadaConKeywords($lote, ['labranza', 'prepar']);
     }
 
     public function trazabilidadCompleta(Lote $lote): bool
@@ -679,10 +714,15 @@ class LoteTrazabilidadService
                 $url = $this->urlAccionFase($lote, $key);
             }
 
+            $esFaseUnica = in_array($key, self::FASES_UNICAS, true);
             $eventosCount = match ($key) {
                 'en_crecimiento' => ($porFase->get('regado', 0) + $porFase->get('fumigacion', 0)),
                 default => $porFase->get($key, 0),
             };
+
+            if ($esFaseUnica) {
+                $eventosCount = 0;
+            }
 
             return [
                 'key' => $key,
@@ -690,6 +730,8 @@ class LoteTrazabilidadService
                 'color' => $meta['color'],
                 'icon' => $meta['icon'],
                 'eventos' => $eventosCount,
+                'fase_unica' => $esFaseUnica,
+                'completada' => $esFaseUnica && $estado === 'done',
                 'estado' => $estado,
                 'url' => $url,
             ];

@@ -10,15 +10,31 @@ final class EnvioAsignacionEstadoCatalogo
     private const ALIASES = [
         'pendiente'   => ['pendiente', 'creada'],
         'asignado'    => ['asignado', 'asignada'],
-        'en_ruta'     => ['en_ruta', 'en_transito'],
-        'entregado'   => ['entregado', 'entregada'],
+        'en_ruta'     => ['en_ruta', 'en_transito', 'en_transporte_planta'],
+        'en_transporte_planta' => ['en_transporte_planta', 'en_ruta', 'en_transito'],
+        'recibido_planta' => ['recibido_planta', 'entregado', 'entregada'],
+        'entregado'   => ['entregado', 'entregada', 'recibido_planta'],
         'cancelado'   => ['cancelada', 'cancelado'],
         'cancelada'   => ['cancelada', 'cancelado'],
         'creada'      => ['creada', 'pendiente'],
         'asignada'    => ['asignada', 'asignado'],
-        'en_transito' => ['en_transito', 'en_ruta'],
-        'entregada'   => ['entregada', 'entregado'],
+        'en_transito' => ['en_transito', 'en_ruta', 'en_transporte_planta'],
+        'entregada'   => ['entregada', 'entregado', 'recibido_planta'],
     ];
+
+    public static function etiqueta(?string $estado): string
+    {
+        $key = strtolower(trim((string) $estado));
+
+        return match ($key) {
+            'en_transporte_planta', 'en_ruta', 'en_transito' => 'En transporte hacia planta',
+            'recibido_planta', 'entregado', 'entregada' => 'Recibido en planta',
+            'asignado', 'asignada' => 'Asignado',
+            'pendiente', 'creada' => 'Pendiente',
+            'cancelado', 'cancelada' => 'Cancelado',
+            default => ucfirst(str_replace('_', ' ', $key)),
+        };
+    }
 
     public static function resolveId(?string $estado): ?int
     {
