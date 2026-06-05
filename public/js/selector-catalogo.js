@@ -219,14 +219,7 @@
                 return;
             }
 
-            const cfg = this.instances[id];
-
-            if (typeof cfg.onSelect === 'function') {
-                cfg.onSelect(item);
-                window.jQuery(this.modalEl).modal('hide');
-                return;
-            }
-
+            const cfg = this.instances[id] || {};
             const wrapper = document.getElementById('selector_wrap_' + id);
             if (!wrapper) {
                 return;
@@ -243,6 +236,10 @@
                 display.value = '';
                 display.placeholder = cfg.placeholderEmpty || cfg.emptyLabel || 'Opcional — sin asignar';
                 display.classList.add('text-muted');
+            }
+
+            if (typeof cfg.onSelect === 'function') {
+                cfg.onSelect(item);
             }
 
             wrapper.dispatchEvent(new CustomEvent('selector-catalogo:change', {

@@ -173,4 +173,26 @@ class RegistroCuentaTest extends TestCase
         $response->assertRedirect(route('register.enviado'));
         $this->assertDatabaseHas('usuario', ['ci_nit' => '1234567 LP']);
     }
+
+    public function test_registro_minorista_crea_solicitud_pendiente(): void
+    {
+        $response = $this->post(route('register.post'), [
+            'nombre' => 'María',
+            'apellido' => 'López',
+            'email' => 'maria.minorista@test.local',
+            'telefono' => '+591 72223333',
+            'ci_nit' => '8765432',
+            'rol_solicitado' => 'minorista',
+            'carta_motivacion' => str_repeat('Deseo comercializar productos trazables de AgroFusion. ', 2),
+            'password' => 'secret123',
+            'password_confirmation' => 'secret123',
+        ]);
+
+        $response->assertRedirect(route('register.enviado'));
+        $this->assertDatabaseHas('usuario', [
+            'email' => 'maria.minorista@test.local',
+            'estado_cuenta' => CuentaEstado::PENDIENTE,
+            'rol_solicitado' => 'minorista',
+        ]);
+    }
 }

@@ -13,10 +13,13 @@ class AlmacenAmbito
 
     public const PLANTA = 'planta';
 
+    public const PUNTO_VENTA = 'punto_venta';
+
     /** @var array<string, string> */
     public const TITULOS = [
         self::AGRICOLA => 'Almacén agrícola',
         self::PLANTA => 'Almacén de planta',
+        self::PUNTO_VENTA => 'Inventario punto de venta',
     ];
 
     public static function fromRequest(?Request $request = null): string
@@ -32,6 +35,9 @@ class AlmacenAmbito
         if (str_starts_with($routeName, self::routePrefix(self::PLANTA).'.')) {
             return self::PLANTA;
         }
+        if (str_starts_with($routeName, self::routePrefix(self::PUNTO_VENTA).'.')) {
+            return self::PUNTO_VENTA;
+        }
         if (str_starts_with($routeName, self::routePrefix(self::AGRICOLA).'.')) {
             return self::AGRICOLA;
         }
@@ -41,7 +47,7 @@ class AlmacenAmbito
 
     public static function esValido(?string $ambito): bool
     {
-        return in_array($ambito, [self::AGRICOLA, self::PLANTA], true);
+        return in_array($ambito, [self::AGRICOLA, self::PLANTA, self::PUNTO_VENTA], true);
     }
 
     public static function routePrefix(string $ambito): string
@@ -49,6 +55,7 @@ class AlmacenAmbito
         return match ($ambito) {
             self::AGRICOLA => 'almacen-agricola',
             self::PLANTA => 'almacen-planta',
+            self::PUNTO_VENTA => 'almacen-punto-venta',
             default => 'almacen-agricola',
         };
     }
@@ -86,6 +93,10 @@ class AlmacenAmbito
 
         if ($ambito === self::PLANTA) {
             return $user->hasAnyRole(['planta', 'jefe_planta', 'admin']);
+        }
+
+        if ($ambito === self::PUNTO_VENTA) {
+            return $user->hasAnyRole(['minorista', 'admin']);
         }
 
         return false;

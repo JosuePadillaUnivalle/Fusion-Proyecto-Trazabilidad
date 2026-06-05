@@ -296,6 +296,30 @@ return [
 
         ],
 
+        'punto_venta' => [
+
+            'create' => 'punto_venta.create',
+
+            'read' => 'punto_venta.view',
+
+            'update' => 'punto_venta.update',
+
+            'delete' => 'punto_venta.delete',
+
+        ],
+
+        'pedidos_distribucion' => [
+
+            'create' => 'pedidos_distribucion.create',
+
+            'read' => 'pedidos_distribucion.view',
+
+            'update' => 'pedidos_distribucion.update',
+
+            'delete' => 'pedidos_distribucion.delete',
+
+        ],
+
     ],
 
 
@@ -452,6 +476,12 @@ return [
 
             'pedidos.delete',
 
+            'pedidos_distribucion.view',
+
+            'pedidos_distribucion.update',
+
+            'pedidos_distribucion.delete',
+
             'usuarios.view',
 
             'usuarios.create',
@@ -493,6 +523,24 @@ return [
             'pedidos.view',
 
             'monitoreo.view',
+
+        ],
+
+        'minorista' => [
+
+            'punto_venta.view',
+
+            'punto_venta.create',
+
+            'punto_venta.update',
+
+            'punto_venta.delete',
+
+            'pedidos_distribucion.view',
+
+            'pedidos_distribucion.create',
+
+            'pedidos_distribucion.update',
 
         ],
 

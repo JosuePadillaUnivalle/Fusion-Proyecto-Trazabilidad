@@ -41,6 +41,16 @@ final class UsuarioRol
         return (bool) ($user && $user->hasRole('transportista'));
     }
 
+    public static function esMinorista(?Usuario $user): bool
+    {
+        return (bool) ($user && $user->hasRole('minorista'));
+    }
+
+    public static function puedeGestionarDistribucionPlanta(?Usuario $user): bool
+    {
+        return self::esAdminGlobal($user) || self::esJefePlanta($user);
+    }
+
     public static function gestionaCampo(?Usuario $user): bool
     {
         return self::esAdminGlobal($user) || self::esJefeAgricultor($user);

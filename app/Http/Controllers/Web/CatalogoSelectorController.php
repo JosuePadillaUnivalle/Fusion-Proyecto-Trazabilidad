@@ -12,12 +12,14 @@ use App\Models\MaquinaPlanta;
 use App\Models\ProcesoPlanta;
 use App\Models\Pedido;
 use App\Models\Produccion;
+use App\Models\PuntoVenta;
 use App\Models\PerfilTransportista;
 use App\Models\Usuario;
 use App\Models\Vehiculo;
 use App\Support\AlmacenAmbito;
 use App\Support\CultivoCatalogo;
 use App\Support\PedidoCatalogo;
+use App\Support\PuntoVentaAccess;
 use App\Support\UbicacionGpsParser;
 use App\Support\UsuarioRol;
 use Illuminate\Database\Eloquent\Builder;
@@ -366,6 +368,56 @@ class CatalogoSelectorController extends Controller
                     'direccion' => $resuelto['direccion'],
                     'ambito' => $a->ambito ?? AlmacenAmbito::AGRICOLA,
                     'ubicacion_estimada' => $resuelto['estimada'],
+                ],
+            ];
+        });
+    }
+
+    public function puntosVenta(Request $request): JsonResponse
+    {
+        $query = PuntoVentaAccess::scopePuntosDelUsuario(
+            PuntoVenta::query()->with('minorista'),
+            $request->user()
+        );
+
+        if (! $request->boolean('incluir_inactivos')) {
+            $query->where('activo', true);
+        }
+
+        if ($request->filled('minorista_usuarioid')) {
+            $query->where('usuarioid', (int) $request->minorista_usuarioid);
+        }
+
+        if ($request->filled('q')) {
+            $term = $request->string('q')->trim()->toString();
+            $query->where(function (Builder $w) use ($term) {
+                $w->where('nombre', 'like', "%{$term}%")
+                    ->orWhere('direccion', 'like', "%{$term}%")
+                    ->orWhereHas('minorista', function (Builder $m) use ($term) {
+                        $m->where('nombre', 'like', "%{$term}%")
+                            ->orWhere('apellido', 'like', "%{$term}%")
+                            ->orWhere('email', 'like', "%{$term}%");
+                    });
+            });
+        }
+
+        return $this->respuestaPaginada($request, $query->orderBy('nombre'), function (PuntoVenta $pv) {
+            $minorista = trim(($pv->minorista?->nombre ?? '').' '.($pv->minorista?->apellido ?? ''));
+
+            return [
+                'id' => $pv->puntoventaid,
+                'label' => $pv->nombre,
+                'meta' => trim(collect([
+                    $minorista !== '' ? $minorista : null,
+                    $pv->direccion ? \Illuminate\Support\Str::limit($pv->direccion, 60) : null,
+                    $pv->activo ? null : 'Inactivo',
+                ])->filter()->implode(' · ')),
+                'extra' => [
+                    'lat' => $pv->latitud,
+                    'lng' => $pv->longitud,
+                    'direccion' => $pv->direccion,
+                    'minorista' => $minorista,
+                    'activo' => (bool) $pv->activo,
                 ],
             ];
         });

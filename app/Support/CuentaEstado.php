@@ -11,7 +11,7 @@ final class CuentaEstado
     /** @return list<string> */
     public static function rolesRegistroPublico(): array
     {
-        return ['jefe_agricultor', 'jefe_planta', 'transportista'];
+        return ['jefe_agricultor', 'jefe_planta', 'transportista', 'minorista'];
     }
 
     /** Rol operativo que crea un jefe al registrar empleados. */

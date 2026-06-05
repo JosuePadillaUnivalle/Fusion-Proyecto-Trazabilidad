@@ -7,7 +7,7 @@
     .form-side { overflow-y: auto; padding: 40px 60px; }
     .form-row { display: flex; gap: 20px; }
     .form-row .form-group { flex: 1; min-width: 0; }
-    .rol-opciones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 4px; }
+    .rol-opciones { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 4px; }
     .rol-opcion { position: relative; }
     .rol-opcion input { position: absolute; opacity: 0; }
     .rol-opcion label {
@@ -120,7 +120,7 @@
 @section('content')
 <div class="form-header">
     <h2>Solicitar acceso</h2>
-    <p>Registro para jefes de producción agrícola, jefes de planta o transportistas. Un administrador revisará tu solicitud.</p>
+    <p>Registro para jefes de producción agrícola, jefes de planta, transportistas o minoristas. Un administrador revisará tu solicitud.</p>
 </div>
 
 @if($errors->any())
@@ -147,9 +147,15 @@
                     @elseif($rol === 'jefe_planta')
                         <i class="fas fa-industry"></i>
                         <span>Jefe Planta</span>
-                    @else
+                    @elseif($rol === 'transportista')
                         <i class="fas fa-truck"></i>
                         <span>Transportista</span>
+                    @elseif($rol === 'minorista')
+                        <i class="fas fa-store"></i>
+                        <span>Minorista</span>
+                    @else
+                        <i class="fas fa-user"></i>
+                        <span>{{ ucfirst(str_replace('_', ' ', $rol)) }}</span>
                     @endif
                 </label>
             </div>

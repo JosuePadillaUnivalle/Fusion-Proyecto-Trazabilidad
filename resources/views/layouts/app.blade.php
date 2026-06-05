@@ -157,6 +157,8 @@
             overflow-y: auto;
             overflow-x: hidden;
             padding: 6px 0 10px;
+            overflow-anchor: none;
+            overscroll-behavior: contain;
         }
 
         .ag-sb-nav::-webkit-scrollbar { width: 3px; }
@@ -951,6 +953,7 @@
     $esAgricultorOperativo = $authUser && \App\Support\UsuarioRol::debeAcotarPorAsignacion($authUser);
     $esPlantaOperativo = $authUser && \App\Support\UsuarioRol::esPlantaOperativo($authUser) && ! $isAdmin;
     $esTransportistaOperativo = $authUser && \App\Support\UsuarioRol::esTransportista($authUser) && ! $isAdmin;
+    $esMinoristaOperativo = $authUser && \App\Support\UsuarioRol::esMinorista($authUser) && ! $isAdmin;
     $pendientesSolicitudes = $isAdmin
         ? \App\Models\Usuario::where('estado_cuenta', \App\Support\CuentaEstado::PENDIENTE)->count()
         : 0;
@@ -1250,6 +1253,37 @@
                     @endcan
                 @endif
 
+                @php
+                    $pvMenuOpen = request()->routeIs('punto-venta.*');
+                    $puedePuntoVentaMenu = $isAdmin || $esMinoristaOperativo
+                        || ($authUser && $authUser->can('punto_venta.view'));
+                    $puedePedidosDistMenu = $isAdmin || $esMinoristaOperativo || $esPlantaOperativo
+                        || ($authUser && $authUser->can('pedidos_distribucion.view'));
+                @endphp
+
+                @if($puedePuntoVentaMenu || $puedePedidosDistMenu)
+                <span class="ag-nav-label">Punto de venta</span>
+                <li class="ag-nav-li">
+                    <a href="#" class="ag-nav-a {{ $pvMenuOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-pv">
+                        <i class="ag-nav-icon fas fa-store"></i>
+                        <span class="ag-nav-text">Comercialización</span>
+                        <i class="ag-nav-arrow fas fa-chevron-right"></i>
+                    </a>
+                    <ul class="ag-subnav {{ $pvMenuOpen ? 'open' : '' }}" id="sub-pv">
+                        @if($puedePuntoVentaMenu)
+                        <li class="ag-sub-li">
+                            <a href="{{ route('punto-venta.puntos.index') }}" class="ag-sub-a {{ request()->routeIs('punto-venta.puntos.*') ? 'active' : '' }}">Puntos de venta</a>
+                        </li>
+                        @endif
+                        @if($puedePedidosDistMenu)
+                        <li class="ag-sub-li">
+                            <a href="{{ route('punto-venta.pedidos.index') }}" class="ag-sub-a {{ request()->routeIs('punto-venta.pedidos.*') ? 'active' : '' }}">Pedidos de distribución</a>
+                        </li>
+                        @endif
+                    </ul>
+                </li>
+                @endif
+
                 @if($isAdmin || auth()->user()?->can('usuarios.view'))
                 <span class="ag-nav-label">{{ ($esJefeAgr || ($authUser && $authUser->hasRole('jefe_planta'))) && ! $isAdmin ? 'Equipo' : 'Administración' }}</span>
 
@@ -1434,22 +1468,53 @@
     }
 
     // ── Sub-menus ─────────────────────────────────────────────────────
+    var sbNav = document.querySelector('.ag-sb-nav');
+    var sbScrollKey = 'agSbNavScroll';
+
+    if (sbNav) {
+        function restoreSbScroll() {
+            try {
+                var savedScroll = sessionStorage.getItem(sbScrollKey);
+                if (savedScroll !== null) {
+                    sbNav.scrollTop = parseInt(savedScroll, 10) || 0;
+                }
+            } catch (err) {}
+        }
+
+        restoreSbScroll();
+        requestAnimationFrame(function () {
+            restoreSbScroll();
+        });
+
+        sbNav.addEventListener('scroll', function () {
+            try { sessionStorage.setItem(sbScrollKey, String(sbNav.scrollTop)); } catch (err) {}
+        }, { passive: true });
+
+        sbNav.querySelectorAll('a[href]:not([href="#"]):not([href=""])').forEach(function (link) {
+            if (link.getAttribute('href') === 'javascript:void(0)') return;
+            link.addEventListener('click', function () {
+                try { sessionStorage.setItem(sbScrollKey, String(sbNav.scrollTop)); } catch (err) {}
+            });
+        });
+    }
+
     document.querySelectorAll('[data-toggle-sub]').forEach(function (trigger) {
         trigger.addEventListener('click', function (e) {
             e.preventDefault();
+            e.stopPropagation();
             var targetId = this.getAttribute('data-toggle-sub');
             var sub = document.getElementById(targetId);
             if (!sub) return;
 
+            var navScrollBefore = sbNav ? sbNav.scrollTop : 0;
             var isOpen = sub.classList.contains('open');
-
-            // close siblings in same level (optional accordion)
-            // (uncomment if you want accordion behaviour)
-            // document.querySelectorAll('.ag-subnav.open').forEach(function(s){ s.classList.remove('open'); });
-            // document.querySelectorAll('.ag-nav-a.group-open').forEach(function(a){ a.classList.remove('group-open'); });
 
             sub.classList.toggle('open', !isOpen);
             trigger.classList.toggle('group-open', !isOpen);
+
+            if (sbNav) {
+                sbNav.scrollTop = navScrollBefore;
+            }
         });
     });
 

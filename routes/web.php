@@ -23,6 +23,8 @@ use App\Http\Controllers\Web\GestionUsuariosController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\PedidoController;
 use App\Http\Controllers\Web\PedidoAgricolaController;
+use App\Http\Controllers\Web\PuntoVentaController;
+use App\Http\Controllers\Web\PedidoDistribucionController;
 use App\Http\Controllers\Web\UserProfileController;
 
 // 🔹 nuevos controladores web de almacenamiento
@@ -102,6 +104,7 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::get('/pedidos', [CatalogoSelectorController::class, 'pedidos'])->name('pedidos');
         Route::get('/actores', [CatalogoSelectorController::class, 'actores'])->name('actores');
         Route::get('/almacenes', [CatalogoSelectorController::class, 'almacenes'])->name('almacenes');
+        Route::get('/puntos-venta', [CatalogoSelectorController::class, 'puntosVenta'])->name('puntos-venta');
         Route::get('/productos-pedido', [CatalogoSelectorController::class, 'productosPedido'])->name('productos-pedido');
         Route::get('/producciones', [CatalogoSelectorController::class, 'producciones'])->name('producciones');
         Route::get('/procesos-planta', [CatalogoSelectorController::class, 'procesosPlanta'])->name('procesos-planta');
@@ -306,6 +309,27 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::post('/{pedido}/aceptar', [PedidoAgricolaController::class, 'aceptar'])->name('aceptar')->middleware('action.permission:pedidos,update');
         Route::post('/{pedido}/rechazar', [PedidoAgricolaController::class, 'rechazar'])->name('rechazar')->middleware('action.permission:pedidos,update');
         Route::post('/{pedido}/confirmar-carga-envio', [PedidoAgricolaController::class, 'confirmarCargaEnvio'])->name('confirmar-carga-envio')->middleware('action.permission:pedidos,update');
+    });
+
+
+    // Punto de venta / minoristas
+    Route::prefix('punto-venta')->name('punto-venta.')->group(function () {
+        Route::get('puntos', [PuntoVentaController::class, 'index'])->name('puntos.index')->middleware('action.permission:punto_venta,read');
+        Route::get('puntos/create', [PuntoVentaController::class, 'create'])->name('puntos.create')->middleware('action.permission:punto_venta,create');
+        Route::post('puntos', [PuntoVentaController::class, 'store'])->name('puntos.store')->middleware('action.permission:punto_venta,create');
+        Route::get('puntos/{punto}', [PuntoVentaController::class, 'show'])->name('puntos.show')->middleware('action.permission:punto_venta,read');
+        Route::get('puntos/{punto}/edit', [PuntoVentaController::class, 'edit'])->name('puntos.edit')->middleware('action.permission:punto_venta,update');
+        Route::put('puntos/{punto}', [PuntoVentaController::class, 'update'])->name('puntos.update')->middleware('action.permission:punto_venta,update');
+        Route::delete('puntos/{punto}', [PuntoVentaController::class, 'destroy'])->name('puntos.destroy')->middleware('action.permission:punto_venta,delete');
+
+        Route::get('pedidos', [PedidoDistribucionController::class, 'index'])->name('pedidos.index')->middleware('action.permission:pedidos_distribucion,read');
+        Route::get('pedidos/create', [PedidoDistribucionController::class, 'create'])->name('pedidos.create')->middleware('action.permission:pedidos_distribucion,create');
+        Route::post('pedidos', [PedidoDistribucionController::class, 'store'])->name('pedidos.store')->middleware('action.permission:pedidos_distribucion,create');
+        Route::get('pedidos/{pedido}', [PedidoDistribucionController::class, 'show'])->name('pedidos.show')->middleware('action.permission:pedidos_distribucion,read');
+        Route::post('pedidos/{pedido}/aceptar', [PedidoDistribucionController::class, 'aceptar'])->name('pedidos.aceptar')->middleware('action.permission:pedidos_distribucion,update');
+        Route::post('pedidos/{pedido}/rechazar', [PedidoDistribucionController::class, 'rechazar'])->name('pedidos.rechazar')->middleware('action.permission:pedidos_distribucion,update');
+        Route::post('pedidos/{pedido}/marcar-enviado', [PedidoDistribucionController::class, 'marcarEnviado'])->name('pedidos.marcar-enviado')->middleware('action.permission:pedidos_distribucion,update');
+        Route::post('pedidos/{pedido}/confirmar-recepcion', [PedidoDistribucionController::class, 'confirmarRecepcion'])->name('pedidos.confirmar-recepcion')->middleware('action.permission:pedidos_distribucion,update');
     });
 
 
