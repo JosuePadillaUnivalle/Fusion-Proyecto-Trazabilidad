@@ -124,6 +124,14 @@
         @csrf
         @method('PUT')
 
+        @if($errors->any())
+            <div class="alert alert-danger">
+                @foreach($errors->all() as $error)
+                    <div>{{ $error }}</div>
+                @endforeach
+            </div>
+        @endif
+
         <div class="row">
             <div class="col-lg-9 col-md-8">
                 <!-- Información del Lote -->
@@ -193,15 +201,21 @@
                         </div>
                         <div class="col-md-4">
                             <div class="form-group">
-                                <label><i class="fas fa-warehouse mr-1"></i> Destino</label>
-                                <select name="destinoproduccionid" class="form-control">
-                                    <option value="">Sin destino específico</option>
-                                    @foreach($destinos as $d)
-                                        <option value="{{ $d->destinoproduccionid }}" {{ $d->destinoproduccionid == $produccion->destinoproduccionid ? 'selected' : '' }}>
-                                            {{ $d->nombre }}
+                                <label class="required-field"><i class="fas fa-warehouse mr-1"></i> Almacén</label>
+                                <select name="almacenid" class="form-control" required>
+                                    <option value="">Seleccionar almacén...</option>
+                                    @foreach($almacenes as $a)
+                                        @php
+                                            $resumen = $resumenesAlmacen[$a->almacenid] ?? ['disponible_kg' => 0];
+                                            $disponible = number_format($resumen['disponible_kg'], 0);
+                                            $um = $a->unidadMedida->abreviatura ?? 'kg';
+                                        @endphp
+                                        <option value="{{ $a->almacenid }}" @selected((string) old('almacenid', $almacenActualId) === (string) $a->almacenid)>
+                                            {{ $a->nombre }} ({{ $disponible }} {{ $um }} disponibles)
                                         </option>
                                     @endforeach
                                 </select>
+                                <small class="text-muted">Indica dónde está almacenada esta cosecha. Puede moverla a otro almacén agrícola.</small>
                             </div>
                         </div>
                     </div>

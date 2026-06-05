@@ -34,16 +34,128 @@ final class PedidoCatalogo
             && in_array($pedido->estado, self::estadosListosParaLogistica(), true);
     }
 
+    public static function puedeAsignarTransportista(Pedido $pedido): bool
+    {
+        return self::listoParaLogistica($pedido);
+    }
+
+    /**
+     * Fase logística derivada del envío (prioriza sobre el estado del pedido en UI).
+     *
+     * @param  array<string, mixed>|null  $logistica
+     */
+    public static function faseLogistica(?array $logistica): ?string
+    {
+        if ($logistica === null) {
+            return null;
+        }
+        if (! empty($logistica['recibido_planta'])) {
+            return 'recibido_planta';
+        }
+        if (! empty($logistica['cargado_en_ruta'])) {
+            return 'en_camino_planta';
+        }
+
+        return null;
+    }
+
+    public static function etiquetaFaseLogistica(?string $fase): ?string
+    {
+        return match ($fase) {
+            'en_camino_planta' => 'En camino a planta',
+            'recibido_planta' => 'Recibido en planta',
+            default => null,
+        };
+    }
+
+    /**
+     * Badge de estado para listados (color único por fase/estado).
+     *
+     * @param  array<string, mixed>|null  $logistica
+     * @return array{clase: string, etiqueta: string}
+     */
+    public static function badgeEstadoLista(?array $logistica, Pedido $pedido): array
+    {
+        $fase = self::faseLogistica($logistica);
+        if ($fase === 'en_camino_planta') {
+            return [
+                'clase' => 'pedido-estado-camino',
+                'etiqueta' => self::etiquetaFaseLogistica($fase),
+                'titulo' => self::etiquetaFaseLogistica($fase),
+            ];
+        }
+        if ($fase === 'recibido_planta') {
+            return [
+                'clase' => 'pedido-estado-recibido',
+                'etiqueta' => self::etiquetaFaseLogistica($fase),
+                'titulo' => self::etiquetaFaseLogistica($fase),
+            ];
+        }
+
+        return match ($pedido->estado) {
+            'sin asignacion' => [
+                'clase' => 'pedido-estado-agricola',
+                'etiqueta' => 'Pendiente agrícola',
+                'titulo' => self::etiquetaEstado('sin asignacion'),
+            ],
+            'pendiente' => [
+                'clase' => 'pedido-estado-logistica',
+                'etiqueta' => 'Pendiente logística',
+                'titulo' => self::etiquetaEstado('pendiente'),
+            ],
+            'confirmado' => [
+                'clase' => 'pedido-estado-confirmado',
+                'etiqueta' => 'Listo para envío',
+                'titulo' => self::etiquetaEstado('confirmado'),
+            ],
+            'en produccion' => [
+                'clase' => 'pedido-estado-produccion',
+                'etiqueta' => 'En producción',
+                'titulo' => self::etiquetaEstado('en produccion'),
+            ],
+            'rechazado' => [
+                'clase' => 'pedido-estado-rechazado',
+                'etiqueta' => 'Rechazado',
+                'titulo' => self::etiquetaEstado('rechazado'),
+            ],
+            default => [
+                'clase' => 'pedido-estado-agricola',
+                'etiqueta' => self::etiquetaEstado($pedido->estado),
+                'titulo' => self::etiquetaEstado($pedido->estado),
+            ],
+        };
+    }
+
     public static function etiquetaEstado(string $estado): string
     {
         return match ($estado) {
             'sin asignacion' => 'Pendiente agrícola',
-            'pendiente' => 'Pendiente agrícola',
+            'pendiente' => 'Pendiente logística',
             'confirmado' => 'Aceptado — listo para envío',
             'en produccion' => 'En producción',
             'rechazado' => 'Rechazado',
             default => ucfirst($estado),
         };
+    }
+
+    /**
+     * Opciones para selects de estado sin etiquetas duplicadas.
+     *
+     * @return array<string, string>
+     */
+    public static function opcionesEstadoEnSelector(?Pedido $pedido = null): array
+    {
+        $opciones = [];
+        foreach (['sin asignacion', 'pendiente', 'confirmado', 'en produccion', 'rechazado'] as $estado) {
+            if ($pedido !== null
+                && in_array($estado, ['confirmado', 'en produccion'], true)
+                && self::pendienteAprobacionAgricola($pedido)) {
+                continue;
+            }
+            $opciones[$estado] = self::etiquetaEstado($estado);
+        }
+
+        return $opciones;
     }
 
     /**

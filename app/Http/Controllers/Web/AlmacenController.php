@@ -491,6 +491,7 @@ class AlmacenController extends Controller
                 'unidad' => $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? '',
                 'kg' => $kg,
                 'search' => strtolower(trim($insumo->nombre.' '.$tipoNombre)),
+                'insumoid' => $insumo->insumoid,
             ]);
         }
 
@@ -517,11 +518,12 @@ class AlmacenController extends Controller
                 'unidad' => $c->unidadMedida?->abreviatura ?? 'kg',
                 'kg' => $kg,
                 'search' => strtolower(trim($nombre.' cosecha '.$cultivo)),
+                'produccionid' => $c->produccionid,
             ]);
         }
 
         $productosPlanta = AlmacenajeLoteProduccion::query()
-            ->with(['loteProduccionPedido.unidadMedida'])
+            ->with(['loteProduccionPedido.unidadMedida', 'loteProduccionPedido.materiasPrimas.insumo.unidadMedida'])
             ->whereNull('fecha_retiro')
             ->where(function ($q) use ($almacen) {
                 $q->where('almacenid', $almacen->almacenid)
@@ -538,10 +540,15 @@ class AlmacenController extends Controller
                 continue;
             }
 
+            $lote->loadMissing('materiasPrimas.insumo.unidadMedida', 'unidadMedida');
             $producto = $lote->producto ?: $lote->nombre;
             $nombre = $producto.' · '.$lote->nombre;
-            $kg = $this->capacidadService->convertirAKg((float) $ingreso->cantidad, $lote->unidadMedida);
-            $unidad = $lote->unidadMedida?->abreviatura ?? $lote->unidadMedida?->nombre ?? 'kg';
+            $resumen = \App\Support\ProductoPlantaCatalogo::resumenProduccion($lote, $this->capacidadService);
+            $kg = $resumen['kg'] > 0
+                ? $resumen['kg']
+                : $this->capacidadService->convertirAKg((float) $ingreso->cantidad, $lote->unidadMedida);
+            $cantidad = $resumen['cantidad'] > 0 ? $resumen['cantidad'] : (float) $ingreso->cantidad;
+            $unidad = \App\Support\ProductoPlantaCatalogo::unidadEtiqueta($producto, $lote->unidadMedida);
             $detalle = trim(($ingreso->condicion ? $ingreso->condicion.' · ' : '').($ingreso->fecha_almacenaje
                 ? \Carbon\Carbon::parse($ingreso->fecha_almacenaje)->format('d/m/Y H:i')
                 : ''));
@@ -552,10 +559,11 @@ class AlmacenController extends Controller
                 'tipo_filtro' => 'producto terminado',
                 'nombre' => $nombre,
                 'detalle' => $detalle !== '' ? \Illuminate\Support\Str::limit($detalle, 80) : ($lote->codigo_lote ?? '—'),
-                'cantidad' => (float) $ingreso->cantidad,
+                'cantidad' => $cantidad,
                 'unidad' => $unidad,
                 'kg' => $kg,
                 'search' => strtolower(trim($nombre.' producto planta '.$producto.' '.$lote->codigo_lote)),
+                'lote_produccion_pedido_id' => $lote->loteproduccionpedidoid,
             ]);
         }
 

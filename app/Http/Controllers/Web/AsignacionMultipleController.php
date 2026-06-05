@@ -9,6 +9,7 @@ use App\Models\RutaMultiEntrega;
 use App\Models\RutaParada;
 use App\Models\Usuario;
 use App\Support\EnvioAsignacionEstadoCatalogo;
+use App\Support\EnvioPedidoService;
 use App\Support\PedidoCatalogo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -194,20 +195,21 @@ class AsignacionMultipleController extends Controller
             return back()->with('error', 'No se puede avanzar el envío hasta que producción agrícola acepte el pedido y reserve stock.');
         }
 
-        $asignacion->update(EnvioAsignacionEstadoCatalogo::applyToAttributes([
-            'estado' => 'en_transporte_planta',
-            'fecha_asignacion' => now(),
-        ]));
+        try {
+            EnvioPedidoService::confirmarCargaHaciaPlanta($asignacion);
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
         return back()->with('success', 'El envío quedó en transporte hacia planta.');
     }
 
-    /** @deprecated La recepción final la confirma planta en recepcion-planta.confirmar */
+    /** @deprecated La recepción en planta se confirma desde Gestión de pedidos. */
     public function markDelivered(EnvioAsignacionMultiple $asignacion): RedirectResponse
     {
         return redirect()
-            ->route('recepcion-planta.index')
-            ->with('warning', 'La recepción en planta debe confirmarla un usuario con rol Planta o Jefe de Planta.');
+            ->route('pedidos.index')
+            ->with('warning', 'Confirme la llegada a planta desde Gestión de pedidos (botón ✓ en el listado).');
     }
 
     /**

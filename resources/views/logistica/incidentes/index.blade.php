@@ -4,14 +4,15 @@
 @section('page_title', 'Incidentes de envío')
 
 @push('styles')
+@include('partials.logistica-modulo-styles')
 <style>
-.x-table thead th{background:#fff2f2;border-bottom:0}
+.inc-resolver-form{margin-top:.5rem;padding-top:.5rem;border-top:1px dashed #eee;width:100%}
 </style>
 @endpush
 
 @section('content')
 <section class="content">
-    <div class="container-fluid">
+    <div class="container-fluid px-3 px-lg-4">
         <div class="card card-outline card-success card-modulo-main elevation-1">
             <x-modulo-index-header
                 titulo="Incidentes de envío"
@@ -21,8 +22,26 @@
                 nuevo-text="Nuevo incidente"
                 nuevo-can="incidentes.create"
             />
+
+            @include('partials.modulo-filtros-form', [
+                'action' => route('logistica.incidentes.index'),
+                'campos' => [
+                    ['name' => 'q', 'label' => 'Buscar', 'placeholder' => 'Descripción, tipo, envío...', 'col' => 'col-md-3'],
+                    ['name' => 'estado', 'label' => 'Estado', 'type' => 'select', 'col' => 'col-md-2', 'options' => [
+                        'abierto' => 'Abierto',
+                        'pendiente' => 'Pendiente',
+                        'resuelto' => 'Resuelto',
+                    ]],
+                    ['name' => 'tipo', 'label' => 'Tipo', 'type' => 'select', 'col' => 'col-md-2',
+                        'options' => ($tiposDisponibles ?? collect())->mapWithKeys(fn ($t) => [$t => $t])->all()],
+                    ['name' => 'envio', 'label' => 'ID envío', 'placeholder' => 'ENV-...', 'col' => 'col-md-2'],
+                    ['name' => 'desde', 'label' => 'Desde', 'type' => 'date', 'col' => 'col-md-1'],
+                    ['name' => 'hasta', 'label' => 'Hasta', 'type' => 'date', 'col' => 'col-md-1'],
+                ],
+            ])
+
             <div class="card-body table-responsive p-0">
-                <table class="table table-modulo table-hover mb-0 x-table">
+                <table class="table table-modulo table-hover mb-0 modulo-table">
                     <thead>
                         <tr>
                             <th>Fecha</th>
@@ -30,7 +49,7 @@
                             <th>Tipo</th>
                             <th>Estado</th>
                             <th>Reportado por</th>
-                            <th>Acción</th>
+                            <th style="min-width:240px">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -39,32 +58,59 @@
                                 <td>{{ optional($incidente->created_at)->format('d/m/Y H:i') }}</td>
                                 <td>{{ $incidente->externo_envio_id ?? ('Pedido #'.$incidente->pedidoid) }}</td>
                                 <td>{{ $incidente->tipo }}</td>
-                                <td><span class="badge badge-{{ $incidente->estado === 'resuelto' ? 'success' : 'warning' }}">{{ $incidente->estado }}</span></td>
+                                <td>
+                                    <span class="badge badge-pill px-3 py-2 badge-{{
+                                        $incidente->estado === 'resuelto' ? 'success' :
+                                        ($incidente->estado === 'pendiente' ? 'warning' : 'danger')
+                                    }}">{{ ucfirst($incidente->estado) }}</span>
+                                </td>
                                 <td>{{ $incidente->reportadoPor?->nombreusuario ?? 'N/D' }}</td>
                                 <td>
+                                    <div class="crud-actions">
+                                        <a href="{{ route('logistica.incidentes.show', $incidente) }}"
+                                           class="btn btn-info" title="Ver detalles">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        @can('incidentes.update')
+                                        <a href="{{ route('logistica.incidentes.edit', $incidente) }}"
+                                           class="btn btn-warning" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        @endcan
+                                        @can('incidentes.delete')
+                                        <form action="{{ route('logistica.incidentes.destroy', $incidente) }}" method="POST"
+                                              onsubmit="return confirm('¿Eliminar este incidente?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger" title="Eliminar">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                        @endcan
+                                    </div>
                                     @if($incidente->estado !== 'resuelto')
                                         @can('incidentes.resolve')
-                                        <form method="POST" action="{{ route('logistica.incidentes.resolve', $incidente) }}">
+                                        <form method="POST" action="{{ route('logistica.incidentes.resolve', $incidente) }}" class="inc-resolver-form">
                                             @csrf
                                             @method('PATCH')
-                                            <input name="nota_resolucion" class="form-control form-control-sm mb-1" placeholder="Nota de resolución">
-                                            <button class="btn btn-sm btn-success">Resolver</button>
+                                            <div class="input-group input-group-sm">
+                                                <input name="nota_resolucion" class="form-control" placeholder="Nota de resolución">
+                                                <div class="input-group-append">
+                                                    <button class="btn btn-success px-3">Resolver</button>
+                                                </div>
+                                            </div>
                                         </form>
-                                        @else
-                                        <small class="text-muted">Pendiente de cierre (sin permiso)</small>
                                         @endcan
-                                    @else
-                                        <small class="text-muted">Resuelto</small>
                                     @endif
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="text-center text-muted py-4"><i class="fas fa-shield-alt mr-1"></i>No hay incidentes registrados.</td></tr>
+                            <tr><td colspan="6" class="text-center text-muted py-5"><i class="fas fa-shield-alt fa-2x mb-2 d-block"></i>No hay incidentes con esos filtros.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
-            <div class="card-footer">{{ $incidentes->links() }}</div>
+            <div class="card-footer py-3">{{ $incidentes->links() }}</div>
         </div>
     </div>
 </section>

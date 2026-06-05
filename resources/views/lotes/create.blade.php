@@ -49,15 +49,17 @@
                             @include('partials.selector-catalogo', [
                                 'id' => 'lote_responsable',
                                 'name' => 'usuarioid',
-                                'label' => 'Responsable del lote',
+                                'label' => 'Empleado asignado',
                                 'icon' => 'fa-user',
                                 'value' => $usuarioidInicial ?: '',
                                 'labelSelected' => $responsableLabel ?? '',
                                 'endpoint' => route('catalogo-selector.usuarios'),
-                                'params' => ['roles' => 'agricultor'],
-                                'title' => 'Seleccionar responsable del lote',
+                                'params' => $responsableSelectorParams ?? ['roles' => 'agricultor'],
+                                'title' => 'Seleccionar empleado',
                                 'searchPlaceholder' => 'Nombre, correo o usuario…',
-                                'help' => 'Solo usuarios con rol agricultor. El administrador supervisa el sistema y no es responsable de parcelas.',
+                                'help' => ! empty($esJefeAgricultorDesignando)
+                                    ? 'Solo aparecen los agricultores registrados bajo tu equipo.'
+                                    : 'Solo usuarios con rol agricultor. El administrador supervisa el sistema y no es responsable de parcelas.',
                                 'required' => true,
                             ])
                         @else

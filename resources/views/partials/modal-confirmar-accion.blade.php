@@ -2,7 +2,7 @@
 <div class="modal fade" id="modalConfirmarAccion" tabindex="-1" role="dialog" aria-labelledby="modalConfirmarTitulo" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
-            <div class="modal-header border-0 py-3 px-4" style="background: linear-gradient(135deg, #7f1d1d, #dc2626); color: #fff;">
+            <div class="modal-header border-0 py-3 px-4" id="modalConfirmarHeader" style="background: linear-gradient(135deg, #7f1d1d, #dc2626); color: #fff;">
                 <h5 class="modal-title font-weight-bold mb-0" id="modalConfirmarTitulo">
                     <i class="fas fa-exclamation-triangle mr-2"></i>Confirmar acción
                 </h5>
@@ -32,11 +32,24 @@
     let formPendiente = null;
 
     window.ModalConfirmar = {
-        abrir(form, titulo, mensaje) {
+        abrir(form, titulo, mensaje, tono) {
             formPendiente = form;
             const tituloEl = document.getElementById('modalConfirmarTitulo');
             const mensajeEl = document.getElementById('modalConfirmarMensaje');
-            if (tituloEl) tituloEl.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>' + (titulo || 'Confirmar acción');
+            const headerEl = document.getElementById('modalConfirmarHeader');
+            const btnEl = document.getElementById('btnConfirmarAccion');
+            const esExito = tono === 'success';
+            if (headerEl) {
+                headerEl.style.background = esExito
+                    ? 'linear-gradient(135deg, #1e4620, #2c5530)'
+                    : 'linear-gradient(135deg, #7f1d1d, #dc2626)';
+            }
+            if (btnEl) {
+                btnEl.className = esExito ? 'btn btn-success px-4 font-weight-bold' : 'btn btn-danger px-4 font-weight-bold';
+            }
+            if (tituloEl) {
+                tituloEl.innerHTML = '<i class="fas fa-' + (esExito ? 'check-circle' : 'exclamation-triangle') + ' mr-2"></i>' + (titulo || 'Confirmar acción');
+            }
             if (mensajeEl) mensajeEl.textContent = mensaje || '¿Desea continuar?';
             if (window.jQuery) {
                 window.jQuery('#modalConfirmarAccion').modal('show');
@@ -53,7 +66,8 @@
         window.ModalConfirmar.abrir(
             form,
             btn.getAttribute('data-confirm-title') || 'Confirmar acción',
-            btn.getAttribute('data-confirm-message') || '¿Desea continuar?'
+            btn.getAttribute('data-confirm-message') || '¿Desea continuar?',
+            btn.getAttribute('data-confirm-tone') || 'danger'
         );
     });
 

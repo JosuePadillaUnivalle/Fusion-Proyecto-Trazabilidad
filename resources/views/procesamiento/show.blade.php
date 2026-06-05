@@ -77,6 +77,8 @@
         font-size: .7rem; font-weight: 700; text-transform: uppercase;
         letter-spacing: .04em; color: #6c757d;
     }
+    .fase-step.fase-step--scroll { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+    .fase-step.fase-step--scroll:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(44,85,48,.2); }
     </style>
 @endpush
 
@@ -89,7 +91,11 @@
             <p class="mb-0 small opacity-90">
                 @if($lote->producto) Producto: {{ $lote->producto }} · @endif
                 Pedido: {{ $lote->pedido?->numero_solicitud ?? '—' }}
-                @if($lote->cantidad_objetivo)
+                @if(!empty($produccionEstimada['entrada_kg']))
+                    · MP: {{ number_format($produccionEstimada['entrada_kg'], 2) }} kg
+                    → {{ number_format($produccionEstimada['cantidad'], 0) }} {{ $produccionEstimada['unidad'] }}
+                    (~{{ number_format($produccionEstimada['kg'], 2) }} kg)
+                @elseif($lote->cantidad_objetivo)
                     · Objetivo: {{ number_format((float) $lote->cantidad_objetivo, 2) }} {{ $lote->unidadMedida?->abreviatura ?? '' }}
                 @endif
             </p>
@@ -132,7 +138,13 @@
 
             <div class="fase-pipeline">
                 @foreach($fases_pipeline as $step)
-                    <div class="fase-step {{ $step['estado'] }}" title="{{ $step['label'] }}">
+                    @php
+                        $scrollFase = $step['key'] === 'transformacion'
+                            && ($step['estado'] === 'active' || $step['estado'] === 'done' || $step['estado'] === 'next');
+                    @endphp
+                    <div class="fase-step {{ $step['estado'] }}{{ $scrollFase ? ' fase-step--scroll' : '' }}"
+                         @if($scrollFase) data-fase-scroll="{{ $step['key'] }}" role="button" tabindex="0" @endif
+                         title="{{ $step['label'] }}{{ $scrollFase ? ' — clic para ir al formulario' : '' }}">
                         <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
                         {{ $step['label'] }}
                         @if(!empty($step['fase_unica']) && !empty($step['completada']))
@@ -197,7 +209,7 @@
     @endif
 
     @if($mostrarTransformacion)
-    <div class="card mb-3 lp-fase-panel {{ $panelActivo === 'transformacion' ? 'lp-fase-panel--activa' : 'lp-fase-panel--historial' }}" data-fase="transformacion">
+    <div id="lp-seccion-transformacion" class="card mb-3 lp-fase-panel {{ $panelActivo === 'transformacion' ? 'lp-fase-panel--activa' : 'lp-fase-panel--historial' }}" data-fase="transformacion">
         <div class="card-header bg-white font-weight-bold d-flex justify-content-between align-items-center">
             <span><i class="fas fa-cogs text-info mr-2"></i>Transformación — línea de procesos</span>
             <div>
@@ -247,12 +259,7 @@
 
             @if($panelActivo === 'transformacion' && in_array($fase_actual, ['transformacion', 'creacion']) && empty($transformacion_completa))
             @can('lote_produccion.create')
-            @if(($procesosDisponibles ?? collect())->isEmpty())
-                <div class="alert alert-warning small mb-0 mt-3">
-                    Todos los procesos disponibles ya fueron registrados. Registre «{{ \App\Support\ProcesoPlantaCatalogo::PROCESO_CIERRE_TRANSFORMACION }}» si aún no lo hizo para cerrar la transformación.
-                </div>
-            @else
-            <div class="lp-form-etapa mt-3">
+            <div class="lp-form-etapa mt-3" id="lp-form-registrar-etapa">
                 <h6 class="font-weight-bold text-success mb-3">
                     <i class="fas fa-plus-circle mr-1"></i>
                     Registrar etapa {{ count($etapas_transformacion ?? []) + 1 }}
@@ -268,7 +275,7 @@
                                     <option value="{{ $proc->procesoplantaid }}">{{ $proc->nombre }}</option>
                                 @endforeach
                             </select>
-                            <small class="text-muted">Cada proceso solo puede registrarse una vez.</small>
+                            <small class="text-muted">Puede repetir el mismo proceso las veces que necesite.</small>
                         </div>
                         <div class="col-md-4 form-group">
                             <label class="small font-weight-bold">Maquinaria</label>
@@ -302,7 +309,6 @@
                     </div>
                 </form>
             </div>
-            @endif
             @endcan
             @endif
         </div>
@@ -370,6 +376,16 @@
                     </p>
                 </div>
             @elseif($panelActivo === 'almacenaje')
+            @if(!empty($produccionEstimada['entrada_kg']))
+            <div class="alert alert-light border small mx-3 mt-3 mb-0">
+                <i class="fas fa-calculator text-success mr-1"></i>
+                <strong>Producción calculada:</strong>
+                {{ number_format($produccionEstimada['entrada_kg'], 2) }} kg de materia prima
+                × {{ number_format($produccionEstimada['rendimiento'] * 100, 0) }}&nbsp;% rendimiento
+                → <strong>{{ number_format($produccionEstimada['cantidad'], 0) }} {{ $produccionEstimada['unidad'] }}</strong>
+                (~{{ number_format($produccionEstimada['kg'], 2) }} kg).
+            </div>
+            @endif
             <form method="POST" action="{{ route('procesamiento.almacenar', $lote) }}" id="formAlmacenajeLote" class="p-3">
                 @csrf
                 @push('almacen-envio-extra-almacenSectionLote')
@@ -408,7 +424,7 @@
                     'crearAlmacenUrl' => route('almacen-planta.create'),
                     'emptyTexto' => 'No hay almacenes de planta registrados.',
                     'productoResumen' => trim($lote->nombre . ($lote->producto ? ' ('.$lote->producto.')' : '')),
-                    'cantidadResumen' => number_format((float) ($cantidadProductoAlmacen ?? 0), 2).' '.($unidadProductoAlmacen ?? 'kg').' (objetivo del lote)',
+                    'cantidadResumen' => number_format((float) ($cantidadProductoAlmacen ?? 0), 0).' '.($unidadProductoAlmacen ?? 'kg').' (~'.number_format((float) ($cantidadProductoAlmacenKg ?? 0), 2).' kg según materia prima)',
                 ])
             </form>
             @endif
@@ -573,6 +589,53 @@
         btn.classList.toggle('btn-success', expandido);
         btn.classList.toggle('btn-outline-success', !expandido);
     });
+})();
+
+(function () {
+    const workspace = document.getElementById('lp-fases-workspace');
+    const btnVerTodas = document.getElementById('btnVerTodasFases');
+
+    function irASeccionFase(fase) {
+        if (!fase) return;
+
+        if (workspace && !workspace.classList.contains('lp-modo-todas-fases')) {
+            workspace.classList.add('lp-modo-todas-fases');
+            if (btnVerTodas) {
+                btnVerTodas.setAttribute('aria-expanded', 'true');
+                const label = btnVerTodas.querySelector('.btn-label');
+                if (label) label.textContent = 'Ver solo fase actual';
+                btnVerTodas.classList.add('btn-success');
+                btnVerTodas.classList.remove('btn-outline-success');
+            }
+        }
+
+        const panel = document.querySelector('.lp-fase-panel[data-fase="' + fase + '"]');
+        const destino = fase === 'transformacion'
+            ? (document.getElementById('lp-form-registrar-etapa') || panel)
+            : panel;
+
+        if (destino) {
+            setTimeout(function () {
+                destino.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 80);
+        }
+    }
+
+    document.querySelectorAll('[data-fase-scroll]').forEach(function (step) {
+        step.addEventListener('click', function () {
+            irASeccionFase(step.dataset.faseScroll);
+        });
+        step.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                irASeccionFase(step.dataset.faseScroll);
+            }
+        });
+    });
+
+    if (window.location.hash === '#transformacion') {
+        irASeccionFase('transformacion');
+    }
 })();
 </script>
 @endpush

@@ -1,6 +1,7 @@
 @php
     $usuarioForm = $usuario ?? null;
-    $mostrarGuias = $mostrarGuias ?? false;
+    $mostrarGuias = ($mostrarGuias ?? false) && ! ($modoJefe ?? false);
+    $modoJefe = $modoJefe ?? false;
 @endphp
 
 @if($mostrarGuias)
@@ -53,22 +54,29 @@
             @error('email')<span class="invalid-feedback">{{ $message }}</span>@enderror
         </div>
     </div>
+    @if(! $modoJefe || $usuarioForm)
     <div class="col-md-6">
         <div class="form-group">
-            <label for="nombreusuario">Nombre de usuario <span class="text-danger">*</span></label>
+            <label for="nombreusuario">Nombre de usuario @if(! $usuarioForm || ! ($usuarioForm->nombreusuario_editado ?? false))<span class="text-danger">*</span>@endif</label>
             @if($mostrarGuias)
             <div class="guia-campo mb-2">
                 <strong>Login.</strong> Texto corto sin espacios (ej. <code>jperez</code>). También debe ser único.
             </div>
             @endif
+            @if($modoJefe && $usuarioForm && ($usuarioForm->nombreusuario_editado ?? false))
+            <input type="text" class="form-control" value="{{ $usuarioForm->nombreusuario }}" readonly disabled>
+            @else
             <input type="text" class="form-control @error('nombreusuario') is-invalid @enderror" id="nombreusuario" name="nombreusuario"
-                value="{{ old('nombreusuario', $usuarioForm->nombreusuario ?? '') }}" placeholder="usuario" required>
+                value="{{ old('nombreusuario', $usuarioForm->nombreusuario ?? '') }}" placeholder="usuario" {{ $modoJefe && ! $usuarioForm ? '' : 'required' }}>
             @error('nombreusuario')<span class="invalid-feedback">{{ $message }}</span>@enderror
+            @endif
         </div>
     </div>
+    @endif
 </div>
 
 <div class="row">
+    @unless($modoJefe)
     <div class="col-md-6">
         <div class="form-group">
             <label for="telefono">Teléfono</label>
@@ -82,6 +90,7 @@
             @error('telefono')<span class="invalid-feedback">{{ $message }}</span>@enderror
         </div>
     </div>
+    @endunless
     <div class="col-md-6">
         <div class="form-group">
             <label for="passwordhash">
@@ -104,6 +113,7 @@
     </div>
 </div>
 
+@unless($modoJefe)
 <div class="row">
     <div class="col-md-6">
         <div class="form-group">
@@ -138,3 +148,4 @@
         </div>
     </div>
 </div>
+@endunless

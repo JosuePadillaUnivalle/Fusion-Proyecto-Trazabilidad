@@ -81,11 +81,11 @@ class AlmacenAmbito
         }
 
         if ($ambito === self::AGRICOLA) {
-            return $user->hasRole('agricultor');
+            return $user->hasAnyRole(['agricultor', 'jefe_agricultor', 'admin']);
         }
 
         if ($ambito === self::PLANTA) {
-            return $user->hasRole('planta');
+            return $user->hasAnyRole(['planta', 'jefe_planta', 'admin']);
         }
 
         return false;

@@ -20,6 +20,7 @@ use App\Support\LoteProduccionTransformacionService;
 use App\Support\LoteProduccionTrazabilidadService;
 use App\Support\MaquinaProcesoCompatibilidad;
 use App\Support\ProcesoPlantaCatalogo;
+use App\Support\ProductoPlantaCatalogo;
 use App\Support\UsuarioRol;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -174,10 +175,8 @@ class LoteProduccionController extends Controller
 
         $dash = $this->trazabilidad->dashboardLote($loteProduccion);
         $procesosPlanta = ProcesoPlantaCatalogo::paraTransformacion();
+        $procesosDisponibles = $procesosPlanta;
         $procesosUsadosIds = $this->transformacion->procesosRegistradosIds($loteProduccion);
-        $procesosDisponibles = $procesosPlanta->filter(
-            fn ($p) => ! in_array((int) $p->procesoplantaid, $procesosUsadosIds, true)
-        )->values();
         $maquinasPlanta = MaquinaPlanta::query()->where('activo', true)->orderBy('nombre')->get();
         $mapaCompatibilidad = MaquinaProcesoCompatibilidad::mapaSelectores();
         $almacenesPlanta = AlmacenAmbito::scope(
@@ -190,13 +189,16 @@ class LoteProduccionController extends Controller
         if ($cantidadProductoAlmacen <= 0) {
             $cantidadProductoAlmacen = (float) $loteProduccion->materiasPrimas->sum('cantidad_usada');
         }
-        $unidadProductoAlmacen = $loteProduccion->unidadMedida?->abreviatura
-            ?? $loteProduccion->unidadMedida?->nombre
-            ?? 'kg';
-        $cantidadProductoAlmacenKg = $this->capacidadService->convertirAKg(
-            $cantidadProductoAlmacen,
+        $productoLote = LoteProduccionNombre::productoDesdeLote($loteProduccion);
+        $produccionEstimada = ProductoPlantaCatalogo::resumenProduccion($loteProduccion, $this->capacidadService);
+        $unidadProductoAlmacen = ProductoPlantaCatalogo::unidadEtiqueta(
+            $productoLote,
             $loteProduccion->unidadMedida
         );
+        $cantidadProductoAlmacen = $produccionEstimada['cantidad'] > 0
+            ? $produccionEstimada['cantidad']
+            : $cantidadProductoAlmacen;
+        $cantidadProductoAlmacenKg = $produccionEstimada['kg'];
 
         return view('procesamiento.show', array_merge($dash, [
             'lote' => $loteProduccion,
@@ -210,6 +212,7 @@ class LoteProduccionController extends Controller
             'cantidadProductoAlmacen' => $cantidadProductoAlmacen,
             'cantidadProductoAlmacenKg' => $cantidadProductoAlmacenKg,
             'unidadProductoAlmacen' => $unidadProductoAlmacen,
+            'produccionEstimada' => $produccionEstimada,
             'fases' => LoteProduccionTrazabilidadService::FASES,
             'puedeEliminar' => $this->loteService->puedeEliminar($loteProduccion),
         ]));
@@ -234,10 +237,6 @@ class LoteProduccionController extends Controller
         $proceso = \App\Models\ProcesoPlanta::query()->findOrFail($data['procesoplantaid']);
         if (in_array($proceso->nombre, ['Control de Calidad'], true)) {
             return back()->with('error', '«Control de Calidad» corresponde a la fase de certificación, no a transformación.');
-        }
-
-        if ($this->transformacion->procesoYaRegistrado($loteProduccion, (int) $data['procesoplantaid'])) {
-            return back()->with('error', 'El proceso «'.$proceso->nombre.'» ya fue registrado. Cada etapa solo puede registrarse una vez.');
         }
 
         if (! MaquinaProcesoCompatibilidad::compatible((int) $data['procesoplantaid'], (int) $data['maquinaplantaid'])) {
@@ -328,14 +327,17 @@ class LoteProduccionController extends Controller
             'observaciones' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $loteProduccion->loadMissing('materiasPrimas', 'unidadMedida');
+        $loteProduccion->loadMissing('materiasPrimas.insumo.unidadMedida', 'unidadMedida');
 
-        $cantidad = (float) ($loteProduccion->cantidad_objetivo ?? 0);
+        $cantidad = ProductoPlantaCatalogo::cantidadParaAlmacenaje($loteProduccion, $this->capacidadService);
+
         if ($cantidad <= 0) {
-            $cantidad = (float) $loteProduccion->materiasPrimas->sum('cantidad_usada');
+            return back()->with('error', 'No hay materia prima registrada ni cantidad objetivo para calcular el almacenaje.');
         }
-        if ($cantidad <= 0) {
-            return back()->with('error', 'Indique la cantidad objetivo del lote (al crear o editar) antes de registrar el almacenaje.');
+
+        $cantidadKg = ProductoPlantaCatalogo::kgParaAlmacenaje($loteProduccion, $this->capacidadService);
+        if ($cantidadKg <= 0) {
+            return back()->with('error', 'No se pudo calcular el peso del producto terminado a partir de la materia prima.');
         }
 
         $almacen = Almacen::query()->with('unidadMedida')->findOrFail($data['almacenid']);
@@ -343,7 +345,6 @@ class LoteProduccionController extends Controller
             return back()->with('error', 'Seleccione un almacén de planta.');
         }
 
-        $cantidadKg = $this->capacidadService->convertirAKg($cantidad, $loteProduccion->unidadMedida);
         $resumen = $this->capacidadService->resumen($almacen);
         if ($cantidadKg > $resumen['disponible_kg']) {
             return back()->with('error',
@@ -361,6 +362,14 @@ class LoteProduccionController extends Controller
             'observaciones' => ($data['observaciones'] ?? null)
                 ?: 'Producto terminado: '.$loteProduccion->nombre,
             'fecha_almacenaje' => now(),
+        ]);
+
+        $loteProduccion->update([
+            'cantidad_objetivo' => $cantidad,
+            'unidadmedidaid' => ProductoPlantaCatalogo::resolverUnidadMedidaId(
+                ProductoPlantaCatalogo::nombreProducto($loteProduccion),
+                $loteProduccion->unidadmedidaid
+            ) ?? $loteProduccion->unidadmedidaid,
         ]);
 
         if (! $loteProduccion->hora_fin) {

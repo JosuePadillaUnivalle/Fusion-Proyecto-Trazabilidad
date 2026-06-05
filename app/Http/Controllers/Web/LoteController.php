@@ -38,6 +38,16 @@ class LoteController extends Controller
 
         if (UsuarioRol::debeAcotarPorAsignacion($request->user())) {
             $query->where('usuarioid', (int) $request->user()->usuarioid);
+        } elseif (
+            UsuarioRol::esJefeAgricultor($request->user())
+            && ! UsuarioRol::esAdminGlobal($request->user())
+        ) {
+            $empleadoIds = Usuario::query()
+                ->where('supervisor_usuarioid', $request->user()->usuarioid)
+                ->whereIn('role', UsuarioRol::rolesEmpleadosGestionables($request->user()))
+                ->pluck('usuarioid');
+
+            $query->whereIn('usuarioid', $empleadoIds);
         }
 
         if ($request->filled('q')) {
@@ -187,14 +197,14 @@ class LoteController extends Controller
     public function create()
     {
         $user = auth()->user();
-        $mostrarSelectorPropietario = $user && (
-            $user->hasRole('admin') || $user->hasRole('Admin')
-        );
+        $mostrarSelectorPropietario = $this->puedeDesignarResponsableLote($user);
+        $responsableSelectorParams = $this->paramsSelectorResponsable($user);
+        $esJefeAgricultorDesignando = $user && UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user);
 
         $propietarioPorDefecto = $this->responsableLotePorDefecto($user);
         $usuarioidInicial = (int) old('usuarioid', $propietarioPorDefecto ?? 0);
         $responsableLabel = null;
-        if ($mostrarSelectorPropietario && $usuarioidInicial && $this->puedeSerResponsableDeLote($usuarioidInicial)) {
+        if ($mostrarSelectorPropietario && $usuarioidInicial && $this->puedeAsignarUsuarioALote($user, $usuarioidInicial)) {
             $resp = Usuario::find($usuarioidInicial);
             $responsableLabel = $resp ? trim($resp->nombre.' '.($resp->apellido ?? '')) : null;
         } elseif ($mostrarSelectorPropietario) {
@@ -210,14 +220,16 @@ class LoteController extends Controller
             'usuarioidInicial',
             'responsableLabel',
             'cultivoidInicial',
-            'cultivoLabel'
+            'cultivoLabel',
+            'responsableSelectorParams',
+            'esJefeAgricultorDesignando'
         ));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'usuarioid' => ['nullable', 'exists:usuario,usuarioid', $this->reglaResponsableLote()],
+            'usuarioid' => ['nullable', 'exists:usuario,usuarioid', $this->reglaResponsableLote($request->user())],
             'nombre' => 'required|string|max:100',
             'ubicacion' => 'nullable|string|max:200',
             'superficie' => 'required|numeric|min:0.01',
@@ -353,9 +365,16 @@ class LoteController extends Controller
         return view('lotes.ubicacion', $this->trazabilidadService->buildLoteDetalleBase($lote));
     }
 
-    public function edit(Lote $lote)
+    public function edit(Lote $lote, Request $request)
     {
+        $user = $request->user();
+        $this->autorizarLoteAsignado($request, $lote);
+
         $lote->load(['usuario', 'cultivo', 'estadoTipo']);
+
+        $puedeDesignarResponsable = $this->puedeDesignarResponsableLote($user);
+        $responsableSelectorParams = $this->paramsSelectorResponsable($user);
+        $esJefeAgricultorDesignando = $user && UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user);
 
         $responsableLabel = ($lote->usuario && $this->puedeSerResponsableDeLote((int) $lote->usuarioid))
             ? trim($lote->usuario->nombre.' '.($lote->usuario->apellido ?? ''))
@@ -367,7 +386,10 @@ class LoteController extends Controller
             'lote',
             'responsableLabel',
             'cultivoLabel',
-            'mostrarFechaSiembra'
+            'mostrarFechaSiembra',
+            'puedeDesignarResponsable',
+            'responsableSelectorParams',
+            'esJefeAgricultorDesignando'
         ));
     }
 
@@ -376,7 +398,7 @@ class LoteController extends Controller
         $this->autorizarLoteAsignado($request, $lote);
 
         $data = $request->validate([
-            'usuarioid' => ['required', 'exists:usuario,usuarioid', $this->reglaResponsableLote()],
+            'usuarioid' => ['required', 'exists:usuario,usuarioid', $this->reglaResponsableLote($request->user())],
             'nombre' => 'required|string|max:100',
             'ubicacion' => 'nullable|string|max:200',
             'superficie' => 'required|numeric|min:0',
@@ -406,14 +428,16 @@ class LoteController extends Controller
         return redirect()->route('lotes.index')->with('success', 'Lote eliminado.');
     }
 
-    private function reglaResponsableLote(): \Closure
+    private function reglaResponsableLote(?Usuario $actor = null): \Closure
     {
-        return function (string $attribute, mixed $value, \Closure $fail): void {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($actor): void {
             if ($value === null || $value === '') {
                 return;
             }
-            if (! $this->puedeSerResponsableDeLote((int) $value)) {
-                $fail('El administrador no puede ser responsable de un lote. Elija un agricultor.');
+            if (! $this->puedeAsignarUsuarioALote($actor ?? auth()->user(), (int) $value)) {
+                $fail(UsuarioRol::esJefeAgricultor($actor ?? auth()->user())
+                    ? 'Debe elegir un agricultor de su equipo.'
+                    : 'El administrador no puede ser responsable de un lote. Elija un agricultor.');
             }
         };
     }
@@ -444,13 +468,72 @@ class LoteController extends Controller
 
     private function autorizarLoteAsignado(Request $request, Lote $lote): void
     {
-        if (! UsuarioRol::debeAcotarPorAsignacion($request->user())) {
+        $user = $request->user();
+        if (! $user) {
+            abort(403);
+        }
+
+        if (UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
+            $empleadoIds = Usuario::query()
+                ->where('supervisor_usuarioid', $user->usuarioid)
+                ->whereIn('role', UsuarioRol::rolesEmpleadosGestionables($user))
+                ->pluck('usuarioid')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if (! in_array((int) $lote->usuarioid, $empleadoIds, true)) {
+                abort(403, 'No tienes acceso a este lote.');
+            }
+
             return;
         }
 
-        if ((int) $lote->usuarioid !== (int) $request->user()->usuarioid) {
+        if (! UsuarioRol::debeAcotarPorAsignacion($user)) {
+            return;
+        }
+
+        if ((int) $lote->usuarioid !== (int) $user->usuarioid) {
             abort(403, 'No tienes acceso a este lote.');
         }
+    }
+
+    private function puedeDesignarResponsableLote(?Usuario $user): bool
+    {
+        return $user && (
+            UsuarioRol::esAdminGlobal($user) || UsuarioRol::esJefeAgricultor($user)
+        );
+    }
+
+    /** @return array<string, mixed> */
+    private function paramsSelectorResponsable(?Usuario $user): array
+    {
+        $params = ['roles' => 'agricultor'];
+
+        if ($user && UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
+            $params['supervisor_usuarioid'] = $user->usuarioid;
+        }
+
+        return $params;
+    }
+
+    private function puedeAsignarUsuarioALote(?Usuario $actor, int $usuarioid): bool
+    {
+        if (! $this->puedeSerResponsableDeLote($usuarioid)) {
+            return false;
+        }
+
+        if (! $actor || UsuarioRol::esAdminGlobal($actor)) {
+            return true;
+        }
+
+        if (UsuarioRol::esJefeAgricultor($actor)) {
+            $empleado = Usuario::find($usuarioid);
+
+            return $empleado
+                && (int) $empleado->supervisor_usuarioid === (int) $actor->usuarioid;
+        }
+
+        return (int) $usuarioid === (int) $actor->usuarioid;
     }
 
     private function responsableLotePorDefecto(?Usuario $user): ?int
@@ -471,7 +554,7 @@ class LoteController extends Controller
     {
         $auth = $request->user();
 
-        if ($usuarioid && $this->puedeSerResponsableDeLote((int) $usuarioid)) {
+        if ($usuarioid && $this->puedeAsignarUsuarioALote($auth, (int) $usuarioid)) {
             return (int) $usuarioid;
         }
 

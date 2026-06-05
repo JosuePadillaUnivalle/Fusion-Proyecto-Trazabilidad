@@ -19,7 +19,54 @@
 
     <div class="env-page-intro mb-3">
         <strong><i class="fas fa-chart-pie text-success mr-1"></i> Reportes de distribución</strong>
-        <span class="d-block small text-muted mt-1">Filtra cada tabla, haz clic en una fila para desplegar sus envíos y usa el buscador dentro del detalle para acotar la lista.</span>
+        <span class="d-block small text-muted mt-1">Use los filtros por sección o el panel global. Expanda filas para ver el detalle de envíos.</span>
+    </div>
+
+    {{-- Filtros globales --}}
+    <div class="card card-modulo-main mb-3">
+        <div class="card-header py-3">
+            <h3 class="card-title mb-0"><i class="fas fa-sliders-h text-success mr-2"></i>Filtros globales</h3>
+        </div>
+        <div class="filtros-panel">
+            <div class="row align-items-end">
+                <div class="col-md-3 mb-2">
+                    <label class="text-muted small font-weight-bold">Estado de envío</label>
+                    <select id="filtroGlobalEstado" class="form-control form-control-sm">
+                        <option value="">Todos los estados</option>
+                        @foreach($estadosLista ?? [] as $est)
+                        <option value="{{ $est }}">{{ ucfirst(str_replace('_', ' ', $est)) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="text-muted small font-weight-bold">Destino</label>
+                    <select id="filtroGlobalDestino" class="form-control form-control-sm">
+                        <option value="">Todos los destinos</option>
+                        @foreach($destinosLista ?? [] as $dest)
+                        <option value="{{ strtolower($dest) }}">{{ $dest }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2 mb-2">
+                    <label class="text-muted small font-weight-bold">Mín. cantidad</label>
+                    <select id="filtroGlobalMinCant" class="form-control form-control-sm">
+                        <option value="">Sin mínimo</option>
+                        <option value="2">≥ 2</option>
+                        <option value="3">≥ 3</option>
+                        <option value="5">≥ 5</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="text-muted small font-weight-bold">Buscar en tablas</label>
+                    <input type="text" id="filtroGlobalTexto" class="form-control form-control-sm" placeholder="Transportista, estado, destino...">
+                </div>
+                <div class="col-md-1 mb-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btnLimpiarGlobal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="row mb-2">
@@ -83,12 +130,28 @@
         </div>
         <div class="filtros-panel">
             <div class="row align-items-end">
-                <div class="col-md-5 mb-2 mb-md-0">
-                    <label class="text-muted">Buscar transportista</label>
+                <div class="col-md-4 mb-2 mb-md-0">
+                    <label class="text-muted small font-weight-bold">Buscar transportista</label>
                     <input type="text" id="searchTopTransportista" class="form-control form-control-sm" placeholder="Nombre del transportista...">
-                    <small class="form-text text-muted">Al expandir un transportista podrás filtrar sus envíos abajo.</small>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-3 mb-2 mb-md-0">
+                    <label class="text-muted small font-weight-bold">Mín. asignaciones</label>
+                    <select id="filtroTopMinAsig" class="form-control form-control-sm">
+                        <option value="">Todas</option>
+                        <option value="2">≥ 2</option>
+                        <option value="5">≥ 5</option>
+                        <option value="10">≥ 10</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2 mb-md-0">
+                    <label class="text-muted small font-weight-bold">Ordenar por</label>
+                    <select id="ordenTopTransportista" class="form-control form-control-sm">
+                        <option value="cant-desc">Más asignaciones</option>
+                        <option value="cant-asc">Menos asignaciones</option>
+                        <option value="nombre-asc">Nombre A-Z</option>
+                    </select>
+                </div>
+                <div class="col-md-2 mb-2">
                     <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btnLimpiarTopTransportista">
                         <i class="fas fa-times mr-1"></i> Limpiar
                     </button>
@@ -115,6 +178,7 @@
                     @endphp
                     <tr class="fila-estado-toggle fila-filtro-rep"
                         data-texto="{{ strtolower($nombre) }}"
+                        data-cant="{{ $t->c }}"
                         data-target="#{{ $uid }}"
                         role="button"
                         tabindex="0"
@@ -159,11 +223,28 @@
                 </div>
                 <div class="filtros-panel">
                     <div class="row align-items-end">
-                        <div class="col-8 mb-2">
-                            <label class="text-muted">Buscar estado</label>
+                        <div class="col-md-4 mb-2">
+                            <label class="text-muted small font-weight-bold">Estado</label>
+                            <select id="selectPorEstado" class="form-control form-control-sm">
+                                <option value="">Todos</option>
+                                @foreach($estadosLista ?? [] as $est)
+                                <option value="{{ $est }}">{{ ucfirst(str_replace('_', ' ', $est)) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="text-muted small font-weight-bold">Buscar</label>
                             <input type="text" id="searchPorEstado" class="form-control form-control-sm" placeholder="Ej: entregado, pendiente...">
                         </div>
-                        <div class="col-4 mb-2">
+                        <div class="col-md-2 mb-2">
+                            <label class="text-muted small font-weight-bold">Mín. cant.</label>
+                            <select id="minCantPorEstado" class="form-control form-control-sm">
+                                <option value="">—</option>
+                                <option value="2">≥ 2</option>
+                                <option value="5">≥ 5</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-2">
                             <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btnLimpiarPorEstado">Limpiar</button>
                         </div>
                     </div>
@@ -185,6 +266,7 @@
                             @endphp
                             <tr class="fila-estado-toggle fila-filtro-rep-est"
                                 data-texto="{{ $estado }}"
+                                data-cant="{{ $cant }}"
                                 data-target="#{{ $uid }}"
                                 role="button"
                                 tabindex="0"
@@ -227,11 +309,28 @@
                 </div>
                 <div class="filtros-panel">
                     <div class="row align-items-end">
-                        <div class="col-8 mb-2">
-                            <label class="text-muted">Buscar destino</label>
+                        <div class="col-md-4 mb-2">
+                            <label class="text-muted small font-weight-bold">Destino</label>
+                            <select id="selectPorDestino" class="form-control form-control-sm">
+                                <option value="">Todos</option>
+                                @foreach($destinosLista ?? [] as $dest)
+                                <option value="{{ strtolower($dest) }}">{{ $dest }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="text-muted small font-weight-bold">Buscar</label>
                             <input type="text" id="searchPorDestino" class="form-control form-control-sm" placeholder="Planta, ciudad, almacén...">
                         </div>
-                        <div class="col-4 mb-2">
+                        <div class="col-md-2 mb-2">
+                            <label class="text-muted small font-weight-bold">Mín. cant.</label>
+                            <select id="minCantPorDestino" class="form-control form-control-sm">
+                                <option value="">—</option>
+                                <option value="2">≥ 2</option>
+                                <option value="3">≥ 3</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-2">
                             <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btnLimpiarPorDestino">Limpiar</button>
                         </div>
                     </div>
@@ -253,6 +352,7 @@
                             @endphp
                             <tr class="fila-estado-toggle fila-filtro-rep-dest"
                                 data-texto="{{ strtolower($destino) }}"
+                                data-cant="{{ $cant }}"
                                 data-target="#{{ $uid }}"
                                 role="button"
                                 tabindex="0"
@@ -292,29 +392,41 @@
 <script>
 $(function () {
     function initFiltroTabla(config) {
-        const rows = document.querySelectorAll(config.rowSelector);
+        const rows = Array.from(document.querySelectorAll(config.rowSelector));
         const total = rows.length;
         const searchEl = document.getElementById(config.searchId);
+        const selectEl = config.selectId ? document.getElementById(config.selectId) : null;
+        const minCantEl = config.minCantId ? document.getElementById(config.minCantId) : null;
         const contadorEl = document.getElementById(config.contadorId);
         const sinEl = document.getElementById(config.sinResultadosId);
+        const tbody = rows[0]?.closest('tbody');
 
         function aplicar() {
             const q = (searchEl?.value || '').trim().toLowerCase();
+            const sel = (selectEl?.value || '').trim().toLowerCase();
+            const minCant = parseInt(minCantEl?.value || '0', 10) || 0;
             let visibles = 0;
+
             rows.forEach(tr => {
-                const match = !q || (tr.dataset.texto || '').includes(q);
-                tr.style.display = match ? '' : 'none';
+                const texto = (tr.dataset.texto || '').toLowerCase();
+                const cant = parseInt(tr.dataset.cant || '0', 10);
+                const matchQ = !q || texto.includes(q);
+                const matchSel = !sel || texto === sel || texto.includes(sel);
+                const matchMin = !minCant || cant >= minCant;
+                const show = matchQ && matchSel && matchMin;
+                tr.style.display = show ? '' : 'none';
                 const next = tr.nextElementSibling;
                 if (next && next.querySelector('.collapse')) {
-                    if (!match) {
+                    if (!show) {
                         next.style.display = 'none';
                         $(next.querySelector('.collapse')).collapse('hide');
                     } else {
                         next.style.display = '';
                     }
                 }
-                if (match) visibles++;
+                if (show) visibles++;
             });
+
             if (contadorEl) {
                 contadorEl.textContent = visibles === total
                     ? `${total} registro(s)`
@@ -324,23 +436,52 @@ $(function () {
         }
 
         searchEl?.addEventListener('input', aplicar);
+        selectEl?.addEventListener('change', aplicar);
+        minCantEl?.addEventListener('change', aplicar);
         document.getElementById(config.limpiarId)?.addEventListener('click', () => {
             if (searchEl) searchEl.value = '';
+            if (selectEl) selectEl.value = '';
+            if (minCantEl) minCantEl.value = '';
             aplicar();
         });
         aplicar();
+
+        return { aplicar, rows, tbody };
     }
 
-    initFiltroTabla({
+    const topConfig = initFiltroTabla({
         rowSelector: '.fila-filtro-rep',
         searchId: 'searchTopTransportista',
+        minCantId: 'filtroTopMinAsig',
         contadorId: 'contadorTopTransportistas',
         sinResultadosId: 'sinTopTransportista',
         limpiarId: 'btnLimpiarTopTransportista'
     });
+
+    document.getElementById('ordenTopTransportista')?.addEventListener('change', function () {
+        const tbody = topConfig.tbody;
+        if (!tbody) return;
+        const pairs = topConfig.rows.map(tr => ({ tr, next: tr.nextElementSibling }));
+        pairs.sort((a, b) => {
+            const ca = parseInt(a.tr.dataset.cant || '0', 10);
+            const cb = parseInt(b.tr.dataset.cant || '0', 10);
+            const na = a.tr.dataset.texto || '';
+            const nb = b.tr.dataset.texto || '';
+            if (this.value === 'cant-asc') return ca - cb;
+            if (this.value === 'nombre-asc') return na.localeCompare(nb);
+            return cb - ca;
+        });
+        pairs.forEach(({ tr, next }) => {
+            tbody.appendChild(tr);
+            if (next) tbody.appendChild(next);
+        });
+    });
+
     initFiltroTabla({
         rowSelector: '.fila-filtro-rep-est',
         searchId: 'searchPorEstado',
+        selectId: 'selectPorEstado',
+        minCantId: 'minCantPorEstado',
         contadorId: 'contadorPorEstado',
         sinResultadosId: 'sinPorEstado',
         limpiarId: 'btnLimpiarPorEstado'
@@ -348,9 +489,46 @@ $(function () {
     initFiltroTabla({
         rowSelector: '.fila-filtro-rep-dest',
         searchId: 'searchPorDestino',
+        selectId: 'selectPorDestino',
+        minCantId: 'minCantPorDestino',
         contadorId: 'contadorPorDestino',
         sinResultadosId: 'sinPorDestino',
         limpiarId: 'btnLimpiarPorDestino'
+    });
+
+    function aplicarFiltroGlobal() {
+        const estado = (document.getElementById('filtroGlobalEstado')?.value || '').toLowerCase();
+        const destino = (document.getElementById('filtroGlobalDestino')?.value || '').toLowerCase();
+        const minCant = parseInt(document.getElementById('filtroGlobalMinCant')?.value || '0', 10) || 0;
+        const texto = (document.getElementById('filtroGlobalTexto')?.value || '').trim().toLowerCase();
+
+        document.querySelectorAll('.fila-filtro-rep, .fila-filtro-rep-est, .fila-filtro-rep-dest').forEach(tr => {
+            const t = (tr.dataset.texto || '').toLowerCase();
+            const cant = parseInt(tr.dataset.cant || '0', 10);
+            let show = true;
+            if (texto && !t.includes(texto)) show = false;
+            if (minCant && cant < minCant) show = false;
+            if (estado && tr.classList.contains('fila-filtro-rep-est') && t !== estado) show = false;
+            if (destino && tr.classList.contains('fila-filtro-rep-dest') && t !== destino) show = false;
+            tr.style.display = show ? '' : 'none';
+            const next = tr.nextElementSibling;
+            if (next && next.querySelector('.collapse')) {
+                next.style.display = show ? '' : 'none';
+                if (!show) $(next.querySelector('.collapse')).collapse('hide');
+            }
+        });
+    }
+
+    ['filtroGlobalEstado', 'filtroGlobalDestino', 'filtroGlobalMinCant'].forEach(id => {
+        document.getElementById(id)?.addEventListener('change', aplicarFiltroGlobal);
+    });
+    document.getElementById('filtroGlobalTexto')?.addEventListener('input', aplicarFiltroGlobal);
+    document.getElementById('btnLimpiarGlobal')?.addEventListener('click', () => {
+        ['filtroGlobalEstado', 'filtroGlobalDestino', 'filtroGlobalMinCant', 'filtroGlobalTexto'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        aplicarFiltroGlobal();
     });
 
     function aplicarFiltroDetalleEnvios(input) {

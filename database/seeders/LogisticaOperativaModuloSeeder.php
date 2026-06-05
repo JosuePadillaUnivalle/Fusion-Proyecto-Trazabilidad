@@ -324,7 +324,7 @@ class LogisticaOperativaModuloSeeder extends Seeder
 
         $defs = [
             [
-                'desc' => self::MARK.' Faltante de 2 bultos en recepción (ENV-MOD-26-02).',
+                'desc' => 'Faltante de 2 bultos detectado en recepción de mercadería.',
                 'ext' => 'ENV-MOD-26-02',
                 'tipo' => 'Faltante',
                 'estado' => 'pendiente',
@@ -332,7 +332,7 @@ class LogisticaOperativaModuloSeeder extends Seeder
                 'alm' => 'alm_central',
             ],
             [
-                'desc' => self::MARK.' Daño menor en empaque — resuelto con nota de crédito (ENV-MOD-26-05).',
+                'desc' => 'Daño menor en empaque — resuelto con nota de crédito al cliente.',
                 'ext' => 'ENV-MOD-26-05',
                 'tipo' => 'Daño producto',
                 'estado' => 'resuelto',
@@ -341,7 +341,7 @@ class LogisticaOperativaModuloSeeder extends Seeder
                 'nota' => 'Cliente aceptó entrega parcial. Reposición programada.',
             ],
             [
-                'desc' => self::MARK.' Cliente no disponible en primera visita (ENV-MOD-26-06).',
+                'desc' => 'Cliente no disponible en primera visita; se reprograma entrega.',
                 'ext' => 'ENV-MOD-26-06',
                 'tipo' => 'Reprogramación',
                 'estado' => 'abierto',
@@ -389,10 +389,10 @@ class LogisticaOperativaModuloSeeder extends Seeder
         }
 
         $docs = [
-            ['titulo' => self::MARK.' Nota entrega almacén ENV-MOD-26-04', 'ext' => 'ENV-MOD-26-04', 'tipo' => 'nota_entrega', 'user' => 'almacen_user', 'alm' => 'alm_central'],
-            ['titulo' => self::MARK.' Nota entrega planta ENV-MOD-26-03', 'ext' => 'ENV-MOD-26-03', 'tipo' => 'nota_entrega', 'user' => 'planta', 'alm' => 'alm_planta'],
-            ['titulo' => self::MARK.' Guía transportista ENV-MOD-26-01', 'ext' => 'ENV-MOD-26-01', 'tipo' => 'guia_entrega', 'user' => 'transportista', 'alm' => 'alm_central'],
-            ['titulo' => self::MARK.' Confirmación ENV-MOD-26-06', 'ext' => 'ENV-MOD-26-06', 'tipo' => 'confirmacion_entrega', 'user' => 'miguel', 'alm' => 'alm_norte'],
+            ['titulo' => 'Nota entrega almacén central', 'ext' => 'ENV-MOD-26-04', 'tipo' => 'nota_entrega', 'user' => 'almacen_user', 'alm' => 'alm_central'],
+            ['titulo' => 'Nota entrega planta de procesamiento', 'ext' => 'ENV-MOD-26-03', 'tipo' => 'nota_entrega', 'user' => 'planta', 'alm' => 'alm_planta'],
+            ['titulo' => 'Guía de transporte Carlos Mamani', 'ext' => 'ENV-MOD-26-01', 'tipo' => 'guia_entrega', 'user' => 'transportista', 'alm' => 'alm_central'],
+            ['titulo' => 'Confirmación de entrega cliente norte', 'ext' => 'ENV-MOD-26-06', 'tipo' => 'confirmacion_entrega', 'user' => 'miguel', 'alm' => 'alm_norte'],
         ];
 
         foreach ($docs as $d) {

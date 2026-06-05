@@ -12,9 +12,14 @@ use App\Models\MaquinaPlanta;
 use App\Models\ProcesoPlanta;
 use App\Models\Pedido;
 use App\Models\Produccion;
+use App\Models\PerfilTransportista;
 use App\Models\Usuario;
+use App\Models\Vehiculo;
 use App\Support\AlmacenAmbito;
 use App\Support\CultivoCatalogo;
+use App\Support\PedidoCatalogo;
+use App\Support\UbicacionGpsParser;
+use App\Support\UsuarioRol;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,6 +46,17 @@ class CatalogoSelectorController extends Controller
             $query->whereNotIn('role', ['admin', 'Admin']);
         }
 
+        if ($request->filled('supervisor_usuarioid')) {
+            $query->where('supervisor_usuarioid', (int) $request->supervisor_usuarioid);
+        } elseif (
+            UsuarioRol::esJefeAgricultor($request->user())
+            && ! UsuarioRol::esAdminGlobal($request->user())
+            && $request->filled('roles')
+            && str_contains((string) $request->roles, 'agricultor')
+        ) {
+            $query->where('supervisor_usuarioid', $request->user()->usuarioid);
+        }
+
         $this->aplicarBusqueda($query, (string) $request->q, ['nombre', 'apellido', 'email', 'nombreusuario']);
 
         return $this->respuestaPaginada($request, $query->orderBy('nombre')->orderBy('apellido'), function (Usuario $u) {
@@ -48,6 +64,45 @@ class CatalogoSelectorController extends Controller
                 'id' => $u->usuarioid,
                 'label' => trim($u->nombre.' '.($u->apellido ?? '')),
                 'meta' => ucfirst((string) ($u->role ?? '')).($u->email ? ' · '.$u->email : ''),
+            ];
+        });
+    }
+
+    public function vehiculos(Request $request): JsonResponse
+    {
+        $query = Vehiculo::query()
+            ->with(['tipoVehiculo'])
+            ->where('activo', true);
+
+        if ($request->filled('transportista_usuarioid') && $request->boolean('solo_transportista')) {
+            $vehiculoIds = PerfilTransportista::query()
+                ->where('usuarioid', (int) $request->transportista_usuarioid)
+                ->whereNotNull('vehiculoid')
+                ->pluck('vehiculoid');
+
+            if ($vehiculoIds->isNotEmpty()) {
+                $query->whereIn('vehiculoid', $vehiculoIds);
+            }
+        }
+
+        $q = trim((string) $request->q);
+        if ($q !== '') {
+            $like = '%'.$q.'%';
+            $query->where(function (Builder $w) use ($like) {
+                $w->where('placa', 'like', $like)
+                    ->orWhere('marca', 'like', $like)
+                    ->orWhere('modelo', 'like', $like)
+                    ->orWhere('color', 'like', $like);
+            });
+        }
+
+        return $this->respuestaPaginada($request, $query->orderBy('placa'), function (Vehiculo $v) {
+            $nombre = trim(collect([$v->marca, $v->modelo])->filter()->implode(' '));
+
+            return [
+                'id' => $v->vehiculoid,
+                'label' => $v->placa,
+                'meta' => trim(($nombre !== '' ? $nombre.' · ' : '').($v->tipoVehiculo?->nombre ?? 'Vehículo')),
             ];
         });
     }
@@ -78,7 +133,17 @@ class CatalogoSelectorController extends Controller
             $query->where('usuarioid', (int) $request->usuarioid);
         }
 
-        if ($request->boolean('solo_produccion') || $request->boolean('solo_cosecha')) {
+        if ($request->boolean('solo_cosecha')) {
+            $query->with(['estadoTipo', 'actividades.tipoActividad']);
+            $ids = \App\Support\EstadoLoteCatalogo::idsPorSlugs(['listo_para_cosecha', 'en_crecimiento']);
+            if ($ids !== []) {
+                $query->whereIn('estadolotetipoid', $ids);
+            } else {
+                $query->whereHas('estadoTipo', function ($q) {
+                    $q->whereRaw('LOWER(TRIM(nombre)) IN (?, ?)', ['listo para cosecha', 'en crecimiento']);
+                });
+            }
+        } elseif ($request->boolean('solo_produccion')) {
             $ids = \App\Support\EstadoLoteCatalogo::idsPorSlugs(['listo_para_cosecha']);
             if ($ids !== []) {
                 $query->whereIn('estadolotetipoid', $ids);
@@ -90,6 +155,50 @@ class CatalogoSelectorController extends Controller
         }
 
         $this->aplicarBusqueda($query, (string) $request->q, ['nombre', 'codigo_trazabilidad', 'ubicacion']);
+
+        if ($request->boolean('solo_cosecha')) {
+            $trazabilidad = app(\App\Support\LoteTrazabilidadService::class);
+            $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+            $page = max(1, (int) $request->input('page', 1));
+            $filtrados = $query->orderBy('nombre')->get()
+                ->filter(fn (Lote $l) => $trazabilidad->puedeRegistrarCosecha($l))
+                ->values();
+            $total = $filtrados->count();
+            $items = $filtrados->slice(($page - 1) * $perPage, $perPage)->values();
+
+            return response()->json([
+                'data' => $items->map(function (Lote $l) {
+                    $meta = [];
+                    if ($l->cultivo?->nombre) {
+                        $meta[] = $l->cultivo->nombre;
+                    }
+                    if ($l->codigo_trazabilidad) {
+                        $meta[] = $l->codigo_trazabilidad;
+                    }
+
+                    $responsable = $l->usuario
+                        ? trim($l->usuario->nombre.' '.($l->usuario->apellido ?? ''))
+                        : '';
+
+                    return [
+                        'id' => $l->loteid,
+                        'label' => $l->nombre,
+                        'meta' => $meta !== [] ? implode(' · ', $meta) : ($l->ubicacion ?: null),
+                        'extra' => [
+                            'responsable' => $responsable,
+                            'cultivo' => $l->cultivo?->nombre ?? 'Sin cultivo',
+                            'superficie' => $l->superficie,
+                        ],
+                    ];
+                })->values(),
+                'meta' => [
+                    'current_page' => $page,
+                    'last_page' => max(1, (int) ceil($total / $perPage)),
+                    'per_page' => $perPage,
+                    'total' => $total,
+                ],
+            ]);
+        }
 
         return $this->respuestaPaginada($request, $query->orderBy('nombre'), function (Lote $l) {
             $meta = [];
@@ -228,16 +337,136 @@ class CatalogoSelectorController extends Controller
 
     public function almacenes(Request $request): JsonResponse
     {
-        $query = Almacen::query();
+        AlmacenAmbito::asegurarAmbitosEnRegistros();
+
+        $query = Almacen::query()->where('activo', true);
+
+        if ($request->filled('ambito') && AlmacenAmbito::esValido($request->string('ambito')->toString())) {
+            $query = AlmacenAmbito::scope($query, $request->string('ambito')->toString());
+        }
+
         $this->aplicarBusqueda($query, (string) $request->q, ['nombre', 'ubicacion']);
 
         return $this->respuestaPaginada($request, $query->orderBy('nombre'), function (Almacen $a) {
+            $resuelto = UbicacionGpsParser::resolverAlmacen(
+                (int) $a->almacenid,
+                $a->nombre,
+                $a->ubicacion
+            );
+
             return [
                 'id' => $a->almacenid,
                 'label' => $a->nombre,
-                'meta' => $a->ubicacion,
+                'meta' => $resuelto['estimada']
+                    ? $resuelto['direccion'].' (ubicación referencial)'
+                    : \Illuminate\Support\Str::limit($resuelto['direccion'], 80),
+                'extra' => [
+                    'lat' => $resuelto['lat'],
+                    'lng' => $resuelto['lng'],
+                    'direccion' => $resuelto['direccion'],
+                    'ambito' => $a->ambito ?? AlmacenAmbito::AGRICOLA,
+                    'ubicacion_estimada' => $resuelto['estimada'],
+                ],
             ];
         });
+    }
+
+    public function productosPedido(Request $request): JsonResponse
+    {
+        AlmacenAmbito::asegurarAmbitosEnRegistros();
+
+        $q = mb_strtolower(trim((string) $request->q));
+        $almacenId = $request->filled('almacenid') ? (int) $request->almacenid : null;
+        $items = collect();
+
+        foreach (PedidoCatalogo::insumosMaterialSiembraGlobales() as $insumo) {
+            if ($almacenId && (int) $insumo->almacenid !== $almacenId) {
+                continue;
+            }
+
+            $almacen = $insumo->almacen?->nombre;
+            $stock = number_format((float) $insumo->stock, 2);
+            $unidad = $insumo->unidadMedida?->abreviatura ?? 'kg';
+            $label = $insumo->nombre;
+            $meta = trim(collect([$almacen, "Stock: {$stock} {$unidad}"])->filter()->implode(' · '));
+
+            if ($q !== '' && ! str_contains(mb_strtolower($label.' '.$meta), $q)) {
+                continue;
+            }
+
+            $items->push([
+                'id' => 'insumo:'.$insumo->insumoid,
+                'label' => $label,
+                'meta' => $meta !== '' ? $meta : 'Insumo · Material de siembra',
+                'extra' => [
+                    'tipo' => 'insumo',
+                    'almacen' => $almacen,
+                    'almacenid' => $insumo->almacenid,
+                ],
+            ]);
+        }
+
+        foreach (PedidoCatalogo::cosechasAgricolasDisponibles() as $cosecha) {
+            if ($almacenId && (int) $cosecha->almacenid !== $almacenId) {
+                continue;
+            }
+
+            $cultivo = $cosecha->produccion?->lote?->cultivo?->nombre ?? 'Cultivo';
+            $lote = $cosecha->produccion?->lote?->nombre ?? 'Lote';
+            $almacen = $cosecha->almacen?->nombre ?? 'Almacén agrícola';
+            $cantidad = number_format((float) $cosecha->cantidad, 2);
+            $unidad = $cosecha->unidadMedida?->abreviatura ?? 'kg';
+            $label = "{$cultivo} — {$lote}";
+            $meta = "{$almacen} · {$cantidad} {$unidad} disponibles";
+
+            if ($q !== '' && ! str_contains(mb_strtolower($label.' '.$meta), $q)) {
+                continue;
+            }
+
+            $items->push([
+                'id' => 'cosecha:'.$cosecha->produccionalmacenamientoid,
+                'label' => $label,
+                'meta' => $meta,
+                'extra' => [
+                    'tipo' => 'cosecha',
+                    'almacen' => $almacen,
+                    'almacenid' => $cosecha->almacenid,
+                ],
+            ]);
+        }
+
+        if ($items->isEmpty()) {
+            foreach (\App\Models\Cultivo::query()->orderBy('nombre')->get() as $cultivo) {
+                $label = $cultivo->nombre;
+                $meta = 'Cultivo de producción agrícola';
+
+                if ($q !== '' && ! str_contains(mb_strtolower($label.' '.$meta), $q)) {
+                    continue;
+                }
+
+                $items->push([
+                    'id' => 'cultivo:'.$cultivo->cultivoid,
+                    'label' => $label,
+                    'meta' => $meta,
+                    'extra' => ['tipo' => 'cultivo'],
+                ]);
+            }
+        }
+
+        $perPage = min(50, max(5, (int) $request->input('per_page', 20)));
+        $page = max(1, (int) $request->input('page', 1));
+        $total = $items->count();
+        $slice = $items->slice(($page - 1) * $perPage, $perPage)->values();
+
+        return response()->json([
+            'data' => $slice,
+            'meta' => [
+                'current_page' => $page,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+                'per_page' => $perPage,
+                'total' => $total,
+            ],
+        ]);
     }
 
     public function producciones(Request $request): JsonResponse

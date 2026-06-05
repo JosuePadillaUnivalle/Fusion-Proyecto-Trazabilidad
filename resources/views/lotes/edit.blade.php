@@ -38,19 +38,31 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-6">
+                        @if($puedeDesignarResponsable ?? false)
                         @include('partials.selector-catalogo', [
                             'id' => 'lote_edit_responsable',
                             'name' => 'usuarioid',
-                            'label' => 'Encargado',
+                            'label' => 'Empleado asignado',
                             'icon' => 'fa-user',
                             'value' => $responsableLabel ? $lote->usuarioid : '',
                             'labelSelected' => $responsableLabel ?? '',
                             'endpoint' => route('catalogo-selector.usuarios'),
-                            'params' => ['roles' => 'agricultor'],
-                            'title' => 'Seleccionar encargado',
+                            'params' => $responsableSelectorParams ?? ['roles' => 'agricultor'],
+                            'title' => 'Seleccionar empleado',
                             'searchPlaceholder' => 'Nombre, correo o usuario…',
+                            'help' => ! empty($esJefeAgricultorDesignando)
+                                ? 'Solo puedes asignar agricultores de tu equipo.'
+                                : null,
                             'required' => true,
                         ])
+                        @else
+                        <div class="form-group">
+                            <label><i class="fas fa-user mr-1"></i> Empleado asignado</label>
+                            <input type="text" class="form-control bg-light" readonly
+                                value="{{ $responsableLabel ?: '—' }}">
+                            <input type="hidden" name="usuarioid" value="{{ $lote->usuarioid }}">
+                        </div>
+                        @endif
 
                         <div class="form-group">
                             <label><i class="fas fa-tag mr-1"></i> Nombre del Lote <span class="text-danger">*</span></label>

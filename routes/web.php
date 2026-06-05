@@ -95,12 +95,14 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
 
     Route::prefix('catalogo-selector')->name('catalogo-selector.')->group(function () {
         Route::get('/usuarios', [CatalogoSelectorController::class, 'usuarios'])->name('usuarios');
+        Route::get('/vehiculos', [CatalogoSelectorController::class, 'vehiculos'])->name('vehiculos');
         Route::get('/cultivos', [CatalogoSelectorController::class, 'cultivos'])->name('cultivos');
         Route::get('/lotes', [CatalogoSelectorController::class, 'lotes'])->name('lotes');
         Route::get('/insumos', [CatalogoSelectorController::class, 'insumos'])->name('insumos');
         Route::get('/pedidos', [CatalogoSelectorController::class, 'pedidos'])->name('pedidos');
         Route::get('/actores', [CatalogoSelectorController::class, 'actores'])->name('actores');
         Route::get('/almacenes', [CatalogoSelectorController::class, 'almacenes'])->name('almacenes');
+        Route::get('/productos-pedido', [CatalogoSelectorController::class, 'productosPedido'])->name('productos-pedido');
         Route::get('/producciones', [CatalogoSelectorController::class, 'producciones'])->name('producciones');
         Route::get('/procesos-planta', [CatalogoSelectorController::class, 'procesosPlanta'])->name('procesos-planta');
         Route::get('/maquinas-planta', [CatalogoSelectorController::class, 'maquinasPlanta'])->name('maquinas-planta');
@@ -167,22 +169,6 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::resource('maquinas-planta', MaquinaPlantaController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
     Route::patch('maquinas-planta/{maquinas_plantum}/toggle-activo', [MaquinaPlantaController::class, 'toggleActivo'])
         ->name('maquinas-planta.toggle-activo');
-
-    // ── Registro a Planta (Entregable 10) ──
-    Route::get('registro-planta', [\App\Http\Controllers\Web\RegistroPlantaController::class, 'index'])->name('registro-planta.index');
-    Route::get('registro-planta/create', [\App\Http\Controllers\Web\RegistroPlantaController::class, 'create'])->name('registro-planta.create');
-    Route::post('registro-planta', [\App\Http\Controllers\Web\RegistroPlantaController::class, 'store'])->name('registro-planta.store');
-    Route::get('registro-planta/{lote}', [\App\Http\Controllers\Web\RegistroPlantaController::class, 'show'])->name('registro-planta.show')->where('lote', '[0-9]+');
-
-    Route::get('recepcion-planta', [\App\Http\Controllers\Web\RecepcionPlantaController::class, 'index'])
-        ->name('recepcion-planta.index')
-        ->middleware('action.permission:recepcion_planta,read');
-    Route::get('recepcion-planta/insumos-por-almacen', [\App\Http\Controllers\Web\RecepcionPlantaController::class, 'insumosPorAlmacen'])
-        ->name('recepcion-planta.insumos')
-        ->middleware('action.permission:recepcion_planta,read');
-    Route::post('recepcion-planta/{asignacion}/confirmar', [\App\Http\Controllers\Web\RecepcionPlantaController::class, 'confirmar'])
-        ->name('recepcion-planta.confirmar')
-        ->middleware('action.permission:recepcion_planta,confirm');
 
     Route::get('procesamiento', [\App\Http\Controllers\Web\LoteProduccionController::class, 'index'])
         ->name('procesamiento.index')
@@ -308,6 +294,9 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::get('pedidos/{pedido}', [PedidoController::class, 'show'])->name('pedidos.show')->middleware('action.permission:pedidos,read');
     Route::get('pedidos/{pedido}/edit', [PedidoController::class, 'edit'])->name('pedidos.edit')->middleware('action.permission:pedidos,update');
     Route::put('pedidos/{pedido}', [PedidoController::class, 'update'])->name('pedidos.update')->middleware('action.permission:pedidos,update');
+    Route::post('pedidos/{pedido}/asignar-transportista', [PedidoController::class, 'asignarTransportista'])->name('pedidos.asignar-transportista')->middleware('action.permission:pedidos,update');
+    Route::post('pedidos/{pedido}/confirmar-carga-envio', [PedidoController::class, 'confirmarCargaEnvio'])->name('pedidos.confirmar-carga-envio')->middleware('action.permission:pedidos,update');
+    Route::post('pedidos/{pedido}/confirmar-llegada-planta', [PedidoController::class, 'confirmarLlegadaPlanta'])->name('pedidos.confirmar-llegada-planta')->middleware('action.permission:recepcion_planta,confirm');
     Route::delete('pedidos/{pedido}', [PedidoController::class, 'destroy'])->name('pedidos.destroy')->middleware('action.permission:pedidos,delete');
 
     // Pedidos recibidos de planta — bandeja producción agrícola
@@ -316,6 +305,7 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::get('/{pedido}', [PedidoAgricolaController::class, 'show'])->name('show')->middleware('action.permission:pedidos,read');
         Route::post('/{pedido}/aceptar', [PedidoAgricolaController::class, 'aceptar'])->name('aceptar')->middleware('action.permission:pedidos,update');
         Route::post('/{pedido}/rechazar', [PedidoAgricolaController::class, 'rechazar'])->name('rechazar')->middleware('action.permission:pedidos,update');
+        Route::post('/{pedido}/confirmar-carga-envio', [PedidoAgricolaController::class, 'confirmarCargaEnvio'])->name('confirmar-carga-envio')->middleware('action.permission:pedidos,update');
     });
 
 
@@ -519,6 +509,18 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::post('/incidentes', [IncidenteEnvioController::class, 'store'])
             ->name('incidentes.store')
             ->middleware('action.permission:incidentes,create');
+        Route::get('/incidentes/{incidente}', [IncidenteEnvioController::class, 'show'])
+            ->name('incidentes.show')
+            ->middleware('action.permission:incidentes,read');
+        Route::get('/incidentes/{incidente}/edit', [IncidenteEnvioController::class, 'edit'])
+            ->name('incidentes.edit')
+            ->middleware('action.permission:incidentes,update');
+        Route::put('/incidentes/{incidente}', [IncidenteEnvioController::class, 'update'])
+            ->name('incidentes.update')
+            ->middleware('action.permission:incidentes,update');
+        Route::delete('/incidentes/{incidente}', [IncidenteEnvioController::class, 'destroy'])
+            ->name('incidentes.destroy')
+            ->middleware('action.permission:incidentes,delete');
         Route::patch('/incidentes/{incidente}/resolver', [IncidenteEnvioController::class, 'resolve'])
             ->name('incidentes.resolve')
             ->middleware('action.permission:incidentes,resolve');
@@ -529,6 +531,18 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::post('/documentos', [DocumentoEntregaController::class, 'store'])
             ->name('documentos.store')
             ->middleware('action.permission:documentos,create');
+        Route::get('/documentos/{documento}', [DocumentoEntregaController::class, 'show'])
+            ->name('documentos.show')
+            ->middleware('action.permission:documentos,read');
+        Route::get('/documentos/{documento}/edit', [DocumentoEntregaController::class, 'edit'])
+            ->name('documentos.edit')
+            ->middleware('action.permission:documentos,update');
+        Route::put('/documentos/{documento}', [DocumentoEntregaController::class, 'update'])
+            ->name('documentos.update')
+            ->middleware('action.permission:documentos,update');
+        Route::delete('/documentos/{documento}', [DocumentoEntregaController::class, 'destroy'])
+            ->name('documentos.destroy')
+            ->middleware('action.permission:documentos,delete');
         Route::get('/documentos/{documento}/download', [DocumentoEntregaController::class, 'download'])
             ->name('documentos.download')
             ->middleware('action.permission:documentos,read');

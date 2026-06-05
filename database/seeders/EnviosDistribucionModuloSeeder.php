@@ -448,9 +448,9 @@ class EnviosDistribucionModuloSeeder extends Seeder
         if (Schema::hasTable('documento_entrega')) {
             foreach (
                 [
-                    ['titulo' => self::MARK.' Guía ENV-MOD-26-01', 'ext' => 'ENV-MOD-26-01', 'tipo' => 'guia_entrega'],
-                    ['titulo' => self::MARK.' Nota ENV-MOD-26-03', 'ext' => 'ENV-MOD-26-03', 'tipo' => 'nota_entrega'],
-                    ['titulo' => self::MARK.' Confirmación ENV-MOD-26-04', 'ext' => 'ENV-MOD-26-04', 'tipo' => 'confirmacion_entrega'],
+                    ['titulo' => 'Guía de transporte ENV-MOD-26-01', 'ext' => 'ENV-MOD-26-01', 'tipo' => 'guia_entrega'],
+                    ['titulo' => 'Nota de entrega ENV-MOD-26-03', 'ext' => 'ENV-MOD-26-03', 'tipo' => 'nota_entrega'],
+                    ['titulo' => 'Confirmación de entrega ENV-MOD-26-04', 'ext' => 'ENV-MOD-26-04', 'tipo' => 'confirmacion_entrega'],
                 ] as $d
             ) {
                 DocumentoEntrega::updateOrCreate(
@@ -470,7 +470,7 @@ class EnviosDistribucionModuloSeeder extends Seeder
 
         if (Schema::hasTable('incidente_envio') && isset($asignaciones['ENV-MOD-26-03'])) {
             IncidenteEnvio::updateOrCreate(
-                ['descripcion' => self::MARK.' Retraso por congestión vial hacia Restaurante Verde.'],
+                ['descripcion' => 'Retraso por congestión vial hacia Restaurante Verde.'],
                 [
                     'externo_envio_id' => 'ENV-MOD-26-03',
                     'pedidoid' => $pedidoMap['ENV-MOD-26-03'] ?? null,

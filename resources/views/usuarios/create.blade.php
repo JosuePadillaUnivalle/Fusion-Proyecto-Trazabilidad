@@ -43,7 +43,10 @@
         <div class="card-body">
             <form method="POST" action="{{ route('gestion.usuario.store') }}">
                 @csrf
-                @include('usuarios.partials.form-fields', ['mostrarGuias' => true])
+                @include('usuarios.partials.form-fields', [
+                    'mostrarGuias' => ! ($modoJefe ?? false),
+                    'modoJefe' => $modoJefe ?? false,
+                ])
 
                 <div class="d-flex flex-wrap" style="gap: 8px;">
                     <button type="submit" class="btn btn-success">

@@ -947,6 +947,7 @@
     $userImgFallback = \App\Support\UsuarioAvatar::placeholder();
     $userRole    = $authUser ? ($authUser->getRoleNames()->first() ?? 'sin rol') : 'invitado';
     $isAdmin     = $authUser && ($authUser->hasRole('Admin') || $authUser->hasRole('admin'));
+    $esJefeAgr = $authUser && \App\Support\UsuarioRol::esJefeAgricultor($authUser);
     $esAgricultorOperativo = $authUser && \App\Support\UsuarioRol::debeAcotarPorAsignacion($authUser);
     $esPlantaOperativo = $authUser && \App\Support\UsuarioRol::esPlantaOperativo($authUser) && ! $isAdmin;
     $esTransportistaOperativo = $authUser && \App\Support\UsuarioRol::esTransportista($authUser) && ! $isAdmin;
@@ -1001,16 +1002,20 @@
                 </li>
 
                 @php
-                    $puedeAlmacenAgricola = $isAdmin || ($authUser && $authUser->hasRole('agricultor'));
+                    $puedeAlmacenAgricola = $isAdmin || ($authUser && $authUser->hasRole('agricultor')) || $esJefeAgr;
                     $puedeAlmacenPlanta = $isAdmin || $esPlantaOperativo;
                     $almAgrOpen = request()->routeIs('almacen-agricola.*');
                     $almPlaOpen = request()->routeIs('almacen-planta.*');
-                    $prodAgrOpen = request()->routeIs('producciones.*', 'climas.*', 'agricola.pedidos.*');
-                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'maquinas-planta.*', 'registro-planta.*', 'procesamiento.*', 'recepcion-planta.*', 'almacen-planta.*');
+                    $prodAgrOpen = request()->routeIs('producciones.*', 'climas.*');
+                    if (! ($esJefeAgr && ! $isAdmin)) {
+                        $prodAgrOpen = $prodAgrOpen || request()->routeIs('agricola.pedidos.*');
+                    }
+                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'maquinas-planta.*', 'procesamiento.*', 'almacen-planta.*', 'pedidos.*');
                     $puedeProdPlanta = $isAdmin || $esPlantaOperativo;
                     $showProdAgricola = ! $esPlantaOperativo && ! $esTransportistaOperativo && (
                         $isAdmin
-                        || $esAgricultorOperativo
+                        || $esJefeAgr
+                        || ($authUser && $authUser->hasRole('agricultor'))
                         || auth()->user()?->canany(['lotes.view','lotes.create','lotes.update','lotes.delete'])
                         || auth()->user()?->can('certificaciones.view')
                         || auth()->user()?->canany(['inventario.view','inventario.create','inventario.update','inventario.delete'])
@@ -1033,7 +1038,7 @@
                     );
                     $puedeEnvios = $isAdmin || ($authUser && $authUser->hasAnyPermission($envPerm));
                     $showOperLogistica = $isAdmin || $esTransportistaOperativo || (
-                        $puedeEnvios && ! $esPlantaOperativo && ! $esAgricultorOperativo
+                        $puedeEnvios && ! $esPlantaOperativo && ! $esAgricultorOperativo && ! $esJefeAgr
                     );
                     $showProdPlantaSection = $isAdmin || $esPlantaOperativo;
                 @endphp
@@ -1083,7 +1088,9 @@
                         <li class="ag-sub-li"><a href="{{ route('producciones.index') }}" class="ag-sub-a {{ request()->routeIs('producciones.*') ? 'active' : '' }}">Cosechas</a></li>
                         @endunless
                         @can('pedidos.view')
+                        @if(! $esJefeAgr || $isAdmin)
                         <li class="ag-sub-li"><a href="{{ route('agricola.pedidos.index') }}" class="ag-sub-a {{ request()->routeIs('agricola.pedidos.*') ? 'active' : '' }}">Pedidos de planta</a></li>
+                        @endif
                         @endcan
                         <li class="ag-sub-li"><a href="{{ route('climas.index') }}" class="ag-sub-a {{ request()->routeIs('climas.*') ? 'active' : '' }}">Clima</a></li>
                     </ul>
@@ -1123,6 +1130,17 @@
                     </ul>
                 </li>
                 @endif
+
+                @can('pedidos.view')
+                @if($esJefeAgr && ! $isAdmin)
+                <li class="ag-nav-li">
+                    <a href="{{ route('agricola.pedidos.index') }}" class="ag-nav-a {{ request()->routeIs('agricola.pedidos.*') ? 'active' : '' }}">
+                        <i class="ag-nav-icon fas fa-shopping-cart"></i>
+                        <span class="ag-nav-text">Pedidos</span>
+                    </a>
+                </li>
+                @endif
+                @endcan
                 @endif
 
                 @if($showOperLogistica)
@@ -1141,7 +1159,7 @@
                         <i class="ag-nav-arrow fas fa-chevron-right"></i>
                     </a>
                     <ul class="ag-subnav {{ $envOpen ? 'open' : '' }}" id="sub-env">
-                        @can('asignaciones.view')
+                        @can('asignaciones.create')
                         <li class="ag-sub-li"><a href="{{ route('logistica.asignaciones.create') }}" class="ag-sub-a {{ request()->routeIs('logistica.asignaciones.*') ? 'active' : '' }}">Asignar envíos</a></li>
                         @endcan
                         @if($isAdmin || auth()->user()?->can('rutas_multi.create'))
@@ -1159,7 +1177,7 @@
                         @can('incidentes.view')
                         <li class="ag-sub-li"><a href="{{ route('logistica.incidentes.index') }}" class="ag-sub-a {{ request()->routeIs('logistica.incidentes.*') ? 'active' : '' }}">Incidentes</a></li>
                         @endcan
-                        @if($isAdmin || auth()->user()?->can('envios.view'))
+                        @if(($isAdmin || auth()->user()?->can('envios.view')) && !auth()->user()?->hasRole('transportista'))
                         <li class="ag-sub-li"><a href="{{ route('envios.reportes-distribucion') }}" class="ag-sub-a {{ request()->routeIs('envios.reportes-distribucion') ? 'active' : '' }}">Reportes distribución</a></li>
                         @endif
                         @can('pedidos.view')
@@ -1186,10 +1204,6 @@
                     </a>
                     <ul class="ag-subnav {{ $prodPlaMenuOpen ? 'open' : '' }}" id="sub-prod-pla">
                         @if($puedeProdPlanta)
-                        <li class="ag-sub-li"><a href="{{ route('registro-planta.index') }}" class="ag-sub-a {{ request()->routeIs('registro-planta.*') ? 'active' : '' }}">Registro a Planta</a></li>
-                        @can('recepcion_planta.view')
-                        <li class="ag-sub-li"><a href="{{ route('recepcion-planta.index') }}" class="ag-sub-a {{ request()->routeIs('recepcion-planta.*') ? 'active' : '' }}">Recepción en planta</a></li>
-                        @endcan
                         @can('lote_produccion.view')
                         <li class="ag-sub-li"><a href="{{ route('procesamiento.index') }}" class="ag-sub-a {{ request()->routeIs('procesamiento.*') ? 'active' : '' }}">Procesamiento de Lote</a></li>
                         @endcan
@@ -1218,6 +1232,17 @@
                 @endif
                 @endif
 
+                @can('pedidos.view')
+                @if($esPlantaOperativo && ! $isAdmin)
+                <li class="ag-nav-li">
+                    <a href="{{ route('pedidos.index') }}" class="ag-nav-a {{ request()->routeIs('pedidos.*') ? 'active' : '' }}">
+                        <i class="ag-nav-icon fas fa-shopping-cart"></i>
+                        <span class="ag-nav-text">Pedidos</span>
+                    </a>
+                </li>
+                @endif
+                @endcan
+
                 {{-- Ventas (no-admin global) --}}
                 @if(!$isAdmin)
                     @can('ventas.view')
@@ -1226,9 +1251,9 @@
                 @endif
 
                 @if($isAdmin || auth()->user()?->can('usuarios.view'))
-                <span class="ag-nav-label">Administración</span>
+                <span class="ag-nav-label">{{ ($esJefeAgr || ($authUser && $authUser->hasRole('jefe_planta'))) && ! $isAdmin ? 'Equipo' : 'Administración' }}</span>
 
-                @if($pendientesSolicitudes > 0)
+                @if($isAdmin && $pendientesSolicitudes > 0)
                 <li class="ag-nav-li">
                     <a href="{{ route('gestion.index', ['estado' => 'pendiente']) }}" class="ag-nav-a {{ request('estado') === 'pendiente' ? 'active' : '' }}">
                         <i class="ag-nav-icon fas fa-user-clock"></i>

@@ -51,8 +51,8 @@
                 <div class="row">
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-primary btn-block quick-link" href="{{ route('envios.mandar') }}"><i class="fas fa-plus-circle"></i>Crear envío</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-info btn-block quick-link" href="{{ route('envios.seguimiento') }}"><i class="fas fa-truck"></i>Mis envíos</a></div>
-                    @can('recepcion_planta.view')
-                    <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-success btn-block quick-link" href="{{ route('recepcion-planta.index') }}"><i class="fas fa-warehouse"></i>Recepción en planta</a></div>
+                    @can('pedidos.view')
+                    <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-success btn-block quick-link" href="{{ route('pedidos.index') }}"><i class="fas fa-clipboard-list"></i>Gestión de pedidos</a></div>
                     @endcan
                     @can('lote_produccion.view')
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-primary btn-block quick-link" href="{{ route('procesamiento.index') }}"><i class="fas fa-industry"></i>Procesamiento de Lote</a></div>

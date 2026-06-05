@@ -211,7 +211,7 @@ class PanelesPorRolModuloSeeder extends Seeder
         }
 
         DocumentoEntrega::updateOrCreate(
-            ['titulo' => self::MARK.' Guía Carlos MOD-PANEL-ENV-01'],
+            ['titulo' => 'Guía de entrega ENV-01 — Carlos Mamani'],
             [
                 'externo_envio_id' => 'MOD-PANEL-ENV-01',
                 'usuarioid' => $carlos->usuarioid,
@@ -223,7 +223,7 @@ class PanelesPorRolModuloSeeder extends Seeder
         );
 
         DocumentoEntrega::updateOrCreate(
-            ['titulo' => self::MARK.' Confirmación Carlos MOD-PANEL-ENV-03'],
+            ['titulo' => 'Confirmación de entrega ENV-03 — Carlos Mamani'],
             [
                 'externo_envio_id' => 'MOD-PANEL-ENV-03',
                 'usuarioid' => $carlos->usuarioid,
@@ -235,7 +235,7 @@ class PanelesPorRolModuloSeeder extends Seeder
         );
 
         IncidenteEnvio::updateOrCreate(
-            ['descripcion' => self::MARK.' Carlos: demora en acceso a zona Equipetrol (MOD-PANEL-ENV-02).'],
+            ['descripcion' => 'Demora en acceso a zona Equipetrol por congestión vial.'],
             [
                 'externo_envio_id' => 'MOD-PANEL-ENV-02',
                 'reportadopor_usuarioid' => $carlos->usuarioid,
@@ -271,7 +271,7 @@ class PanelesPorRolModuloSeeder extends Seeder
         }
 
         DocumentoEntrega::updateOrCreate(
-            ['titulo' => self::MARK.' Nota entrega almacén central'],
+            ['titulo' => 'Nota recepción panel almacén'],
             [
                 'externo_envio_id' => 'MOD-PANEL-ALM-01',
                 'usuarioid' => $almacenUser->usuarioid,
@@ -283,7 +283,7 @@ class PanelesPorRolModuloSeeder extends Seeder
         );
 
         IncidenteEnvio::updateOrCreate(
-            ['descripcion' => self::MARK.' Almacén: diferencia de peso en recepción MOD-PANEL-ALM-02.'],
+            ['descripcion' => 'Diferencia de peso detectada en recepción de mercadería.'],
             [
                 'externo_envio_id' => 'MOD-PANEL-ALM-02',
                 'reportadopor_usuarioid' => $almacenUser->usuarioid,

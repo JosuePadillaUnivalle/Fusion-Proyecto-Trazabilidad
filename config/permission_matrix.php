@@ -304,6 +304,58 @@ return [
 
         'admin' => ['*'],
 
+        'jefe_agricultor' => [
+
+            'panel_agricultor.view',
+
+            'lotes.view',
+
+            'lotes.create',
+
+            'lotes.update',
+
+            'lotes.delete',
+
+            'certificaciones.view',
+
+            'certificaciones.create',
+
+            'certificaciones.update',
+
+            'certificaciones.delete',
+
+            'inventario.view',
+
+            'inventario.create',
+
+            'inventario.update',
+
+            'inventario.delete',
+
+            'pedidos.view',
+
+            'pedidos.create',
+
+            'pedidos.update',
+
+            'almacen.movimientos.view',
+
+            'almacen.ingresos.create',
+
+            'almacen.salidas.create',
+
+            'almacen.reportes.view',
+
+            'usuarios.view',
+
+            'usuarios.create',
+
+            'usuarios.update',
+
+            'usuarios.delete',
+
+        ],
+
         'agricultor' => [
 
             'panel_agricultor.view',
@@ -382,6 +434,8 @@ return [
 
             'inventario.update',
 
+            'inventario.delete',
+
             'almacen.movimientos.view',
 
             'almacen.ingresos.create',
@@ -389,6 +443,22 @@ return [
             'almacen.salidas.create',
 
             'almacen.reportes.view',
+
+            'pedidos.view',
+
+            'pedidos.create',
+
+            'pedidos.update',
+
+            'pedidos.delete',
+
+            'usuarios.view',
+
+            'usuarios.create',
+
+            'usuarios.update',
+
+            'usuarios.delete',
 
         ],
 
@@ -408,9 +478,19 @@ return [
 
             'documentos.create',
 
+            'documentos.update',
+
+            'documentos.delete',
+
             'incidentes.view',
 
             'incidentes.create',
+
+            'incidentes.update',
+
+            'incidentes.delete',
+
+            'pedidos.view',
 
             'monitoreo.view',
 

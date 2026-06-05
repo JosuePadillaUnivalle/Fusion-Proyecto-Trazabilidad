@@ -15,9 +15,6 @@
 
 <section class="content">
     <div class="container-fluid">
-        @if(session('success'))
-            <div class="alert alert-success">{{ session('success') }}</div>
-        @endif
         @if(session('error'))
             <div class="alert alert-danger">{{ session('error') }}</div>
         @endif
@@ -127,6 +124,12 @@
                         </ul>
                     </div>
                 @endif
+
+                @include('partials.pedido-envio-logistica', [
+                    'pedido' => $pedido,
+                    'mostrarConfirmarCarga' => true,
+                    'rutaConfirmarCarga' => route('agricola.pedidos.confirmar-carga-envio', $pedido),
+                ])
             </div>
 
             <div class="col-lg-4">
@@ -136,24 +139,29 @@
                         <div class="card-body">
                             <p class="text-muted small">
                                 Al aceptar se reservará y descontará stock del almacén agrícola.
-                                Logística podrá asignar transportista después.
+                                Luego, se podrá asignar un transportista.
                             </p>
-                            <form method="POST" action="{{ route('agricola.pedidos.aceptar', $pedido) }}" class="mb-3"
-                                  onsubmit="return confirm('¿Confirma que puede ir a recoger este pedido y reservar el stock del almacén agrícola?')">
+                            <form method="POST" action="{{ route('agricola.pedidos.aceptar', $pedido) }}" class="mb-3">
                                 @csrf
-                                <button type="submit" class="btn btn-success btn-block btn-lg" @disabled($erroresStock !== [])>
+                                <button type="button" class="btn btn-success btn-block btn-lg" @disabled($erroresStock !== [])
+                                        data-confirm-modal
+                                        data-confirm-tone="success"
+                                        data-confirm-title="Confirmar aceptación del pedido"
+                                        data-confirm-message="¿Confirma que puede ir a recoger este pedido y reservar el stock del almacén agrícola?">
                                     <i class="fas fa-check mr-1"></i> Aceptar y reservar
                                 </button>
                             </form>
                             <hr>
-                            <form method="POST" action="{{ route('agricola.pedidos.rechazar', $pedido) }}"
-                                  onsubmit="return confirm('¿Rechazar este pedido? Logística no podrá asignarlo.')">
+                            <form method="POST" action="{{ route('agricola.pedidos.rechazar', $pedido) }}">
                                 @csrf
                                 <div class="form-group">
                                     <label class="small">Motivo (opcional)</label>
                                     <textarea name="motivo_rechazo" class="form-control" rows="2" maxlength="500" placeholder="Ej: stock insuficiente"></textarea>
                                 </div>
-                                <button type="submit" class="btn btn-outline-danger btn-block">
+                                <button type="button" class="btn btn-outline-danger btn-block"
+                                        data-confirm-modal
+                                        data-confirm-title="Rechazar pedido"
+                                        data-confirm-message="¿Rechazar este pedido? No se podrá asignar transportista después.">
                                     <i class="fas fa-times mr-1"></i> Rechazar pedido
                                 </button>
                             </form>
@@ -162,13 +170,26 @@
                 @else
                     <div class="card">
                         <div class="card-body">
-                            @if($pedido->estado === 'confirmado' || $pedido->estado === 'en produccion')
-                                <p class="text-success mb-0">
-                                    <i class="fas fa-truck mr-1"></i>
-                                    Stock reservado. Logística puede asignar transportista en <strong>Envíos → Asignar envíos</strong>.
-                                </p>
-                            @elseif($pedido->estado === 'rechazado')
+                            @if($pedido->estado === 'rechazado')
                                 <p class="text-danger mb-0">Pedido rechazado. El envío quedó cancelado para logística.</p>
+                            @elseif($pedido->envioAsignacion?->transportista_usuarioid)
+                                @php $log = \App\Support\EnvioPedidoService::datosLogistica($pedido->envioAsignacion); @endphp
+                                @if($log && $log['cargado_en_ruta'])
+                                    <p class="text-info mb-0">
+                                        <i class="fas fa-shipping-fast mr-1"></i>
+                                        Pedido cargado. En camino hacia planta con <strong>{{ $log['transportista_nombre'] }}</strong>.
+                                    </p>
+                                @else
+                                    <p class="text-primary mb-0">
+                                        <i class="fas fa-truck mr-1"></i>
+                                        Transportista asignado. Pendiente de carga en almacén agrícola.
+                                    </p>
+                                @endif
+                            @elseif($pedido->estado === 'confirmado' || $pedido->estado === 'en produccion')
+                                <p class="text-success mb-0">
+                                    <i class="fas fa-check mr-1"></i>
+                                    Stock reservado. Planta puede asignar transportista.
+                                </p>
                             @endif
                         </div>
                     </div>
@@ -181,4 +202,6 @@
         </div>
     </div>
 </section>
+
+@include('partials.modal-confirmar-accion')
 @endsection

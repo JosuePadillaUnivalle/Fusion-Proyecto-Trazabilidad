@@ -41,6 +41,7 @@ class Usuario extends Authenticatable
         'tipo_licencia',
         'passwordhash',
         'role',
+        'supervisor_usuarioid',
         'imagenurl',
         'informacionadicional',
         'carta_motivacion',
@@ -65,6 +66,7 @@ class Usuario extends Authenticatable
     protected $casts = [
         'usuarioid' => 'integer',
         'almacenid' => 'integer',
+        'supervisor_usuarioid' => 'integer',
         'activo' => 'boolean',
         'bienvenida_vista' => 'boolean',
         'nombreusuario_editado' => 'boolean',
@@ -124,5 +126,15 @@ class Usuario extends Authenticatable
     public function perfilTransportista()
     {
         return $this->hasOne(PerfilTransportista::class, 'usuarioid', 'usuarioid');
+    }
+
+    public function supervisor()
+    {
+        return $this->belongsTo(self::class, 'supervisor_usuarioid', 'usuarioid');
+    }
+
+    public function empleados()
+    {
+        return $this->hasMany(self::class, 'supervisor_usuarioid', 'usuarioid');
     }
 }

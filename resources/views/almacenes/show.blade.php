@@ -66,8 +66,21 @@
 
 }
 
-#mapaDetalleAlmacen {
+.page-almacen-show .contenido-acciones {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.25rem;
+    justify-content: center;
+}
 
+.page-almacen-show .contenido-acciones .btn {
+    padding: 0.2rem 0.45rem;
+    line-height: 1.2;
+    font-size: 0.85rem;
+}
+
+#mapaDetalleAlmacen {
     height: 220px;
 
     min-height: 220px;
@@ -388,6 +401,8 @@
 
                         <th class="text-right">Cantidad</th><th class="text-right">Equivalente (kg)</th><th>Detalle</th>
 
+                        <th class="text-center text-nowrap">Acciones</th>
+
                     </tr>
 
                 </thead>
@@ -410,13 +425,46 @@
 
                             <td class="text-muted small">{{ $item->detalle }}</td>
 
+                            <td class="text-center text-nowrap">
+                                <div class="contenido-acciones">
+                                    @if($item->categoria === 'insumo' && ! empty($item->insumoid))
+                                        <a href="{{ route('insumos.show', $item->insumoid) }}" class="btn btn-sm btn-outline-info" title="Ver"><i class="fas fa-eye"></i></a>
+                                        @can('inventario.update')
+                                        <a href="{{ route('insumos.edit', $item->insumoid) }}" class="btn btn-sm btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>
+                                        @endcan
+                                        @can('inventario.delete')
+                                        <form action="{{ route('insumos.destroy', $item->insumoid) }}" method="POST" class="d-inline m-0 on-submit-confirm" data-confirm-title="¿Eliminar insumo?" data-confirm-text="Se quitará este insumo del inventario.">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
+                                        </form>
+                                        @endcan
+                                    @elseif($item->categoria === 'cosecha' && ! empty($item->produccionid))
+                                        <a href="{{ route('producciones.show', $item->produccionid) }}" class="btn btn-sm btn-outline-info" title="Ver"><i class="fas fa-eye"></i></a>
+                                        <a href="{{ route('producciones.edit', $item->produccionid) }}" class="btn btn-sm btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>
+                                        <form action="{{ route('producciones.destroy', $item->produccionid) }}" method="POST" class="d-inline m-0 on-submit-confirm" data-confirm-title="¿Eliminar cosecha?" data-confirm-text="Se eliminará el registro de producción y su almacenamiento.">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
+                                        </form>
+                                    @elseif($item->categoria === 'producto_planta' && ! empty($item->lote_produccion_pedido_id))
+                                        <a href="{{ route('procesamiento.show', $item->lote_produccion_pedido_id) }}" class="btn btn-sm btn-outline-info" title="Ver"><i class="fas fa-eye"></i></a>
+                                        <a href="{{ route('procesamiento.edit', $item->lote_produccion_pedido_id) }}" class="btn btn-sm btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>
+                                        <form action="{{ route('procesamiento.destroy', $item->lote_produccion_pedido_id) }}" method="POST" class="d-inline m-0 on-submit-confirm" data-confirm-title="¿Eliminar lote de procesamiento?" data-confirm-text="Esta acción no se puede deshacer.">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
+                                        </form>
+                                    @else
+                                        <span class="text-muted small">—</span>
+                                    @endif
+                                </div>
+                            </td>
+
                         </tr>
 
                     @empty
 
                         <tr id="contenidoEmptyRow">
 
-                            <td colspan="6" class="text-center text-muted py-4">
+                            <td colspan="7" class="text-center text-muted py-4">
 
                                 <i class="fas fa-inbox fa-2x mb-2 d-block text-light"></i>
 
@@ -553,6 +601,32 @@
     if (fCat) fCat.addEventListener('change', aplicarFiltroContenido);
 
     if (fTipo) fTipo.addEventListener('change', aplicarFiltroContenido);
+
+    document.querySelectorAll('.on-submit-confirm').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var el = this;
+            if (typeof Swal === 'undefined') {
+                if (confirm(el.dataset.confirmText || '¿Confirmar eliminación?')) {
+                    el.submit();
+                }
+                return;
+            }
+            Swal.fire({
+                title: el.dataset.confirmTitle || '¿Eliminar?',
+                text: el.dataset.confirmText || 'Esta acción no se puede deshacer.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, eliminar'
+            }).then(function (result) {
+                if (result.isConfirmed) {
+                    el.submit();
+                }
+            });
+        });
+    });
 
 })();
 

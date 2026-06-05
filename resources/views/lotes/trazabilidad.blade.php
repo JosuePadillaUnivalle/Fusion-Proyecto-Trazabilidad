@@ -74,7 +74,18 @@
                 @endforeach
             </div>
 
-            @if(!empty($url_siguiente_fase) && !empty($siguiente_fase_label))
+            @if($fase_actual === 'en_crecimiento' && ! empty($url_asignar_actividad))
+                <div class="text-center mb-3 d-flex flex-wrap justify-content-center" style="gap: 8px;">
+                    <a href="{{ $url_asignar_actividad }}" class="btn btn-outline-success btn-sm">
+                        <i class="fas fa-tasks mr-1"></i> Asignar actividad
+                    </a>
+                    @if(!empty($url_siguiente_fase) && !empty($siguiente_fase_label))
+                    <a href="{{ $url_siguiente_fase }}" class="btn btn-success btn-sm">
+                        <i class="fas fa-forward mr-1"></i> Ir a {{ $siguiente_fase_label }}
+                    </a>
+                    @endif
+                </div>
+            @elseif(!empty($url_siguiente_fase) && !empty($siguiente_fase_label))
                 <div class="text-center mb-3">
                     <a href="{{ $url_siguiente_fase }}" class="btn btn-success btn-sm">
                         <i class="fas fa-forward mr-1"></i> Ir a {{ $siguiente_fase_label }}

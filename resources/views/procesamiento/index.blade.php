@@ -276,16 +276,17 @@
                     </div>
 
                     <div class="lote-section">
-                        <div class="lote-section-title"><i class="fas fa-balance-scale mr-1"></i> Cantidad objetivo</div>
+                        <div class="lote-section-title"><i class="fas fa-balance-scale mr-1"></i> Cantidad objetivo <span class="text-muted font-weight-normal">(referencia; purés se calculan de la MP)</span></div>
                         <div class="input-group">
-                            <input type="number" name="cantidad_objetivo" class="form-control" step="0.01" min="0" value="{{ old('cantidad_objetivo') }}" placeholder="500">
-                            <select name="unidadmedidaid" class="custom-select" style="max-width:140px;">
+                            <input type="number" name="cantidad_objetivo" id="cantidadObjetivoLote" class="form-control" step="0.01" min="0" value="{{ old('cantidad_objetivo') }}" placeholder="Opcional">
+                            <select name="unidadmedidaid" id="unidadObjetivoLote" class="custom-select" style="max-width:140px;">
                                 <option value="">Unidad</option>
                                 @foreach($unidadesMedida as $um)
-                                    <option value="{{ $um->unidadmedidaid }}" @selected(old('unidadmedidaid') == $um->unidadmedidaid)>{{ $um->abreviatura ?? $um->nombre }}</option>
+                                    <option value="{{ $um->unidadmedidaid }}" data-abbr="{{ strtolower($um->abreviatura ?? $um->nombre) }}" @selected(old('unidadmedidaid') == $um->unidadmedidaid)>{{ $um->abreviatura ?? $um->nombre }}</option>
                                 @endforeach
                             </select>
                         </div>
+                        <small id="hintCantidadObjetivo" class="text-muted d-none mt-1">Para purés, la cantidad en unidades y el peso se calculan al almacenar según la materia prima usada (~85&nbsp;% rendimiento, envases de 300&nbsp;g).</small>
                     </div>
 
                     <div class="lote-section mb-0">
@@ -414,8 +415,24 @@
     productoInput?.addEventListener('input', function () {
         clearTimeout(previewTimer);
         previewTimer = setTimeout(actualizarNombrePreview, 280);
+        actualizarHintCantidadObjetivo();
     });
-    productoInput?.addEventListener('change', actualizarNombrePreview);
+    productoInput?.addEventListener('change', function () {
+        actualizarNombrePreview();
+        actualizarHintCantidadObjetivo();
+    });
+
+    function actualizarHintCantidadObjetivo() {
+        const producto = (productoInput?.value || '').toLowerCase();
+        const esPure = producto.includes('puré') || producto.includes('pure');
+        const hint = document.getElementById('hintCantidadObjetivo');
+        const selectUm = document.getElementById('unidadObjetivoLote');
+        if (hint) hint.classList.toggle('d-none', !esPure);
+        if (esPure && selectUm) {
+            const optUnd = Array.from(selectUm.options).find(o => (o.dataset.abbr || '').includes('und') || (o.textContent || '').toLowerCase().includes('und'));
+            if (optUnd) selectUm.value = optUnd.value;
+        }
+    }
 
     document.addEventListener('DOMContentLoaded', function () {
         if (!window.CatalogoSelector) return;

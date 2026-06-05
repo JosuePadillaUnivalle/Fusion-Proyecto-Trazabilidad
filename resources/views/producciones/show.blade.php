@@ -50,21 +50,25 @@
         background: white;
         border-radius: 12px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        padding: 20px;
-        height: 100%;
-        margin-bottom: 20px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
     }
 
     .info-card h5 {
         color: var(--primary-color);
         font-weight: 600;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
         border-bottom: 2px solid #f1f3f4;
+        font-size: 1rem;
     }
 
     .info-item {
-        margin-bottom: 15px;
+        margin-bottom: 10px;
+    }
+
+    .info-item:last-child {
+        margin-bottom: 0;
     }
 
     .info-item label {
@@ -82,9 +86,14 @@
     }
 
     .btn-action {
-        padding: 10px 25px;
+        padding: 8px 16px;
         border-radius: 8px;
         font-weight: 500;
+        font-size: 0.9rem;
+    }
+
+    .sidebar-stack .info-card {
+        margin-bottom: 10px;
     }
 
     .produccion-image {
@@ -96,8 +105,8 @@
     .almacen-item {
         background: #f8f9fc;
         border-radius: 8px;
-        padding: 12px;
-        margin-bottom: 10px;
+        padding: 10px 12px;
+        margin-bottom: 0;
     }
 </style>
 @endpush
@@ -162,8 +171,23 @@
                 </div>
                 <div class="col-md-6">
                     <div class="info-item">
-                        <label><i class="fas fa-warehouse mr-1"></i> Destino</label>
-                        <span><span class="badge badge-info">{{ $produccion->destino->nombre ?? 'No especificado' }}</span></span>
+                        <label><i class="fas fa-warehouse mr-1"></i> Almacén</label>
+                        @php
+                            $almacenActivo = $produccion->almacenamientos
+                                ?->whereNull('fechasalida')
+                                ->sortByDesc('fechaentrada')
+                                ->first();
+                        @endphp
+                        <span>
+                            @if($almacenActivo?->almacen)
+                                <span class="badge badge-info">{{ $almacenActivo->almacen->nombre }}</span>
+                                @if($almacenActivo->almacen->ubicacion)
+                                    <br><small class="text-muted">{{ $almacenActivo->almacen->ubicacion }}</small>
+                                @endif
+                            @else
+                                <span class="text-muted">Sin almacén asignado</span>
+                            @endif
+                        </span>
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -174,30 +198,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Almacenamiento -->
-        @if($produccion->almacenamientos && $produccion->almacenamientos->count() > 0)
-            <div class="info-card">
-                <h5><i class="fas fa-warehouse mr-2"></i>Almacenamiento</h5>
-                
-                @foreach($produccion->almacenamientos as $almacenamiento)
-                    <div class="almacen-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong><i class="fas fa-box mr-1"></i> {{ $almacenamiento->almacen->nombre ?? 'Almacén' }}</strong>
-                                <br>
-                                <small class="text-muted">{{ $almacenamiento->almacen->ubicacion ?? '' }}</small>
-                            </div>
-                            <div class="text-right">
-                                <span class="badge badge-success" style="font-size: 1rem;">
-                                    {{ number_format($almacenamiento->cantidad ?? 0, 2) }} kg
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        @endif
 
         <!-- Observaciones -->
         @if($produccion->observaciones)
@@ -219,7 +219,7 @@
     </div>
 
     <!-- Panel Lateral -->
-    <div class="col-lg-4">
+    <div class="col-lg-4 sidebar-stack">
         <!-- Lote Asociado -->
         <div class="info-card">
             <h5><i class="fas fa-map-marked-alt mr-2"></i>Lote</h5>

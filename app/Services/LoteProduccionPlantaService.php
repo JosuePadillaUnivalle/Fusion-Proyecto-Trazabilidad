@@ -15,6 +15,7 @@ use App\Models\Usuario;
 use App\Support\AlmacenAmbito;
 use App\Support\LoteProduccionNombre;
 use App\Support\LoteProduccionTrazabilidadService;
+use App\Support\ProductoPlantaCatalogo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -48,6 +49,7 @@ class LoteProduccionPlantaService
         }
 
         $tipoSalida = $this->tipoMovimientoSalidaProduccion();
+        $unidadmedidaid = ProductoPlantaCatalogo::resolverUnidadMedidaId($producto, $unidadmedidaid);
 
         return DB::transaction(function () use ($usuario, $producto, $nombre, $pedidoid, $cantidadObjetivo, $unidadmedidaid, $lineas, $observaciones, $tipoSalida) {
             $pedidoIdFinal = $pedidoid ?? $this->crearPedidoInterno($nombre);
@@ -291,6 +293,17 @@ class LoteProduccionPlantaService
         }
 
         return DB::transaction(function () use ($usuario, $lote, $pedidoid, $cantidadObjetivo, $unidadmedidaid, $observaciones, $producto, $lineas, $fase) {
+            $productoReferencia = $producto !== null
+                ? LoteProduccionNombre::normalizarProducto($producto)
+                : LoteProduccionNombre::productoDesdeLote($lote);
+
+            if ($unidadmedidaid !== null || $producto !== null) {
+                $unidadmedidaid = ProductoPlantaCatalogo::resolverUnidadMedidaId(
+                    $productoReferencia,
+                    $unidadmedidaid ?? $lote->unidadmedidaid
+                );
+            }
+
             $payload = [
                 'pedidoid' => $pedidoid,
                 'cantidad_objetivo' => $cantidadObjetivo,

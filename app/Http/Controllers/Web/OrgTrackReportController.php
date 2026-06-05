@@ -15,6 +15,8 @@ class OrgTrackReportController extends Controller
 {
     public function index(Request $request): View
     {
+        abort_if($request->user()?->hasRole('transportista'), 403);
+
         $counts = [
             'total' => EnvioAsignacionMultiple::count(),
             'pendientes' => EnvioAsignacionMultiple::where('estado', 'pendiente')->count(),
@@ -55,6 +57,9 @@ class OrgTrackReportController extends Controller
         arsort($porEstado);
         arsort($porDestino);
 
+        $estadosLista = array_keys($porEstado);
+        $destinosLista = array_keys($porDestino);
+
         $enviosPorTransportistaId = [];
         $asignaciones = EnvioAsignacionMultiple::query()
             ->with(['transportista', 'pedido'])
@@ -83,6 +88,8 @@ class OrgTrackReportController extends Controller
             'enviosPorEstado',
             'enviosPorDestino',
             'enviosPorTransportistaId',
+            'estadosLista',
+            'destinosLista',
         ));
     }
 }

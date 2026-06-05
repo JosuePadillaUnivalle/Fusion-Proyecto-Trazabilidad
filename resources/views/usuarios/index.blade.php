@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Gestión de usuarios | AgroFusion')
-@section('page_title', 'Gestión de usuarios')
+@section('title', ($tituloGestion ?? 'Gestión de usuarios').' | AgroFusion')
+@section('page_title', $tituloGestion ?? 'Gestión de usuarios')
 
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
@@ -214,12 +214,13 @@
 @endpush
 
 @section('content')
+@php $modoJefe = $modoJefe ?? false; @endphp
 <div class="modulo-usu usu-index-page">
 
     <div class="usu-index-stats">
         <div class="usu-index-stat green">
             <h3>{{ $stats['total'] ?? 0 }}</h3>
-            <p>Total usuarios</p>
+            <p>{{ $modoJefe ? 'Total empleados' : 'Total usuarios' }}</p>
             <i class="fas fa-users"></i>
         </div>
         <div class="usu-index-stat blue">
@@ -227,6 +228,7 @@
             <p>Activos</p>
             <i class="fas fa-user-check"></i>
         </div>
+        @unless($modoJefe)
         <div class="usu-index-stat yellow">
             <h3>{{ $stats['pendientes'] ?? 0 }}</h3>
             <p>Pendientes</p>
@@ -237,11 +239,12 @@
             <p>Roles</p>
             <i class="fas fa-user-shield"></i>
         </div>
+        @endunless
     </div>
 
     <div class="usu-index-card">
         <div class="usu-index-card-head">
-            <h2><i class="fas fa-users"></i> Usuarios del sistema</h2>
+            <h2><i class="fas fa-users"></i> {{ $tituloGestion ?? 'Usuarios del sistema' }}</h2>
             <div class="usu-index-head-actions">
                 <span class="usu-index-count">{{ $usuarios->total() }} {{ $usuarios->total() === 1 ? 'registro' : 'registros' }}</span>
                 @can('usuarios.create')
@@ -260,6 +263,7 @@
                         <input type="text" id="buscar" name="buscar" class="form-control"
                             value="{{ request('buscar') }}" placeholder="Nombre, correo, usuario…">
                     </div>
+                    @unless($modoJefe)
                     <div class="col-lg-2 col-md-6 mb-2 mb-lg-0">
                         <label for="rol">Rol</label>
                         <select name="rol" id="rol" class="form-control">
@@ -277,6 +281,8 @@
                             <option value="pendiente" @selected(request('estado') === 'pendiente')>Pendientes</option>
                         </select>
                     </div>
+                    @endunless
+                    @if($modoJefe && $lotes->isNotEmpty())
                     <div class="col-lg-3 col-md-6 mb-2 mb-lg-0">
                         <label for="lote"><i class="fas fa-map-marked-alt mr-1"></i> Lote asignado</label>
                         <select name="lote" id="lote" class="form-control">
@@ -288,7 +294,20 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-lg-2 col-md-12 mb-2 mb-lg-0 usu-index-filtro-actions d-flex" style="gap:6px;">
+                    @elseif(! $modoJefe)
+                    <div class="col-lg-3 col-md-6 mb-2 mb-lg-0">
+                        <label for="lote"><i class="fas fa-map-marked-alt mr-1"></i> Lote asignado</label>
+                        <select name="lote" id="lote" class="form-control">
+                            <option value="">Todos los lotes</option>
+                            @foreach($lotes as $lote)
+                                <option value="{{ $lote->loteid }}" @selected(request('lote') == $lote->loteid)>
+                                    {{ $lote->nombre }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
+                    <div class="col-lg-{{ $modoJefe ? '3' : '2' }} col-md-12 mb-2 mb-lg-0 usu-index-filtro-actions d-flex" style="gap:6px;">
                         <button type="submit" class="btn btn-apply flex-grow-1">
                             <i class="fas fa-search mr-1"></i> Aplicar
                         </button>

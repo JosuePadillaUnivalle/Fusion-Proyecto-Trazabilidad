@@ -29,6 +29,7 @@ class LoteTrazabilidadService
     private const FASES_EVENTO_EXTRA = [
         'regado' => ['label' => 'Regado', 'color' => '#28a745', 'icon' => 'tint'],
         'fumigacion' => ['label' => 'Fumigación', 'color' => '#fd7e14', 'icon' => 'spray-can'],
+        'fertilizacion' => ['label' => 'Fertilización', 'color' => '#20c997', 'icon' => 'flask'],
     ];
 
     /** @var array<string, string> */
@@ -151,6 +152,26 @@ class LoteTrazabilidadService
     }
 
     /**
+     * URL para registrar actividades de la fase «En crecimiento» (sin saltar a cosecha).
+     */
+    public function urlAsignarActividadEnCrecimiento(Lote $lote): string
+    {
+        $return = route('lotes.trazabilidad', $lote);
+        $params = [
+            'loteid' => $lote->loteid,
+            'return' => $return,
+        ];
+
+        $tipoSugerido = $this->siguienteTipoActividadCrecimiento($lote);
+        if ($tipoSugerido !== null) {
+            $params['tipo'] = $tipoSugerido;
+            $params['completar'] = 1;
+        }
+
+        return route('actividades.create', $params);
+    }
+
+    /**
      * URL directa para registrar la fase indicada (usada en el botón «siguiente» del pipeline).
      */
     public function urlAccionFase(Lote $lote, string $faseKey): ?string
@@ -164,24 +185,7 @@ class LoteTrazabilidadService
                 'return' => $return,
                 'completar' => 1,
             ]),
-            'en_crecimiento' => match (true) {
-                ! $this->milestoneRegado($lote) => route('actividades.create', [
-                    'loteid' => $lote->loteid,
-                    'tipo' => 'Riego',
-                    'return' => $return,
-                    'completar' => 1,
-                ]),
-                ! $this->milestoneFumigacion($lote) => route('actividades.create', [
-                    'loteid' => $lote->loteid,
-                    'tipo' => 'Control de plagas',
-                    'return' => $return,
-                    'completar' => 1,
-                ]),
-                default => route('producciones.create', [
-                    'loteid' => $lote->loteid,
-                    'return' => $return,
-                ]),
-            },
+            'en_crecimiento' => $this->urlAsignarActividadEnCrecimiento($lote),
             'cosecha' => route('producciones.create', [
                 'loteid' => $lote->loteid,
                 'return' => $return,
@@ -192,6 +196,63 @@ class LoteTrazabilidadService
             ]),
             default => null,
         };
+    }
+
+    public function siguienteTipoActividadCrecimiento(Lote $lote): ?string
+    {
+        $lote->loadMissing('actividades.tipoActividad');
+
+        if (! $this->milestoneRegado($lote)) {
+            return 'Riego';
+        }
+        if (! $this->milestoneFumigacion($lote)) {
+            return 'Control de plagas';
+        }
+        if (! $this->milestoneFertilizacion($lote)) {
+            return 'Fertilización';
+        }
+
+        return null;
+    }
+
+    public function actividadesCrecimientoCompletas(Lote $lote): bool
+    {
+        $lote->loadMissing('actividades.tipoActividad');
+
+        return $this->milestoneRegado($lote)
+            && $this->milestoneFumigacion($lote)
+            && $this->milestoneFertilizacion($lote);
+    }
+
+    /** @return list<string> */
+    public function actividadesCrecimientoPendientes(Lote $lote): array
+    {
+        $lote->loadMissing('actividades.tipoActividad');
+        $pendientes = [];
+
+        if (! $this->milestoneRegado($lote)) {
+            $pendientes[] = 'riego';
+        }
+        if (! $this->milestoneFumigacion($lote)) {
+            $pendientes[] = 'control de plagas';
+        }
+        if (! $this->milestoneFertilizacion($lote)) {
+            $pendientes[] = 'fertilización';
+        }
+
+        return $pendientes;
+    }
+
+    public function puedeRegistrarCosecha(Lote $lote): bool
+    {
+        $lote->loadMissing(['estadoTipo', 'actividades.tipoActividad']);
+        $slug = EstadoLoteCatalogo::slugFromNombre($lote->estadoTipo->nombre ?? '');
+
+        if ($slug === 'listo_para_cosecha') {
+            return true;
+        }
+
+        return $slug === 'en_crecimiento' && $this->actividadesCrecimientoCompletas($lote);
     }
 
     private function milestoneSiembra(Lote $lote): bool
@@ -214,6 +275,11 @@ class LoteTrazabilidadService
     private function milestoneFumigacion(Lote $lote): bool
     {
         return $this->actividadCompletadaConKeywords($lote, ['fumig', 'plaga', 'fitosanit']);
+    }
+
+    private function milestoneFertilizacion(Lote $lote): bool
+    {
+        return $this->actividadCompletadaConKeywords($lote, ['fertiliz']);
     }
 
     private function milestoneCosecha(Lote $lote): bool
@@ -378,6 +444,9 @@ class LoteTrazabilidadService
                 if (! $this->milestoneFumigacion($lote)) {
                     $pasos[] = 'Registrar fumigación o control de plagas';
                 }
+                if (! $this->milestoneFertilizacion($lote)) {
+                    $pasos[] = 'Registrar fertilización del lote';
+                }
                 $pasos[] = 'Documentar fechas y observaciones de las actividades de crecimiento';
                 break;
 
@@ -502,6 +571,7 @@ class LoteTrazabilidadService
                 str_contains($tipoNombre, 'cosecha') => 'cosecha',
                 str_contains($tipoNombre, 'riego') || str_contains($tipoNombre, 'regad') => 'regado',
                 str_contains($tipoNombre, 'fumig') || str_contains($tipoNombre, 'plaga') => 'fumigacion',
+                str_contains($tipoNombre, 'fertiliz') => 'fertilizacion',
                 str_contains($tipoNombre, 'labranza') => 'preparacion',
                 default => 'regado',
             };
@@ -716,7 +786,7 @@ class LoteTrazabilidadService
 
             $esFaseUnica = in_array($key, self::FASES_UNICAS, true);
             $eventosCount = match ($key) {
-                'en_crecimiento' => ($porFase->get('regado', 0) + $porFase->get('fumigacion', 0)),
+                'en_crecimiento' => ($porFase->get('regado', 0) + $porFase->get('fumigacion', 0) + $porFase->get('fertilizacion', 0)),
                 default => $porFase->get($key, 0),
             };
 
@@ -739,6 +809,12 @@ class LoteTrazabilidadService
 
         $siguienteFase = $this->siguienteFase($faseActual);
         $urlSiguienteFase = $siguienteFase ? $this->urlAccionFase($lote, $siguienteFase) : null;
+        $urlAsignarActividad = $faseActual === 'en_crecimiento'
+            ? $this->urlAsignarActividadEnCrecimiento($lote)
+            : null;
+        $siguienteActividadCrecimiento = $faseActual === 'en_crecimiento'
+            ? $this->siguienteTipoActividadCrecimiento($lote)
+            : null;
 
         return array_merge($base, [
             'filtros' => $filtros,
@@ -754,6 +830,8 @@ class LoteTrazabilidadService
             'siguiente_fase' => $siguienteFase,
             'siguiente_fase_label' => $siguienteFase ? (self::FASES[$siguienteFase]['label'] ?? $siguienteFase) : null,
             'url_siguiente_fase' => $urlSiguienteFase,
+            'url_asignar_actividad' => $urlAsignarActividad,
+            'siguiente_actividad_crecimiento' => $siguienteActividadCrecimiento,
             'chart_por_fase' => [
                 'labels' => $porFase->keys()->map(fn ($k) => self::FASES[$k]['label'] ?? $k)->values()->all(),
                 'data' => $porFase->values()->all(),

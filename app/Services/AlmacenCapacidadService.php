@@ -5,12 +5,14 @@ namespace App\Services;
 use App\Models\Almacen;
 use App\Models\AlmacenajeLoteProduccion;
 use App\Models\Insumo;
+use App\Models\LoteProduccionPedido;
 use App\Models\ProduccionAlmacenamiento;
 use App\Models\UnidadMedida;
+use App\Support\ProductoPlantaCatalogo;
 
 class AlmacenCapacidadService
 {
-    public function convertirAKg(float $cantidad, ?UnidadMedida $unidad): float
+    public function convertirAKg(float $cantidad, ?UnidadMedida $unidad, ?string $producto = null): float
     {
         if (! $unidad) {
             return $cantidad;
@@ -81,7 +83,7 @@ class AlmacenCapacidadService
     public function productoPlantaKgEnAlmacen(Almacen $almacen): float
     {
         return (float) AlmacenajeLoteProduccion::query()
-            ->with(['loteProduccionPedido.unidadMedida'])
+            ->with(['loteProduccionPedido.unidadMedida', 'loteProduccionPedido.materiasPrimas.insumo.unidadMedida'])
             ->whereNull('fecha_retiro')
             ->where(function ($q) use ($almacen) {
                 $q->where('almacenid', $almacen->almacenid)
@@ -91,10 +93,17 @@ class AlmacenCapacidadService
             })
             ->get()
             ->sum(function (AlmacenajeLoteProduccion $row) {
-                return $this->convertirAKg(
-                    (float) $row->cantidad,
-                    $row->loteProduccionPedido?->unidadMedida
-                );
+                $lote = $row->loteProduccionPedido;
+                if ($lote === null) {
+                    return 0.0;
+                }
+
+                $kg = ProductoPlantaCatalogo::kgParaAlmacenaje($lote, $this);
+                if ($kg > 0) {
+                    return $kg;
+                }
+
+                return $this->convertirAKg((float) $row->cantidad, $lote->unidadMedida);
             });
     }
 
@@ -123,5 +132,24 @@ class AlmacenCapacidadService
             'disponible_kg' => $disponibleKg,
             'porcentaje' => $porcentaje,
         ];
+    }
+
+    public function convertirLoteProduccionAKg(float $cantidad, LoteProduccionPedido $lote): float
+    {
+        $kg = ProductoPlantaCatalogo::kgParaAlmacenaje($lote, $this);
+        if ($kg > 0) {
+            return $kg;
+        }
+
+        return $this->convertirAKg($cantidad, $lote->unidadMedida);
+    }
+
+    private function nombreProductoLote(?LoteProduccionPedido $lote): ?string
+    {
+        if ($lote === null) {
+            return null;
+        }
+
+        return ProductoPlantaCatalogo::nombreProducto($lote);
     }
 }

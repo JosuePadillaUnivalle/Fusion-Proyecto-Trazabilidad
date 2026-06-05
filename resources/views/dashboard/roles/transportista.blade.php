@@ -220,22 +220,17 @@
     </div>
     <div class="card-body">
         <div class="row">
-            <div class="col-6 col-md-3 mb-2">
-                <a class="btn btn-info btn-block quick-btn" href="{{ route('logistica.asignaciones.index') }}">
+            <div class="col-6 col-md-4 mb-2">
+                <a class="btn btn-info btn-block quick-btn" href="{{ route('pedidos.index') }}">
                     <i class="fas fa-box"></i><span>Mis envíos</span>
                 </a>
             </div>
-            <div class="col-6 col-md-3 mb-2">
-                <a class="btn btn-success btn-block quick-btn" href="{{ route('logistica.rutas.index') }}">
-                    <i class="fas fa-route"></i><span>Mis rutas</span>
-                </a>
-            </div>
-            <div class="col-6 col-md-3 mb-2">
+            <div class="col-6 col-md-4 mb-2">
                 <a class="btn btn-secondary btn-block quick-btn" href="{{ route('logistica.documentos.index') }}">
                     <i class="fas fa-file-alt"></i><span>Documentos</span>
                 </a>
             </div>
-            <div class="col-6 col-md-3 mb-2">
+            <div class="col-6 col-md-4 mb-2">
                 <a class="btn btn-danger btn-block quick-btn" href="{{ route('logistica.incidentes.index') }}">
                     <i class="fas fa-exclamation-circle"></i><span>Incidentes</span>
                 </a>

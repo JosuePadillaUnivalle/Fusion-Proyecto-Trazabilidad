@@ -120,7 +120,7 @@
 @section('content')
 <div class="form-header">
     <h2>Solicitar acceso</h2>
-    <p>Regístrate en AgroFusion. Un administrador revisará tu solicitud.</p>
+    <p>Registro para jefes de producción agrícola, jefes de planta o transportistas. Un administrador revisará tu solicitud.</p>
 </div>
 
 @if($errors->any())
@@ -141,12 +141,12 @@
                 <input type="radio" name="rol_solicitado" id="rol_{{ $rol }}" value="{{ $rol }}"
                     {{ old('rol_solicitado') === $rol ? 'checked' : '' }} required>
                 <label for="rol_{{ $rol }}">
-                    @if($rol === 'agricultor')
+                    @if($rol === 'jefe_agricultor')
                         <i class="fas fa-tractor"></i>
-                        <span>Agricultor</span>
-                    @elseif($rol === 'planta')
+                        <span>Jefe Agricultor</span>
+                    @elseif($rol === 'jefe_planta')
                         <i class="fas fa-industry"></i>
-                        <span>Planta</span>
+                        <span>Jefe Planta</span>
                     @else
                         <i class="fas fa-truck"></i>
                         <span>Transportista</span>

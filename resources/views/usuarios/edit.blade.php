@@ -217,7 +217,7 @@
                 @csrf
                 @method('PUT')
 
-                @include('usuarios.partials.form-edit-fields')
+                @include('usuarios.partials.form-edit-fields', ['modoJefe' => $modoJefe ?? false])
 
                 <div class="usu-edit-actions">
                     <button type="submit" class="btn btn-success usu-edit-btn-save">

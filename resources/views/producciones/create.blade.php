@@ -101,8 +101,8 @@
                     <div class="form-group">
                         <label><i class="fas fa-map-marked-alt mr-1 text-success"></i> Lote a cosechar <span class="text-danger">*</span></label>
                         <div class="guia-campo mb-2">
-                            <strong>¿Para qué sirve?</strong> Identifica el lote que ya está <em>listo para cosecha</em>.
-                            Solo aparecen lotes en ese estado del ciclo agrícola.
+                            <strong>¿Para qué sirve?</strong> Identifica el lote cuyas actividades de crecimiento ya están completas
+                            (riego, control de plagas y fertilización) o que está en estado <em>listo para cosecha</em>.
                         </div>
                         @include('partials.selector-catalogo', [
                             'id' => 'produccion_lote',
@@ -118,12 +118,12 @@
                         ])
                         @if($lotes->isEmpty())
                             <small class="form-text text-warning">
-                                <i class="fas fa-exclamation-triangle"></i> No hay lotes en estado «Listo para cosecha».
-                                Actualiza el estado del lote en <a href="{{ route('lotes.index') }}">Gestión de lotes</a> antes de registrar la cosecha.
+                                <i class="fas fa-exclamation-triangle"></i> No hay lotes listos para cosechar.
+                                Completa las actividades de crecimiento en <a href="{{ route('lotes.index') }}">Gestión de lotes</a> antes de registrar la cosecha.
                             </small>
                         @else
                             <small class="form-text text-muted">
-                                {{ $lotes->count() === 1 ? 'Un solo lote disponible — ya está preseleccionado.' : 'Solo lotes listos para cosecha.' }}
+                                {{ $lotes->count() === 1 ? 'Un solo lote disponible — ya está preseleccionado.' : 'Lotes con actividades de crecimiento completas o listos para cosecha.' }}
                             </small>
                         @endif
                     </div>

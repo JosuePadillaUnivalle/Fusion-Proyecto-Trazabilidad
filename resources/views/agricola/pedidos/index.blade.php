@@ -4,12 +4,6 @@
 @section('page_title', 'Pedidos de planta')
 
 @section('content')
-        @if(session('success'))
-            <div class="alert alert-success alert-dismissible fade show">
-                <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
-                <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
-            </div>
-        @endif
         @if(session('error'))
             <div class="alert alert-danger alert-dismissible fade show">
                 <i class="fas fa-exclamation-circle mr-1"></i> {{ session('error') }}
@@ -70,6 +64,7 @@
                                 <th>Cantidad</th>
                                 <th>Entrega deseada</th>
                                 <th>Estado</th>
+                                <th>Transporte</th>
                                 <th class="text-center">Acciones</th>
                             </tr>
                         </thead>
@@ -104,6 +99,22 @@
                                             {{ \App\Support\PedidoCatalogo::etiquetaEstado($pedido->estado) }}
                                         </span>
                                     </td>
+                                    <td>
+                                        @php $logEnvio = \App\Support\EnvioPedidoService::datosLogistica($pedido->envioAsignacion); @endphp
+                                        @if($logEnvio)
+                                            <strong>{{ $logEnvio['transportista_nombre'] }}</strong>
+                                            <br><small class="text-muted">{{ $logEnvio['vehiculo_nombre'] }} · {{ $logEnvio['placa'] }}</small>
+                                            @if($logEnvio['cargado_en_ruta'])
+                                                <br><span class="badge badge-info mt-1">En camino a planta</span>
+                                            @elseif($logEnvio['recibido_planta'])
+                                                <br><span class="badge badge-success mt-1">Recibido</span>
+                                            @else
+                                                <br><span class="badge badge-secondary mt-1">Asignado</span>
+                                            @endif
+                                        @else
+                                            <span class="text-muted small">Sin transportista</span>
+                                        @endif
+                                    </td>
                                     <td class="text-center">
                                         <a href="{{ route('agricola.pedidos.show', $pedido) }}" class="btn btn-sm btn-primary">
                                             <i class="fas fa-eye mr-1"></i> Revisar
@@ -112,7 +123,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center py-5 text-muted">
+                                    <td colspan="7" class="text-center py-5 text-muted">
                                         <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
                                         No hay pedidos de planta por ahora.
                                     </td>

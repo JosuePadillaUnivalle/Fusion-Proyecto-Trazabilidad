@@ -1,4 +1,5 @@
 @php
+    $modoJefe = $modoJefe ?? false;
     $rolActualNombre = $usuario->roles->first()?->name;
     $rolDefaultId = old('rolid');
     if ($rolDefaultId === null && $rolActualNombre) {
@@ -38,7 +39,7 @@
     </div>
 </section>
 
-<section class="usu-edit-section">
+<section class="usu-edit-section {{ $modoJefe ? 'mb-0' : '' }}">
     <h4 class="usu-edit-section-title">
         <i class="fas fa-at"></i> Acceso y contacto
     </h4>
@@ -56,15 +57,20 @@
         </div>
         <div class="col-md-6">
             <div class="usu-edit-field">
-                <label for="nombreusuario">Nombre de usuario <span class="text-danger">*</span></label>
+                <label for="nombreusuario">Nombre de usuario @if(! ($usuario->nombreusuario_editado ?? false))<span class="text-danger">*</span>@endif</label>
                 <div class="usu-edit-input-wrap">
                     <i class="fas fa-at"></i>
+                    @if($modoJefe && ($usuario->nombreusuario_editado ?? false))
+                    <input type="text" class="form-control" value="{{ $usuario->nombreusuario }}" readonly disabled>
+                    @else
                     <input type="text" class="form-control @error('nombreusuario') is-invalid @enderror" id="nombreusuario" name="nombreusuario"
                         value="{{ old('nombreusuario', $usuario->nombreusuario) }}" required placeholder="usuario">
+                    @endif
                 </div>
                 @error('nombreusuario')<span class="usu-edit-error">{{ $message }}</span>@enderror
             </div>
         </div>
+        @unless($modoJefe)
         <div class="col-md-6">
             <div class="usu-edit-field mb-md-0">
                 <label for="telefono">Teléfono</label>
@@ -76,9 +82,23 @@
                 @error('telefono')<span class="usu-edit-error">{{ $message }}</span>@enderror
             </div>
         </div>
+        @endunless
+        @if($modoJefe)
+        <div class="col-md-6">
+            <div class="usu-edit-field mb-md-0">
+                <label for="passwordhash">Nueva contraseña <small class="text-muted">(opcional)</small></label>
+                <div class="usu-edit-input-wrap">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" class="form-control @error('passwordhash') is-invalid @enderror" id="passwordhash" name="passwordhash">
+                </div>
+                @error('passwordhash')<span class="usu-edit-error">{{ $message }}</span>@enderror
+            </div>
+        </div>
+        @endif
     </div>
 </section>
 
+@unless($modoJefe)
 <section class="usu-edit-section mb-0">
     <h4 class="usu-edit-section-title">
         <i class="fas fa-user-shield"></i> Rol en el sistema
@@ -103,3 +123,4 @@
         </div>
     </div>
 </section>
+@endunless
