@@ -87,7 +87,7 @@ class GestionUsuariosController extends Controller
         return view('usuarios.show', compact('usuario', 'stats', 'lotesRecientes', 'modoJefe'));
     }
 
-    public function edit(Usuario $usuario): View
+    public function edit(Usuario $usuario): View|RedirectResponse
     {
         $this->autorizarAccesoUsuario($usuario);
 

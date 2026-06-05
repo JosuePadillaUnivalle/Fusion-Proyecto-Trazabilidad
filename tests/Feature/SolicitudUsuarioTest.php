@@ -61,7 +61,7 @@ class SolicitudUsuarioTest extends TestCase
             'nombre' => 'Jose',
             'apellido' => 'Mamani',
             'nombreusuario' => 'sol_temporal123',
-            'rol_solicitado' => 'agricultor',
+            'rol_solicitado' => 'jefe_agricultor',
         ]);
 
         $response = $this->actingAs($admin)->post(route('gestion.solicitud.aprobar', $pendiente));
@@ -183,7 +183,7 @@ class SolicitudUsuarioTest extends TestCase
             'ci_nit' => (string) random_int(1000000, 9999999),
             'passwordhash' => bcrypt('secret123'),
             'carta_motivacion' => str_repeat('Quiero unirme a AgroFusion. ', 3),
-            'rol_solicitado' => 'agricultor',
+            'rol_solicitado' => 'jefe_agricultor',
             'estado_cuenta' => CuentaEstado::PENDIENTE,
             'activo' => true,
             'fecharegistro' => now(),
