@@ -24,7 +24,9 @@ use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\PedidoController;
 use App\Http\Controllers\Web\PedidoAgricolaController;
 use App\Http\Controllers\Web\PuntoVentaController;
+use App\Http\Controllers\Web\PuntoVentaInventarioController;
 use App\Http\Controllers\Web\PedidoDistribucionController;
+use App\Http\Controllers\Web\TrazabilidadPublicaController;
 use App\Http\Controllers\Web\UserProfileController;
 
 // 🔹 nuevos controladores web de almacenamiento
@@ -78,6 +80,8 @@ Route::post('/register', [AuthController::class, 'register'])->name('register.po
 Route::get('/registro-enviado', [AuthController::class, 'registroEnviado'])->name('register.enviado');
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+Route::get('/trazabilidad/{codigo}', [TrazabilidadPublicaController::class, 'show'])->name('trazabilidad.publica');
 
 
 // RUTAS PROTEGIDAS (REQUIEREN ESTAR LOGUEADO)
@@ -321,6 +325,11 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::get('puntos/{punto}/edit', [PuntoVentaController::class, 'edit'])->name('puntos.edit')->middleware('action.permission:punto_venta,update');
         Route::put('puntos/{punto}', [PuntoVentaController::class, 'update'])->name('puntos.update')->middleware('action.permission:punto_venta,update');
         Route::delete('puntos/{punto}', [PuntoVentaController::class, 'destroy'])->name('puntos.destroy')->middleware('action.permission:punto_venta,delete');
+
+        Route::get('puntos/{punto}/inventario/{insumo}/edit', [PuntoVentaInventarioController::class, 'edit'])->name('puntos.inventario.edit')->middleware('action.permission:punto_venta,update');
+        Route::put('puntos/{punto}/inventario/{insumo}', [PuntoVentaInventarioController::class, 'update'])->name('puntos.inventario.update')->middleware('action.permission:punto_venta,update');
+        Route::delete('puntos/{punto}/inventario/{insumo}', [PuntoVentaInventarioController::class, 'destroy'])->name('puntos.inventario.destroy')->middleware('action.permission:punto_venta,delete');
+        Route::get('puntos/{punto}/inventario/{insumo}/qr', [PuntoVentaInventarioController::class, 'qr'])->name('puntos.inventario.qr')->middleware('action.permission:punto_venta,read');
 
         Route::get('pedidos', [PedidoDistribucionController::class, 'index'])->name('pedidos.index')->middleware('action.permission:pedidos_distribucion,read');
         Route::get('pedidos/create', [PedidoDistribucionController::class, 'create'])->name('pedidos.create')->middleware('action.permission:pedidos_distribucion,create');

@@ -45,7 +45,7 @@ class ProductoPlantaCatalogo
 
         return UnidadMedida::query()
             ->where(function ($q) {
-                $q->whereRaw('LOWER(TRIM(COALESCE(abreviatura, ""))) = ?', ['und'])
+                $q->whereRaw("LOWER(TRIM(COALESCE(abreviatura, ''))) = ?", ['und'])
                     ->orWhereRaw('LOWER(TRIM(nombre)) = ?', ['unidad']);
             })
             ->value('unidadmedidaid');

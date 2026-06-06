@@ -51,6 +51,15 @@ class CreateOperationalRoleUsersSeeder extends Seeder
                 'role' => 'transportista',
                 'password' => self::DEMO_PASSWORD,
             ],
+            [
+                'email' => 'minorista@agrofusion.com',
+                'nombre' => 'María',
+                'apellido' => 'Minorista Demo',
+                'nombreusuario' => 'minorista_demo',
+                'telefono' => '700000200',
+                'role' => 'minorista',
+                'password' => 'Minorista2026',
+            ],
         ];
 
         foreach ($users as $entry) {

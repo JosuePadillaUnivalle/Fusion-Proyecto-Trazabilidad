@@ -83,8 +83,10 @@ class RecepcionPuntoVentaService
             ->first();
 
         if ($insumoDestino === null) {
+            $codigo = 'TRZ-PDV-'.now()->format('Ymd').'-'.strtoupper(substr(uniqid(), -6));
             $insumoDestino = Insumo::create([
                 'nombre' => $insumoOrigen->nombre,
+                'codigo_trazabilidad' => $codigo,
                 'tipoinsumoid' => $insumoOrigen->tipoinsumoid ?? TipoInsumo::query()->value('tipoinsumoid'),
                 'unidadmedidaid' => $insumoOrigen->unidadmedidaid,
                 'stock' => 0,

@@ -24,6 +24,7 @@ class Insumo extends Model
         'preciounitario',
         'descripcion',
         'almacenid',
+        'codigo_trazabilidad',
     ];
 
     protected $casts = [

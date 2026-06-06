@@ -6,15 +6,88 @@
 @push('styles')
 @include('punto_venta.partials.modulo-styles')
 <style>
-.pdv-pedido-flujo { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
-.pdv-pedido-flujo .paso {
-    flex: 1 1 120px; text-align: center; padding: .55rem .4rem; border-radius: 8px;
-    background: #f4f6f5; font-size: .72rem; color: #6c757d; border: 1px solid #e8ecea;
+.pdv-pedido-flujo {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .75rem;
+    margin-bottom: 1.25rem;
 }
-.pdv-pedido-flujo .paso.activo { background: #fff8e6; border-color: #ffc107; color: #856404; font-weight: 600; }
-.pdv-pedido-flujo .paso.hecho { background: #e8f5e9; border-color: #28a745; color: #155724; }
+@media (max-width: 991px) {
+    .pdv-pedido-flujo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.pdv-paso-card {
+    background: #fff;
+    border: 2px solid #d1fae5;
+    border-radius: 14px;
+    padding: .9rem .65rem;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(5, 150, 105, .1);
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+.pdv-paso-card .paso-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #ecfdf5;
+    color: #059669;
+    font-weight: 700;
+    font-size: .78rem;
+    margin-bottom: .4rem;
+}
+.pdv-paso-card .paso-icon {
+    display: block;
+    font-size: 1.15rem;
+    color: #10b981;
+    margin-bottom: .35rem;
+}
+.pdv-paso-card .paso-label {
+    display: block;
+    font-size: .72rem;
+    font-weight: 600;
+    color: #047857;
+    line-height: 1.35;
+}
+.pdv-paso-card.pendiente {
+    opacity: .65;
+    border-color: #e5e7eb;
+    box-shadow: none;
+    background: #fafafa;
+}
+.pdv-paso-card.pendiente .paso-num { background: #f3f4f6; color: #9ca3af; }
+.pdv-paso-card.pendiente .paso-icon,
+.pdv-paso-card.pendiente .paso-label { color: #9ca3af; }
+.pdv-paso-card.activo {
+    background: linear-gradient(145deg, #047857, #10b981);
+    border-color: #065f46;
+    box-shadow: 0 6px 18px rgba(5, 150, 105, .35);
+    transform: translateY(-2px);
+}
+.pdv-paso-card.activo .paso-num {
+    background: rgba(255, 255, 255, .22);
+    color: #fff;
+}
+.pdv-paso-card.activo .paso-icon,
+.pdv-paso-card.activo .paso-label { color: #fff; }
+.pdv-paso-card.hecho {
+    background: linear-gradient(180deg, #ecfdf5, #d1fae5);
+    border-color: #6ee7b7;
+}
+.pdv-paso-card.hecho .paso-num {
+    background: #059669;
+    color: #fff;
+}
+.pdv-paso-card.hecho .paso-icon { color: #059669; }
+.pdv-paso-card.hecho .paso-label { color: #065f46; }
 .pdv-detalle-grid dt { font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; color: #6c757d; }
 .pdv-detalle-grid dd { margin-bottom: .85rem; }
+.pdv-banner-llegada {
+    border-radius: 14px;
+    border: 2px solid #6ee7b7;
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+}
 </style>
 @endpush
 
@@ -26,10 +99,10 @@
         $unidad = $det?->insumo?->unidadMedida?->abreviatura ?? '';
         $stockOk = $erroresStock === [];
         $pasos = [
-            ['id' => 'pendiente', 'label' => '1. Solicitud minorista', 'hecho' => true, 'activo' => $pendientePlanta],
-            ['id' => 'confirmado', 'label' => '2. Revisión planta', 'hecho' => in_array($pedido->estado, ['confirmado', 'en_transito', 'recibido'], true), 'activo' => $pendientePlanta],
-            ['id' => 'transito', 'label' => '3. En tránsito', 'hecho' => in_array($pedido->estado, ['en_transito', 'recibido'], true), 'activo' => $pedido->estado === 'confirmado'],
-            ['id' => 'recibido', 'label' => '4. Recepción PDV', 'hecho' => $pedido->estado === 'recibido', 'activo' => $pedido->estado === 'en_transito'],
+            ['num' => 1, 'icon' => 'fa-paper-plane', 'label' => 'Solicitud minorista', 'hecho' => true, 'activo' => false],
+            ['num' => 2, 'icon' => 'fa-industry', 'label' => 'Revisión planta', 'hecho' => in_array($pedido->estado, ['confirmado', 'en_transito', 'recibido'], true), 'activo' => $pendientePlanta],
+            ['num' => 3, 'icon' => 'fa-shipping-fast', 'label' => 'En tránsito', 'hecho' => in_array($pedido->estado, ['en_transito', 'recibido'], true), 'activo' => $pedido->estado === 'confirmado'],
+            ['num' => 4, 'icon' => 'fa-dolly', 'label' => 'Recepción PDV', 'hecho' => $pedido->estado === 'recibido', 'activo' => $pedido->estado === 'en_transito'],
         ];
     @endphp
 
@@ -40,6 +113,27 @@
             </a>
         </div>
     </div>
+
+    @if($puedeAnunciarLlegada ?? false)
+    <div class="alert pdv-banner-llegada d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3 py-3 px-4">
+        <div>
+            <strong class="text-success d-block mb-1">
+                <i class="fas fa-truck-loading mr-1"></i> El pedido está en camino a su tienda
+            </strong>
+            <span class="text-muted small">Cuando reciba el producto, anuncie la llegada para ingresarlo a su inventario.</span>
+        </div>
+        <form method="POST" action="{{ route('punto-venta.pedidos.confirmar-recepcion', $pedido) }}" class="mb-0">
+            @csrf
+            <button type="button" class="btn btn-success btn-lg font-weight-bold px-4"
+                    data-confirm-modal
+                    data-confirm-tone="success"
+                    data-confirm-title="Anunciar llegada del pedido"
+                    data-confirm-message="¿Confirma que el pedido ya llegó a su punto de venta? Se ingresará al inventario.">
+                <i class="fas fa-bullhorn mr-1"></i> Anunciar llegada
+            </button>
+        </form>
+    </div>
+    @endif
 
     <div class="row align-items-start">
         <div class="col-lg-8">
@@ -54,8 +148,15 @@
                     @if(! in_array($pedido->estado, ['rechazado', 'cancelado'], true))
                     <div class="pdv-pedido-flujo">
                         @foreach($pasos as $paso)
-                            <div class="paso {{ $paso['hecho'] && ! $paso['activo'] ? 'hecho' : ($paso['activo'] ? 'activo' : '') }}">
-                                {{ $paso['label'] }}
+                            @php
+                                $clasePaso = $paso['activo']
+                                    ? 'activo'
+                                    : ($paso['hecho'] ? 'hecho' : 'pendiente');
+                            @endphp
+                            <div class="pdv-paso-card {{ $clasePaso }}">
+                                <span class="paso-num">{{ $paso['num'] }}</span>
+                                <i class="fas {{ $paso['icon'] }} paso-icon"></i>
+                                <span class="paso-label">{{ $paso['label'] }}</span>
                             </div>
                         @endforeach
                     </div>
@@ -149,34 +250,45 @@
                             <label class="small text-muted">Motivo (opcional)</label>
                             <textarea name="motivo_rechazo" class="form-control form-control-sm" rows="2" maxlength="500" placeholder="Ej: stock insuficiente"></textarea>
                         </div>
-                        <button type="submit" class="btn btn-outline-danger btn-block" onclick="return confirm('¿Rechazar esta solicitud?');">
+                        <button type="button" class="btn btn-outline-danger btn-block"
+                                data-confirm-modal
+                                data-confirm-title="Rechazar solicitud"
+                                data-confirm-message="¿Rechazar esta solicitud del minorista? Esta acción no se puede deshacer.">
                             <i class="fas fa-times mr-1"></i> Rechazar solicitud
                         </button>
                     </form>
                 </div>
             </div>
             @elseif($puedeGestionarPlanta && \App\Support\PedidoDistribucionCatalogo::puedeMarcarEnviado($pedido))
-            <div class="card pdv-card card-outline card-primary mb-3">
-                <div class="card-header bg-white py-2"><h3 class="card-title mb-0 font-weight-bold">Envío a PDV</h3></div>
+            <div class="card pdv-card card-outline card-success mb-3">
+                <div class="card-header bg-white py-2"><h3 class="card-title mb-0 font-weight-bold"><i class="fas fa-shipping-fast text-success mr-1"></i> Envío a PDV</h3></div>
                 <div class="card-body">
                     <p class="text-muted small mb-3">El pedido fue aceptado. Marque cuando el producto salga de planta hacia el minorista.</p>
                     <form method="POST" action="{{ route('punto-venta.pedidos.marcar-enviado', $pedido) }}">
                         @csrf
-                        <button type="submit" class="btn btn-primary btn-block btn-lg" onclick="return confirm('¿Confirmar que el envío salió de planta?');">
+                        <button type="button" class="btn btn-success btn-block btn-lg"
+                                data-confirm-modal
+                                data-confirm-tone="success"
+                                data-confirm-title="Marcar envío en tránsito"
+                                data-confirm-message="¿Confirmar que el envío salió de planta hacia el punto de venta?">
                             <i class="fas fa-shipping-fast mr-1"></i> Marcar en tránsito
                         </button>
                     </form>
                 </div>
             </div>
-            @elseif($esMinoristaDueño && \App\Support\PedidoDistribucionCatalogo::puedeConfirmarRecepcion($pedido))
+            @elseif($puedeAnunciarLlegada ?? false)
             <div class="card pdv-card card-outline card-success mb-3">
-                <div class="card-header bg-white py-2"><h3 class="card-title mb-0 font-weight-bold">Recepción en tienda</h3></div>
+                <div class="card-header bg-white py-2"><h3 class="card-title mb-0 font-weight-bold"><i class="fas fa-store text-success mr-1"></i> Recepción en tienda</h3></div>
                 <div class="card-body">
-                    <p class="text-muted small mb-3">Confirme cuando reciba el producto. Se ingresará al inventario de su punto de venta.</p>
+                    <p class="text-muted small mb-3">El pedido ya salió de planta. Anuncie la llegada cuando lo reciba en su punto de venta.</p>
                     <form method="POST" action="{{ route('punto-venta.pedidos.confirmar-recepcion', $pedido) }}">
                         @csrf
-                        <button type="submit" class="btn btn-success btn-block btn-lg" onclick="return confirm('¿Confirmar recepción e ingresar al inventario?');">
-                            <i class="fas fa-dolly mr-1"></i> Confirmar recepción
+                        <button type="button" class="btn btn-success btn-block btn-lg"
+                                data-confirm-modal
+                                data-confirm-tone="success"
+                                data-confirm-title="Anunciar llegada del pedido"
+                                data-confirm-message="¿Confirma que el pedido ya llegó a su punto de venta? Se ingresará al inventario.">
+                            <i class="fas fa-bullhorn mr-1"></i> Anunciar llegada
                         </button>
                     </form>
                 </div>
@@ -201,18 +313,20 @@
                 </div>
             </div>
             @elseif($pedido->estado === 'confirmado')
-            <div class="card pdv-card card-outline card-info mb-3">
-                <div class="card-body small mb-0">
+            <div class="card pdv-card card-outline card-success mb-3">
+                <div class="card-body small mb-0 text-success">
                     <i class="fas fa-box mr-1"></i> Planta aceptó el pedido. Pendiente de salida hacia su punto de venta.
                 </div>
             </div>
-            @elseif($pedido->estado === 'en_transito' && ! $esMinoristaDueño)
-            <div class="card pdv-card card-outline card-primary mb-3">
-                <div class="card-body small mb-0">
-                    <i class="fas fa-shipping-fast mr-1"></i> Producto en camino al punto de venta.
+            @elseif($pedido->estado === 'en_transito' && ! ($puedeAnunciarLlegada ?? false))
+            <div class="card pdv-card card-outline card-success mb-3">
+                <div class="card-body small mb-0 text-success">
+                    <i class="fas fa-shipping-fast mr-1"></i> Producto en camino al punto de venta. El minorista confirmará la recepción.
                 </div>
             </div>
             @endif
         </div>
     </div>
+
+    @include('partials.modal-confirmar-accion')
 @endsection

@@ -178,6 +178,8 @@ class PedidoDistribucionController extends Controller
             || UsuarioRol::esAdminGlobal(auth()->user());
         $esMinoristaDueño = UsuarioRol::esMinorista(auth()->user())
             && (int) $pedido->puntoVenta?->usuarioid === (int) auth()->id();
+        $puedeAnunciarLlegada = $esMinoristaDueño
+            && PedidoDistribucionCatalogo::puedeConfirmarRecepcion($pedido);
 
         $erroresStock = $puedeGestionarPlanta
             ? app(PedidoDistribucionPlantaService::class)->verificarDisponibilidad($pedido)
@@ -187,6 +189,7 @@ class PedidoDistribucionController extends Controller
             'pedido',
             'puedeGestionarPlanta',
             'esMinoristaDueño',
+            'puedeAnunciarLlegada',
             'erroresStock'
         ));
     }
@@ -254,7 +257,11 @@ class PedidoDistribucionController extends Controller
     public function confirmarRecepcion(PedidoDistribucion $pedido): RedirectResponse
     {
         abort_unless(PuntoVentaAccess::puedeVerPedido(auth()->user(), $pedido), 403);
-        abort_unless(UsuarioRol::esMinorista(auth()->user()), 403);
+        abort_unless(
+            UsuarioRol::esMinorista(auth()->user())
+            && (int) $pedido->puntoVenta?->usuarioid === (int) auth()->id(),
+            403
+        );
 
         try {
             app(RecepcionPuntoVentaService::class)->confirmar($pedido, auth()->user());
@@ -264,6 +271,6 @@ class PedidoDistribucionController extends Controller
 
         return redirect()
             ->route('punto-venta.puntos.show', $pedido->puntoventaid)
-            ->with('success', 'Recepción confirmada. El inventario del punto de venta fue actualizado.');
+            ->with('success', 'Llegada del pedido confirmada. El inventario del punto de venta fue actualizado.');
     }
 }

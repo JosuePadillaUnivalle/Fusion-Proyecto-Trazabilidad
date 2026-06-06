@@ -19,7 +19,7 @@ class PuntoVentaAlmacenService
 
         $tipoAlmacenId = TipoAlmacen::query()->value('tipoalmacenid');
         $unidadId = UnidadMedida::query()
-            ->whereRaw('LOWER(TRIM(COALESCE(abreviatura, ""))) = ?', ['kg'])
+            ->whereRaw("LOWER(TRIM(COALESCE(abreviatura, ''))) = ?", ['kg'])
             ->value('unidadmedidaid')
             ?? UnidadMedida::query()->value('unidadmedidaid');
 
