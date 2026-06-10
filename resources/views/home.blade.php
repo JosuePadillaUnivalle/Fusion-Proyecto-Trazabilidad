@@ -241,6 +241,10 @@
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
         }
 
+        .alert-item.alert-item-agotado {
+            border-left-color: #dc3545;
+        }
+
         .alert-icon {
             width: 35px;
             height: 35px;
@@ -252,6 +256,10 @@
             justify-content: center;
             margin-right: 12px;
             font-size: 14px;
+        }
+
+        .alert-item-agotado .alert-icon {
+            background: #dc3545;
         }
 
         .alert-content h6 {
@@ -526,13 +534,19 @@
                 </div>
                 <div class="card-body d-flex flex-column justify-content-center">
                     @forelse($insumosStockBajo as $insumo)
-                        <div class="alert-item">
+                        @php $stockAgotado = (float) $insumo->stock <= 0; @endphp
+                        <div class="alert-item {{ $stockAgotado ? 'alert-item-agotado' : '' }}">
                             <div class="alert-icon">
-                                <i class="fas fa-exclamation"></i>
+                                <i class="fas {{ $stockAgotado ? 'fa-times' : 'fa-exclamation' }}"></i>
                             </div>
                             <div class="alert-content">
-                                <h6>Stock bajo: {{ $insumo->nombre }}</h6>
-                                <small>Stock actual: {{ number_format($insumo->stock, 2) }} {{ $insumo->unidadMedida->abreviatura ?? '' }} (alerta ≤ {{ \App\Support\InsumoCatalogo::UMBRAL_ALERTA_STOCK }})</small>
+                                <h6>{{ $stockAgotado ? 'Stock agotado' : 'Stock bajo' }}: {{ $insumo->nombre }}</h6>
+                                <small>
+                                    Stock actual: {{ number_format($insumo->stock, 2) }} {{ $insumo->unidadMedida->abreviatura ?? '' }}
+                                    @unless($stockAgotado)
+                                        (Menor a {{ \App\Support\InsumoCatalogo::UMBRAL_ALERTA_STOCK }})
+                                    @endunless
+                                </small>
                             </div>
                         </div>
                     @empty

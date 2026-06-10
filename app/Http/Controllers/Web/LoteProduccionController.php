@@ -138,6 +138,12 @@ class LoteProduccionController extends Controller
         $unidadesMedida = UnidadMedida::query()->orderBy('nombre')->get();
         $productosLote = LoteProduccionNombre::productosDistintos();
         $procesosPlanta = \App\Support\ProcesoPlantaCatalogo::activosOrdenados();
+        $plantillaLabel = null;
+        if (old('plantillatransformacionid')) {
+            $pltOld = \App\Models\PlantillaTransformacion::query()
+                ->find((int) old('plantillatransformacionid'));
+            $plantillaLabel = $pltOld?->nombre;
+        }
 
         return view('procesamiento.index', compact(
             'lotes',
@@ -153,7 +159,8 @@ class LoteProduccionController extends Controller
             'busqueda',
             'desde',
             'hasta',
-            'procesosPlanta'
+            'procesosPlanta',
+            'plantillaLabel'
         ));
     }
 
@@ -200,8 +207,14 @@ class LoteProduccionController extends Controller
             : $cantidadProductoAlmacen;
         $cantidadProductoAlmacenKg = $produccionEstimada['kg'];
 
+        $loteProduccion->load('plantillaTransformacion.pasos.proceso', 'plantillaTransformacion.pasos.maquina');
+        $rutaPlantilla = $this->transformacion->rutaPlantilla($loteProduccion);
+        $siguientePasoPlantilla = $this->transformacion->siguientePasoPlantilla($loteProduccion);
+
         return view('procesamiento.show', array_merge($dash, [
             'lote' => $loteProduccion,
+            'rutaPlantilla' => $rutaPlantilla,
+            'siguientePasoPlantilla' => $siguientePasoPlantilla,
             'procesosPlanta' => $procesosPlanta,
             'procesosDisponibles' => $procesosDisponibles,
             'procesosUsadosIds' => $procesosUsadosIds,
@@ -226,6 +239,10 @@ class LoteProduccionController extends Controller
             return back()->with('error', 'La transformación ya finalizó con «'.ProcesoPlantaCatalogo::PROCESO_CIERRE_TRANSFORMACION.'».');
         }
 
+        if ($this->transformacion->plantillaAgotada($loteProduccion)) {
+            return back()->with('error', 'Ya registró todos los pasos del proceso de transformación predefinido.');
+        }
+
         $data = $request->validate([
             'procesoplantaid' => ['required', 'integer', 'exists:proceso_planta,procesoplantaid'],
             'maquinaplantaid' => ['required', 'integer', 'exists:maquina_planta,maquinaplantaid'],
@@ -239,10 +256,14 @@ class LoteProduccionController extends Controller
             return back()->with('error', '«Control de Calidad» corresponde a la fase de certificación, no a transformación.');
         }
 
-        if (! MaquinaProcesoCompatibilidad::compatible((int) $data['procesoplantaid'], (int) $data['maquinaplantaid'])) {
-            $maquina = MaquinaPlanta::find($data['maquinaplantaid']);
+        $maquina = MaquinaPlanta::find($data['maquinaplantaid']);
 
+        if (! MaquinaProcesoCompatibilidad::compatible((int) $data['procesoplantaid'], (int) $data['maquinaplantaid'])) {
             return back()->with('error', 'La maquinaria «'.($maquina?->nombre ?? '').'» no es compatible con el proceso «'.$proceso->nombre.'».');
+        }
+
+        if ($maquina?->enMantenimiento()) {
+            return back()->with('error', 'La maquinaria «'.$maquina->nombre.'» está en mantenimiento. Espere a que vuelva a estar activa para registrar la etapa.');
         }
 
         try {
@@ -275,9 +296,10 @@ class LoteProduccionController extends Controller
 
         $loteProduccion->update(['procesoplantaid' => $data['procesoplantaid']]);
 
+        $loteProduccion->refresh();
         $mensaje = 'Etapa «'.$proceso->nombre.'» registrada.';
-        if (ProcesoPlantaCatalogo::esCierreTransformacion($proceso->nombre)) {
-            $mensaje .= ' Transformación completada: ya puede certificar el lote.';
+        if ($this->trazabilidad->transformacionCompleta($loteProduccion)) {
+            $mensaje .= ' Transformación completada con «'.ProcesoPlantaCatalogo::PROCESO_CIERRE_TRANSFORMACION.'»: ya puede certificar el lote.';
         }
 
         return redirect()
@@ -294,7 +316,7 @@ class LoteProduccionController extends Controller
         }
 
         $data = $request->validate([
-            'razon' => ['required', 'string', 'max:100'],
+            'razon' => ['required', 'string', Rule::in(EvaluacionFinalLoteProduccion::RAZONES)],
             'observaciones' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -308,17 +330,29 @@ class LoteProduccionController extends Controller
             ]
         );
 
+        if ($data['razon'] === EvaluacionFinalLoteProduccion::RAZON_NO_CONFORME) {
+            $loteProduccion->almacenajes()->delete();
+            $loteProduccion->update(['hora_fin' => now()]);
+            $mensaje = 'Lote marcado como no conforme. No puede ingresar a almacén; el lote queda cerrado.';
+        } else {
+            $mensaje = 'Lote certificado. Ya puede registrar el almacenaje del producto terminado.';
+        }
+
         return redirect()
             ->route('procesamiento.show', $loteProduccion)
-            ->with('success', 'Evaluación final registrada.');
+            ->with('success', $mensaje);
     }
 
     public function almacenar(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse
     {
         abort_unless(UsuarioRol::esPlantaOperativo($request->user()) || $request->user()?->hasRole('admin'), 403);
 
-        if (! $loteProduccion->evaluacionesFinales()->exists()) {
-            return back()->with('error', 'Certifique el lote antes de almacenar.');
+        if (! $this->trazabilidad->evaluacionAprobada($loteProduccion)) {
+            if ($this->trazabilidad->loteRechazado($loteProduccion)) {
+                return back()->with('error', 'Este lote fue marcado como no conforme y no puede ingresar a almacén.');
+            }
+
+            return back()->with('error', 'Debe certificar el lote (resultado «Certificado») antes de almacenar.');
         }
 
         $data = $request->validate([
@@ -428,6 +462,7 @@ class LoteProduccionController extends Controller
             'materias' => ['required', 'array', 'min:1'],
             'materias.*.insumoid' => ['required', 'integer', 'exists:insumo,insumoid'],
             'materias.*.cantidad' => ['required', 'numeric', 'min:0.001'],
+            'plantillatransformacionid' => ['nullable', 'integer', 'exists:plantilla_transformacion,plantillatransformacionid'],
         ]);
 
         $lineas = collect($data['materias'])
@@ -437,6 +472,18 @@ class LoteProduccionController extends Controller
             ])
             ->all();
 
+        if (! empty($data['plantillatransformacionid'])) {
+            $plantilla = \App\Models\PlantillaTransformacion::query()
+                ->with(['pasos.maquina'])
+                ->find((int) $data['plantillatransformacionid']);
+
+            if (! $plantilla || ! $plantilla->estaOperativa()) {
+                $maquinas = $plantilla?->maquinasEnMantenimiento()->pluck('nombre')->join(', ') ?: 'desconocida';
+
+                return back()->withInput()->with('error', 'No se puede asignar ese proceso: hay máquinas en mantenimiento ('.$maquinas.').');
+            }
+        }
+
         try {
             $lote = $this->loteService->crear(
                 $request->user(),
@@ -445,7 +492,8 @@ class LoteProduccionController extends Controller
                 isset($data['cantidad_objetivo']) ? (float) $data['cantidad_objetivo'] : null,
                 isset($data['unidadmedidaid']) ? (int) $data['unidadmedidaid'] : null,
                 $lineas,
-                $data['observaciones'] ?? null
+                $data['observaciones'] ?? null,
+                isset($data['plantillatransformacionid']) ? (int) $data['plantillatransformacionid'] : null
             );
         } catch (\InvalidArgumentException $e) {
             return back()->withInput()->with('error', $e->getMessage());

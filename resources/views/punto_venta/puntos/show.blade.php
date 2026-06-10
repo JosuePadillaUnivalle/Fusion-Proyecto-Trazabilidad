@@ -37,10 +37,6 @@
         </div>
     </div>
 
-    @if(session('success'))
-        <div class="alert alert-success py-2">{{ session('success') }}</div>
-    @endif
-
     <div class="row align-items-start">
         <div class="col-lg-4">
             <div class="card pdv-card card-outline card-primary">

@@ -121,11 +121,13 @@
                             <a href="{{ route('maquinas-planta.edit', $maquina) }}" class="btn btn-sm btn-outline-primary" title="Editar">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            <form method="POST" action="{{ route('maquinas-planta.destroy', $maquina) }}" class="d-inline"
-                                onsubmit="return confirm('¿Eliminar esta máquina?')">
+                            <form method="POST" action="{{ route('maquinas-planta.destroy', $maquina) }}" class="d-inline">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar"
+                                    data-confirm-modal
+                                    data-confirm-title="Eliminar máquina"
+                                    data-confirm-message="¿Eliminar «{{ $maquina->nombre }}»? Esta acción no se puede deshacer.">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </form>
@@ -151,6 +153,7 @@
     </div>
 
     @include('maquinas_planta.partials.modal-foto-maquina')
+    @include('partials.modal-confirmar-accion')
 </div>
 @endsection
 

@@ -1013,7 +1013,7 @@
                     if (! ($esJefeAgr && ! $isAdmin)) {
                         $prodAgrOpen = $prodAgrOpen || request()->routeIs('agricola.pedidos.*');
                     }
-                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'maquinas-planta.*', 'procesamiento.*', 'almacen-planta.*', 'pedidos.*');
+                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'plantillas-transformacion.*', 'maquinas-planta.*', 'procesamiento.*', 'almacen-planta.*', 'pedidos.*');
                     $puedeProdPlanta = $isAdmin || $esPlantaOperativo;
                     $showProdAgricola = ! $esPlantaOperativo && ! $esTransportistaOperativo && (
                         $isAdmin
@@ -1211,6 +1211,7 @@
                         <li class="ag-sub-li"><a href="{{ route('procesamiento.index') }}" class="ag-sub-a {{ request()->routeIs('procesamiento.*') ? 'active' : '' }}">Procesamiento de Lote</a></li>
                         @endcan
                         <li class="ag-sub-li"><a href="{{ route('procesos-planta.index') }}" class="ag-sub-a {{ request()->routeIs('procesos-planta.*') ? 'active' : '' }}">Procesos de planta</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('plantillas-transformacion.index') }}" class="ag-sub-a {{ request()->routeIs('plantillas-transformacion.*') ? 'active' : '' }}">Procesos de transformación</a></li>
                         <li class="ag-sub-li"><a href="{{ route('maquinas-planta.index') }}" class="ag-sub-a {{ request()->routeIs('maquinas-planta.*') ? 'active' : '' }}">Máquinas de planta</a></li>
                         @endif
                         @if($puedeAlmacenPlanta)
@@ -1257,7 +1258,7 @@
                     $pvMenuOpen = request()->routeIs('punto-venta.*');
                     $puedePuntoVentaMenu = $isAdmin || $esMinoristaOperativo
                         || ($authUser && $authUser->can('punto_venta.view'));
-                    $puedePedidosDistMenu = $isAdmin || $esMinoristaOperativo || $esPlantaOperativo
+                    $puedePedidosDistMenu = $isAdmin || $esMinoristaOperativo
                         || ($authUser && $authUser->can('pedidos_distribucion.view'));
                 @endphp
 

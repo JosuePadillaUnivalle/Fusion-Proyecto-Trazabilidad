@@ -25,6 +25,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use App\Models\UsuarioNotificacion;
 use App\Services\NotificacionUsuarioService;
+use App\Support\EtiquetaDemo;
+use App\Support\InsumoCatalogo;
 use App\Support\UsuarioRol;
 
 class DashboardController extends Controller
@@ -162,10 +164,13 @@ class DashboardController extends Controller
         // INSUMOS CON STOCK BAJO (para alertas)
         // ========================================
         $insumosStockBajo = Insumo::with(['tipo', 'unidadMedida'])
-            ->where('stock', '<=', \App\Support\InsumoCatalogo::UMBRAL_ALERTA_STOCK)
+            ->where('stock', '<=', InsumoCatalogo::UMBRAL_ALERTA_STOCK)
             ->orderBy('stock')
-            ->limit(5)
-            ->get();
+            ->limit(12)
+            ->get()
+            ->filter(fn (Insumo $insumo) => ! EtiquetaDemo::esDemo($insumo->nombre))
+            ->take(5)
+            ->values();
 
         // ========================================
         // LOTES POR ESTADO (info-boxes)

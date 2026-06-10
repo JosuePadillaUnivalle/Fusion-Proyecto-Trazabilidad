@@ -438,6 +438,8 @@ return [
 
             'almacen.reportes.view',
 
+            'pedidos_distribucion.view',
+
         ],
 
         'jefe_planta' => [

@@ -26,6 +26,48 @@ class LoteProduccionTrazabilidadService
     /** Fases que ocurren una sola vez en el pipeline. */
     private const FASES_UNICAS = ['creacion', 'certificacion', 'almacenaje', 'completado'];
 
+    public function evaluacionActual(LoteProduccionPedido $lote): ?EvaluacionFinalLoteProduccion
+    {
+        $lote->loadMissing('evaluacionesFinales');
+
+        return $lote->evaluacionesFinales->sortByDesc('fecha_evaluacion')->first();
+    }
+
+    public function evaluacionAprobada(LoteProduccionPedido $lote): bool
+    {
+        return $this->evaluacionActual($lote)?->esCertificado() ?? false;
+    }
+
+    public function loteRechazado(LoteProduccionPedido $lote): bool
+    {
+        return $this->evaluacionActual($lote)?->esNoConforme() ?? false;
+    }
+
+    /** Elimina ingresos a almacén inválidos en lotes marcados como no conforme. */
+    public function limpiarAlmacenajeSiRechazado(LoteProduccionPedido $lote): void
+    {
+        if (! $this->loteRechazado($lote)) {
+            return;
+        }
+
+        if ($lote->almacenajes()->exists()) {
+            $lote->almacenajes()->delete();
+        }
+
+        $lote->unsetRelation('almacenajes');
+    }
+
+    public function almacenajeVigente(LoteProduccionPedido $lote): ?AlmacenajeLoteProduccion
+    {
+        if ($this->loteRechazado($lote)) {
+            return null;
+        }
+
+        $lote->loadMissing('almacenajes');
+
+        return $lote->almacenajes->sortByDesc('fecha_almacenaje')->first();
+    }
+
     public function resolverFaseActual(LoteProduccionPedido $lote): string
     {
         $lote->loadMissing(['evaluacionesFinales', 'almacenajes', 'materiasPrimas']);
@@ -34,7 +76,11 @@ class LoteProduccionTrazabilidadService
             return 'completado';
         }
 
-        if ($lote->evaluacionesFinales->isNotEmpty()) {
+        if ($this->loteRechazado($lote)) {
+            return 'completado';
+        }
+
+        if ($this->evaluacionAprobada($lote)) {
             return 'almacenaje';
         }
 
@@ -93,10 +139,10 @@ class LoteProduccionTrazabilidadService
         if ($lote->evaluacionesFinales->isNotEmpty()) {
             $hechas[] = 'certificacion';
         }
-        if ($lote->almacenajes->isNotEmpty()) {
+        if ($lote->almacenajes->isNotEmpty() && ! $this->loteRechazado($lote)) {
             $hechas[] = 'almacenaje';
-            $hechas[] = 'completado';
-        } elseif ($lote->hora_fin) {
+        }
+        if (($lote->almacenajes->isNotEmpty() && ! $this->loteRechazado($lote)) || $lote->hora_fin || $this->loteRechazado($lote)) {
             $hechas[] = 'completado';
         }
 
@@ -117,7 +163,9 @@ class LoteProduccionTrazabilidadService
 
     public function trazabilidadCompleta(LoteProduccionPedido $lote): bool
     {
-        return $lote->hora_fin !== null || $lote->almacenajes()->exists();
+        return $lote->hora_fin !== null
+            || $lote->almacenajes()->exists()
+            || $this->loteRechazado($lote);
     }
 
     /**
@@ -133,19 +181,25 @@ class LoteProduccionTrazabilidadService
             'almacenajes',
         ]);
 
+        $this->limpiarAlmacenajeSiRechazado($lote);
+
         $faseActual = $this->resolverFaseActual($lote);
         $registros = $this->registrosDeLote($lote);
         $etapasTransformacion = $this->transformacion->timeline($lote);
         $transformacionCompleta = $this->transformacionCompleta($lote);
         $totalEtapas = count($etapasTransformacion);
 
-        $fasesPipeline = collect(self::FASES)->map(function ($meta, $key) use ($faseActual, $lote, $transformacionCompleta, $totalEtapas) {
+        $rechazado = $this->loteRechazado($lote);
+
+        $fasesPipeline = collect(self::FASES)->map(function ($meta, $key) use ($faseActual, $lote, $transformacionCompleta, $totalEtapas, $rechazado) {
             $ordenActual = self::FASES[$faseActual]['orden'] ?? 1;
             $ordenSiguiente = $ordenActual + 1;
             $completo = $this->trazabilidadCompleta($lote);
 
             $estado = match (true) {
-                $completo => 'done',
+                $key === 'almacenaje' && $rechazado => 'skipped',
+                $completo && $key !== 'almacenaje' => 'done',
+                $completo && $key === 'almacenaje' && ! $rechazado && $lote->almacenajes->isNotEmpty() => 'done',
                 $meta['orden'] < $ordenActual => 'done',
                 $key === 'transformacion' && $transformacionCompleta && $ordenActual >= self::FASES['transformacion']['orden'] => 'done',
                 $key === $faseActual => 'active',
@@ -185,8 +239,10 @@ class LoteProduccionTrazabilidadService
             'etapas_transformacion' => $etapasTransformacion,
             'transformacion_completa' => $transformacionCompleta,
             'registros' => $registros,
-            'evaluacion' => $lote->evaluacionesFinales->sortByDesc('fecha_evaluacion')->first(),
-            'almacenaje' => $lote->almacenajes->sortByDesc('fecha_almacenaje')->first(),
+            'evaluacion' => $this->evaluacionActual($lote),
+            'evaluacion_aprobada' => $this->evaluacionAprobada($lote),
+            'lote_rechazado' => $rechazado,
+            'almacenaje' => $this->almacenajeVigente($lote),
         ];
     }
 
@@ -201,9 +257,13 @@ class LoteProduccionTrazabilidadService
         bool $transformacionCompleta
     ): array {
         if ($this->trazabilidadCompleta($lote)) {
+            $resumen = $this->loteRechazado($lote)
+                ? 'Lote cerrado como no conforme — sin ingreso a almacén'
+                : 'Lote completado y trazabilidad cerrada';
+
             return [
                 'completo' => true,
-                'resumen' => 'Lote completado y trazabilidad cerrada',
+                'resumen' => $resumen,
                 'acciones' => [],
             ];
         }
@@ -246,7 +306,10 @@ class LoteProduccionTrazabilidadService
         if ($lote->hora_fin || $lote->almacenajes()->exists()) {
             return 'completado';
         }
-        if ($lote->evaluacionesFinales()->exists()) {
+        if ($this->loteRechazado($lote)) {
+            return 'no_conforme';
+        }
+        if ($this->evaluacionAprobada($lote)) {
             return 'certificado';
         }
         if ($this->transformacion->transformacionIniciada($lote)) {

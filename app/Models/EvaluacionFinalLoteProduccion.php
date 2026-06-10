@@ -7,6 +7,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EvaluacionFinalLoteProduccion extends Model
 {
+    public const RAZON_CERTIFICADO = 'Certificado';
+
+    public const RAZON_NO_CONFORME = 'No conforme';
+
+    /** @var list<string> */
+    public const RAZONES = [
+        self::RAZON_CERTIFICADO,
+        self::RAZON_NO_CONFORME,
+    ];
+
     protected $table = 'evaluacion_final_lote_produccion';
     protected $primaryKey = 'evaluacionfinalloteid';
 
@@ -30,5 +40,15 @@ class EvaluacionFinalLoteProduccion extends Model
     public function inspector(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'inspector_usuarioid', 'usuarioid');
+    }
+
+    public function esCertificado(): bool
+    {
+        return $this->razon === self::RAZON_CERTIFICADO;
+    }
+
+    public function esNoConforme(): bool
+    {
+        return $this->razon === self::RAZON_NO_CONFORME;
     }
 }

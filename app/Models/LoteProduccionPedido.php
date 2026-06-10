@@ -14,6 +14,7 @@ class LoteProduccionPedido extends Model
     protected $fillable = [
         'pedidoid',
         'procesoplantaid',
+        'plantillatransformacionid',
         'codigo_lote',
         'nombre',
         'producto',
@@ -48,6 +49,11 @@ class LoteProduccionPedido extends Model
     public function procesoPlanta(): BelongsTo
     {
         return $this->belongsTo(ProcesoPlanta::class, 'procesoplantaid', 'procesoplantaid');
+    }
+
+    public function plantillaTransformacion(): BelongsTo
+    {
+        return $this->belongsTo(PlantillaTransformacion::class, 'plantillatransformacionid', 'plantillatransformacionid');
     }
 
     public function registrosProceso(): HasMany

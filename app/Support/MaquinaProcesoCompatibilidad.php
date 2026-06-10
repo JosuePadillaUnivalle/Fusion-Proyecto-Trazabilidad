@@ -63,6 +63,18 @@ class MaquinaProcesoCompatibilidad
      */
     public static function maquinasParaProceso(int $procesoplantaid): Collection
     {
+        return self::todasMaquinasParaProceso($procesoplantaid)
+            ->filter(fn (MaquinaPlanta $m) => $m->activo)
+            ->values();
+    }
+
+    /**
+     * Todas las máquinas compatibles con el proceso (activas e inactivas).
+     *
+     * @return Collection<int, MaquinaPlanta>
+     */
+    public static function todasMaquinasParaProceso(int $procesoplantaid): Collection
+    {
         $proceso = ProcesoPlanta::query()->find($procesoplantaid);
         if (! $proceso) {
             return collect();
@@ -73,7 +85,6 @@ class MaquinaProcesoCompatibilidad
             ->pluck('maquinaplantaid');
 
         return MaquinaPlanta::query()
-            ->where('activo', true)
             ->orderBy('nombre')
             ->get()
             ->filter(function (MaquinaPlanta $m) use ($proceso, $idsVinculados) {
@@ -89,6 +100,27 @@ class MaquinaProcesoCompatibilidad
                 return in_array($proceso->nombre, $permitidos, true);
             })
             ->values();
+    }
+
+    /**
+     * @return array<int, list<array{id: int, nombre: string, codigo: ?string, activo: bool}>>
+     */
+    public static function mapaMaquinasFormulario(): array
+    {
+        $result = [];
+        foreach (ProcesoPlantaCatalogo::paraTransformacion() as $proceso) {
+            $result[(int) $proceso->procesoplantaid] = self::todasMaquinasParaProceso((int) $proceso->procesoplantaid)
+                ->map(fn (MaquinaPlanta $m) => [
+                    'id' => (int) $m->maquinaplantaid,
+                    'nombre' => $m->nombre,
+                    'codigo' => $m->codigo,
+                    'activo' => (bool) $m->activo,
+                ])
+                ->values()
+                ->all();
+        }
+
+        return $result;
     }
 
     /**

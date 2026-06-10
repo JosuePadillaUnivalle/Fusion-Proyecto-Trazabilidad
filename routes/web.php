@@ -54,6 +54,7 @@ use App\Http\Controllers\Web\CertificacionController;
 use App\Http\Controllers\Web\ActorAbastecimientoController;
 use App\Http\Controllers\Web\ProcesoPlantaController;
 use App\Http\Controllers\Web\MaquinaPlantaController;
+use App\Http\Controllers\Web\PlantillaTransformacionController;
 use App\Http\Controllers\Web\AsignacionMultipleController;
 use App\Http\Controllers\Web\RutaMultiEntregaController;
 use App\Http\Controllers\Web\IncidenteEnvioController;
@@ -111,8 +112,10 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::get('/puntos-venta', [CatalogoSelectorController::class, 'puntosVenta'])->name('puntos-venta');
         Route::get('/productos-pedido', [CatalogoSelectorController::class, 'productosPedido'])->name('productos-pedido');
         Route::get('/producciones', [CatalogoSelectorController::class, 'producciones'])->name('producciones');
+        Route::get('/producciones-stock-almacen', [CatalogoSelectorController::class, 'produccionesStockAlmacen'])->name('producciones-stock-almacen');
         Route::get('/procesos-planta', [CatalogoSelectorController::class, 'procesosPlanta'])->name('procesos-planta');
         Route::get('/maquinas-planta', [CatalogoSelectorController::class, 'maquinasPlanta'])->name('maquinas-planta');
+        Route::get('/plantillas-transformacion', [CatalogoSelectorController::class, 'plantillasTransformacion'])->name('plantillas-transformacion');
     });
 
     // API endpoints para clima (OpenWeather)
@@ -173,6 +176,8 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::resource('producciones', ProduccionController::class)
         ->parameters(['producciones' => 'produccion']);
     Route::resource('procesos-planta', ProcesoPlantaController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::resource('plantillas-transformacion', PlantillaTransformacionController::class)
+        ->parameters(['plantillas-transformacion' => 'plantillas_transformacion']);
     Route::resource('maquinas-planta', MaquinaPlantaController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
     Route::patch('maquinas-planta/{maquinas_plantum}/toggle-activo', [MaquinaPlantaController::class, 'toggleActivo'])
         ->name('maquinas-planta.toggle-activo');

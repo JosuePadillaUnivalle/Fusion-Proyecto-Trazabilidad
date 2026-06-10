@@ -92,6 +92,7 @@
             </div>
         </form>
     </div>
+    @include('partials.modal-confirmar-accion')
 </div>
 @endsection
 

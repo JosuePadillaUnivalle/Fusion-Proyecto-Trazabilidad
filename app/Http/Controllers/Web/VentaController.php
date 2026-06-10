@@ -68,39 +68,47 @@ class VentaController extends Controller
 
     public function create()
     {
-        $preciosPorProduccion = Venta::query()
-            ->select('produccionid', DB::raw('MAX(preciounitario) as ultimo_precio'))
-            ->groupBy('produccionid')
-            ->pluck('ultimo_precio', 'produccionid');
+        $hayProductosConStock = Produccion::query()
+            ->whereHas('almacenamientos', fn ($q) => $q->where('cantidad', '>', 0))
+            ->exists();
 
-        $preciosPorCultivo = Venta::query()
-            ->join('produccion', 'venta.produccionid', '=', 'produccion.produccionid')
-            ->join('lote', 'produccion.loteid', '=', 'lote.loteid')
-            ->select('lote.cultivoid', DB::raw('ROUND(AVG(venta.preciounitario), 2) as precio_prom'))
-            ->groupBy('lote.cultivoid')
-            ->pluck('precio_prom', 'cultivoid');
+        $cultivosFiltro = Cultivo::query()
+            ->whereHas('lotes.producciones.almacenamientos', fn ($q) => $q->where('cantidad', '>', 0))
+            ->orderBy('nombre')
+            ->get(['cultivoid', 'nombre']);
 
-        $producciones = Produccion::with(['lote.cultivo', 'unidadMedida', 'destino', 'almacenamientos.almacen'])
-            ->whereHas('almacenamientos', function ($q) {
-                $q->where('cantidad', '>', 0);
-            })
-            ->get()
-            ->map(function ($p) use ($preciosPorProduccion, $preciosPorCultivo) {
-                $p->stock_disponible = $p->almacenamientos->sum('cantidad');
-                $p->almacen_nombre = $p->almacenamientos->first()->almacen->nombre ?? 'Sin almacén';
-                $cultivoId = $p->lote->cultivoid ?? null;
-                $p->precio_sugerido = $preciosPorProduccion[$p->produccionid]
-                    ?? ($cultivoId ? ($preciosPorCultivo[$cultivoId] ?? null) : null);
-
-                return $p;
-            })
-            ->filter(fn ($p) => $p->stock_disponible > 0)
-            ->sortByDesc('stock_disponible')
-            ->values();
+        $oldProduccionLabel = '';
+        $oldProduccionExtra = null;
+        if (old('produccionid')) {
+            $prodOld = Produccion::with(['lote.cultivo', 'unidadMedida', 'almacenamientos.almacen'])
+                ->find(old('produccionid'));
+            if ($prodOld) {
+                $stock = (float) $prodOld->almacenamientos->sum('cantidad');
+                $cultivo = $prodOld->lote->cultivo->nombre ?? 'Producto';
+                $lote = $prodOld->lote->nombre ?? 'Lote';
+                $almacen = $prodOld->almacenamientos->first()->almacen->nombre ?? 'Sin almacén';
+                $oldProduccionLabel = $cultivo.' · '.$lote.' · '.$almacen;
+                $oldProduccionExtra = [
+                    'disponible' => $stock,
+                    'unidad' => $prodOld->unidadMedida->abreviatura ?? 'kg',
+                    'unidad_id' => $prodOld->unidadmedidaid,
+                    'cultivo' => $cultivo,
+                    'lote' => $lote,
+                    'almacen' => $almacen,
+                    'precio' => old('preciounitario'),
+                ];
+            }
+        }
 
         $unidades = UnidadMedida::where('categoria', 'peso')->get();
 
-        return view('ventas.create', compact('producciones', 'unidades'));
+        return view('ventas.create', compact(
+            'hayProductosConStock',
+            'cultivosFiltro',
+            'oldProduccionLabel',
+            'oldProduccionExtra',
+            'unidades'
+        ));
     }
 
     public function store(Request $request)
@@ -147,19 +155,20 @@ class VentaController extends Controller
                 }
             }
 
+            $total = round((float) $data['cantidad'] * (float) $data['preciounitario'], 2);
+
             Venta::create([
                 'produccionid'   => $data['produccionid'],
                 'cliente'        => $data['cliente'],
                 'cantidad'       => $data['cantidad'],
                 'unidadmedidaid' => $data['unidadmedidaid'],
                 'preciounitario' => $data['preciounitario'],
+                'total'          => $total,
                 'fechaventa'     => now()->toDateString(),
                 'observaciones'  => $data['observaciones'],
             ]);
 
             DB::commit();
-
-            $total = $data['cantidad'] * $data['preciounitario'];
             $unidad = UnidadMedida::find($data['unidadmedidaid']);
 
             return redirect()
@@ -242,6 +251,7 @@ class VentaController extends Controller
                 }
             }
 
+            $data['total'] = round((float) $data['cantidad'] * (float) $data['preciounitario'], 2);
             $venta->update($data);
 
             DB::commit();

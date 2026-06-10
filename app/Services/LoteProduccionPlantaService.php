@@ -31,7 +31,8 @@ class LoteProduccionPlantaService
         ?float $cantidadObjetivo,
         ?int $unidadmedidaid,
         array $lineas,
-        ?string $observaciones = null
+        ?string $observaciones = null,
+        ?int $plantillatransformacionid = null
     ): LoteProduccionPedido {
         if ($lineas === []) {
             throw new \InvalidArgumentException('Debe indicar al menos una materia prima del almacén.');
@@ -51,7 +52,7 @@ class LoteProduccionPlantaService
         $tipoSalida = $this->tipoMovimientoSalidaProduccion();
         $unidadmedidaid = ProductoPlantaCatalogo::resolverUnidadMedidaId($producto, $unidadmedidaid);
 
-        return DB::transaction(function () use ($usuario, $producto, $nombre, $pedidoid, $cantidadObjetivo, $unidadmedidaid, $lineas, $observaciones, $tipoSalida) {
+        return DB::transaction(function () use ($usuario, $producto, $nombre, $pedidoid, $cantidadObjetivo, $unidadmedidaid, $lineas, $observaciones, $tipoSalida, $plantillatransformacionid) {
             $pedidoIdFinal = $pedidoid ?? $this->crearPedidoInterno($nombre);
 
             $codigo = 'LOTE-'.str_pad((string) (LoteProduccionPedido::max('loteproduccionpedidoid') + 1), 4, '0', STR_PAD_LEFT).'-'.now()->format('Ymd');
@@ -69,6 +70,11 @@ class LoteProduccionPlantaService
 
             if (\Illuminate\Support\Facades\Schema::hasColumn('lote_produccion_pedido', 'producto')) {
                 $loteData['producto'] = $producto;
+            }
+
+            if ($plantillatransformacionid !== null
+                && \Illuminate\Support\Facades\Schema::hasColumn('lote_produccion_pedido', 'plantillatransformacionid')) {
+                $loteData['plantillatransformacionid'] = $plantillatransformacionid;
             }
 
             $lote = LoteProduccionPedido::create($loteData);

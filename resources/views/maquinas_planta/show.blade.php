@@ -189,5 +189,6 @@
     @if($maquina->imagenSrc())
         @include('maquinas_planta.partials.modal-foto-maquina')
     @endif
+    @include('partials.modal-confirmar-accion')
 </div>
 @endsection

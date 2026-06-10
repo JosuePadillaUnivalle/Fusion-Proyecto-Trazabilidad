@@ -80,6 +80,42 @@ class ProcesoPlantaCatalogo
         return $norm === self::PROCESO_CIERRE_TRANSFORMACION;
     }
 
+    public static function idProcesoCierreTransformacion(): ?int
+    {
+        $id = ProcesoPlanta::query()
+            ->where('nombre', self::PROCESO_CIERRE_TRANSFORMACION)
+            ->where('activo', true)
+            ->value('procesoplantaid');
+
+        return $id !== null ? (int) $id : null;
+    }
+
+    /**
+     * @param  list<array{procesoplantaid?: mixed}>  $pasos
+     */
+    public static function errorSiUltimoPasoNoEsEmpaquetado(array $pasos): ?string
+    {
+        $ids = [];
+        foreach ($pasos as $paso) {
+            if (! empty($paso['procesoplantaid'])) {
+                $ids[] = (int) $paso['procesoplantaid'];
+            }
+        }
+
+        if ($ids === []) {
+            return 'Debe definir al menos un paso en la línea.';
+        }
+
+        $ultimoId = $ids[array_key_last($ids)];
+        $nombre = ProcesoPlanta::query()->find($ultimoId)?->nombre;
+
+        if (! self::esCierreTransformacion($nombre)) {
+            return 'El último paso debe ser «'.self::PROCESO_CIERRE_TRANSFORMACION.'». Agregue Empaquetado como etapa final antes de guardar.';
+        }
+
+        return null;
+    }
+
     public static function normalizarNombre(?string $nombre): ?string
     {
         if ($nombre === null || trim($nombre) === '') {

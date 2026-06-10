@@ -180,4 +180,29 @@ class ProductoPlantaCatalogo
 
         return $resumen['kg'] > 0 ? $resumen['kg'] : (float) ($lote->cantidad_objetivo ?? 0);
     }
+
+    /**
+     * Materia prima en kg para alcanzar un objetivo en unidades (purés).
+     *
+     * @return array{unidades: float, salida_kg: float, entrada_kg: float, rendimiento: float, peso_kg_por_unidad: float}|null
+     */
+    public static function recomendacionMateriaPrima(?string $producto, float $unidadesObjetivo): ?array
+    {
+        if (! self::esProductoPorUnidades($producto) || $unidadesObjetivo <= 0) {
+            return null;
+        }
+
+        $pesoUnd = self::PESO_KG_POR_UNIDAD_PURE;
+        $rendimiento = self::RENDIMIENTO_PURE;
+        $salidaKg = $unidadesObjetivo * $pesoUnd;
+        $entradaKg = $salidaKg / $rendimiento;
+
+        return [
+            'unidades' => $unidadesObjetivo,
+            'salida_kg' => round($salidaKg, 2),
+            'entrada_kg' => round($entradaKg, 2),
+            'rendimiento' => $rendimiento,
+            'peso_kg_por_unidad' => $pesoUnd,
+        ];
+    }
 }

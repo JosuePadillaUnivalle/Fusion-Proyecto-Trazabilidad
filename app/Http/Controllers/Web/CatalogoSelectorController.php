@@ -11,20 +11,24 @@ use App\Models\Lote;
 use App\Models\MaquinaPlanta;
 use App\Models\ProcesoPlanta;
 use App\Models\Pedido;
+use App\Models\PlantillaTransformacion;
 use App\Models\Produccion;
 use App\Models\PuntoVenta;
+use App\Models\Venta;
 use App\Models\PerfilTransportista;
 use App\Models\Usuario;
 use App\Models\Vehiculo;
 use App\Support\AlmacenAmbito;
 use App\Support\CultivoCatalogo;
 use App\Support\PedidoCatalogo;
+use App\Support\ProcesoPlantaCatalogo;
 use App\Support\PuntoVentaAccess;
 use App\Support\UbicacionGpsParser;
 use App\Support\UsuarioRol;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CatalogoSelectorController extends Controller
 {
@@ -347,6 +351,10 @@ class CatalogoSelectorController extends Controller
             $query = AlmacenAmbito::scope($query, $request->string('ambito')->toString());
         }
 
+        if ($request->boolean('con_stock')) {
+            $query->whereHas('almacenamientos', fn (Builder $q) => $q->where('cantidad', '>', 0));
+        }
+
         $this->aplicarBusqueda($query, (string) $request->q, ['nombre', 'ubicacion']);
 
         return $this->respuestaPaginada($request, $query->orderBy('nombre'), function (Almacen $a) {
@@ -521,6 +529,72 @@ class CatalogoSelectorController extends Controller
         ]);
     }
 
+    public function produccionesStockAlmacen(Request $request): JsonResponse
+    {
+        $preciosPorProduccion = Venta::query()
+            ->select('produccionid', DB::raw('MAX(preciounitario) as ultimo_precio'))
+            ->groupBy('produccionid')
+            ->pluck('ultimo_precio', 'produccionid');
+
+        $preciosPorCultivo = Venta::query()
+            ->join('produccion', 'venta.produccionid', '=', 'produccion.produccionid')
+            ->join('lote', 'produccion.loteid', '=', 'lote.loteid')
+            ->select('lote.cultivoid', DB::raw('ROUND(AVG(venta.preciounitario), 2) as precio_prom'))
+            ->groupBy('lote.cultivoid')
+            ->pluck('precio_prom', 'cultivoid');
+
+        $query = Produccion::query()
+            ->with(['lote.cultivo', 'unidadMedida', 'almacenamientos.almacen'])
+            ->whereHas('almacenamientos', fn (Builder $q) => $q->where('cantidad', '>', 0));
+
+        if ($request->filled('cultivoid')) {
+            $query->whereHas('lote', fn (Builder $l) => $l->where('cultivoid', (int) $request->cultivoid));
+        }
+
+        if ($request->filled('almacenid')) {
+            $query->whereHas('almacenamientos', function (Builder $q) use ($request) {
+                $q->where('almacenid', (int) $request->almacenid)
+                    ->where('cantidad', '>', 0);
+            });
+        }
+
+        $q = trim((string) $request->q);
+        if ($q !== '') {
+            $like = '%'.$q.'%';
+            $query->where(function (Builder $w) use ($like) {
+                $w->whereHas('lote', fn (Builder $l) => $l->where('nombre', 'like', $like))
+                    ->orWhereHas('lote.cultivo', fn (Builder $c) => $c->where('nombre', 'like', $like))
+                    ->orWhereHas('almacenamientos.almacen', fn (Builder $a) => $a->where('nombre', 'like', $like));
+            });
+        }
+
+        return $this->respuestaPaginada($request, $query->orderByDesc('produccionid'), function (Produccion $p) use ($preciosPorProduccion, $preciosPorCultivo) {
+            $stock = (float) $p->almacenamientos->sum('cantidad');
+            $cultivo = $p->lote->cultivo->nombre ?? 'Producto';
+            $lote = $p->lote->nombre ?? 'Lote';
+            $almacen = $p->almacenamientos->first()->almacen->nombre ?? 'Sin almacén';
+            $unidad = $p->unidadMedida->abreviatura ?? 'kg';
+            $cultivoId = $p->lote->cultivoid ?? null;
+            $precio = $preciosPorProduccion[$p->produccionid]
+                ?? ($cultivoId ? ($preciosPorCultivo[$cultivoId] ?? null) : null);
+
+            return [
+                'id' => $p->produccionid,
+                'label' => $cultivo.' · '.$lote.' · '.$almacen,
+                'meta' => number_format($stock, 2).' '.$unidad.' disponibles',
+                'extra' => [
+                    'disponible' => $stock,
+                    'unidad' => $unidad,
+                    'unidad_id' => $p->unidadmedidaid,
+                    'cultivo' => $cultivo,
+                    'lote' => $lote,
+                    'almacen' => $almacen,
+                    'precio' => $precio !== null ? (float) $precio : null,
+                ],
+            ];
+        });
+    }
+
     public function producciones(Request $request): JsonResponse
     {
         $query = Produccion::query()->with(['lote', 'destino']);
@@ -580,6 +654,71 @@ class CatalogoSelectorController extends Controller
                 'id' => $m->maquinaplantaid,
                 'label' => $m->nombre,
                 'meta' => $m->codigo ?: ($m->activo ? 'Activa' : 'Mantenimiento'),
+            ];
+        });
+    }
+
+    public function plantillasTransformacion(Request $request): JsonResponse
+    {
+        $query = PlantillaTransformacion::query()
+            ->with(['pasos.proceso', 'pasos.maquina']);
+
+        $disponibilidad = (string) $request->input('disponibilidad', 'operativas');
+        if ($disponibilidad === 'operativas') {
+            $query->operativas();
+        } elseif ($disponibilidad === 'mantenimiento') {
+            $query->bloqueadasPorMantenimiento();
+        }
+
+        $q = trim((string) $request->q);
+        if ($q !== '') {
+            $like = '%'.$q.'%';
+            $query->where(function (Builder $w) use ($like) {
+                $w->where('nombre', 'like', $like)
+                    ->orWhere('descripcion', 'like', $like)
+                    ->orWhere('producto_ejemplo', 'like', $like)
+                    ->orWhere('palabras_clave', 'like', $like);
+            });
+        }
+
+        return $this->respuestaPaginada($request, $query->orderBy('nombre'), function (PlantillaTransformacion $p) {
+            $bloqueada = $p->bloqueadaPorMantenimiento();
+            $pasos = $p->pasos->map(function ($paso) {
+                $procesoNombre = $paso->proceso?->nombre ?? '—';
+                $maquina = $paso->maquina
+                    ? $paso->maquina->nombre.($paso->maquina->codigo ? ' ('.$paso->maquina->codigo.')' : '')
+                    : 'Cualquiera compatible';
+
+                return [
+                    'orden' => (int) $paso->orden,
+                    'proceso' => $procesoNombre,
+                    'maquina' => $maquina,
+                    'notas' => $paso->notas,
+                    'es_cierre' => ProcesoPlantaCatalogo::esCierreTransformacion($procesoNombre),
+                    'maquina_mantenimiento' => $paso->maquina && ! $paso->maquina->activo,
+                ];
+            })->values()->all();
+
+            $metaPartes = [];
+            if ($p->producto_ejemplo) {
+                $metaPartes[] = 'Ej: '.$p->producto_ejemplo;
+            }
+            $metaPartes[] = count($pasos).' paso'.(count($pasos) === 1 ? '' : 's');
+            $metaPartes[] = $bloqueada ? 'En mantenimiento' : 'Disponible';
+
+            return [
+                'id' => $p->plantillatransformacionid,
+                'label' => $p->nombre,
+                'meta' => implode(' · ', $metaPartes),
+                'extra' => [
+                    'descripcion' => $p->descripcion,
+                    'producto_ejemplo' => $p->producto_ejemplo,
+                    'palabras_clave' => $p->palabrasClaveLista(),
+                    'estado' => $bloqueada ? 'mantenimiento' : 'disponible',
+                    'pasos' => $pasos,
+                    'url' => route('plantillas-transformacion.show', $p),
+                    'seleccionable' => ! $bloqueada,
+                ],
             ];
         });
     }

@@ -36,6 +36,10 @@
 .trz-dash a.fase-step-link.fase-step.next:hover { color: #fff; }
 .trz-dash a.fase-step-link.fase-step.active:hover { color: #fff; opacity: .95; }
 .trz-dash .fase-step.pending { opacity: .65; }
+.trz-dash .fase-step.skipped {
+    border-color: #dee2e6; background: #f8f9fa; color: #6c757d; opacity: .85;
+    text-decoration: line-through; text-decoration-color: rgba(108,117,125,.45);
+}
 .trz-dash .fase-step .badge { font-size: .65rem; margin-top: 4px; }
 .trz-dash .progress-fase { height: 10px; border-radius: 8px; background: #e9ecef; margin-bottom: 1rem; }
 .trz-dash .progress-fase .bar { height: 100%; border-radius: 8px; background: linear-gradient(90deg, #2c5530, #4a7c59); }

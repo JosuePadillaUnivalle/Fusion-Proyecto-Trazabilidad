@@ -37,7 +37,7 @@
     </div>
     @endif
 
-    @if($producciones->isEmpty())
+    @if(!$hayProductosConStock)
     <div class="alert alert-warning">
         <i class="fas fa-exclamation-triangle mr-1"></i>
         No hay productos con stock en almacén. Primero registra una cosecha y envíala a almacén desde el módulo de Producción.
@@ -55,23 +55,40 @@
                     <div class="card-body">
                         <div class="form-group">
                             <label class="font-weight-bold"><i class="fas fa-warehouse mr-1 text-success"></i> Producto en almacén <span class="text-danger">*</span></label>
-                            <select name="produccionid" id="produccionid" class="form-control" required {{ $producciones->isEmpty() ? 'disabled' : '' }}>
-                                <option value="">— Seleccione producto con stock —</option>
-                                @foreach($producciones as $p)
-                                <option value="{{ $p->produccionid }}"
-                                    @selected(old('produccionid') == $p->produccionid)
-                                    data-disponible="{{ $p->stock_disponible }}"
-                                    data-unidad="{{ $p->unidadMedida->abreviatura ?? 'kg' }}"
-                                    data-unidad-id="{{ $p->unidadmedidaid }}"
-                                    data-cultivo="{{ $p->lote->cultivo->nombre ?? 'Sin cultivo' }}"
-                                    data-lote="{{ $p->lote->nombre ?? '' }}"
-                                    data-almacen="{{ $p->almacen_nombre }}"
-                                    data-precio="{{ $p->precio_sugerido ?? '' }}">
-                                    {{ $p->lote->cultivo->nombre ?? 'Producto' }} · {{ $p->lote->nombre ?? 'Lote' }} · {{ $p->almacen_nombre }}
-                                    ({{ number_format($p->stock_disponible, 2) }} {{ $p->unidadMedida->abreviatura ?? 'kg' }})
-                                </option>
-                                @endforeach
-                            </select>
+                            @if($hayProductosConStock)
+                            @include('partials.selector-catalogo', [
+                                'id' => 'venta_producto',
+                                'name' => 'produccionid',
+                                'value' => old('produccionid', ''),
+                                'labelSelected' => $oldProduccionLabel,
+                                'endpoint' => route('catalogo-selector.producciones-stock-almacen'),
+                                'title' => 'Buscar producto con stock en almacén',
+                                'searchPlaceholder' => 'Cultivo o lote…',
+                                'required' => true,
+                                'filterAlmacen' => [
+                                    'param' => 'almacenid',
+                                    'endpoint' => route('catalogo-selector.almacenes'),
+                                    'placeholder' => 'Escriba el nombre del almacén (ej. Norte, Santa Cruz)…',
+                                    'params' => ['con_stock' => '1'],
+                                ],
+                                'filter' => [
+                                    'param' => 'cultivoid',
+                                    'options' => array_merge(
+                                        [['value' => '', 'label' => 'Todos los cultivos']],
+                                        $cultivosFiltro->map(fn ($c) => [
+                                            'value' => (string) $c->cultivoid,
+                                            'label' => $c->nombre,
+                                        ])->all()
+                                    ),
+                                ],
+                            ])
+                            <small class="text-muted d-block mt-1">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Pulse <strong>Buscar</strong>: elija el almacén en la lista, filtre por cultivo y seleccione el producto.
+                            </small>
+                            @else
+                            <input type="text" class="form-control" disabled placeholder="Sin productos con stock">
+                            @endif
                         </div>
 
                         <div id="productoPreview" class="producto-preview" style="display:none;">
@@ -86,16 +103,16 @@
                         <div class="form-group">
                             <label class="font-weight-bold"><i class="fas fa-user mr-1 text-success"></i> Cliente <span class="text-danger">*</span></label>
                             <input type="text" name="cliente" id="cliente" class="form-control" required maxlength="100"
-                                placeholder="Nombre del comprador" value="{{ old('cliente') }}" {{ $producciones->isEmpty() ? 'disabled' : '' }}>
+                                placeholder="Nombre del comprador" value="{{ old('cliente') }}" {{ !$hayProductosConStock ? 'disabled' : '' }}>
                         </div>
 
                         <div class="form-group">
                             <label class="font-weight-bold"><i class="fas fa-balance-scale mr-1 text-success"></i> Cantidad a vender <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <input type="number" step="0.01" name="cantidad" id="cantidad" class="form-control" min="0.01" required
-                                    value="{{ old('cantidad') }}" placeholder="Ej: 100" {{ $producciones->isEmpty() ? 'disabled' : '' }}>
+                                    value="{{ old('cantidad') }}" placeholder="Ej: 100" {{ !$hayProductosConStock ? 'disabled' : '' }}>
                                 <div class="input-group-append">
-                                    <select name="unidadmedidaid" id="unidadmedidaid" class="form-control" required {{ $producciones->isEmpty() ? 'disabled' : '' }}>
+                                    <select name="unidadmedidaid" id="unidadmedidaid" class="form-control" required {{ !$hayProductosConStock ? 'disabled' : '' }}>
                                         @foreach($unidades as $u)
                                         <option value="{{ $u->unidadmedidaid }}" @selected(old('unidadmedidaid', $u->es_base ? $u->unidadmedidaid : null) == $u->unidadmedidaid)>
                                             {{ $u->abreviatura }}
@@ -117,7 +134,7 @@
                             <div class="input-group">
                                 <div class="input-group-prepend"><span class="input-group-text">Bs.</span></div>
                                 <input type="number" step="0.01" name="preciounitario" id="preciounitario" class="form-control" min="0" required
-                                    value="{{ old('preciounitario') }}" placeholder="Ej: 15.00" {{ $producciones->isEmpty() ? 'disabled' : '' }}>
+                                    value="{{ old('preciounitario') }}" placeholder="Ej: 15.00" {{ !$hayProductosConStock ? 'disabled' : '' }}>
                                 <div class="input-group-append"><span class="input-group-text">por <span id="unidadPrecio">kg</span></span></div>
                             </div>
                             <small class="text-muted" id="hintPrecio" style="display:none;">
@@ -127,12 +144,12 @@
 
                         <div class="form-group mb-0">
                             <label class="font-weight-bold"><i class="fas fa-comment mr-1 text-success"></i> Observaciones</label>
-                            <textarea name="observaciones" class="form-control" rows="2" maxlength="200" placeholder="Opcional…" {{ $producciones->isEmpty() ? 'disabled' : '' }}>{{ old('observaciones') }}</textarea>
+                            <textarea name="observaciones" class="form-control" rows="2" maxlength="200" placeholder="Opcional…" {{ !$hayProductosConStock ? 'disabled' : '' }}>{{ old('observaciones') }}</textarea>
                         </div>
                     </div>
                     <div class="card-footer d-flex justify-content-between">
                         <a href="{{ route('ventas.index') }}" class="btn btn-secondary"><i class="fas fa-times mr-1"></i> Cancelar</a>
-                        <button type="submit" class="btn btn-success" {{ $producciones->isEmpty() ? 'disabled' : '' }}>
+                        <button type="submit" class="btn btn-success" {{ !$hayProductosConStock ? 'disabled' : '' }}>
                             <i class="fas fa-save mr-1"></i> Registrar venta
                         </button>
                     </div>
@@ -190,8 +207,9 @@ $(function () {
     }
 
     function marcarPasos() {
-        var p1 = $('#produccionid').val() ? 'done' : 'active';
-        var p2 = $('#cliente').val() && $('#cantidad').val() ? 'done' : ($('#produccionid').val() ? 'active' : '');
+        var prodId = document.querySelector('#selector_wrap_venta_producto .selector-catalogo-value')?.value || '';
+        var p1 = prodId ? 'done' : 'active';
+        var p2 = $('#cliente').val() && $('#cantidad').val() ? 'done' : (prodId ? 'active' : '');
         var p3 = $('#preciounitario').val() ? 'done' : (p2 === 'done' ? 'active' : '');
         $('#paso1').attr('class', 'paso-num ' + (p1 === 'done' ? 'done' : 'active'));
         $('#paso2').attr('class', 'paso-num ' + (p2 || ''));
@@ -199,8 +217,8 @@ $(function () {
         $('#paso4').attr('class', 'paso-num');
     }
 
-    function aplicarProducto(selected) {
-        if (!selected.val()) {
+    function aplicarProducto(extra) {
+        if (!extra || !extra.disponible) {
             $('#productoPreview').slideUp();
             $('#btnVenderTodo').prop('disabled', true);
             stockActual = 0;
@@ -209,13 +227,13 @@ $(function () {
             return;
         }
 
-        stockActual = parseFloat(selected.data('disponible')) || 0;
-        var unidad = selected.data('unidad') || 'kg';
-        var unidadId = selected.data('unidad-id');
-        var precio = selected.data('precio');
+        stockActual = parseFloat(extra.disponible) || 0;
+        var unidad = extra.unidad || 'kg';
+        var unidadId = extra.unidad_id;
+        var precio = extra.precio;
 
-        $('#pvCultivoLote').text(selected.data('cultivo') + ' · ' + selected.data('lote'));
-        $('#pvAlmacen').text(selected.data('almacen'));
+        $('#pvCultivoLote').text((extra.cultivo || '') + ' · ' + (extra.lote || ''));
+        $('#pvAlmacen').text(extra.almacen || '—');
         $('#pvStock').text(stockActual.toFixed(2) + ' ' + unidad);
         $('#maxDisponible').text(stockActual.toFixed(2) + ' ' + unidad);
         $('#unidadPrecio').text(unidad);
@@ -244,8 +262,17 @@ $(function () {
         $('#cliente').focus();
     }
 
-    $('#produccionid').on('change', function () {
-        aplicarProducto($(this).find(':selected'));
+    if (window.CatalogoSelector) {
+        var cfgBase = CatalogoSelector.instances.venta_producto || {};
+        CatalogoSelector.register('venta_producto', Object.assign({}, cfgBase, {
+            onSelect: function (item) {
+                aplicarProducto(item.extra || {});
+            },
+        }));
+    }
+
+    document.getElementById('selector_wrap_venta_producto')?.addEventListener('selector-catalogo:change', function (e) {
+        aplicarProducto(e.detail?.extra || {});
     });
 
     $('#btnVenderTodo').on('click', function () {
@@ -266,10 +293,12 @@ $(function () {
         $('#unidadPrecio').text($(this).find(':selected').text());
     });
 
-    if ($('#produccionid').val()) {
-        aplicarProducto($('#produccionid').find(':selected'));
-    }
+    @if($oldProduccionExtra)
+    aplicarProducto(@json($oldProduccionExtra));
+    @endif
+
     calcularTotal();
+    marcarPasos();
 });
 </script>
 @endpush

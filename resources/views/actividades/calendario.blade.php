@@ -10,6 +10,7 @@
 @endsection
 
 @php
+    use Illuminate\Support\Str;
     $pctCompletadas = $stats['total'] > 0
         ? round(($stats['completadas'] / $stats['total']) * 100)
         : 0;
@@ -18,10 +19,8 @@
         'riego' => '#17a2b8',
         'cosecha' => '#e67e00',
         'fumigacion' => '#dc3545',
-        'fumigación' => '#dc3545',
-        'labranza' => '#6c757d',
         'fertilizacion' => '#fd7e14',
-        'fertilización' => '#fd7e14',
+        'labranza' => '#6c757d',
         'control-de-plagas' => '#6f42c1',
         'poda' => '#20c997',
         'auditoria-de-calidad' => '#5a6268',
@@ -32,10 +31,8 @@
         'siembra' => 'fa-seedling',
         'riego' => 'fa-tint',
         'fertilizacion' => 'fa-flask',
-        'fertilización' => 'fa-flask',
         'cosecha' => 'fa-box-open',
         'fumigacion' => 'fa-spray-can',
-        'fumigación' => 'fa-spray-can',
         'labranza' => 'fa-tractor',
         'control-de-plagas' => 'fa-bug',
         'poda' => 'fa-cut',
@@ -74,7 +71,7 @@
     background-color: #17a2b8 !important;
     border-color: #17a2b8 !important;
 }
-/* Vista mes: cuadrícula limpia, sin barras de eventos */
+/* Vista mes: cuadricula limpia, sin barras de eventos */
 .page-calendario .fc-dayGridMonth-view .fc-daygrid-day-events,
 .page-calendario .fc-dayGridMonth-view .fc-daygrid-event-harness,
 .page-calendario .fc-dayGridMonth-view .fc-more-link {
@@ -117,15 +114,33 @@
     color: #495057;
 }
 .page-calendario .fc-day-today .fc-daygrid-day-number {
-    background: #2c5530;
-    color: #fff;
+    background: transparent;
+    color: #17a2b8;
+    border: 2px solid #17a2b8;
     border-radius: 50%;
     width: 28px;
     height: 28px;
-    line-height: 28px;
+    line-height: 24px;
     text-align: center;
     padding: 0;
     margin: 4px;
+    font-weight: 700;
+    box-shadow: 0 0 0 2px rgba(23, 162, 184, 0.15);
+}
+.page-calendario .dia-label-hoy {
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #17a2b8;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+}
+.page-calendario .fc-daygrid-day-frame:has(.dia-badge-calendario) .dia-label-hoy {
+    display: none;
 }
 /* Vista agenda: filas blancas, borde de color (no bloques saturados) */
 .page-calendario .fc-list-event {
@@ -235,18 +250,159 @@
     font-size: 0.9rem;
 }
 .page-calendario .fc-daygrid-day.fc-day-today .fc-daygrid-day-frame {
-    background: rgba(44, 85, 48, 0.06) !important;
+    background: rgba(23, 162, 184, 0.08) !important;
+    box-shadow: inset 0 0 0 1px rgba(23, 162, 184, 0.25);
 }
-.page-calendario .activity-detail-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
+/* Modal fuera de .page-calendario: estilos por #activityModal */
+#activityModal .actividad-detalle-modal {
+    border-radius: 18px;
+    overflow: hidden;
+}
+#activityModal .actividad-detalle-hero {
+    position: relative;
+    padding: 1.85rem 1.65rem 1.45rem;
+    color: #fff;
+    background: linear-gradient(135deg, #2c5530, #4a7c59);
+}
+#activityModal .actividad-detalle-hero .close {
+    position: absolute;
+    top: 1rem;
+    right: 1.15rem;
+    opacity: 0.92;
+    text-shadow: none;
+    font-size: 1.4rem;
+    padding: 0.15rem 0.35rem;
+}
+#activityModal .actividad-detalle-hero-icon {
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.22);
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-right: 12px;
-    color: #fff;
+    font-size: 1.45rem;
+    margin-bottom: 0.9rem;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+#activityModal .actividad-detalle-hero h4 {
+    font-size: 1.45rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+    line-height: 1.25;
+    padding-right: 1.5rem;
+}
+#activityModal .actividad-detalle-hero-lote {
+    font-size: 0.9rem;
+    opacity: 0.94;
+    margin: 0 0 0.85rem;
+    padding-right: 0.5rem;
+}
+#activityModal .actividad-detalle-estado {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.38rem 0.8rem;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+#activityModal .actividad-detalle-estado.completada {
+    background: rgba(255, 255, 255, 0.96);
+    color: #1e7e34;
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+#activityModal .actividad-detalle-estado.pendiente {
+    background: rgba(255, 193, 7, 0.96);
+    color: #856404;
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+#activityModal .actividad-detalle-body {
+    padding: 1.4rem 1.55rem 1.3rem !important;
+    background: #f4f7f5;
+}
+#activityModal .actividad-detalle-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+}
+#activityModal .actividad-detalle-campo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: #fff;
+    border: 1px solid #e3ebe5;
+    border-radius: 14px;
+    padding: 1rem 1.15rem;
+    box-shadow: 0 2px 8px rgba(44, 85, 48, 0.06);
+}
+#activityModal .campo-icon-wrap {
+    width: 46px;
+    height: 46px;
+    border-radius: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
+    font-size: 1.1rem;
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+#activityModal .campo-icon-responsable { background: linear-gradient(135deg, #2c5530, #4a7c59); }
+#activityModal .campo-icon-lote { background: linear-gradient(135deg, #17a2b8, #20c997); }
+#activityModal .campo-icon-inicio { background: linear-gradient(135deg, #f39c12, #ffc107); }
+#activityModal .campo-icon-fin { background: linear-gradient(135deg, #6f42c1, #8e64e8); }
+#activityModal .campo-icon-obs { background: linear-gradient(135deg, #495057, #6c757d); }
+#activityModal .campo-texto {
+    flex: 1;
+    min-width: 0;
+}
+#activityModal .actividad-detalle-campo .campo-label,
+#activityModal .actividad-detalle-obs .campo-label {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #7a8794;
+    margin-bottom: 0.3rem;
+}
+#activityModal .actividad-detalle-campo .campo-valor {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1a252f;
+    line-height: 1.4;
+    word-break: break-word;
+}
+#activityModal .actividad-detalle-obs {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-top: 0.95rem;
+    background: #fff;
+    border: 1px solid #e3ebe5;
+    border-radius: 14px;
+    padding: 1.05rem 1.15rem;
+    box-shadow: 0 2px 8px rgba(44, 85, 48, 0.06);
+}
+#activityModal .actividad-detalle-obs p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #495057;
+    line-height: 1.55;
+}
+#activityModal .actividad-detalle-footer {
+    background: #fff;
+    border-top: 1px solid #e9ecef;
+    padding: 1.05rem 1.55rem 1.2rem !important;
+    gap: 0.75rem;
 }
 .page-calendario .fab-button {
     position: fixed;
@@ -384,7 +540,7 @@
                 @endphp
                 @foreach($tiposActividad as $tipo)
                     @php
-                        $slug = Str::slug($tipo->nombre);
+                        $slug = Str::slug($tipo->nombre, '-', 'es');
                         $color = $coloresTipo[$slug] ?? '#6c757d';
                         $icono = $iconosTipo[$slug] ?? 'fa-tasks';
                         $activoDefecto = in_array($slug, $tiposPrincipales, true);
@@ -393,7 +549,7 @@
                         class="btn btn-tipo-filtro {{ $activoDefecto ? 'active' : '' }}"
                         data-tipo-slug="{{ $slug }}"
                         data-color="{{ $color }}"
-                        title="{{ $activoDefecto ? 'Activo — clic para ocultar' : 'Inactivo — clic para mostrar' }}"
+                        title="{{ $activoDefecto ? 'Activo - clic para ocultar' : 'Inactivo - clic para mostrar' }}"
                         style="--tipo-color: {{ $color }};"
                         aria-pressed="{{ $activoDefecto ? 'true' : 'false' }}">
                         <i class="fas {{ $icono }} tipo-icono"></i>
@@ -403,6 +559,11 @@
                 @endforeach
             </div>
             <div id="filtro-contador" class="mt-1"></div>
+            <template id="tpl-alerta-tipos-vacio">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                <strong>Ning&uacute;n tipo seleccionado</strong>
+                &mdash; activa al menos uno o pulsa &laquo;Todos&raquo;
+            </template>
         </div>
 
         <div class="card-body p-2">
@@ -411,15 +572,19 @@
         <div class="card-footer py-2 d-flex flex-wrap align-items-center" style="gap: 12px;">
             <small class="text-muted">
                 <i class="fas fa-mouse-pointer mr-1"></i>
-                <strong>Mes:</strong> clic en un día (número = cantidad de actividades).
+                <strong>Mes:</strong> clic en un d&iacute;a (n&uacute;mero = cantidad de actividades).
             </small>
             <small class="text-muted">
                 <span class="dia-badge-calendario d-inline-block" style="position:static;transform:none;min-width:22px;height:22px;line-height:22px;font-size:0.7rem;"></span>
-                Total del día
+                Total del d&iacute;a
             </small>
             <small class="text-muted">
                 <span class="dia-badge-calendario tiene-pendientes d-inline-block" style="position:static;transform:none;min-width:22px;height:22px;line-height:22px;font-size:0.7rem;"></span>
                 Con pendientes
+            </small>
+            <small class="text-muted">
+                <span class="d-inline-block mr-1" style="width:22px;height:22px;border:2px solid #17a2b8;border-radius:50%;vertical-align:middle;"></span>
+                D&iacute;a actual
             </small>
         </div>
     </div>
@@ -436,7 +601,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-success text-white py-2">
-                <h5 class="modal-title mb-0"><i class="fas fa-calendar-day mr-2"></i> <span id="dia-modal-titulo">Actividades del día</span></h5>
+                <h5 class="modal-title mb-0"><i class="fas fa-calendar-day mr-2"></i> <span id="dia-modal-titulo">Actividades del d&iacute;a</span></h5>
                 <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <div class="modal-body p-0">
@@ -450,71 +615,63 @@
 </div>
 
 <div class="modal fade" id="activityModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title"><i class="fas fa-info-circle mr-2"></i> Detalle de la actividad</h5>
-                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 520px;">
+        <div class="modal-content actividad-detalle-modal border-0 shadow-lg">
+            <div class="actividad-detalle-hero" id="modal-hero">
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Cerrar"><span>&times;</span></button>
+                <div class="actividad-detalle-hero-icon">
+                    <i class="fas fa-tasks" id="modal-hero-icon"></i>
+                </div>
+                <h4 id="modal-hero-tipo">Actividad</h4>
+                <p class="actividad-detalle-hero-lote" id="modal-hero-lote"></p>
+                <span class="actividad-detalle-estado pendiente" id="modal-hero-estado">
+                    <i class="fas fa-clock"></i> Pendiente
+                </span>
             </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="activity-detail-icon bg-success"><i class="fas fa-tasks"></i></div>
-                            <div>
-                                <small class="text-muted d-block">Tipo</small>
-                                <strong id="modal-tipo">—</strong>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="activity-detail-icon bg-info"><i class="fas fa-map-marked-alt"></i></div>
-                            <div>
-                                <small class="text-muted d-block">Lote</small>
-                                <strong id="modal-lote">—</strong>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="activity-detail-icon" style="background:#4a7c59;"><i class="fas fa-user"></i></div>
-                            <div>
-                                <small class="text-muted d-block">Responsable</small>
-                                <strong id="modal-responsable">—</strong>
-                            </div>
+            <div class="modal-body actividad-detalle-body">
+                <div class="actividad-detalle-grid">
+                    <div class="actividad-detalle-campo">
+                        <div class="campo-icon-wrap campo-icon-responsable"><i class="fas fa-user-check"></i></div>
+                        <div class="campo-texto">
+                            <span class="campo-label">Responsable</span>
+                            <span class="campo-valor" id="modal-responsable">-</span>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="activity-detail-icon bg-warning"><i class="fas fa-calendar"></i></div>
-                            <div>
-                                <small class="text-muted d-block">Inicio</small>
-                                <strong id="modal-fecha-inicio">—</strong>
-                            </div>
+                    <div class="actividad-detalle-campo">
+                        <div class="campo-icon-wrap campo-icon-lote"><i class="fas fa-map-marked-alt"></i></div>
+                        <div class="campo-texto">
+                            <span class="campo-label">Lote</span>
+                            <span class="campo-valor" id="modal-lote">-</span>
                         </div>
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="activity-detail-icon bg-primary"><i class="fas fa-calendar-check"></i></div>
-                            <div>
-                                <small class="text-muted d-block">Fin</small>
-                                <strong id="modal-fecha-fin">—</strong>
-                            </div>
+                    </div>
+                    <div class="actividad-detalle-campo">
+                        <div class="campo-icon-wrap campo-icon-inicio"><i class="fas fa-play-circle"></i></div>
+                        <div class="campo-texto">
+                            <span class="campo-label">Inicio</span>
+                            <span class="campo-valor" id="modal-fecha-inicio">-</span>
                         </div>
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="activity-detail-icon bg-secondary"><i class="fas fa-flag"></i></div>
-                            <div>
-                                <small class="text-muted d-block">Estado</small>
-                                <span id="modal-estado"><span class="badge badge-warning">Pendiente</span></span>
-                            </div>
+                    </div>
+                    <div class="actividad-detalle-campo">
+                        <div class="campo-icon-wrap campo-icon-fin"><i class="fas fa-flag-checkered"></i></div>
+                        <div class="campo-texto">
+                            <span class="campo-label">Fin</span>
+                            <span class="campo-valor" id="modal-fecha-fin">-</span>
                         </div>
                     </div>
                 </div>
-                <div class="callout callout-info mb-0 py-2">
-                    <strong><i class="fas fa-comment mr-1"></i> Observaciones</strong>
-                    <p id="modal-observaciones" class="mb-0 text-muted small">—</p>
+                <div class="actividad-detalle-obs">
+                    <div class="campo-icon-wrap campo-icon-obs"><i class="fas fa-sticky-note"></i></div>
+                    <div class="campo-texto">
+                        <span class="campo-label">Observaciones</span>
+                        <p id="modal-observaciones">Sin observaciones</p>
+                    </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cerrar</button>
+            <div class="modal-footer actividad-detalle-footer d-flex justify-content-between align-items-center">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-dismiss="modal">Cerrar</button>
                 @can('lotes.update')
                 <a href="#" id="btn-editar-actividad" class="btn btn-success btn-sm">
-                    <i class="fas fa-edit mr-1"></i> Editar
+                    <i class="fas fa-edit mr-1"></i> Editar actividad
                 </a>
                 @endcan
             </div>
@@ -551,7 +708,7 @@
                                 <select name="loteid" class="form-control form-control-sm" required>
                                     <option value="">Seleccionar...</option>
                                     @foreach($lotes as $lote)
-                                        <option value="{{ $lote->loteid }}">{{ $lote->nombre }} — {{ $lote->cultivo->nombre ?? 'Sin cultivo' }}</option>
+                                        <option value="{{ $lote->loteid }}">{{ $lote->nombre }} &mdash; {{ $lote->cultivo->nombre ?? 'Sin cultivo' }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -596,6 +753,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var calendarEl = document.getElementById('calendar');
     var allEvents = @json($eventos);
     var editUrlTemplate = @json(route('actividades.edit', ['actividad' => '__ID__']));
+    var coloresTipoMap = @json($coloresTipo);
+    var iconosTipoMap = @json($iconosTipo);
     var contadorEl = document.getElementById('filtro-contador');
     var conteosPorDia = {};
 
@@ -677,28 +836,37 @@ document.addEventListener('DOMContentLoaded', function () {
             var g = grupos[key];
             var e = g.event;
             var props = e.extendedProps || {};
-            var sufijo = g.count > 1 ? ' (×' + g.count + ')' : '';
+            var sufijo = g.count > 1 ? ' (' + g.count + ')' : '';
             return Object.assign({}, e, {
-                title: (props.tipo || 'Actividad') + ' · ' + (props.lote || '') + sufijo,
+                title: (props.tipo || 'Actividad') + ' - ' + (props.lote || 'N/D') + sufijo,
                 classNames: [claseTipoEvento(props.tipoSlug)].concat(props.pendiente ? ['event-pendiente'] : []),
             });
         });
     }
 
     function pintarBadgesMes() {
-        document.querySelectorAll('.dia-badge-calendario').forEach(function (el) { el.remove(); });
+        document.querySelectorAll('.dia-badge-calendario, .dia-label-hoy').forEach(function (el) { el.remove(); });
         if (calendar.view.type !== 'dayGridMonth') return;
 
         document.querySelectorAll('.fc-daygrid-day[data-date]').forEach(function (celda) {
             var fecha = celda.getAttribute('data-date');
-            var info = conteosPorDia[fecha];
-            if (!info || info.total === 0) return;
             var frame = celda.querySelector('.fc-daygrid-day-frame');
             if (!frame) return;
-            var badge = document.createElement('div');
-            badge.className = 'dia-badge-calendario' + (info.pendientes > 0 ? ' tiene-pendientes' : '');
-            badge.textContent = info.total;
-            frame.appendChild(badge);
+            var info = conteosPorDia[fecha];
+            var esHoy = celda.classList.contains('fc-day-today');
+
+            if (info && info.total > 0) {
+                var badge = document.createElement('div');
+                badge.className = 'dia-badge-calendario' + (info.pendientes > 0 ? ' tiene-pendientes' : '');
+                badge.textContent = info.total;
+                badge.title = info.total + ' actividad' + (info.total !== 1 ? 'es' : '');
+                frame.appendChild(badge);
+            } else if (esHoy) {
+                var label = document.createElement('span');
+                label.className = 'dia-label-hoy';
+                label.textContent = 'Hoy';
+                frame.appendChild(label);
+            }
         });
     }
 
@@ -708,7 +876,8 @@ document.addEventListener('DOMContentLoaded', function () {
         var html = '<i class="fas fa-filter mr-1"></i> Mostrando <strong>' + n + '</strong> de ' + allEvents.length + ' actividades';
         if (slugs.length === 0) {
             contadorEl.className = 'mt-1 filtro-alerta';
-            html = '<i class="fas fa-exclamation-triangle mr-1"></i> <strong>Ningún tipo seleccionado</strong> — activa al menos uno o pulsa «Todos»';
+            var tplAlerta = document.getElementById('tpl-alerta-tipos-vacio');
+            html = tplAlerta ? tplAlerta.innerHTML : '<strong>Ningun tipo seleccionado</strong> - activa al menos uno o pulsa Todos';
         } else {
             contadorEl.className = 'mt-1 filtro-actualizado';
             setTimeout(function () {
@@ -726,18 +895,54 @@ document.addEventListener('DOMContentLoaded', function () {
         cal.classList.add('calendario-actualizado');
     }
 
+    function formatearNombreLote(nombre) {
+        if (!nombre) return '-';
+        return String(nombre).replace(/^Lote\s+/i, '');
+    }
+
+    function colorHeroSecundario(hex) {
+        if (!hex || hex.charAt(0) !== '#') return '#4a7c59';
+        var r = Math.max(0, parseInt(hex.slice(1, 3), 16) - 28);
+        var g = Math.max(0, parseInt(hex.slice(3, 5), 16) - 28);
+        var b = Math.max(0, parseInt(hex.slice(5, 7), 16) - 28);
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+
     function abrirDetalleActividad(props) {
-        document.getElementById('modal-tipo').textContent = props.tipo || '—';
-        document.getElementById('modal-lote').textContent = props.lote || '—';
-        document.getElementById('modal-responsable').textContent = props.responsable || '—';
-        document.getElementById('modal-fecha-inicio').textContent = props.fechainicioFmt || '—';
+        var slug = props.tipoSlug || '';
+        var color = coloresTipoMap[slug] || '#2c5530';
+        var icono = iconosTipoMap[slug] || 'fa-tasks';
+        var hero = document.getElementById('modal-hero');
+        var heroIcon = document.getElementById('modal-hero-icon');
+        var heroEstado = document.getElementById('modal-hero-estado');
+
+        if (hero) {
+            hero.style.background = 'linear-gradient(135deg, ' + color + ', ' + colorHeroSecundario(color) + ')';
+        }
+        if (heroIcon) {
+            heroIcon.className = 'fas ' + icono;
+        }
+        var loteFmt = formatearNombreLote(props.lote);
+        document.getElementById('modal-hero-tipo').textContent = props.tipo || 'Actividad';
+        document.getElementById('modal-hero-lote').textContent = loteFmt !== '-' ? loteFmt : 'Sin lote';
+        document.getElementById('modal-responsable').textContent = props.responsable || '-';
+        document.getElementById('modal-lote').textContent = loteFmt;
+        document.getElementById('modal-fecha-inicio').textContent = props.fechainicioFmt || '-';
         document.getElementById('modal-fecha-fin').textContent = props.pendiente
             ? 'Pendiente (se registra al completar)'
-            : (props.fechafin || '—');
+            : (props.fechafin || '-');
         document.getElementById('modal-observaciones').textContent = props.observaciones || 'Sin observaciones';
-        document.getElementById('modal-estado').innerHTML = props.pendiente
-            ? '<span class="badge badge-warning">Pendiente</span>'
-            : '<span class="badge badge-success">Completada</span>';
+
+        if (heroEstado) {
+            if (props.pendiente) {
+                heroEstado.className = 'actividad-detalle-estado pendiente';
+                heroEstado.innerHTML = '<i class="fas fa-clock"></i> Pendiente';
+            } else {
+                heroEstado.className = 'actividad-detalle-estado completada';
+                heroEstado.innerHTML = '<i class="fas fa-check-circle"></i> Completada';
+            }
+        }
+
         if (window.ACTIVIDADES_PUEDE_EDITAR) {
             var btnEd = document.getElementById('btn-editar-actividad');
             if (btnEd) btnEd.href = editUrlTemplate.replace('__ID__', props.id);
@@ -759,18 +964,18 @@ document.addEventListener('DOMContentLoaded', function () {
         lista.innerHTML = '';
 
         if (!grupos.length) {
-            lista.innerHTML = '<div class="p-3 text-muted text-center">Sin actividades este día</div>';
+            lista.innerHTML = '<div class="p-3 text-muted text-center">Sin actividades este d&iacute;a</div>';
         } else {
             grupos.forEach(function (g) {
                 var li = document.createElement('button');
                 li.type = 'button';
                 li.className = 'list-group-item list-group-item-action text-left d-flex justify-content-between align-items-center';
-                var texto = '<span><strong>' + g.tipo + '</strong> <span class="text-muted">· ' + g.lote + '</span></span>';
+                var texto = '<span><strong>' + g.tipo + '</strong> <span class="text-muted">- ' + g.lote + '</span></span>';
                 var badges = g.pendiente
                     ? '<span class="badge badge-warning">Pendiente</span>'
                     : '<span class="badge badge-success">Hecha</span>';
                 if (g.cantidad > 1) {
-                    badges = '<span class="badge badge-secondary mr-1">×' + g.cantidad + '</span>' + badges;
+                    badges = '<span class="badge badge-secondary mr-1">x' + g.cantidad + '</span>' + badges;
                 }
                 li.innerHTML = texto + badges;
                 li.addEventListener('click', function () {
@@ -861,7 +1066,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function setBtnTipoActivo(btn, activo) {
         btn.classList.toggle('active', activo);
         btn.setAttribute('aria-pressed', activo ? 'true' : 'false');
-        btn.title = activo ? 'Activo — clic para ocultar' : 'Inactivo — clic para mostrar';
+        btn.title = activo ? 'Activo - clic para ocultar' : 'Inactivo - clic para mostrar';
     }
 
     document.querySelectorAll('.btn-tipo-filtro').forEach(function (btn) {

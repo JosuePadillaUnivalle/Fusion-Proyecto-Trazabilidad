@@ -3,7 +3,10 @@
 namespace App\Support;
 
 use App\Models\LoteProduccionPedido;
+use App\Models\PlantillaTransformacion;
+use App\Models\PlantillaTransformacionPaso;
 use App\Models\ProcesoMaquinaPlanta;
+use App\Models\ProcesoPlanta;
 use App\Models\RegistroProcesoMaquinaPlanta;
 use Illuminate\Support\Collection;
 
@@ -26,10 +29,38 @@ class LoteProduccionTransformacionService
             return false;
         }
 
+        $plantilla = $this->plantillaDelLote($lote);
+        if ($plantilla) {
+            $plantilla->loadMissing(['pasos.proceso']);
+            $totalPasos = $plantilla->pasos->count();
+            if ($totalPasos === 0 || $registros->count() < $totalPasos) {
+                return false;
+            }
+
+            $ultimoPasoPlantilla = $plantilla->pasos->sortByDesc('orden')->first();
+            $ultimoRegistro = $registros->last();
+            $nombreUltimoPaso = $ultimoPasoPlantilla?->proceso?->nombre ?? '';
+            $nombreUltimoRegistro = $ultimoRegistro->procesoMaquina?->proceso?->nombre ?? '';
+
+            return $registros->count() === $totalPasos
+                && ProcesoPlantaCatalogo::esCierreTransformacion($nombreUltimoPaso)
+                && $nombreUltimoRegistro === $nombreUltimoPaso;
+        }
+
         $ultimo = $registros->last();
         $nombre = $ultimo->procesoMaquina?->proceso?->nombre;
 
         return ProcesoPlantaCatalogo::esCierreTransformacion($nombre);
+    }
+
+    public function plantillaAgotada(LoteProduccionPedido $lote): bool
+    {
+        $plantilla = $this->plantillaDelLote($lote);
+        if (! $plantilla) {
+            return false;
+        }
+
+        return $this->registrosOrdenados($lote)->count() >= $plantilla->pasos()->count();
     }
 
     public function transformacionIniciada(LoteProduccionPedido $lote): bool
@@ -98,6 +129,78 @@ class LoteProduccionTransformacionService
             return $existente;
         }
 
-        throw new \InvalidArgumentException('No hay vínculo configurado entre ese proceso y la maquinaria.');
+        $proceso = ProcesoPlanta::query()->find($procesoplantaid);
+        $orden = (int) ProcesoMaquinaPlanta::query()
+            ->where('procesoplantaid', $procesoplantaid)
+            ->max('orden_paso');
+
+        return ProcesoMaquinaPlanta::create([
+            'procesoplantaid' => $procesoplantaid,
+            'maquinaplantaid' => $maquinaplantaid,
+            'orden_paso' => max(1, $orden + 1),
+            'nombre' => $proceso?->nombre ?? 'Paso',
+            'descripcion' => 'Vínculo generado automáticamente desde plantilla de transformación.',
+        ]);
+    }
+
+    public function plantillaDelLote(LoteProduccionPedido $lote): ?PlantillaTransformacion
+    {
+        if (! $lote->plantillatransformacionid) {
+            return null;
+        }
+
+        return PlantillaTransformacionResolver::resolverPorId((int) $lote->plantillatransformacionid);
+    }
+
+    /**
+     * @return list<array{orden: int, proceso: string, maquina: ?string, procesoplantaid: int, maquinaplantaid: ?int, notas: ?string, estado: string}>
+     */
+    public function rutaPlantilla(LoteProduccionPedido $lote): array
+    {
+        $plantilla = $this->plantillaDelLote($lote);
+        if (! $plantilla) {
+            return [];
+        }
+
+        $plantilla->loadMissing(['pasos.proceso', 'pasos.maquina']);
+        $completados = $this->registrosOrdenados($lote)->count();
+        $items = [];
+
+        foreach ($plantilla->pasos as $paso) {
+            $orden = (int) $paso->orden;
+            $estado = 'pendiente';
+            if ($orden <= $completados) {
+                $estado = 'hecho';
+            } elseif ($orden === $completados + 1) {
+                $estado = 'actual';
+            }
+
+            $items[] = [
+                'orden' => $orden,
+                'proceso' => $paso->proceso?->nombre ?? '—',
+                'maquina' => $paso->maquina?->nombre,
+                'procesoplantaid' => (int) $paso->procesoplantaid,
+                'maquinaplantaid' => $paso->maquinaplantaid ? (int) $paso->maquinaplantaid : null,
+                'notas' => $paso->notas,
+                'estado' => $estado,
+            ];
+        }
+
+        return $items;
+    }
+
+    public function siguientePasoPlantilla(LoteProduccionPedido $lote): ?PlantillaTransformacionPaso
+    {
+        $plantilla = $this->plantillaDelLote($lote);
+        if (! $plantilla) {
+            return null;
+        }
+
+        $siguienteOrden = $this->registrosOrdenados($lote)->count() + 1;
+
+        return $plantilla->pasos()
+            ->with(['proceso', 'maquina'])
+            ->where('orden', $siguienteOrden)
+            ->first();
     }
 }

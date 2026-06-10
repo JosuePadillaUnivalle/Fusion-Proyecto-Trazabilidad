@@ -15,6 +15,13 @@
 @section('content')
 <div class="modulo-prod">
 
+    <div class="alert alert-light border small mb-3">
+        <i class="fas fa-project-diagram text-success mr-1"></i>
+        Los procesos de esta lista son <strong>etapas atómicas</strong> (mezclado, empaque, etc.).
+        Para rutas completas (puré de papa, papas fritas, snacks…) use
+        <a href="{{ route('plantillas-transformacion.index') }}">Procesos de transformación</a>.
+    </div>
+
     <div class="row mb-2">
         <div class="col-lg-4 col-6">
             <div class="small-box small-box-green">

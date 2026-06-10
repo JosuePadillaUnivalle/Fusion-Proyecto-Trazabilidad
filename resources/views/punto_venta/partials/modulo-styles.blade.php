@@ -39,6 +39,11 @@
 }
 .modulo-filtros-panel .form-control { border-radius: 8px; font-size: .9rem; }
 .modulo-filtros-panel .btn-filtro-modulo {
-    padding: .5rem 1rem; font-size: .875rem; border-radius: 8px;
+    padding: .55rem 1.25rem;
+    font-size: .875rem;
+    font-weight: 600;
+    border-radius: 8px;
+    min-width: 110px;
 }
+.modulo-filtros-acciones { gap: .5rem; }
 </style>

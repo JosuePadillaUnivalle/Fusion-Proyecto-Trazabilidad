@@ -19,10 +19,19 @@ class Venta extends Model
         'cantidad',
         'unidadmedidaid',
         'preciounitario',
+        'total',
         'fechaventa',
         'observaciones',
-        // 'total' es columna GENERATED en PostgreSQL, no se incluye en fillable
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (Venta $venta) {
+            if ($venta->cantidad !== null && $venta->preciounitario !== null) {
+                $venta->total = round((float) $venta->cantidad * (float) $venta->preciounitario, 2);
+            }
+        });
+    }
 
     protected $casts = [
         'ventaid'        => 'integer',

@@ -13,6 +13,7 @@ use App\Support\LoteTrazabilidadService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use App\Services\NotificacionUsuarioService;
 use App\Support\UsuarioRol;
 
@@ -26,11 +27,7 @@ class ActividadController extends Controller
 
     public function index(Request $request)
     {
-        $query = Actividad::query()->with(['lote.cultivo', 'usuario', 'tipoActividad', 'prioridad']);
-
-        if (UsuarioRol::debeAcotarPorAsignacion($request->user())) {
-            $query->where('usuarioid', (int) $request->user()->usuarioid);
-        }
+        $query = $this->queryActividadesVisibles($request)->with(['lote.cultivo', 'usuario', 'tipoActividad', 'prioridad']);
 
         if ($request->filled('q')) {
             $term = '%'.trim((string) $request->q).'%';
@@ -77,27 +74,43 @@ class ActividadController extends Controller
     /**
      * Calendario de actividades
      */
-    public function calendario()
+    public function calendario(Request $request)
     {
+        $baseQuery = $this->queryActividadesVisibles($request)->whereNotNull('fechainicio');
+
         $stats = [
-            'total' => Actividad::whereNotNull('fechainicio')->count(),
-            'mes' => Actividad::whereMonth('fechainicio', now()->month)
+            'total' => (clone $baseQuery)->count(),
+            'mes' => (clone $baseQuery)
+                ->whereMonth('fechainicio', now()->month)
                 ->whereYear('fechainicio', now()->year)
                 ->count(),
-            'hoy' => Actividad::whereDate('fechainicio', now()->toDateString())->count(),
-            'pendientes' => Actividad::whereNull('fechafin')->count(),
-            'completadas' => Actividad::whereNotNull('fechafin')->count(),
+            'hoy' => (clone $baseQuery)->whereDate('fechainicio', now()->toDateString())->count(),
+            'pendientes' => (clone $baseQuery)->whereNull('fechafin')->count(),
+            'completadas' => (clone $baseQuery)->whereNotNull('fechafin')->count(),
         ];
 
-        $actividades = Actividad::with(['lote', 'usuario', 'tipoActividad'])
-            ->whereNotNull('fechainicio')
+        $actividades = (clone $baseQuery)
+            ->with(['lote.cultivo', 'usuario', 'tipoActividad'])
             ->orderBy('fechainicio')
             ->get();
 
         $eventos = $actividades->map(fn ($act) => $this->formatEventoCalendario($act))->values();
 
-        $lotes = Lote::with('cultivo')->orderBy('nombre')->get();
-        $usuarios = Usuario::orderBy('nombre')->get();
+        $lotesQuery = Lote::with('cultivo')->orderBy('nombre');
+        if (UsuarioRol::debeAcotarPorAsignacion($request->user())) {
+            $lotesQuery->where('usuarioid', (int) $request->user()->usuarioid);
+        }
+        $lotes = $lotesQuery->get();
+
+        if (UsuarioRol::debeAcotarPorAsignacion($request->user())) {
+            $usuarios = Usuario::query()
+                ->where('usuarioid', (int) $request->user()->usuarioid)
+                ->orderBy('nombre')
+                ->get();
+        } else {
+            $usuarios = Usuario::orderBy('nombre')->get();
+        }
+
         $tiposActividad = TipoActividad::orderBy('nombre')->get();
 
         return view('actividades.calendario', compact(
@@ -316,6 +329,17 @@ class ActividadController extends Controller
         }
     }
 
+    private function queryActividadesVisibles(Request $request)
+    {
+        $query = Actividad::query();
+
+        if (UsuarioRol::debeAcotarPorAsignacion($request->user())) {
+            $query->where('usuarioid', (int) $request->user()->usuarioid);
+        }
+
+        return $query;
+    }
+
     private function formatEventoCalendario(Actividad $act): array
     {
         $tipo = $act->tipoActividad->nombre ?? 'Actividad';
@@ -331,7 +355,7 @@ class ActividadController extends Controller
             'extendedProps' => [
                 'id' => $act->actividadid,
                 'tipo' => $tipo,
-                'tipoSlug' => Str::slug($tipo),
+                'tipoSlug' => Str::slug($tipo, '-', 'es'),
                 'lote' => $lote,
                 'loteid' => $act->loteid,
                 'responsable' => trim(($act->usuario->nombre ?? '').' '.($act->usuario->apellido ?? '')),

@@ -83,6 +83,29 @@
 @endpush
 
 @section('content')
+<script>
+(function () {
+    var key = 'lp_procesamiento_scroll';
+    var saved = sessionStorage.getItem(key);
+    if (saved === null) return;
+    var y = parseInt(saved, 10);
+    if (isNaN(y)) return;
+    sessionStorage.removeItem(key);
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+    function restaurarScroll() {
+        var html = document.documentElement;
+        var prev = html.style.scrollBehavior;
+        html.style.scrollBehavior = 'auto';
+        window.scrollTo(0, y);
+        html.style.scrollBehavior = prev;
+    }
+
+    restaurarScroll();
+    document.addEventListener('DOMContentLoaded', restaurarScroll);
+    window.addEventListener('load', restaurarScroll);
+})();
+</script>
 <div class="trz-dash">
     <div class="lp-header d-flex flex-wrap justify-content-between align-items-start">
         <div>
@@ -147,7 +170,9 @@
                          title="{{ $step['label'] }}{{ $scrollFase ? ' — clic para ir al formulario' : '' }}">
                         <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
                         {{ $step['label'] }}
-                        @if(!empty($step['fase_unica']) && !empty($step['completada']))
+                        @if($step['estado'] === 'skipped')
+                            <span class="d-block small mt-1 text-muted">Omitido</span>
+                        @elseif(!empty($step['fase_unica']) && !empty($step['completada']))
                             <span class="d-block small mt-1"><i class="fas fa-check"></i></span>
                         @endif
                     </div>
@@ -178,7 +203,8 @@
         $fasesHechas = $fases_completadas ?? [];
         $mostrarTransformacion = $panelActivo === 'transformacion' || in_array('transformacion', $fasesHechas) || count($etapas_transformacion ?? []) > 0;
         $mostrarCertificacion = $panelActivo === 'certificacion' || in_array('certificacion', $fasesHechas);
-        $mostrarAlmacenaje = $panelActivo === 'almacenaje' || in_array('almacenaje', $fasesHechas);
+        $mostrarAlmacenaje = in_array('almacenaje', $fasesHechas)
+            || ($panelActivo === 'almacenaje' && empty($lote_rechazado));
         $hayHistorial = count(array_intersect(['transformacion', 'certificacion', 'almacenaje'], $fasesHechas)) > 0
             && $panelActivo !== 'completado';
     @endphp
@@ -201,9 +227,15 @@
     @if($panelActivo === 'completado')
     <div class="card lp-fase-card mb-3 lp-fase-panel lp-fase-panel--activa" data-fase="completado">
         <div class="card-body text-center py-4">
-            <i class="fas fa-flag-checkered fa-3x text-success mb-3"></i>
-            <h5 class="font-weight-bold text-success mb-2">Lote completado</h5>
-            <p class="text-muted mb-0">Trazabilidad cerrada al 100 %. Todas las fases fueron registradas correctamente.</p>
+            @if(!empty($lote_rechazado))
+                <i class="fas fa-times-circle fa-3x text-warning mb-3"></i>
+                <h5 class="font-weight-bold text-warning mb-2">Lote cerrado — no conforme</h5>
+                <p class="text-muted mb-0">La transformación se completó, pero la evaluación final fue <strong>no conforme</strong>. El producto no ingresó a almacén.</p>
+            @else
+                <i class="fas fa-flag-checkered fa-3x text-success mb-3"></i>
+                <h5 class="font-weight-bold text-success mb-2">Lote completado</h5>
+                <p class="text-muted mb-0">Trazabilidad cerrada al 100 %. Todas las fases fueron registradas correctamente.</p>
+            @endif
         </div>
     </div>
     @endif
@@ -224,9 +256,33 @@
         <div class="card-body">
             @if($panelActivo === 'transformacion')
             <p class="small text-muted mb-3">
-                Registre cada etapa con el proceso de planta, la maquinaria utilizada y el horario.
+                @if(!empty($rutaPlantilla))
+                    Siga el <strong>proceso de transformación</strong> paso a paso. El formulario sugiere el siguiente proceso y máquina.
+                @else
+                    Registre cada etapa con el proceso de planta, la maquinaria utilizada y el horario.
+                @endif
                 La transformación se cierra al registrar <strong>{{ \App\Support\ProcesoPlantaCatalogo::PROCESO_CIERRE_TRANSFORMACION }}</strong>.
             </p>
+            @endif
+
+            @if(!empty($rutaPlantilla))
+            <div class="mb-3 p-2 rounded border" style="background:#f8fbf8;">
+                <div class="small font-weight-bold text-success mb-2">
+                    <i class="fas fa-project-diagram mr-1"></i>
+                    Proceso: {{ $lote->plantillaTransformacion?->nombre ?? 'Predefinido' }}
+                    @if($lote->plantillaTransformacion)
+                        <a href="{{ route('plantillas-transformacion.show', $lote->plantillaTransformacion) }}" class="ml-2 font-weight-normal">Ver detalle</a>
+                    @endif
+                </div>
+                <div class="d-flex flex-wrap" style="gap:6px;">
+                    @foreach($rutaPlantilla as $paso)
+                    <span class="badge px-2 py-1 {{ $paso['estado'] === 'hecho' ? 'badge-success' : ($paso['estado'] === 'actual' ? 'badge-warning' : 'badge-light border text-muted') }}">
+                        {{ $paso['orden'] }}. {{ $paso['proceso'] }}
+                        @if($paso['estado'] === 'hecho')<i class="fas fa-check ml-1"></i>@endif
+                    </span>
+                    @endforeach
+                </div>
+            </div>
             @endif
 
             @forelse($etapas_transformacion ?? [] as $etapa)
@@ -275,7 +331,11 @@
                                     <option value="{{ $proc->procesoplantaid }}">{{ $proc->nombre }}</option>
                                 @endforeach
                             </select>
+                            @if(!empty($siguientePasoPlantilla))
+                            <small class="text-success"><i class="fas fa-magic mr-1"></i>Sugerido: {{ $siguientePasoPlantilla->proceso?->nombre }}</small>
+                            @else
                             <small class="text-muted">Puede repetir el mismo proceso las veces que necesite.</small>
+                            @endif
                         </div>
                         <div class="col-md-4 form-group">
                             <label class="small font-weight-bold">Maquinaria</label>
@@ -316,7 +376,7 @@
     @endif
 
     @if($mostrarCertificacion)
-    <div class="card lp-fase-card mb-3 lp-fase-panel {{ $panelActivo === 'certificacion' ? 'lp-fase-panel--activa' : 'lp-fase-panel--historial' }}" data-fase="certificacion">
+    <div id="certificacion" class="card lp-fase-card mb-3 lp-fase-panel {{ $panelActivo === 'certificacion' ? 'lp-fase-panel--activa' : 'lp-fase-panel--historial' }}" data-fase="certificacion">
         <div class="card-header bg-white font-weight-bold d-flex justify-content-between align-items-center">
             <span><i class="fas fa-certificate mr-2" style="color:#7c3aed"></i>Certificación</span>
             @if($panelActivo !== 'certificacion' && $evaluacion)
@@ -333,15 +393,20 @@
                     </p>
                 </div>
             @elseif($panelActivo === 'certificacion')
+            <p class="small text-muted mb-3">
+                Completar la transformación no implica certificación automática: debe registrar el resultado del control de calidad.
+                Solo los lotes <strong>certificados</strong> pueden pasar a almacenaje.
+            </p>
             <form method="POST" action="{{ route('procesamiento.certificar', $lote) }}" class="lp-form-etapa mb-0">
                 @csrf
                 <div class="form-row">
                     <div class="col-md-4 form-group">
                         <label class="small font-weight-bold">Resultado</label>
                         <select name="razon" class="form-control form-control-sm" required>
-                            <option value="Certificado">Certificado</option>
-                            <option value="No conforme">No conforme</option>
+                            <option value="{{ \App\Models\EvaluacionFinalLoteProduccion::RAZON_CERTIFICADO }}">Certificado</option>
+                            <option value="{{ \App\Models\EvaluacionFinalLoteProduccion::RAZON_NO_CONFORME }}">No conforme</option>
                         </select>
+                        <small class="text-muted d-block mt-1">No conforme cierra el lote sin almacenar.</small>
                     </div>
                     <div class="col-md-8 form-group mb-md-0">
                         <label class="small font-weight-bold">Observaciones</label>
@@ -486,7 +551,12 @@
             <div class="lp-resumen-card lp-resumen-alm">
                 <div class="lp-resumen-head"><i class="fas fa-warehouse"></i> Almacenaje</div>
                 <div class="lp-resumen-body">
-                    @if($almacenaje)
+                    @if(!empty($lote_rechazado))
+                        <p class="lp-resumen-empty mb-0">
+                            <i class="fas fa-ban d-block mb-2 text-warning"></i>
+                            Sin ingreso a almacén<br><small class="text-muted">Lote no conforme</small>
+                        </p>
+                    @elseif($almacenaje)
                         <div class="lp-resumen-item">
                             <span class="nombre"><i class="fas fa-map-marker-alt text-warning mr-1"></i>{{ $almacenaje->ubicacion }}</span>
                         </div>
@@ -572,6 +642,24 @@
     }
 
     selectProceso.addEventListener('change', actualizarMaquinas);
+
+    @php
+        $sugeridoPasoJs = $siguientePasoPlantilla ? [
+            'procesoplantaid' => $siguientePasoPlantilla->procesoplantaid,
+            'maquinaplantaid' => $siguientePasoPlantilla->maquinaplantaid,
+            'notas' => $siguientePasoPlantilla->notas,
+        ] : null;
+    @endphp
+    const sugerido = @json($sugeridoPasoJs);
+    if (sugerido && sugerido.procesoplantaid) {
+        selectProceso.value = String(sugerido.procesoplantaid);
+        actualizarMaquinas();
+        if (sugerido.maquinaplantaid) {
+            selectMaquina.value = String(sugerido.maquinaplantaid);
+        }
+        const obs = document.querySelector('#formRegistrarEtapa input[name="observaciones"]');
+        if (obs && sugerido.notas && !obs.value) obs.value = sugerido.notas;
+    }
 })();
 
 (function () {
@@ -635,6 +723,15 @@
 
     if (window.location.hash === '#transformacion') {
         irASeccionFase('transformacion');
+    }
+
+    const formRegistrarEtapa = document.getElementById('formRegistrarEtapa');
+    if (formRegistrarEtapa) {
+        formRegistrarEtapa.addEventListener('submit', function () {
+            try {
+                sessionStorage.setItem('lp_procesamiento_scroll', String(window.scrollY));
+            } catch (err) {}
+        });
     }
 })();
 </script>

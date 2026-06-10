@@ -43,19 +43,19 @@ $role->syncPermissions($permisosMinorista);
 app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
 
 $punto = PuntoVenta::query()
-    ->where('nombre', 'Mercado Prueba')
+    ->where('nombre', 'Mercado Satélite Norte')
     ->orWhere('usuarioid', $usuario->usuarioid)
     ->first();
 
 if ($punto === null) {
     $punto = PuntoVenta::create([
         'usuarioid' => $usuario->usuarioid,
-        'nombre' => 'Tienda Demo Minorista',
-        'direccion' => 'Av. Demo 123, Santa Cruz',
+        'nombre' => 'Mercado Satélite Norte',
+        'direccion' => 'Av. Cristo Redentor 450, Santa Cruz',
         'latitud' => -17.7833,
         'longitud' => -63.1821,
         'activo' => true,
-        'observaciones' => 'Punto de venta de prueba para minorista demo',
+        'observaciones' => 'Punto de venta minorista operativo',
         'fechacreacion' => now(),
     ]);
 } else {

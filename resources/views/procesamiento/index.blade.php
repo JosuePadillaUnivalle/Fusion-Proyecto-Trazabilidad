@@ -256,6 +256,23 @@
                             </datalist>
                             <small class="text-muted">Elegí uno existente o escribí un producto nuevo.</small>
                         </div>
+                        <div class="form-group mb-2">
+                            <label class="small font-weight-bold"><i class="fas fa-project-diagram mr-1 text-success"></i> Proceso de transformación <span class="text-muted font-weight-normal">(opcional)</span></label>
+                            <div class="picker-field">
+                                <input type="text"
+                                       id="plantilla_display"
+                                       class="picker-display {{ $plantillaLabel ? '' : 'text-muted' }}"
+                                       readonly
+                                       placeholder="Sin proceso asignado"
+                                       value="{{ $plantillaLabel ?? '' }}">
+                                <input type="hidden" name="plantillatransformacionid" id="plantillatransformacionid" value="{{ old('plantillatransformacionid') }}">
+                                <div class="picker-actions">
+                                    <button type="button" class="btn btn-outline-success btn-sm" id="btnBuscarPlantilla"><i class="fas fa-search mr-1"></i>Buscar</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLimpiarPlantilla" title="Quitar"><i class="fas fa-times"></i></button>
+                                </div>
+                            </div>
+                            <small class="text-muted d-block mt-1">Abre un buscador para filtrar, ver etapas y elegir el proceso manualmente.</small>
+                        </div>
                         <div class="alert alert-light border mb-0 py-2 px-3 small">
                             <i class="fas fa-magic text-success mr-1"></i>
                             Se creará como: <strong id="nombreLotePreview" class="text-success">—</strong>
@@ -291,6 +308,14 @@
 
                     <div class="lote-section mb-0">
                         <div class="lote-section-title"><i class="fas fa-boxes mr-1"></i> Materia prima <span class="text-danger">*</span></div>
+                        <div id="recomendacionMpBox" class="recomendacion-mp-pure d-none mb-2">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                <div class="recomendacion-mp-texto" id="recomendacionMpTexto"></div>
+                                <button type="button" class="btn btn-sm btn-success" id="btnAplicarRecomendacionMp">
+                                    <i class="fas fa-magic mr-1"></i> Aplicar cantidad sugerida
+                                </button>
+                            </div>
+                        </div>
                         <div class="table-responsive tabla-materias mb-2">
                             <table class="table table-sm mb-0">
                                 <thead><tr><th>Insumo</th><th style="width:130px">Cantidad</th><th style="width:44px"></th></tr></thead>
@@ -319,6 +344,7 @@
 </div>
 
 @include('partials.selector-catalogo-modal')
+@include('partials.selector-plantilla-transformacion-modal')
 @endcan
 
 @include('partials.modal-confirmar-accion')
@@ -331,18 +357,61 @@
 #modalSelectorCatalogo .modal-header { background: linear-gradient(135deg, #1e4620, #4a7c59); }
 #modalSelectorCatalogo .selector-catalogo-row { cursor: pointer; }
 #modalSelectorCatalogo .selector-catalogo-row:hover { background: #eef7ef; }
+.recomendacion-mp-pure {
+    background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+    border: 1px solid #a7d9b4;
+    border-radius: 10px;
+    padding: 0.65rem 0.85rem;
+    font-size: 0.84rem;
+    color: #1e4620;
+}
+.recomendacion-mp-pure .recomendacion-mp-texto strong { color: #2c5530; }
+.mp-rec-hint { font-size: 0.75rem; }
+#modalSelectorPlantilla .modal-content { border: 0; border-radius: 14px; overflow: hidden; }
+.selector-plantilla-lista { max-height: 420px; overflow-y: auto; background: #fafcfb; }
+.selector-plantilla-card {
+    display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid #e8efe9;
+    background: #fff; padding: .75rem .9rem; transition: background .15s;
+}
+.selector-plantilla-card:hover, .selector-plantilla-card.active { background: #eef7ef; }
+.selector-plantilla-card:last-child { border-bottom: 0; }
+.selector-plantilla-detalle { min-height: 420px; background: #fff; }
+.selector-plantilla-pasos { max-height: 280px; overflow-y: auto; }
+.selector-plantilla-paso {
+    display: flex; align-items: flex-start; gap: .65rem;
+    padding: .55rem 0; border-bottom: 1px dashed #e5ebe6;
+}
+.selector-plantilla-paso:last-child { border-bottom: 0; }
+.selector-plantilla-paso-num {
+    flex-shrink: 0; width: 1.65rem; height: 1.65rem; border-radius: 50%;
+    background: #2c5530; color: #fff; font-size: .72rem; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.selector-plantilla-paso--cierre .selector-plantilla-paso-num { background: #17a2b8; }
 </style>
 @endpush
 
 @push('scripts')
+@php
+    $pureCfgJs = [
+        'pesoKgUnd' => \App\Support\ProductoPlantaCatalogo::PESO_KG_POR_UNIDAD_PURE,
+        'rendimiento' => \App\Support\ProductoPlantaCatalogo::RENDIMIENTO_PURE,
+        'pesoEnvaseG' => (int) round(\App\Support\ProductoPlantaCatalogo::PESO_KG_POR_UNIDAD_PURE * 1000),
+        'rendimientoPct' => (int) round(\App\Support\ProductoPlantaCatalogo::RENDIMIENTO_PURE * 100),
+    ];
+@endphp
 <script src="{{ asset('js/selector-catalogo.js') }}"></script>
+<script src="{{ asset('js/selector-plantilla-transformacion.js') }}"></script>
 <script>
 (function() {
+    const PURE_CFG = @json($pureCfgJs);
     const materias = [];
     const tbody = document.getElementById('tbodyMaterias');
     const filaVacia = document.getElementById('filaMateriasVacia');
     const pedidoDisplay = document.getElementById('pedido_display');
     const pedidoInput = document.getElementById('pedidoid');
+    const plantillaDisplay = document.getElementById('plantilla_display');
+    const plantillaInput = document.getElementById('plantillatransformacionid');
     const productoInput = document.getElementById('productoLote');
     const nombrePreview = document.getElementById('nombreLotePreview');
     const urlSiguienteNombre = @json(route('procesamiento.siguiente-nombre'));
@@ -352,9 +421,97 @@
         return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
     }
 
+    function esProductoPure() {
+        const p = (productoInput?.value || '').toLowerCase();
+        return p.includes('puré') || p.includes('pure');
+    }
+
+    function esUnidadKg(unidad) {
+        const u = String(unidad || '').toLowerCase();
+        return u === 'kg' || u.includes('kilogram');
+    }
+
+    function formatoNumero(n) {
+        return Number(n).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function calcularMpRecomendada() {
+        if (!esProductoPure()) return null;
+        const und = parseFloat(document.getElementById('cantidadObjetivoLote')?.value) || 0;
+        if (und <= 0) return null;
+        const salidaKg = und * PURE_CFG.pesoKgUnd;
+        const entradaKg = Math.round((salidaKg / PURE_CFG.rendimiento) * 100) / 100;
+        return { und, salidaKg: Math.round(salidaKg * 100) / 100, entradaKg };
+    }
+
+    function actualizarRecomendacionMp() {
+        const box = document.getElementById('recomendacionMpBox');
+        const texto = document.getElementById('recomendacionMpTexto');
+        const rec = calcularMpRecomendada();
+        if (!box || !texto) return;
+
+        if (!rec || !materias.length) {
+            box.classList.add('d-none');
+            tbody.querySelectorAll('.mp-rec-hint').forEach(el => el.remove());
+            return;
+        }
+
+        texto.innerHTML =
+            '<i class="fas fa-calculator text-success mr-1"></i>' +
+            'Para <strong>' + formatoNumero(rec.und) + ' und</strong> de puré (~' + PURE_CFG.pesoEnvaseG + ' g/envase, ' + PURE_CFG.rendimientoPct + '% rendimiento): ' +
+            'se necesitan aprox. <strong>' + formatoNumero(rec.entradaKg) + ' kg</strong> de materia prima ' +
+            '(~' + formatoNumero(rec.salidaKg) + ' kg de producto terminado).';
+        box.classList.remove('d-none');
+
+        tbody.querySelectorAll('tr:not(#filaMateriasVacia)').forEach((tr, idx) => {
+            let hint = tr.querySelector('.mp-rec-hint');
+            const unidad = tr.querySelector('.mp-cantidad-input')?.dataset.unidad || '';
+            const td = tr.querySelector('td:nth-child(2)');
+            if (!esUnidadKg(unidad) || !td) {
+                if (hint) hint.remove();
+                return;
+            }
+            const sugerido = materias.length === 1 ? rec.entradaKg : (idx === 0 ? rec.entradaKg : null);
+            if (!sugerido) {
+                if (hint) hint.remove();
+                return;
+            }
+            const hintHtml = '<small class="d-block text-success mt-1 mp-rec-hint"><i class="fas fa-lightbulb mr-1"></i>Sugerido: ~' + formatoNumero(sugerido) + ' kg</small>';
+            if (hint) {
+                hint.outerHTML = hintHtml;
+            } else {
+                td.insertAdjacentHTML('beforeend', hintHtml);
+            }
+            const input = tr.querySelector('.mp-cantidad-input');
+            if (input && !input.value) {
+                input.placeholder = '~' + formatoNumero(sugerido);
+            }
+        });
+    }
+
+    function aplicarRecomendacionMp() {
+        const rec = calcularMpRecomendada();
+        if (!rec) return;
+        const inputsKg = Array.from(tbody.querySelectorAll('.mp-cantidad-input')).filter(inp => esUnidadKg(inp.dataset.unidad));
+        if (!inputsKg.length) {
+            alert('La recomendación está en kg. Agregue un insumo cuya unidad sea kg (ej. papa a granel).');
+            return;
+        }
+        if (inputsKg.length === 1) {
+            inputsKg[0].value = rec.entradaKg;
+            return;
+        }
+        const porInsumo = Math.round((rec.entradaKg / inputsKg.length) * 100) / 100;
+        inputsKg.forEach(inp => { inp.value = porInsumo; });
+    }
+
     function renderMaterias() {
         tbody.querySelectorAll('tr:not(#filaMateriasVacia)').forEach(r => r.remove());
-        if (!materias.length) { filaVacia.style.display = ''; return; }
+        if (!materias.length) {
+            filaVacia.style.display = '';
+            actualizarRecomendacionMp();
+            return;
+        }
         filaVacia.style.display = 'none';
         materias.forEach((m, i) => {
             const tr = document.createElement('tr');
@@ -362,11 +519,12 @@
                 '<td><strong>' + esc(m.label) + '</strong><br><small class="text-muted">' + esc(m.meta) + '</small>' +
                 '<input type="hidden" name="materias[' + i + '][insumoid]" value="' + m.id + '"></td>' +
                 '<td><div class="input-group input-group-sm">' +
-                '<input type="number" name="materias[' + i + '][cantidad]" class="form-control" step="0.001" min="0.001" max="' + m.stock + '" required>' +
+                '<input type="number" name="materias[' + i + '][cantidad]" class="form-control mp-cantidad-input" data-unidad="' + esc(m.unidad) + '" step="0.001" min="0.001" max="' + m.stock + '" required>' +
                 '<div class="input-group-append"><span class="input-group-text">' + esc(m.unidad) + '</span></div></div></td>' +
                 '<td><button type="button" class="btn btn-outline-danger btn-sm btn-quitar-materia" data-idx="' + i + '"><i class="fas fa-trash"></i></button></td>';
             tbody.appendChild(tr);
         });
+        actualizarRecomendacionMp();
     }
 
     function aplicarPedido(payload) {
@@ -416,11 +574,16 @@
         clearTimeout(previewTimer);
         previewTimer = setTimeout(actualizarNombrePreview, 280);
         actualizarHintCantidadObjetivo();
+        actualizarRecomendacionMp();
     });
     productoInput?.addEventListener('change', function () {
         actualizarNombrePreview();
         actualizarHintCantidadObjetivo();
+        actualizarRecomendacionMp();
     });
+
+    document.getElementById('cantidadObjetivoLote')?.addEventListener('input', actualizarRecomendacionMp);
+    document.getElementById('btnAplicarRecomendacionMp')?.addEventListener('click', aplicarRecomendacionMp);
 
     function actualizarHintCantidadObjetivo() {
         const producto = (productoInput?.value || '').toLowerCase();
@@ -464,8 +627,27 @@
         document.getElementById('btnBuscarInsumo')?.addEventListener('click', function () {
             CatalogoSelector.open('procesamiento_insumo');
         });
+        document.getElementById('btnBuscarPlantilla')?.addEventListener('click', function () {
+            PlantillaSelector.open();
+        });
+
+        PlantillaSelector.configure({
+            endpoint: @json(route('catalogo-selector.plantillas-transformacion')),
+            onSelect(item) {
+                plantillaInput.value = item.id;
+                plantillaDisplay.value = item.label;
+                plantillaDisplay.classList.remove('text-muted');
+            },
+        });
 
         actualizarNombrePreview();
+    });
+
+    document.getElementById('btnLimpiarPlantilla')?.addEventListener('click', function () {
+        plantillaInput.value = '';
+        plantillaDisplay.value = '';
+        plantillaDisplay.classList.add('text-muted');
+        plantillaDisplay.placeholder = 'Sin proceso asignado';
     });
 
     document.getElementById('btnLimpiarPedido')?.addEventListener('click', function () {
@@ -487,6 +669,7 @@
     });
 
     if (pedidoInput.value && pedidoDisplay.value) pedidoDisplay.classList.remove('text-muted');
+    if (plantillaInput.value && plantillaDisplay.value) plantillaDisplay.classList.remove('text-muted');
 
     @if($errors->any() || old('producto'))
     $('#modalNuevoLote').modal('show');

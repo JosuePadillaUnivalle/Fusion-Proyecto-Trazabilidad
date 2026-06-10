@@ -38,17 +38,22 @@
             const mensajeEl = document.getElementById('modalConfirmarMensaje');
             const headerEl = document.getElementById('modalConfirmarHeader');
             const btnEl = document.getElementById('btnConfirmarAccion');
-            const esExito = tono === 'success';
-            if (headerEl) {
-                headerEl.style.background = esExito
-                    ? 'linear-gradient(135deg, #1e4620, #2c5530)'
-                    : 'linear-gradient(135deg, #7f1d1d, #dc2626)';
-            }
-            if (btnEl) {
-                btnEl.className = esExito ? 'btn btn-success px-4 font-weight-bold' : 'btn btn-danger px-4 font-weight-bold';
-            }
+            const iconos = { success: 'check-circle', warning: 'wrench', danger: 'exclamation-triangle' };
+            const fondos = {
+                success: 'linear-gradient(135deg, #1e4620, #2c5530)',
+                warning: 'linear-gradient(135deg, #b45309, #f59e0b)',
+                danger: 'linear-gradient(135deg, #7f1d1d, #dc2626)',
+            };
+            const botones = {
+                success: 'btn btn-success px-4 font-weight-bold',
+                warning: 'btn btn-warning px-4 font-weight-bold text-dark',
+                danger: 'btn btn-danger px-4 font-weight-bold',
+            };
+            const t = ['success', 'warning', 'danger'].includes(tono) ? tono : 'danger';
+            if (headerEl) headerEl.style.background = fondos[t];
+            if (btnEl) btnEl.className = botones[t];
             if (tituloEl) {
-                tituloEl.innerHTML = '<i class="fas fa-' + (esExito ? 'check-circle' : 'exclamation-triangle') + ' mr-2"></i>' + (titulo || 'Confirmar acción');
+                tituloEl.innerHTML = '<i class="fas fa-' + iconos[t] + ' mr-2"></i>' + (titulo || 'Confirmar acción');
             }
             if (mensajeEl) mensajeEl.textContent = mensaje || '¿Desea continuar?';
             if (window.jQuery) {

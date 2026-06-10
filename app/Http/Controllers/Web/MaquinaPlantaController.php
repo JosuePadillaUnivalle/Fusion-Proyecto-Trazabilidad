@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DestinoProduccion;
 use App\Models\MaquinaPlanta;
 use App\Models\ProcesoPlanta;
+use App\Support\PlantillaTransformacionDisponibilidad;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -154,11 +155,25 @@ class MaquinaPlantaController extends Controller
 
     public function toggleActivo(MaquinaPlanta $maquinas_plantum): RedirectResponse
     {
+        $bloqueadasAntes = PlantillaTransformacionDisponibilidad::idsBloqueadas();
+
         $maquinas_plantum->update(['activo' => ! $maquinas_plantum->activo]);
 
         $mensaje = $maquinas_plantum->activo
             ? 'La máquina quedó activa y disponible en registro.'
             : 'La máquina quedó en mantenimiento.';
+
+        if (! $maquinas_plantum->activo) {
+            $nuevasBloqueadas = count(array_diff(
+                PlantillaTransformacionDisponibilidad::idsBloqueadas(),
+                $bloqueadasAntes
+            ));
+            if ($nuevasBloqueadas > 0) {
+                $mensaje .= ' '.$nuevasBloqueadas.' proceso(s) de transformación quedaron temporalmente no disponibles.';
+            }
+        } else {
+            $mensaje .= ' Los procesos de transformación vinculados se reevaluarán automáticamente.';
+        }
 
         return back()->with('success', $mensaje);
     }

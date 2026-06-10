@@ -48,20 +48,21 @@
             :registros="$pedidos->count()"
             filtros-target="#filtrosPedidosDistPanel"
             :nuevo-href="$puedeCrear ? route('punto-venta.pedidos.create') : null"
-            nuevo-text="Nueva solicitud"
-            nuevo-can="pedidos_distribucion.create"
+            :nuevo-text="$esMinorista ? 'Solicitar producto' : 'Nueva solicitud'"
+            nuevo-icon="fa-paper-plane"
         />
 
         <div id="filtrosPedidosDistPanel" class="collapse {{ request()->hasAny(['q','estado','puntoventaid']) ? 'show' : '' }}">
             @include('partials.modulo-filtros-form', [
                 'action' => route('punto-venta.pedidos.index'),
                 'campos' => [
-                    ['name' => 'q', 'label' => 'Buscar', 'placeholder' => 'Solicitud, producto o PDV…', 'col' => 'col-md-4'],
-                    ['name' => 'puntoventaid', 'label' => 'Punto de venta', 'type' => 'select', 'col' => 'col-md-3',
+                    ['name' => 'q', 'label' => 'Buscar', 'placeholder' => 'Solicitud, producto o PDV…', 'col' => 'col-lg-4 col-md-6'],
+                    ['name' => 'puntoventaid', 'label' => 'Punto de venta', 'type' => 'select', 'col' => 'col-lg-3 col-md-6',
                         'options' => $puntosVenta->pluck('nombre', 'puntoventaid')->all()],
-                    ['name' => 'estado', 'label' => 'Estado', 'type' => 'select', 'col' => 'col-md-3',
+                    ['name' => 'estado', 'label' => 'Estado', 'type' => 'select', 'col' => 'col-lg-3 col-md-6',
                         'options' => \App\Support\PedidoDistribucionCatalogo::etiquetasEstado()],
                 ],
+                'botonesAlineacion' => 'end',
             ])
         </div>
 

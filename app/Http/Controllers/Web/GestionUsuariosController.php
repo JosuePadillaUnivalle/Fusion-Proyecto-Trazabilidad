@@ -9,6 +9,7 @@ use App\Models\Usuario;
 use App\Services\UsuarioEliminacionService;
 use App\Services\UsuarioUsernameService;
 use App\Support\CuentaEstado;
+use App\Support\PermissionMatrixSync;
 use App\Support\UsuarioAvatar;
 use App\Support\UsuarioRol;
 use App\Support\UsuarioSolicitud;
@@ -256,6 +257,7 @@ class GestionUsuariosController extends Controller
         }
 
         Role::firstOrCreate(['name' => $rolNombre, 'guard_name' => 'web']);
+        PermissionMatrixSync::syncRole($rolNombre);
 
         $usernameService = app(UsuarioUsernameService::class);
         $nombreusuario = $usernameService->generarDesdeNombreApellido(

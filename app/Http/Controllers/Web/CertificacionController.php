@@ -7,38 +7,34 @@ use App\Models\CertificacionLote;
 use App\Models\EstadoLoteTipo;
 use App\Models\HistorialEstadoLote;
 use App\Models\Lote;
+use App\Support\CertificacionIndexService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class CertificacionController extends Controller
 {
-    public function index(): View
+    public function __construct(
+        private CertificacionIndexService $indexService
+    ) {}
+
+    public function index(Request $request): View
     {
-        $todosLotes = Lote::query()
-            ->with(['cultivo', 'estadoTipo', 'usuario'])
-            ->orderByDesc('loteid')
-            ->get();
+        $ambito = $request->input('ambito', 'planta');
+        if (! in_array($ambito, ['planta', 'campo'], true)) {
+            $ambito = 'planta';
+        }
 
-        $certificados = CertificacionLote::query()
-            ->with(['lote.cultivo', 'usuario'])
-            ->orderByDesc('fecha_certificacion')
-            ->limit(20)
-            ->get();
+        $datos = $ambito === 'campo'
+            ? $this->indexService->datosCampo()
+            : $this->indexService->datosPlanta();
 
-        $lotesCertificadosIds = $certificados->pluck('loteid')->toArray();
-
-        $lotesPendientes = $todosLotes
-            ->filter(fn ($l) => ! in_array($l->loteid, $lotesCertificadosIds))
-            ->values();
-
-        $stats = [
-            'pendientes'   => $lotesPendientes->count(),
-            'certificados' => count($lotesCertificadosIds),
-            'total_lotes'  => $todosLotes->count(),
-        ];
-
-        return view('certificaciones.index', compact('lotesPendientes', 'certificados', 'stats'));
+        return view('certificaciones.index', [
+            'ambito' => $datos['ambito'],
+            'lotesPendientes' => $datos['pendientes'],
+            'certificados' => $datos['certificados'],
+            'stats' => $datos['stats'],
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -51,8 +47,8 @@ class CertificacionController extends Controller
         $this->certificarLote($validated['loteid'], $validated['observaciones'] ?? null);
 
         return redirect()
-            ->route('certificaciones.index')
-            ->with('success', 'Lote certificado correctamente.');
+            ->route('certificaciones.index', ['ambito' => 'campo'])
+            ->with('success', 'Lote de campo certificado correctamente.');
     }
 
     public function storeBatch(Request $request): RedirectResponse
@@ -70,8 +66,8 @@ class CertificacionController extends Controller
         }
 
         return redirect()
-            ->route('certificaciones.index')
-            ->with('success', "$count lote(s) certificado(s) correctamente.");
+            ->route('certificaciones.index', ['ambito' => 'campo'])
+            ->with('success', "$count lote(s) de campo certificado(s) correctamente.");
     }
 
     private function certificarLote(int $loteid, ?string $observaciones): void
