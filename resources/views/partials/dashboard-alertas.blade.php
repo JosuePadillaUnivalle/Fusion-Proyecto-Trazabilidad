@@ -7,7 +7,7 @@
         </div>
         <ul class="list-unstyled mb-0">
             @foreach($alertas as $alerta)
-            <li class="mb-2">
+            <li class="mb-2 {{ $loop->first ? 'pr-4' : '' }}" @if($loop->first) style="position:relative;" @endif>
                 <form action="{{ route('notificaciones.leer', $alerta) }}" method="POST" class="d-inline">
                     @csrf
                     <button type="submit" class="btn btn-link btn-sm p-0 text-left" style="font-size:.86rem;">
@@ -18,6 +18,15 @@
                         @endif
                     </button>
                 </form>
+                @if($loop->first)
+                <form action="{{ route('notificaciones.descartar', $alerta) }}" method="POST"
+                      class="m-0 p-0" style="position:absolute;top:0;right:0;">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-link text-muted p-0" title="Cerrar aviso" aria-label="Cerrar aviso" style="line-height:1;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </form>
+                @endif
             </li>
             @endforeach
         </ul>

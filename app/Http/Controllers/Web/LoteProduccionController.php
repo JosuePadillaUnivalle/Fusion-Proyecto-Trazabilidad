@@ -5,16 +5,19 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Almacen;
 use App\Models\AlmacenajeLoteProduccion;
+use App\Models\AsignacionEtapaPlanta;
 use App\Models\EvaluacionFinalLoteProduccion;
 use App\Models\LoteProduccionPedido;
 use App\Models\MaquinaPlanta;
 use App\Models\Pedido;
 use App\Models\RegistroProcesoMaquinaPlanta;
 use App\Models\UnidadMedida;
+use App\Models\Usuario;
 use App\Services\AlmacenCapacidadService;
 use App\Services\LoteProduccionPlantaService;
 use App\Support\AlmacenAmbito;
 use App\Support\AlmacenajeLoteCondiciones;
+use App\Support\AsignacionEtapaPlantaService;
 use App\Support\LoteProduccionNombre;
 use App\Support\LoteProduccionTransformacionService;
 use App\Support\LoteProduccionTrazabilidadService;
@@ -35,6 +38,7 @@ class LoteProduccionController extends Controller
         private readonly LoteProduccionTrazabilidadService $trazabilidad,
         private readonly LoteProduccionTransformacionService $transformacion,
         private readonly AlmacenCapacidadService $capacidadService,
+        private readonly AsignacionEtapaPlantaService $asignacionEtapa,
     ) {}
 
     public function index(Request $request): View
@@ -210,6 +214,17 @@ class LoteProduccionController extends Controller
         $loteProduccion->load('plantillaTransformacion.pasos.proceso', 'plantillaTransformacion.pasos.maquina');
         $rutaPlantilla = $this->transformacion->rutaPlantilla($loteProduccion);
         $siguientePasoPlantilla = $this->transformacion->siguientePasoPlantilla($loteProduccion);
+        $user = auth()->user();
+        $puedeAsignarEtapa = UsuarioRol::gestionaPlanta($user) || $user?->hasRole('admin');
+        $operadoresPlanta = $puedeAsignarEtapa
+            ? UsuarioRol::queryOperariosPlanta()->orderBy('nombre')->orderBy('apellido')->get()
+            : collect();
+        $asignacionesPendientesLote = AsignacionEtapaPlanta::query()
+            ->with(['proceso', 'maquina', 'operador'])
+            ->where('loteproduccionpedidoid', $loteProduccion->loteproduccionpedidoid)
+            ->pendientes()
+            ->orderByDesc('creado_en')
+            ->get();
 
         return view('procesamiento.show', array_merge($dash, [
             'lote' => $loteProduccion,
@@ -228,7 +243,59 @@ class LoteProduccionController extends Controller
             'produccionEstimada' => $produccionEstimada,
             'fases' => LoteProduccionTrazabilidadService::FASES,
             'puedeEliminar' => $this->loteService->puedeEliminar($loteProduccion),
+            'puedeAsignarEtapa' => $puedeAsignarEtapa,
+            'operadoresPlanta' => $operadoresPlanta,
+            'asignacionesPendientesLote' => $asignacionesPendientesLote,
+            'puedeAsignarNuevaEtapa' => $puedeAsignarEtapa && $this->asignacionEtapa->puedeAsignar($loteProduccion),
         ]));
+    }
+
+    public function asignarEtapa(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse
+    {
+        abort_unless(UsuarioRol::gestionaPlanta($request->user()) || $request->user()?->hasRole('admin'), 403);
+
+        $data = $request->validate([
+            'procesoplantaid' => ['required', 'integer', 'exists:proceso_planta,procesoplantaid'],
+            'maquinaplantaid' => ['required', 'integer', 'exists:maquina_planta,maquinaplantaid'],
+            'operador_usuarioid' => ['required', 'integer', 'exists:usuario,usuarioid'],
+            'observaciones' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        try {
+            $asignacion = $this->asignacionEtapa->asignar($loteProduccion, $data, $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage())->withInput();
+        }
+
+        $operador = $asignacion->operador;
+
+        return redirect()
+            ->route('procesamiento.show', $loteProduccion)
+            ->with('success', 'Etapa asignada a '.($operador?->nombreCompleto() ?? 'operario').'. Recibirá una alerta en su panel.');
+    }
+
+    public function completarEtapaAsignada(
+        Request $request,
+        LoteProduccionPedido $loteProduccion,
+        AsignacionEtapaPlanta $asignacion,
+    ): RedirectResponse {
+        abort_unless(UsuarioRol::gestionaPlanta($request->user()) || $request->user()?->hasRole('admin'), 403);
+
+        if ((int) $asignacion->loteproduccionpedidoid !== (int) $loteProduccion->loteproduccionpedidoid) {
+            abort(404);
+        }
+
+        try {
+            $this->asignacionEtapa->completarPorSupervisor($asignacion, $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $proceso = $asignacion->proceso?->nombre ?? 'etapa';
+
+        return redirect()
+            ->route('procesamiento.show', $loteProduccion)
+            ->with('success', "«{$proceso}» marcada como completada. La alerta del operario fue retirada.");
     }
 
     public function registrarEtapa(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse

@@ -96,6 +96,7 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/notificaciones/{notificacion}/leer', [DashboardController::class, 'marcarNotificacionLeida'])->name('notificaciones.leer');
+    Route::post('/notificaciones/{notificacion}/descartar', [DashboardController::class, 'descartarNotificacion'])->name('notificaciones.descartar');
     Route::get('/dashboard/panel-planta', [DashboardController::class, 'panelPlanta'])->name('dashboard.panel-planta');
     Route::get('/dashboard/panel-transportista', [DashboardController::class, 'panelTransportista'])->name('dashboard.panel-transportista');
     Route::get('/dashboard/panel-almacen', [DashboardController::class, 'panelAlmacen'])->name('dashboard.panel-almacen');
@@ -205,6 +206,21 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         ->middleware('action.permission:lote_produccion,read');
     Route::post('procesamiento/{loteProduccion}/etapa', [\App\Http\Controllers\Web\LoteProduccionController::class, 'registrarEtapa'])
         ->name('procesamiento.registrar-etapa')
+        ->middleware('action.permission:lote_produccion,create');
+    Route::post('procesamiento/{loteProduccion}/asignar-etapa', [\App\Http\Controllers\Web\LoteProduccionController::class, 'asignarEtapa'])
+        ->name('procesamiento.asignar-etapa')
+        ->middleware('action.permission:lote_produccion,create');
+    Route::post('procesamiento/{loteProduccion}/asignaciones-etapa/{asignacion}/completar', [\App\Http\Controllers\Web\LoteProduccionController::class, 'completarEtapaAsignada'])
+        ->name('procesamiento.completar-etapa-asignada')
+        ->middleware('action.permission:lote_produccion,create');
+    Route::get('mis-tareas-planta', [\App\Http\Controllers\Web\TareaPlantaController::class, 'index'])
+        ->name('tareas-planta.index')
+        ->middleware('action.permission:lote_produccion,read');
+    Route::get('mis-tareas-planta/{asignacion}', [\App\Http\Controllers\Web\TareaPlantaController::class, 'show'])
+        ->name('tareas-planta.show')
+        ->middleware('action.permission:lote_produccion,read');
+    Route::post('mis-tareas-planta/{asignacion}/completar', [\App\Http\Controllers\Web\TareaPlantaController::class, 'completar'])
+        ->name('tareas-planta.completar')
         ->middleware('action.permission:lote_produccion,create');
     Route::post('procesamiento/{loteProduccion}/certificar', [\App\Http\Controllers\Web\LoteProduccionController::class, 'certificar'])
         ->name('procesamiento.certificar')

@@ -313,17 +313,46 @@
                 @endif
             @endforelse
 
+            @if(!empty($asignacionesPendientesLote) && $asignacionesPendientesLote->count())
+            <div class="alert alert-warning py-2 px-3 mb-3">
+                <strong class="small d-block mb-1"><i class="fas fa-user-clock mr-1"></i>Asignaciones pendientes</strong>
+                <ul class="mb-0 pl-0 list-unstyled small">
+                    @foreach($asignacionesPendientesLote as $asig)
+                    <li class="d-flex flex-wrap justify-content-between align-items-center border-bottom py-2" style="gap:.5rem;">
+                        <span>
+                            {{ $asig->proceso?->nombre }} · {{ $asig->maquina?->nombre }}
+                            → <strong>{{ $asig->operador?->nombreCompleto() }}</strong>
+                            @if($asig->observaciones) <span class="text-muted">({{ Str::limit($asig->observaciones, 60) }})</span> @endif
+                        </span>
+                        @if(!empty($puedeAsignarEtapa))
+                        <form method="POST" action="{{ route('procesamiento.completar-etapa-asignada', [$lote, $asig]) }}" class="mb-0">
+                            @csrf
+                            <button type="button" class="btn btn-success btn-sm font-weight-bold"
+                                    data-confirm-modal
+                                    data-confirm-tone="success"
+                                    data-confirm-title="Completar fase"
+                                    data-confirm-message="¿Marcar «{{ $asig->proceso?->nombre }}» como completada? Se retirará la alerta de {{ $asig->operador?->nombreCompleto() }}.">
+                                <i class="fas fa-check mr-1"></i>Marcar completada
+                            </button>
+                        </form>
+                        @endif
+                    </li>
+                    @endforeach
+                </ul>
+            </div>
+            @endif
+
             @if($panelActivo === 'transformacion' && in_array($fase_actual, ['transformacion', 'creacion']) && empty($transformacion_completa))
-            @can('lote_produccion.create')
+            @if(!empty($puedeAsignarEtapa) && !empty($puedeAsignarNuevaEtapa))
             <div class="lp-form-etapa mt-3" id="lp-form-registrar-etapa">
                 <h6 class="font-weight-bold text-success mb-3">
-                    <i class="fas fa-plus-circle mr-1"></i>
-                    Registrar etapa {{ count($etapas_transformacion ?? []) + 1 }}
+                    <i class="fas fa-user-plus mr-1"></i>
+                    Asignar etapa {{ count($etapas_transformacion ?? []) + count($asignacionesPendientesLote ?? []) + 1 }} a operario
                 </h6>
-                <form method="POST" action="{{ route('procesamiento.registrar-etapa', $lote) }}" id="formRegistrarEtapa">
+                <form method="POST" action="{{ route('procesamiento.asignar-etapa', $lote) }}" id="formAsignarEtapa">
                     @csrf
                     <div class="form-row">
-                        <div class="col-md-4 form-group">
+                        <div class="col-md-3 form-group">
                             <label class="small font-weight-bold">Proceso de planta</label>
                             <select name="procesoplantaid" id="selectProcesoEtapa" class="form-control form-control-sm" required>
                                 <option value="">Seleccionar…</option>
@@ -337,7 +366,7 @@
                             <small class="text-muted">Puede repetir el mismo proceso las veces que necesite.</small>
                             @endif
                         </div>
-                        <div class="col-md-4 form-group">
+                        <div class="col-md-3 form-group">
                             <label class="small font-weight-bold">Maquinaria</label>
                             <select name="maquinaplantaid" id="selectMaquinaEtapa" class="form-control form-control-sm" required disabled>
                                 <option value="">Primero elija un proceso…</option>
@@ -347,29 +376,37 @@
                             </select>
                             <small class="text-muted" id="hintMaquinaEtapa">Solo equipos compatibles con el proceso.</small>
                         </div>
-                        <div class="col-md-4 form-group">
+                        <div class="col-md-3 form-group">
+                            <label class="small font-weight-bold">Operario (rol planta)</label>
+                            <select name="operador_usuarioid" id="selectOperadorEtapa" class="form-control form-control-sm" required disabled>
+                                <option value="">Primero elija maquinaria…</option>
+                                @foreach($operadoresPlanta as $op)
+                                    <option value="{{ $op->usuarioid }}">{{ $op->nombreCompleto() }}</option>
+                                @endforeach
+                            </select>
+                            <small class="text-muted" id="hintOperadorEtapa">El operario recibirá una alerta en su panel.</small>
+                        </div>
+                        <div class="col-md-3 form-group">
                             <label class="small font-weight-bold">Observaciones</label>
                             <input type="text" name="observaciones" class="form-control form-control-sm" maxlength="500" placeholder="Ej. Pelado y corte en cubos">
                         </div>
                     </div>
                     <div class="form-row">
-                        <div class="col-md-4 form-group mb-md-0">
-                            <label class="small font-weight-bold">Inicio</label>
-                            <input type="datetime-local" name="hora_inicio" class="form-control form-control-sm" required value="{{ now()->format('Y-m-d\TH:i') }}">
-                        </div>
-                        <div class="col-md-4 form-group mb-md-0">
-                            <label class="small font-weight-bold">Fin</label>
-                            <input type="datetime-local" name="hora_fin" class="form-control form-control-sm" required value="{{ now()->format('Y-m-d\TH:i') }}">
-                        </div>
-                        <div class="col-md-4 form-group mb-0 d-flex align-items-end">
-                            <button type="submit" class="btn btn-info btn-sm btn-block font-weight-bold">
-                                <i class="fas fa-save mr-1"></i>Registrar etapa
+                        <div class="col-md-12 form-group mb-0 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-success btn-sm font-weight-bold">
+                                <i class="fas fa-paper-plane mr-1"></i>Asignar a operario
                             </button>
                         </div>
                     </div>
                 </form>
             </div>
-            @endcan
+            @elseif(\App\Support\UsuarioRol::esOperarioPlanta(auth()->user()))
+            <div class="alert alert-info py-2 px-3 mt-3 mb-0 small">
+                <i class="fas fa-info-circle mr-1"></i>
+                Las etapas se asignan desde el jefe de planta. Revise sus tareas en
+                <a href="{{ route('tareas-planta.index') }}" class="alert-link font-weight-bold">Mis tareas de transformación</a>.
+            </div>
+            @endif
             @endif
         </div>
     </div>
@@ -639,9 +676,26 @@
             selectMaquina.appendChild(opt);
         });
         if (hintMaquina) hintMaquina.textContent = opciones.length + ' equipo(s) compatible(s) con este proceso.';
+        actualizarOperador();
+    }
+
+    const selectOperador = document.getElementById('selectOperadorEtapa');
+    const hintOperador = document.getElementById('hintOperadorEtapa');
+
+    function actualizarOperador() {
+        if (!selectOperador) return;
+        const maquinaOk = selectMaquina && !selectMaquina.disabled && selectMaquina.value;
+        selectOperador.disabled = !maquinaOk;
+        if (!maquinaOk) {
+            selectOperador.value = '';
+            if (hintOperador) hintOperador.textContent = 'Primero elija maquinaria…';
+            return;
+        }
+        if (hintOperador) hintOperador.textContent = 'El operario recibirá una alerta en su panel.';
     }
 
     selectProceso.addEventListener('change', actualizarMaquinas);
+    if (selectMaquina) selectMaquina.addEventListener('change', actualizarOperador);
 
     @php
         $sugeridoPasoJs = $siguientePasoPlantilla ? [
@@ -656,8 +710,9 @@
         actualizarMaquinas();
         if (sugerido.maquinaplantaid) {
             selectMaquina.value = String(sugerido.maquinaplantaid);
+            actualizarOperador();
         }
-        const obs = document.querySelector('#formRegistrarEtapa input[name="observaciones"]');
+        const obs = document.querySelector('#formAsignarEtapa input[name="observaciones"]');
         if (obs && sugerido.notas && !obs.value) obs.value = sugerido.notas;
     }
 })();
@@ -725,9 +780,9 @@
         irASeccionFase('transformacion');
     }
 
-    const formRegistrarEtapa = document.getElementById('formRegistrarEtapa');
-    if (formRegistrarEtapa) {
-        formRegistrarEtapa.addEventListener('submit', function () {
+    const formAsignarEtapa = document.getElementById('formAsignarEtapa');
+    if (formAsignarEtapa) {
+        formAsignarEtapa.addEventListener('submit', function () {
             try {
                 sessionStorage.setItem('lp_procesamiento_scroll', String(window.scrollY));
             } catch (err) {}

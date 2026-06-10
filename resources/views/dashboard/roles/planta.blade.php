@@ -27,6 +27,20 @@
 
 <section class="content">
     <div class="container-fluid">
+        @include('partials.dashboard-alertas')
+
+        @if(auth()->user() && \App\Support\UsuarioRol::esOperarioPlanta(auth()->user()) && ($tareasPendientesCount ?? 0) > 0)
+        <div class="alert alert-warning border-0 shadow-sm d-flex flex-wrap justify-content-between align-items-center mb-3" style="gap:.75rem;">
+            <div>
+                <strong><i class="fas fa-industry mr-1"></i>Tiene {{ $tareasPendientesCount }} tarea(s) de transformación pendiente(s)</strong>
+                <span class="d-block small text-muted">El jefe de planta le asignó trabajo en maquinaria. Revise el detalle y márquelas como completadas.</span>
+            </div>
+            <a href="{{ route('tareas-planta.index') }}" class="btn btn-warning btn-sm font-weight-bold">
+                <i class="fas fa-tasks mr-1"></i>Ver mis tareas
+            </a>
+        </div>
+        @endif
+
         <div class="row">
             <div class="col-md-6 col-lg">
                 <div class="card metric-card bg-success panel-card"><div class="card-body"><i class="fas fa-boxes icon"></i><h3 class="mb-1">{{ $stats['pedidos_totales'] }}</h3><p class="mb-0">Pedidos</p></div></div>
@@ -57,6 +71,9 @@
                     @can('lote_produccion.view')
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-primary btn-block quick-link" href="{{ route('procesamiento.index') }}"><i class="fas fa-industry"></i>Procesamiento de Lote</a></div>
                     @endcan
+                    @if(auth()->user() && \App\Support\UsuarioRol::esOperarioPlanta(auth()->user()))
+                    <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-warning btn-block quick-link" href="{{ route('tareas-planta.index') }}"><i class="fas fa-tasks"></i>Mis tareas</a></div>
+                    @endif
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-warning btn-block quick-link" href="{{ route('logistica.asignaciones.index') }}"><i class="fas fa-user-tag"></i>Asignaciones</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-success btn-block quick-link" href="{{ route('logistica.rutas.index') }}"><i class="fas fa-route"></i>Rutas de entrega</a></div>
                     <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-secondary btn-block quick-link" href="{{ route('logistica.documentos.index') }}"><i class="fas fa-file-alt"></i>Documentos</a></div>

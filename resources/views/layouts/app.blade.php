@@ -1210,6 +1210,9 @@
                         @can('lote_produccion.view')
                         <li class="ag-sub-li"><a href="{{ route('procesamiento.index') }}" class="ag-sub-a {{ request()->routeIs('procesamiento.*') ? 'active' : '' }}">Procesamiento de Lote</a></li>
                         @endcan
+                        @if($authUser && \App\Support\UsuarioRol::esOperarioPlanta($authUser))
+                        <li class="ag-sub-li"><a href="{{ route('tareas-planta.index') }}" class="ag-sub-a {{ request()->routeIs('tareas-planta.*') ? 'active' : '' }}">Mis tareas de transformación</a></li>
+                        @endif
                         <li class="ag-sub-li"><a href="{{ route('procesos-planta.index') }}" class="ag-sub-a {{ request()->routeIs('procesos-planta.*') ? 'active' : '' }}">Procesos de planta</a></li>
                         <li class="ag-sub-li"><a href="{{ route('plantillas-transformacion.index') }}" class="ag-sub-a {{ request()->routeIs('plantillas-transformacion.*') ? 'active' : '' }}">Procesos de transformación</a></li>
                         <li class="ag-sub-li"><a href="{{ route('maquinas-planta.index') }}" class="ag-sub-a {{ request()->routeIs('maquinas-planta.*') ? 'active' : '' }}">Máquinas de planta</a></li>

@@ -1,0 +1,18 @@
+---
+description: Commits de Fusion-Proyectos con los 3 coautores del equipo
+alwaysApply: true
+---
+
+# Commits con coautores (Fusion-Proyectos)
+
+En **cada commit** de este repositorio, incluir al final del mensaje (cuerpo del commit):
+
+```
+Co-authored-by: darktwist9 <hamza.cassis@gmail.com>
+Co-authored-by: Fernando-Fk <Fernando-Fk@users.noreply.github.com>
+```
+
+- Autor principal: cuenta del repositorio (`JosuePadillaUnivalle`).
+- Remoto: `origin` → `https://github.com/JosuePadillaUnivalle/Fusion-Proyecto-Trazabilidad.git`
+- No commitear `.env`, credenciales ni `database.sqlite` con datos sensibles.
+- Mensajes en español, estilo convencional (`feat`, `fix`, `refactor`, etc.).

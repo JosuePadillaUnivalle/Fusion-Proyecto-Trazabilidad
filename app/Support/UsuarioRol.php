@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Usuario;
+use Illuminate\Database\Eloquent\Builder;
 
 final class UsuarioRol
 {
@@ -29,6 +30,21 @@ final class UsuarioRol
     public static function esPlantaOperativo(?Usuario $user): bool
     {
         return (bool) ($user && $user->hasAnyRole(['planta', 'jefe_planta']));
+    }
+
+    /** Operario de planta (Spatie rol planta, sin jefe_planta ni admin). */
+    public static function esOperarioPlanta(?Usuario $user): bool
+    {
+        return (bool) ($user && $user->hasRole('planta') && ! self::esJefePlanta($user) && ! self::esAdminGlobal($user));
+    }
+
+    /** Usuarios asignables como operarios en transformación (solo Spatie «planta», nunca jefe). */
+    public static function queryOperariosPlanta(): Builder
+    {
+        return Usuario::query()
+            ->where('activo', true)
+            ->whereHas('roles', fn (Builder $q) => $q->where('name', 'planta'))
+            ->whereDoesntHave('roles', fn (Builder $q) => $q->whereIn('name', ['jefe_planta', 'admin']));
     }
 
     public static function puedeConfirmarRecepcionPlanta(?Usuario $user): bool
