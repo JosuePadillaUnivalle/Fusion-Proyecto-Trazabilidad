@@ -33,6 +33,8 @@
     border: 2px dashed #2c5530; color: #2c5530; background: #f0fdf4;
     border-radius: 10px; font-weight: 600; width: 100%; padding: .65rem;
 }
+.page-edit-lote #productoLote::-webkit-calendar-picker-indicator,
+.page-edit-lote #productoLote::-webkit-list-button { display: none !important; }
 </style>
 @endpush
 
@@ -147,7 +149,6 @@
     </div>
 </div>
 
-@include('partials.selector-catalogo-modal')
 @endsection
 
 @push('scripts')

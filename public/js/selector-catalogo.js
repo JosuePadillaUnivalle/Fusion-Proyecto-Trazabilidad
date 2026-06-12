@@ -11,11 +11,41 @@
         almacenDebounceTimer: null,
         page: 1,
 
+        ensureModalOnBody() {
+            if (!this.modalEl || this.modalEl.parentElement === document.body) {
+                return;
+            }
+            document.body.appendChild(this.modalEl);
+        },
+
+        cleanupModalArtifacts() {
+            if (document.querySelector('.modal.show')) {
+                return;
+            }
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+            document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
+        },
+
+        syncModalStacking() {
+            if (!this.modalEl) {
+                return;
+            }
+            const zIndex = 1060;
+            this.modalEl.style.zIndex = String(zIndex);
+            document.querySelectorAll('.modal-backdrop').forEach((el) => {
+                el.style.zIndex = String(zIndex - 10);
+            });
+        },
+
         init() {
             this.modalEl = document.getElementById('modalSelectorCatalogo');
             if (!this.modalEl) {
                 return;
             }
+
+            this.ensureModalOnBody();
+            this.cleanupModalArtifacts();
 
             const searchInput = this.modalEl.querySelector('#selectorCatalogoBuscar');
             const filterSelect = this.modalEl.querySelector('#selectorCatalogoFiltro');
@@ -69,6 +99,31 @@
             });
 
             this.modalEl.querySelector('#selectorCatalogoLista').addEventListener('click', (e) => {
+                const actionBtn = e.target.closest('.sel-row-action-btn');
+                if (actionBtn && this.activeId) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const row = actionBtn.closest('[data-item-id]');
+                    if (!row) {
+                        return;
+                    }
+                    let extra = {};
+                    try {
+                        extra = JSON.parse(row.getAttribute('data-item-extra') || '{}');
+                    } catch (err) {
+                        extra = {};
+                    }
+                    const cfg = this.instances[this.activeId] || {};
+                    if (typeof cfg.onRowAction === 'function') {
+                        cfg.onRowAction({
+                            id: row.getAttribute('data-item-id'),
+                            label: row.getAttribute('data-item-label'),
+                            extra,
+                        });
+                    }
+                    return;
+                }
+
                 const row = e.target.closest('[data-item-id]');
                 if (!row || !this.activeId) {
                     return;
@@ -101,18 +156,24 @@
 
             window.jQuery(this.modalEl).on('hidden.bs.modal', () => {
                 this.activeId = null;
+                window.setTimeout(() => this.cleanupModalArtifacts(), 80);
             });
 
             window.jQuery(this.modalEl).on('show.bs.modal', () => {
-                const visibleCount = document.querySelectorAll('.modal.show').length;
-                const zIndex = 1050 + (10 * visibleCount);
-                this.modalEl.style.zIndex = String(zIndex);
-                setTimeout(() => {
-                    const backdrops = document.querySelectorAll('.modal-backdrop');
-                    if (backdrops.length) {
-                        backdrops[backdrops.length - 1].style.zIndex = String(zIndex - 1);
-                    }
-                }, 0);
+                this.ensureModalOnBody();
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                if (backdrops.length > 1) {
+                    backdrops.forEach((el, index) => {
+                        if (index < backdrops.length - 1) {
+                            el.remove();
+                        }
+                    });
+                }
+                window.requestAnimationFrame(() => this.syncModalStacking());
+            });
+
+            window.jQuery(this.modalEl).on('shown.bs.modal', () => {
+                this.syncModalStacking();
             });
         },
 
@@ -129,13 +190,31 @@
             this.activeId = id;
             this.page = 1;
 
+            if (typeof cfg.beforeOpen === 'function') {
+                cfg.beforeOpen(cfg);
+            }
+
             this.modalEl.querySelector('#selectorCatalogoTitulo').textContent = cfg.title || 'Buscar y seleccionar';
             this.modalEl.querySelector('#selectorCatalogoBuscar').value = '';
             this.modalEl.querySelector('#selectorCatalogoBuscar').placeholder = cfg.searchPlaceholder || 'Escriba para buscar…';
 
+            this.modalEl.classList.remove('sel-theme-planta', 'sel-theme-vehiculo', 'sel-theme-origen');
+            if (cfg.theme) {
+                this.modalEl.classList.add('sel-theme-' + cfg.theme);
+            }
+
             const headerIcon = this.modalEl.querySelector('#selectorCatalogoHeaderIcon');
             if (headerIcon) {
                 headerIcon.className = 'fas ' + (cfg.modalIcon || 'fa-search');
+            }
+
+            const colNombre = this.modalEl.querySelector('#selectorCatalogoColNombre');
+            const colDetalle = this.modalEl.querySelector('#selectorCatalogoColDetalle');
+            if (colNombre) {
+                colNombre.textContent = cfg.colNombre || 'Nombre';
+            }
+            if (colDetalle) {
+                colDetalle.textContent = cfg.colDetalle || 'Detalle';
             }
 
             const buscarLabel = this.modalEl.querySelector('#selectorCatalogoBuscarLabel');
@@ -153,6 +232,15 @@
                     `<option value="${o.value ?? ''}">${o.label}</option>`
                 ).join('');
                 filterSelect.name = cfg.filter.param || 'filtro';
+                const filterParam = cfg.filter.param || 'filtro';
+                const preVal = cfg.params && cfg.params[filterParam] != null && cfg.params[filterParam] !== ''
+                    ? String(cfg.params[filterParam])
+                    : '';
+                if (preVal && filterSelect.querySelector(`option[value="${preVal}"]`)) {
+                    filterSelect.value = preVal;
+                } else {
+                    filterSelect.selectedIndex = 0;
+                }
             } else {
                 filterWrap.style.display = 'none';
                 filterSelect.innerHTML = '';
@@ -364,12 +452,37 @@
             const cfg = this.instances[this.activeId] || {};
             const rowIcon = cfg.rowIcon || 'fa-leaf';
 
-            if (!items.length) {
+            if (!items.length && !cfg.allowEmpty) {
                 lista.innerHTML = '<tr><td colspan="2" class="sel-modal-empty"><i class="fas fa-search d-block mb-2"></i>Sin resultados. Pruebe otro término o filtro.</td></tr>';
                 return;
             }
 
-            lista.innerHTML = items.map((item) => `
+            let html = '';
+            if (cfg.allowEmpty && this.page === 1) {
+                const todosLabel = cfg.emptyLabel || 'Todos';
+                html += `
+                <tr class="selector-catalogo-row selector-catalogo-row--todos"
+                    data-item-id=""
+                    data-item-label="${this.escape(todosLabel)}"
+                    data-item-extra="{}"
+                    role="button">
+                    <td class="sel-col-nombre">
+                        <span class="sel-row-icon"><i class="fas fa-times-circle"></i></span>
+                        ${this.escape(todosLabel)}
+                    </td>
+                    <td class="sel-col-meta">Quitar filtro</td>
+                </tr>`;
+            }
+
+            if (!items.length) {
+                html += '<tr><td colspan="2" class="sel-modal-empty"><i class="fas fa-search d-block mb-2"></i>Sin resultados. Pruebe otro término o filtro.</td></tr>';
+                lista.innerHTML = html;
+                return;
+            }
+
+            const actionLabel = cfg.rowAction?.label || (typeof cfg.onRowAction === 'function' ? 'Ver' : null);
+
+            html += items.map((item) => `
                 <tr class="selector-catalogo-row"
                     data-item-id="${item.id}"
                     data-item-label="${this.escape(item.label)}"
@@ -379,9 +492,13 @@
                         <span class="sel-row-icon"><i class="fas ${rowIcon}"></i></span>
                         ${this.escape(item.label)}
                     </td>
-                    <td class="sel-col-meta">${item.meta ? this.escape(item.meta) : '—'}</td>
+                    <td class="sel-col-meta${actionLabel ? ' sel-col-meta--with-action' : ''}">
+                        <span class="sel-col-meta-text">${item.meta ? this.escape(item.meta) : '—'}</span>
+                        ${actionLabel ? `<button type="button" class="btn btn-sm btn-outline-success sel-row-action-btn" title="Ver productos en este almacén">${this.escape(actionLabel)}</button>` : ''}
+                    </td>
                 </tr>
             `).join('');
+            lista.innerHTML = html;
         },
 
         renderPagination(meta) {
@@ -424,18 +541,27 @@
                         display.classList.add('text-muted');
                     }
                 }
-
-                wrapper.dispatchEvent(new CustomEvent('selector-catalogo:change', {
-                    bubbles: true,
-                    detail: { id: item.id, label: item.label, extra: item.extra || {} },
-                }));
             }
 
-            if (typeof cfg.onSelect === 'function') {
-                cfg.onSelect(item);
-            }
+            const finalize = () => {
+                if (wrapper) {
+                    wrapper.dispatchEvent(new CustomEvent('selector-catalogo:change', {
+                        bubbles: true,
+                        detail: { id: item.id, label: item.label, extra: item.extra || {} },
+                    }));
+                }
+                if (typeof cfg.onSelect === 'function') {
+                    cfg.onSelect(item);
+                }
+            };
 
-            window.jQuery(this.modalEl).modal('hide');
+            const $modal = window.jQuery(this.modalEl);
+            if ($modal.hasClass('show')) {
+                $modal.one('hidden.bs.modal', finalize);
+                $modal.modal('hide');
+            } else {
+                finalize();
+            }
         },
 
         clear(id) {

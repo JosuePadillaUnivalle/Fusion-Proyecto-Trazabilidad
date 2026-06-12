@@ -108,10 +108,43 @@ class RutaPorCallesService
         return $out;
     }
 
+    /** @var array<string, array{0: float, 1: float}> */
+    private const PUNTOS_CIUDAD = [
+        'quillacollo' => [-17.3923, -66.2784],
+        'cochabamba' => [-17.3935, -66.1570],
+        'el alto' => [-16.5047, -68.1632],
+        'la paz' => [-16.5000, -68.1500],
+        'santa cruz' => [-17.7833, -63.1821],
+        'oruro' => [-17.9754, -67.1130],
+        'sucre' => [-19.0478, -65.2595],
+        'tarija' => [-21.5318, -64.7311],
+    ];
+
+    /**
+     * @return array{lat: float, lng: float, aproximada?: bool}|null
+     */
     public function coordsDesdePedido(?Pedido $pedido): ?array
     {
         if ($pedido?->latitud && $pedido?->longitud) {
-            return ['lat' => (float) $pedido->latitud, 'lng' => (float) $pedido->longitud];
+            return [
+                'lat' => (float) $pedido->latitud,
+                'lng' => (float) $pedido->longitud,
+                'aproximada' => false,
+            ];
+        }
+
+        $texto = strtolower(trim(
+            ($pedido->nombre_planta ?? '').' '.($pedido->direccion_texto ?? '')
+        ));
+
+        foreach (self::PUNTOS_CIUDAD as $clave => $coords) {
+            if ($texto !== '' && str_contains($texto, $clave)) {
+                return [
+                    'lat' => $coords[0],
+                    'lng' => $coords[1],
+                    'aproximada' => true,
+                ];
+            }
         }
 
         return null;

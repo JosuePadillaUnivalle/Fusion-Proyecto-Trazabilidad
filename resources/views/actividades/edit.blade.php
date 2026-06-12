@@ -134,17 +134,31 @@
 
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="form-group">
-                            <label class="required-field"><i class="fas fa-user mr-1"></i> Responsable</label>
-                            <select name="usuarioid" class="form-control" required>
-                                <option value="">Seleccionar...</option>
-                                @foreach($usuarios as $u)
-                                    <option value="{{ $u->usuarioid }}" {{ $u->usuarioid == $actividad->usuarioid ? 'selected' : '' }}>
-                                        {{ $u->nombre }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
+                        @if(!empty($puedeDesignarResponsable))
+                            @include('partials.selector-catalogo', [
+                                'id' => 'actividad_edit_responsable',
+                                'name' => 'usuarioid',
+                                'label' => 'Responsable',
+                                'icon' => 'fa-user',
+                                'value' => old('usuarioid', $actividad->usuarioid),
+                                'labelSelected' => $responsableLabel ?? '',
+                                'endpoint' => route('catalogo-selector.usuarios'),
+                                'params' => $responsableSelectorParams ?? ['roles' => 'agricultor'],
+                                'title' => 'Seleccionar responsable',
+                                'searchPlaceholder' => 'Nombre, correo o usuario…',
+                                'help' => ! empty($esJefeAgricultorDesignando)
+                                    ? 'Solo agricultores operativos de su equipo (el jefe no es responsable de campo).'
+                                    : 'Agricultor operativo que ejecutará la actividad.',
+                                'required' => true,
+                            ])
+                        @else
+                            <div class="form-group">
+                                <label class="required-field"><i class="fas fa-user mr-1"></i> Responsable</label>
+                                <input type="text" class="form-control bg-light" readonly
+                                       value="{{ $responsableLabel ?? trim(auth()->user()->nombre.' '.(auth()->user()->apellido ?? '')) }}">
+                                <input type="hidden" name="usuarioid" value="{{ auth()->user()->usuarioid }}">
+                            </div>
+                        @endif
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">

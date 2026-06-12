@@ -9,234 +9,162 @@
 @endsection
 
 @push('styles')
+@include('dashboard.partials.panel-accesos-styles')
 <style>
-.metric-card { border:0; border-radius:14px; overflow:hidden; position:relative; box-shadow:0 6px 20px rgba(18,38,63,.1); }
-.metric-card .card-body { padding:1.2rem 1.4rem; }
-.metric-icon { position:absolute; right:14px; top:50%; transform:translateY(-50%); font-size:2.4rem; opacity:.18; }
-.metric-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; opacity:.8; font-weight:600; }
-.metric-value { font-size:2rem; font-weight:800; line-height:1.1; }
-.metric-sub { font-size:.78rem; opacity:.75; }
-.panel-card { border:0; border-radius:14px; box-shadow:0 6px 20px rgba(18,38,63,.08); }
-.panel-card .card-header { background:#fff; border-bottom:1px solid #f0f0f0; border-radius:14px 14px 0 0 !important; padding:.9rem 1.2rem; }
-.panel-card .card-title { font-weight:700; color:#1a252f; margin:0; }
-.quick-btn { border-radius:10px; padding:.7rem 1rem; display:flex; align-items:center; gap:.6rem; font-weight:600; font-size:.9rem; transition:transform .15s,box-shadow .15s; border:0; }
-.quick-btn:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,.15); }
-.x-table thead th { background:#f2f7f3; border-bottom:0; font-size:.77rem; text-transform:uppercase; letter-spacing:.04em; color:#4a7c59; font-weight:700; }
-.x-table tbody td { vertical-align:middle; font-size:.86rem; }
-.progress-bar-custom { height:6px; border-radius:3px; }
-.status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:5px; }
-.badge-estado { border-radius:20px; font-size:.73rem; padding:.28em .75em; font-weight:600; }
-.empty-row td { text-align:center; color:#adb5bd; padding:2rem; font-size:.85rem; }
-.info-chip { display:inline-flex; align-items:center; gap:.4rem; background:#f2f7f3; border-radius:8px; padding:.35rem .75rem; font-size:.82rem; color:#2c5530; font-weight:600; }
+.role-panel-wrap { --rp-border: rgba(234, 88, 12, .18); --rp-hero-bg: linear-gradient(135deg, #fff7ed 0%, #ffedd5 42%, #f8fafc 100%); --rp-glow: radial-gradient(circle, rgba(249, 115, 22, .18) 0%, transparent 70%); --rp-title: #9a3412; --rp-icon-bg: linear-gradient(135deg, #ea580c, #f59e0b); --rp-tile-hover: #fdba74; }
+.role-metric--a1 { background: linear-gradient(135deg, #15803d, #22c55e); }
+.role-metric--a2 { background: linear-gradient(135deg, #c2410c, #f59e0b); }
+.role-metric--a3 { background: linear-gradient(135deg, #0369a1, #0ea5e9); }
+.role-metric--a4 { background: linear-gradient(135deg, #059669, #10b981); }
+.role-metric--a5 { background: linear-gradient(135deg, #7c3aed, #a855f7); }
 </style>
 @endpush
 
 @section('content')
+<section class="content px-0 role-panel-wrap">
+    <div class="container-fluid px-0">
 
-{{-- Bienvenida --}}
-<div class="d-flex align-items-center mb-3" style="gap:.75rem;">
-    <div style="width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#fd7e14,#ffc107);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#fff;">
-        <i class="fas fa-truck-moving"></i>
-    </div>
-    <div>
-        <div style="font-size:1.05rem;font-weight:700;color:#1a252f;">Bienvenido, {{ auth()->user()->nombre ?? 'Transportista' }}</div>
-        <div style="font-size:.8rem;color:#6c757d;">Panel operativo · {{ now()->format('d \d\e F, Y') }}</div>
-    </div>
-</div>
+        <div class="role-panel-hero position-relative" style="z-index:1">
+            <div class="role-panel-hero__title">
+                <i class="fas fa-truck-moving"></i>Panel Transportista
+            </div>
+            <p class="role-panel-hero__sub">
+                Hola, <strong>{{ auth()->user()->nombre ?? 'Transportista' }}</strong> · {{ now()->format('d/m/Y') }} · Gestión de envíos asignados.
+            </p>
+        </div>
 
-{{-- Métricas --}}
-<div class="row mb-3">
-    <div class="col-6 col-lg mb-3">
-        <div class="card metric-card text-white" style="background:linear-gradient(135deg,#2c5530,#4a7c59);">
-            <div class="card-body">
-                <i class="fas fa-clipboard-check metric-icon"></i>
-                <div class="metric-label">Asignados</div>
-                <div class="metric-value">{{ $stats['asignados'] }}</div>
-                <div class="metric-sub">envíos en total</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-lg mb-3">
-        <div class="card metric-card text-white" style="background:linear-gradient(135deg,#fd7e14,#ffc107);">
-            <div class="card-body">
-                <i class="fas fa-box metric-icon"></i>
-                <div class="metric-label">Por recoger</div>
-                <div class="metric-value">{{ $stats['por_recoger'] }}</div>
-                <div class="metric-sub">pendientes de pickup</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-lg mb-3">
-        <div class="card metric-card text-white" style="background:linear-gradient(135deg,#17a2b8,#1e88e5);">
-            <div class="card-body">
-                <i class="fas fa-truck-moving metric-icon"></i>
-                <div class="metric-label">En camino</div>
-                <div class="metric-value">{{ $stats['en_camino'] }}</div>
-                <div class="metric-sub">en tránsito ahora</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-lg mb-3">
-        <div class="card metric-card text-white" style="background:linear-gradient(135deg,#28a745,#20c997);">
-            <div class="card-body">
-                <i class="fas fa-check-circle metric-icon"></i>
-                <div class="metric-label">Entregados hoy</div>
-                <div class="metric-value">{{ $stats['entregados_hoy'] }}</div>
-                <div class="metric-sub">completados hoy</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-lg mb-3">
-        <div class="card metric-card text-white" style="background:linear-gradient(135deg,#6f42c1,#e91e63);">
-            <div class="card-body">
-                <i class="fas fa-tachometer-alt metric-icon"></i>
-                <div class="metric-label">Productividad</div>
-                <div class="metric-value">{{ $stats['productividad'] }}<span style="font-size:1rem;">%</span></div>
-                <div class="metric-sub">tasa de completación</div>
-            </div>
-        </div>
-    </div>
-</div>
+        @include('partials.dashboard-alertas')
 
-{{-- Barra productividad --}}
-@if($stats['asignados'] > 0)
-<div class="card panel-card mb-3">
-    <div class="card-body py-3">
-        <div class="d-flex justify-content-between align-items-center mb-1">
-            <span style="font-size:.83rem;font-weight:600;color:#4a5568;">Progreso general</span>
-            <span class="info-chip"><i class="fas fa-chart-pie fa-xs"></i>{{ $stats['productividad'] }}% completado</span>
+        @include('dashboard.partials.filtros', [
+            'filtros' => $filtros,
+            'actionUrl' => url()->current(),
+        ])
+
+        <div class="role-metrics">
+            <div class="role-metric role-metric--a1">
+                <i class="fas fa-clipboard-check role-metric__icon"></i>
+                <div class="role-metric__val">{{ $stats['asignados'] }}</div>
+                <p class="role-metric__lbl">Asignados</p>
+                <div class="role-metric__sub">envíos en total</div>
+            </div>
+            <div class="role-metric role-metric--a2">
+                <i class="fas fa-box role-metric__icon"></i>
+                <div class="role-metric__val">{{ $stats['por_recoger'] }}</div>
+                <p class="role-metric__lbl">Por recoger</p>
+                <div class="role-metric__sub">pendientes pickup</div>
+            </div>
+            <div class="role-metric role-metric--a3">
+                <i class="fas fa-shipping-fast role-metric__icon"></i>
+                <div class="role-metric__val">{{ $stats['en_camino'] }}</div>
+                <p class="role-metric__lbl">En camino</p>
+                <div class="role-metric__sub">en tránsito ahora</div>
+            </div>
+            <div class="role-metric role-metric--a4">
+                <i class="fas fa-check-circle role-metric__icon"></i>
+                <div class="role-metric__val">{{ $stats['entregados_hoy'] }}</div>
+                <p class="role-metric__lbl">Entregados ({{ $filtros->etiquetaPeriodo() }})</p>
+            </div>
+            <div class="role-metric role-metric--a5">
+                <i class="fas fa-tachometer-alt role-metric__icon"></i>
+                <div class="role-metric__val">{{ $stats['productividad'] }}%</div>
+                <p class="role-metric__lbl">Productividad</p>
+            </div>
         </div>
-        <div class="progress" style="height:10px;border-radius:5px;background:#e8f5e8;">
-            <div class="progress-bar" role="progressbar"
-                 style="width:{{ $stats['productividad'] }}%;background:linear-gradient(90deg,#2c5530,#28a745);border-radius:5px;"
-                 aria-valuenow="{{ $stats['productividad'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-        </div>
-        <div class="d-flex justify-content-between mt-1">
-            <small class="text-muted">{{ $stats['asignados'] }} asignados</small>
-            <small class="text-muted">
+
+        @if($stats['asignados'] > 0)
+        <div class="role-progress-wrap">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="font-weight-bold text-secondary" style="font-size:.85rem">Progreso general</span>
+                <span class="badge badge-light border">{{ $stats['productividad'] }}% completado</span>
+            </div>
+            <div class="progress" style="height:10px;border-radius:5px;background:#f1f5f9;">
+                <div class="progress-bar" style="width:{{ $stats['productividad'] }}%;background:linear-gradient(90deg,#ea580c,#f59e0b);border-radius:5px;"></div>
+            </div>
+            <div class="d-flex justify-content-between mt-2 small text-muted">
+                <span>{{ $stats['asignados'] }} asignados</span>
                 @if($stats['incidentes_abiertos'] > 0)
-                    <span class="text-danger"><i class="fas fa-exclamation-triangle fa-xs"></i> {{ $stats['incidentes_abiertos'] }} incidente(s) abiertos</span>
+                    <span class="text-danger"><i class="fas fa-exclamation-triangle"></i> {{ $stats['incidentes_abiertos'] }} incidente(s)</span>
                 @else
-                    <span class="text-success"><i class="fas fa-shield-alt fa-xs"></i> Sin incidentes</span>
+                    <span class="text-success"><i class="fas fa-shield-alt"></i> Sin incidentes</span>
                 @endif
-            </small>
-        </div>
-    </div>
-</div>
-@endif
-
-<div class="row">
-    {{-- Mis últimas asignaciones --}}
-    <div class="col-lg-7 mb-3">
-        <div class="card panel-card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="card-title"><i class="fas fa-box mr-2" style="color:#2c5530;"></i>Mis últimas asignaciones</h3>
-                <a href="{{ route('logistica.asignaciones.index') }}" class="btn btn-sm btn-outline-success" style="border-radius:8px;font-size:.78rem;">Ver todas</a>
             </div>
-            <div class="card-body p-0">
-                <table class="table x-table mb-0">
-                    <thead>
-                        <tr>
-                            <th>Envío</th>
-                            <th>Vehículo</th>
-                            <th>Estado</th>
-                            <th>Fecha</th>
-                        </tr>
-                    </thead>
+        </div>
+        @endif
+
+        <div class="role-block-card">
+            <div class="role-block-card__head">
+                <h3><i class="fas fa-box text-warning mr-2"></i>Mis últimas asignaciones</h3>
+                <a href="{{ route('logistica.asignaciones.listado') }}" class="btn btn-sm btn-outline-success">Ver todas</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table role-x-table mb-0">
+                    <thead><tr><th>Envío</th><th>Vehículo</th><th>Estado</th><th>Fecha</th><th>Acción</th></tr></thead>
                     <tbody>
                         @forelse($mis_asignaciones as $a)
                         <tr>
+                            <td><span class="role-code">{{ $a->externo_envio_id ?? '#'.$a->id }}</span></td>
+                            <td>{{ $a->vehiculo_ref ?? '—' }}</td>
                             <td>
-                                <span style="font-family:monospace;font-size:.82rem;background:#f2f7f3;padding:.15em .5em;border-radius:4px;color:#2c5530;">
-                                    {{ $a->externo_envio_id ?? '#'.$a->id }}
-                                </span>
+                                @php $color = ['entregado'=>'success','en_ruta'=>'info','asignado'=>'warning','cancelado'=>'danger'][$a->estado] ?? 'secondary'; @endphp
+                                <span class="badge badge-{{ $color }}">{{ ucfirst(str_replace('_',' ',$a->estado)) }}</span>
                             </td>
-                            <td style="color:#4a5568;">{{ $a->vehiculo_ref ?? '—' }}</td>
+                            <td class="text-muted small">{{ optional($a->fecha_asignacion)->format('d/m/Y') ?? '—' }}</td>
                             <td>
-                                @php
-                                    $colores = ['entregado'=>'success','en_ruta'=>'info','asignado'=>'warning','cancelado'=>'danger'];
-                                    $color = $colores[$a->estado] ?? 'secondary';
-                                @endphp
-                                <span class="badge badge-{{ $color }} badge-estado">{{ ucfirst(str_replace('_',' ',$a->estado)) }}</span>
+                                @if(in_array($a->estado, ['recibido_planta', 'entregado', 'entregada'], true) || $a->fecha_recepcion_planta)
+                                    <span class="text-success small"><i class="fas fa-check mr-1"></i>Recibido</span>
+                                @elseif(in_array($a->estado, ['en_transporte_planta', 'en_ruta', 'en_transito'], true))
+                                    @include('logistica.partials.accion-llegada-destino', ['asignacion' => $a])
+                                @else
+                                    @include('logistica.partials.accion-iniciar-transporte', ['asignacion' => $a])
+                                @endif
                             </td>
-                            <td style="color:#9ca3af;font-size:.78rem;">{{ optional($a->fecha_asignacion)->format('d/m/Y') ?? '—' }}</td>
                         </tr>
                         @empty
-                        <tr class="empty-row">
-                            <td colspan="4"><i class="fas fa-inbox mr-1"></i>Sin asignaciones registradas</td>
-                        </tr>
+                        <tr><td colspan="5" class="text-center text-muted py-4"><i class="fas fa-inbox mr-1"></i>Sin asignaciones registradas</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
         </div>
-    </div>
 
-    {{-- Mis rutas --}}
-    <div class="col-lg-5 mb-3">
-        <div class="card panel-card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="card-title"><i class="fas fa-route mr-2" style="color:#2c5530;"></i>Mis rutas</h3>
-                <a href="{{ route('logistica.rutas.index') }}" class="btn btn-sm btn-outline-primary" style="border-radius:8px;font-size:.78rem;">Ver todas</a>
+        <div class="card role-acc-card">
+            <div class="role-acc-card__head">
+                <h3><i class="fas fa-bolt text-warning mr-2"></i>Accesos rápidos</h3>
             </div>
-            <div class="card-body p-0">
-                <table class="table x-table mb-0">
-                    <thead>
-                        <tr>
-                            <th>Ruta</th>
-                            <th>Paradas</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($mis_rutas as $ruta)
-                        <tr>
-                            <td style="font-weight:600;">{{ Str::limit($ruta->nombre, 22) }}</td>
-                            <td><span class="badge badge-secondary" style="border-radius:12px;">{{ $ruta->paradas_count ?? 0 }}</span></td>
-                            <td>
-                                @php
-                                    $rc = ['completada'=>'success','en_ruta'=>'info','cancelada'=>'danger','planificada'=>'warning'];
-                                    $rc2 = $rc[$ruta->estado] ?? 'secondary';
-                                @endphp
-                                <span class="badge badge-{{ $rc2 }} badge-estado">{{ ucfirst(str_replace('_',' ',$ruta->estado)) }}</span>
-                            </td>
-                        </tr>
-                        @empty
-                        <tr class="empty-row">
-                            <td colspan="3"><i class="fas fa-map-signs mr-1"></i>Sin rutas asignadas</td>
-                        </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+            <div class="role-acc-grupo">
+                <div class="role-acc-grupo__titulo">Operación</div>
+                <div class="role-acc-grid">
+                    @can('asignaciones.view')
+                    <a href="{{ route('logistica.asignaciones.listado') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--trans"><i class="fas fa-truck"></i></span>
+                        <span>
+                            <span class="role-acc-tile__lbl">Mis envíos</span>
+                            <span class="role-acc-tile__sub">Listado y acciones de entrega</span>
+                        </span>
+                    </a>
+                    @endcan
+                    @can('documentos.view')
+                    <a href="{{ route('logistica.documentos.index') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--adm"><i class="fas fa-file-alt"></i></span>
+                        <span>
+                            <span class="role-acc-tile__lbl">Documentos</span>
+                            <span class="role-acc-tile__sub">Notas y comprobantes</span>
+                        </span>
+                    </a>
+                    @endcan
+                    @can('incidentes.view')
+                    <a href="{{ route('logistica.incidentes.index') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--warn"><i class="fas fa-exclamation-circle"></i></span>
+                        <span>
+                            <span class="role-acc-tile__lbl">Incidentes</span>
+                            <span class="role-acc-tile__sub">{{ $stats['incidentes_abiertos'] }} abierto(s)</span>
+                        </span>
+                    </a>
+                    @endcan
+                </div>
             </div>
         </div>
     </div>
-</div>
-
-{{-- Accesos rápidos --}}
-<div class="card panel-card">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-bolt mr-2" style="color:#fd7e14;"></i>Accesos rápidos</h3>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-6 col-md-4 mb-2">
-                <a class="btn btn-info btn-block quick-btn" href="{{ route('pedidos.index') }}">
-                    <i class="fas fa-box"></i><span>Mis envíos</span>
-                </a>
-            </div>
-            <div class="col-6 col-md-4 mb-2">
-                <a class="btn btn-secondary btn-block quick-btn" href="{{ route('logistica.documentos.index') }}">
-                    <i class="fas fa-file-alt"></i><span>Documentos</span>
-                </a>
-            </div>
-            <div class="col-6 col-md-4 mb-2">
-                <a class="btn btn-danger btn-block quick-btn" href="{{ route('logistica.incidentes.index') }}">
-                    <i class="fas fa-exclamation-circle"></i><span>Incidentes</span>
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
-
+</section>
+@include('partials.modal-confirmar-accion')
 @endsection

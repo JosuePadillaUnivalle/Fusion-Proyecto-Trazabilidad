@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\EstadoVehiculo;
 use App\Models\TipoVehiculo;
 use App\Models\Vehiculo;
+use App\Support\TransportistaFlotaCatalogo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -38,6 +39,10 @@ class EnvioVehiculoController extends Controller
             if ($estado) {
                 $q->where('estadovehiculoid', $estado);
             }
+        }
+
+        if ($request->filled('ambito_flota') && in_array($request->string('ambito_flota')->toString(), TransportistaFlotaCatalogo::valores(), true)) {
+            $q->where('ambito_flota', $request->string('ambito_flota')->toString());
         }
 
         $vehiculos = $q->orderBy('placa')->paginate(15)->withQueryString();
@@ -114,6 +119,7 @@ class EnvioVehiculoController extends Controller
             'tipovehiculoid' => 'required|integer|exists:tipo_vehiculo,tipovehiculoid',
             'estadovehiculoid' => 'nullable|integer|exists:estado_vehiculo,estadovehiculoid',
             'activo' => 'nullable|boolean',
+            'ambito_flota' => 'required|in:'.implode(',', TransportistaFlotaCatalogo::valores()),
         ]);
 
         $data['activo'] = $request->boolean('activo', true);

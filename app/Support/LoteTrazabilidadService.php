@@ -2,10 +2,12 @@
 
 namespace App\Support;
 
+use App\Models\Actividad;
 use App\Models\CertificacionLote;
 use App\Models\Cultivo;
 use App\Models\EstadoLoteTipo;
 use App\Models\Lote;
+use App\Models\Usuario;
 use App\Support\EstadoLoteCatalogo;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -165,7 +167,6 @@ class LoteTrazabilidadService
         $tipoSugerido = $this->siguienteTipoActividadCrecimiento($lote);
         if ($tipoSugerido !== null) {
             $params['tipo'] = $tipoSugerido;
-            $params['completar'] = 1;
         }
 
         return route('actividades.create', $params);
@@ -183,7 +184,6 @@ class LoteTrazabilidadService
                 'loteid' => $lote->loteid,
                 'tipo' => 'Siembra',
                 'return' => $return,
-                'completar' => 1,
             ]),
             'en_crecimiento' => $this->urlAsignarActividadEnCrecimiento($lote),
             'cosecha' => route('producciones.create', [
@@ -584,7 +584,8 @@ class LoteTrazabilidadService
                 $actividad->usuario->nombre ?? null,
                 'tasks',
                 'primary',
-                $actividad->fechafin !== null
+                $actividad->fechafin !== null,
+                (int) $actividad->actividadid,
             ));
         }
 
@@ -842,7 +843,25 @@ class LoteTrazabilidadService
                 'data' => $porTipo->values()->all(),
             ],
             'chart_linea' => $this->chartLineaMensual($eventosFiltrados),
+            'actividades_marcables_ids' => $this->idsActividadesMarcables($lote, $request->user()),
         ]);
+    }
+
+    /** @return list<int> */
+    private function idsActividadesMarcables(Lote $lote, ?Usuario $user): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        return Actividad::query()
+            ->where('loteid', $lote->loteid)
+            ->whereNull('fechafin')
+            ->get()
+            ->filter(fn (Actividad $actividad) => ActividadPermisos::puedeMarcarCompletada($user, $actividad))
+            ->map(fn (Actividad $actividad) => (int) $actividad->actividadid)
+            ->values()
+            ->all();
     }
 
     /**
@@ -942,7 +961,8 @@ class LoteTrazabilidadService
         ?string $usuario,
         string $icono,
         string $color,
-        ?bool $completada = null
+        ?bool $completada = null,
+        ?int $actividadid = null,
     ): array {
         $row = [
             'fecha' => $fecha,
@@ -961,6 +981,9 @@ class LoteTrazabilidadService
         ];
         if ($completada !== null) {
             $row['completada'] = $completada;
+        }
+        if ($actividadid !== null) {
+            $row['actividadid'] = $actividadid;
         }
 
         return $row;

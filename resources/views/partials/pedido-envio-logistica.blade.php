@@ -60,6 +60,11 @@
                 <i class="fas fa-warehouse mr-1"></i>
                 Mercadería recibida en planta.
             </div>
+        @elseif(\App\Support\PedidoCatalogo::pendienteAprobacionAgricola($pedido))
+            <div class="alert alert-secondary mb-0 mt-3 py-2 small">
+                <i class="fas fa-hourglass-half mr-1"></i>
+                Transporte programado. Se activará cuando producción agrícola <strong>acepte el pedido</strong>.
+            </div>
         @else
             <div class="alert alert-warning mb-0 mt-3 py-2 small">
                 <i class="fas fa-dolly mr-1"></i>

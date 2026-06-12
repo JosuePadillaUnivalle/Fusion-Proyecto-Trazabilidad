@@ -40,7 +40,7 @@
             nuevo-can="transportistas.create"
         />
 
-        <div id="filtrosTransportistas" class="filtros-panel collapse {{ request()->hasAny(['buscar','estado']) ? 'show' : '' }}">
+        <div id="filtrosTransportistas" class="filtros-panel collapse {{ request()->hasAny(['buscar','estado','ambito_flota']) ? 'show' : '' }}">
             <form method="GET" action="{{ route('envios.transportistas') }}">
                 <div class="row align-items-end">
                     <div class="col-lg-5 col-md-6 mb-2 mb-md-0">
@@ -52,7 +52,16 @@
                             <input type="text" name="buscar" class="form-control" value="{{ request('buscar') }}" placeholder="Nombre, correo o teléfono">
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6 mb-2 mb-md-0">
+                    <div class="col-lg-2 col-md-6 mb-2 mb-md-0">
+                        <label class="small text-muted mb-1">Categoría</label>
+                        <select name="ambito_flota" class="form-control form-control-sm">
+                            <option value="">Todas</option>
+                            @foreach(\App\Support\TransportistaFlotaCatalogo::etiquetas() as $valor => $etiqueta)
+                            <option value="{{ $valor }}" @selected(request('ambito_flota') === $valor)>{{ \App\Support\TransportistaFlotaCatalogo::categoriaCorta($valor) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-lg-2 col-md-6 mb-2 mb-md-0">
                         <label class="small text-muted mb-1">Estado</label>
                         <select name="estado" class="form-control form-control-sm">
                             <option value="">Todos</option>
@@ -72,6 +81,7 @@
                 <thead>
                     <tr>
                         <th>Nombre</th>
+                        <th>Categoría</th>
                         <th>Correo</th>
                         <th>Teléfono</th>
                         <th>Estado</th>
@@ -80,8 +90,16 @@
                 </thead>
                 <tbody>
                     @forelse($transportistas as $t)
+                    @php
+                        $ambito = $t->perfilTransportista?->ambito_flota ?? \App\Support\TransportistaFlotaCatalogo::AGRICOLA;
+                    @endphp
                     <tr>
                         <td class="font-weight-bold">{{ $t->nombreCompleto() }}</td>
+                        <td>
+                            <span class="badge {{ \App\Support\TransportistaFlotaCatalogo::badgeClase($ambito) }} badge-estado">
+                                {{ \App\Support\TransportistaFlotaCatalogo::categoriaCorta($ambito) }}
+                            </span>
+                        </td>
                         <td>{{ $t->email }}</td>
                         <td>{{ $t->telefono ?? '—' }}</td>
                         <td>
@@ -105,7 +123,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-4">
+                        <td colspan="6" class="text-center text-muted py-4">
                             <i class="fas fa-user-slash mr-1"></i> No hay transportistas registrados.
                             <a href="{{ route('envios.transportistas.create') }}" class="d-block mt-2">Registrar el primero</a>
                         </td>

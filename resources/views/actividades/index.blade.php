@@ -237,8 +237,7 @@
                             </td>
                             <td class="text-center">
                                 <div class="btn-group btn-group-sm btn-actions">
-                                    @if(!$esCompletada)
-                                        @can('lotes.update')
+                                    @if(!$esCompletada && (auth()->user()?->can('lotes.update') || (int) $act->usuarioid === (int) auth()->id()))
                                         <form action="{{ route('actividades.marcar-realizada', $act) }}" method="POST" class="d-inline form-realizada">
                                             @csrf
                                             <button type="button" class="btn btn-realizada btn-marcar-realizada"
@@ -248,7 +247,6 @@
                                                 <i class="fas fa-check"></i>
                                             </button>
                                         </form>
-                                        @endcan
                                     @endif
                                     <a href="{{ route('actividades.show', $act) }}" class="btn btn-default" title="Ver">
                                         <i class="fas fa-eye text-info"></i>
@@ -319,8 +317,7 @@
                         {{ $esCompletada ? 'Completada' : 'Pendiente' }}
                     </span>
                     <div class="btn-group btn-group-sm btn-actions flex-shrink-0">
-                        @if(!$esCompletada)
-                            @can('lotes.update')
+                        @if(!$esCompletada && (auth()->user()?->can('lotes.update') || (int) $act->usuarioid === (int) auth()->id()))
                             <form action="{{ route('actividades.marcar-realizada', $act) }}" method="POST" class="d-inline form-realizada">
                                 @csrf
                                 <button type="button" class="btn btn-realizada btn-marcar-realizada"
@@ -329,7 +326,6 @@
                                     <i class="fas fa-check mr-1"></i> Hecha
                                 </button>
                             </form>
-                            @endcan
                         @endif
                         <a href="{{ route('actividades.show', $act) }}" class="btn btn-default"><i class="fas fa-eye text-info"></i></a>
                         @can('lotes.update')

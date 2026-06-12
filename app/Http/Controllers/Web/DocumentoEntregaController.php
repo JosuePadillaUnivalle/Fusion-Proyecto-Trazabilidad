@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\DocumentoEntrega;
+use App\Support\DocumentoEntregaArchivo;
 use App\Support\DocumentoEntregaTransportista;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -191,10 +192,18 @@ class DocumentoEntregaController extends Controller
             ->with('success', 'Documento eliminado.');
     }
 
-    public function download(DocumentoEntrega $documento): StreamedResponse
+    public function download(DocumentoEntrega $documento): StreamedResponse|RedirectResponse
     {
         $this->autorizarAccesoDocumento($documento);
-        abort_unless(Storage::disk('public')->exists($documento->archivo_path), 404, 'Documento no encontrado.');
+
+        DocumentoEntregaArchivo::asegurarPdfOperativo($documento->fresh());
+        $documento->refresh();
+
+        if (! $documento->archivo_path || ! Storage::disk('public')->exists($documento->archivo_path)) {
+            return redirect()
+                ->route('logistica.documentos.show', $documento)
+                ->with('error', 'El archivo no está disponible. Vuelva a cargarlo desde Editar.');
+        }
 
         return Storage::disk('public')->download(
             $documento->archivo_path,

@@ -25,6 +25,7 @@ class Vehiculo extends Model
         'estadovehiculoid',
         'color',
         'activo',
+        'ambito_flota',
     ];
 
     protected $casts = [

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\EnvioAsignacionMultiple;
 use App\Models\Pedido;
+use App\Services\NotificacionUsuarioService;
 use App\Support\EnvioAsignacionEstadoCatalogo;
 use App\Support\EnvioPedidoService;
 use App\Support\PedidoCatalogo;
@@ -16,20 +17,77 @@ use Illuminate\View\View;
 
 class PedidoAgricolaController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $pedidos = Pedido::query()
+        $query = PedidoCatalogo::queryOperativosLogistica()
             ->with([
                 'detalles.insumo',
                 'detalles.cosechaAlmacen.almacen',
                 'aceptadoPor',
                 'envioAsignacion.transportista.perfilTransportista.vehiculo.tipoVehiculo',
-            ])
+            ]);
+
+        if ($request->filled('q')) {
+            $term = '%'.$request->string('q')->trim()->toString().'%';
+            $query->where(function ($q) use ($term) {
+                $q->where('numero_solicitud', 'like', $term)
+                    ->orWhereHas('detalles', fn ($d) => $d->where('cultivo_personalizado', 'like', $term))
+                    ->orWhereHas('envioAsignacion.transportista', function ($t) use ($term) {
+                        $t->where('nombre', 'like', $term)
+                            ->orWhere('apellido', 'like', $term)
+                            ->orWhere('nombreusuario', 'like', $term);
+                    });
+            });
+        }
+
+        if ($request->filled('estado')) {
+            match ($request->string('estado')->toString()) {
+                'pendiente_agricola' => $query->whereIn('estado', ['sin asignacion', 'pendiente']),
+                'aceptado' => $query->whereIn('estado', ['confirmado', 'en produccion']),
+                'rechazado' => $query->where('estado', 'rechazado'),
+                default => null,
+            };
+        }
+
+        if ($request->filled('transporte')) {
+            if ($request->string('transporte')->toString() === 'con') {
+                $query->whereHas('envioAsignacion', fn ($e) => $e->whereNotNull('transportista_usuarioid'));
+            } elseif ($request->string('transporte')->toString() === 'sin') {
+                $query->where(function ($q) {
+                    $q->whereDoesntHave('envioAsignacion')
+                        ->orWhereHas('envioAsignacion', fn ($e) => $e->whereNull('transportista_usuarioid'));
+                });
+            }
+        }
+
+        if ($request->filled('fase_envio')) {
+            match ($request->string('fase_envio')->toString()) {
+                'pendiente_salida' => $query->whereHas('envioAsignacion', fn ($e) => $e
+                    ->whereNotNull('transportista_usuarioid')
+                    ->whereIn('estado', ['asignado', 'asignada', 'pendiente', 'creada'])),
+                'en_camino' => $query->whereHas('envioAsignacion', fn ($e) => $e
+                    ->whereIn('estado', ['en_transporte_planta', 'en_ruta', 'en_transito'])),
+                'recibido' => $query->whereHas('envioAsignacion', fn ($e) => $e
+                    ->where(function ($s) {
+                        $s->whereIn('estado', ['recibido_planta', 'entregado', 'entregada'])
+                            ->orWhereNotNull('fecha_recepcion_planta');
+                    })),
+                default => null,
+            };
+        }
+
+        $pedidos = $query
+            ->orderByRaw("CASE WHEN estado IN ('sin asignacion', 'pendiente') THEN 0 ELSE 1 END")
             ->orderByDesc('pedidoid')
             ->get();
 
-        $pendientes = $pedidos->filter(fn (Pedido $p) => PedidoCatalogo::pendienteAprobacionAgricola($p));
-        $procesados = $pedidos->reject(fn (Pedido $p) => PedidoCatalogo::pendienteAprobacionAgricola($p));
+        $todosOperativos = PedidoCatalogo::queryOperativosLogistica()
+            ->with('envioAsignacion')
+            ->orderByDesc('pedidoid')
+            ->get();
+
+        $pendientes = $todosOperativos->filter(fn (Pedido $p) => PedidoCatalogo::pendienteAprobacionAgricola($p));
+        $procesados = $todosOperativos->reject(fn (Pedido $p) => PedidoCatalogo::pendienteAprobacionAgricola($p));
 
         return view('agricola.pedidos.index', compact('pedidos', 'pendientes', 'procesados'));
     }
@@ -48,16 +106,17 @@ class PedidoAgricolaController extends Controller
         return view('agricola.pedidos.show', compact('pedido', 'erroresStock'));
     }
 
-    public function aceptar(Request $request, Pedido $pedido): RedirectResponse
+    public function aceptar(Request $request, Pedido $pedido, NotificacionUsuarioService $notificaciones): RedirectResponse
     {
         if (! PedidoCatalogo::pendienteAprobacionAgricola($pedido)) {
             return back()->with('warning', 'Este pedido ya fue procesado por producción agrícola.');
         }
 
         $reserva = app(PedidoReservaService::class);
+        $envioActivado = null;
 
         try {
-            DB::transaction(function () use ($pedido, $reserva) {
+            DB::transaction(function () use ($pedido, $reserva, &$envioActivado) {
                 $reserva->reservar($pedido);
 
                 $pedido->update([
@@ -66,22 +125,48 @@ class PedidoAgricolaController extends Controller
                     'aceptado_por_usuarioid' => auth()->id(),
                 ]);
 
-                EnvioAsignacionMultiple::query()
+                EnvioPedidoService::activarTransportistaProgramado($pedido->fresh());
+
+                $envio = EnvioAsignacionMultiple::query()
                     ->where(function ($q) use ($pedido) {
                         $q->where('pedidoid', $pedido->pedidoid)
                             ->orWhere('externo_envio_id', $pedido->numero_solicitud);
                     })
-                    ->update(EnvioAsignacionEstadoCatalogo::applyToAttributes([
+                    ->first();
+
+                if ($envio && ! $envio->transportista_usuarioid) {
+                    $envio->update(EnvioAsignacionEstadoCatalogo::applyToAttributes([
                         'estado' => 'pendiente',
                     ]));
+                }
+
+                if ($envio?->transportista_usuarioid) {
+                    $envioActivado = $envio->fresh(['pedido.detalles']);
+                }
             });
         } catch (\Throwable $e) {
             return back()->with('error', $e->getMessage());
         }
 
+        if ($envioActivado) {
+            $notificaciones->envioListoParaRecoger($envioActivado);
+        }
+
+        $tieneChofer = EnvioAsignacionMultiple::query()
+            ->where(function ($q) use ($pedido) {
+                $q->where('pedidoid', $pedido->pedidoid)
+                    ->orWhere('externo_envio_id', $pedido->numero_solicitud);
+            })
+            ->whereNotNull('transportista_usuarioid')
+            ->exists();
+
+        $mensaje = $tieneChofer
+            ? 'Pedido aceptado. Se reservó material del almacén agrícola y el transportista programado quedó asignado.'
+            : 'Pedido aceptado. Se reservó material del almacén agrícola. Ya se puede asignar un transportista.';
+
         return redirect()
             ->route('agricola.pedidos.show', $pedido)
-            ->with('success', 'Pedido aceptado. Se reservó material del almacén agrícola. Ya se puede asignar un transportista.');
+            ->with('success', $mensaje);
     }
 
     public function rechazar(Request $request, Pedido $pedido): RedirectResponse

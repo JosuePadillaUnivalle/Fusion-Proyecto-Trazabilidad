@@ -179,6 +179,7 @@ class EnviosDistribucionModuloSeeder extends Seeder
                     'color' => 'Blanco',
                     'activo' => true,
                     'tipovehiculoid' => $tipoCodigo ? ($tipoIds[$tipoCodigo] ?? null) : null,
+                    'ambito_flota' => 'agricola',
                 ]
             );
         }

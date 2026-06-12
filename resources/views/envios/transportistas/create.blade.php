@@ -51,7 +51,19 @@
                     <div class="col-md-6">
                         <div class="form-group">
                             <label>Teléfono</label>
-                            <input name="telefono" class="form-control" value="{{ old('telefono') }}">
+                            <input name="telefono" class="form-control" value="{{ old('telefono') }}" placeholder="+591 7XXXXXXX">
+                            <small class="text-muted">Formato Bolivia: +591 seguido del número (ej. +591 76202982).</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Flota <span class="text-danger">*</span></label>
+                            <select name="ambito_flota" class="form-control" required>
+                                @foreach(\App\Support\TransportistaFlotaCatalogo::etiquetas() as $valor => $etiqueta)
+                                <option value="{{ $valor }}" @selected(old('ambito_flota', 'agricola') === $valor)>{{ $etiqueta }}</option>
+                                @endforeach
+                            </select>
+                            <small class="text-muted">Agrícola: envíos a planta. Planta: reparto a minoristas.</small>
                         </div>
                     </div>
                     <div class="col-md-6">

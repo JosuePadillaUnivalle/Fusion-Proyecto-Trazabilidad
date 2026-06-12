@@ -14,6 +14,7 @@ use App\Models\Pedido;
 use App\Models\PlantillaTransformacion;
 use App\Models\Produccion;
 use App\Models\PuntoVenta;
+use App\Models\RutaMultiEntrega;
 use App\Models\Venta;
 use App\Models\PerfilTransportista;
 use App\Models\Usuario;
@@ -23,6 +24,8 @@ use App\Support\CultivoCatalogo;
 use App\Support\PedidoCatalogo;
 use App\Support\ProcesoPlantaCatalogo;
 use App\Support\PuntoVentaAccess;
+use App\Support\TransportistaFlotaCatalogo;
+use Illuminate\Support\Facades\Schema;
 use App\Support\UbicacionGpsParser;
 use App\Support\UsuarioRol;
 use Illuminate\Database\Eloquent\Builder;
@@ -35,6 +38,7 @@ class CatalogoSelectorController extends Controller
     public function usuarios(Request $request): JsonResponse
     {
         $query = Usuario::query()->where('activo', true);
+        $esTransportista = $request->filled('roles') && str_contains((string) $request->roles, 'transportista');
 
         if ($request->filled('roles')) {
             $roles = array_filter(array_map('trim', explode(',', (string) $request->roles)));
@@ -52,24 +56,70 @@ class CatalogoSelectorController extends Controller
             $query->whereNotIn('role', ['admin', 'Admin']);
         }
 
-        if ($request->filled('supervisor_usuarioid')) {
+        if ($request->boolean('solo_empleados_equipo') && $request->filled('supervisor_usuarioid')) {
+            $query->where('supervisor_usuarioid', (int) $request->supervisor_usuarioid);
+        } elseif ($request->filled('supervisor_usuarioid')) {
             $query->where('supervisor_usuarioid', (int) $request->supervisor_usuarioid);
         } elseif (
             UsuarioRol::esJefeAgricultor($request->user())
             && ! UsuarioRol::esAdminGlobal($request->user())
             && $request->filled('roles')
             && str_contains((string) $request->roles, 'agricultor')
+            && ! $request->boolean('solo_empleados_equipo')
         ) {
-            $query->where('supervisor_usuarioid', $request->user()->usuarioid);
+            $jefeId = (int) $request->user()->usuarioid;
+            $query->where(function ($q) use ($jefeId) {
+                $q->where('supervisor_usuarioid', $jefeId)
+                    ->orWhere('usuarioid', $jefeId);
+            });
         }
 
-        $this->aplicarBusqueda($query, (string) $request->q, ['nombre', 'apellido', 'email', 'nombreusuario']);
+        if ($request->boolean('excluir_jefes_agricolas')) {
+            $query->whereDoesntHave('roles', fn ($q) => $q->where('name', 'jefe_agricultor'));
+        }
 
-        return $this->respuestaPaginada($request, $query->orderBy('nombre')->orderBy('apellido'), function (Usuario $u) {
+        if ($esTransportista) {
+            $query->with('perfilTransportista.vehiculo');
+
+            if ($request->filled('ambito_flota') && in_array($request->string('ambito_flota')->toString(), TransportistaFlotaCatalogo::valores(), true)) {
+                $ambito = $request->string('ambito_flota')->toString();
+                if ($ambito === TransportistaFlotaCatalogo::AGRICOLA) {
+                    $query->where(function (Builder $q) {
+                        $q->whereDoesntHave('perfilTransportista')
+                            ->orWhereHas('perfilTransportista', fn (Builder $p) => $p->where('ambito_flota', TransportistaFlotaCatalogo::AGRICOLA));
+                    });
+                } else {
+                    $query->whereHas('perfilTransportista', fn (Builder $p) => $p->where('ambito_flota', $ambito));
+                }
+            }
+
+            if ($request->string('con_vehiculo')->toString() === '1') {
+                $query->whereHas('perfilTransportista', fn ($p) => $p->whereNotNull('vehiculoid'));
+            } elseif ($request->string('con_vehiculo')->toString() === '0') {
+                $query->where(function (Builder $q) {
+                    $q->whereDoesntHave('perfilTransportista')
+                        ->orWhereHas('perfilTransportista', fn ($p) => $p->whereNull('vehiculoid'));
+                });
+            }
+        }
+
+        $this->aplicarBusquedaTransportista($query, (string) $request->q, $esTransportista);
+
+        return $this->respuestaPaginada($request, $query->orderBy('nombre')->orderBy('apellido'), function (Usuario $u) use ($esTransportista) {
+            $placa = $esTransportista ? ($u->perfilTransportista?->vehiculo?->placa) : null;
+            $metaPartes = array_filter([
+                $u->email,
+                $placa ? 'Placa: '.$placa : null,
+            ]);
+
             return [
                 'id' => $u->usuarioid,
                 'label' => trim($u->nombre.' '.($u->apellido ?? '')),
-                'meta' => ucfirst((string) ($u->role ?? '')).($u->email ? ' · '.$u->email : ''),
+                'meta' => $metaPartes !== [] ? implode(' · ', $metaPartes) : ucfirst((string) ($u->role ?? '')),
+                'extra' => [
+                    'placa' => $placa ?? '',
+                    'email' => $u->email ?? '',
+                ],
             ];
         });
     }
@@ -80,14 +130,19 @@ class CatalogoSelectorController extends Controller
             ->with(['tipoVehiculo'])
             ->where('activo', true);
 
-        if ($request->filled('transportista_usuarioid') && $request->boolean('solo_transportista')) {
-            $vehiculoIds = PerfilTransportista::query()
+        if ($request->boolean('solo_transportista') && $request->filled('transportista_usuarioid')) {
+            $ambito = PerfilTransportista::query()
                 ->where('usuarioid', (int) $request->transportista_usuarioid)
-                ->whereNotNull('vehiculoid')
-                ->pluck('vehiculoid');
+                ->value('ambito_flota') ?? TransportistaFlotaCatalogo::AGRICOLA;
 
-            if ($vehiculoIds->isNotEmpty()) {
-                $query->whereIn('vehiculoid', $vehiculoIds);
+            if (Schema::hasColumn('vehiculo', 'ambito_flota')) {
+                $query->where('ambito_flota', $ambito);
+            } else {
+                $vehiculoIds = PerfilTransportista::query()
+                    ->where('usuarioid', (int) $request->transportista_usuarioid)
+                    ->whereNotNull('vehiculoid')
+                    ->pluck('vehiculoid');
+                $query->whereIn('vehiculoid', $vehiculoIds->isNotEmpty() ? $vehiculoIds : [-1]);
             }
         }
 
@@ -105,10 +160,61 @@ class CatalogoSelectorController extends Controller
         return $this->respuestaPaginada($request, $query->orderBy('placa'), function (Vehiculo $v) {
             $nombre = trim(collect([$v->marca, $v->modelo])->filter()->implode(' '));
 
+            $categoria = Schema::hasColumn('vehiculo', 'ambito_flota')
+                ? TransportistaFlotaCatalogo::categoriaCorta($v->ambito_flota)
+                : null;
+
             return [
                 'id' => $v->vehiculoid,
                 'label' => $v->placa,
-                'meta' => trim(($nombre !== '' ? $nombre.' · ' : '').($v->tipoVehiculo?->nombre ?? 'Vehículo')),
+                'meta' => trim(collect([
+                    $nombre !== '' ? $nombre : null,
+                    $v->tipoVehiculo?->nombre ?? 'Vehículo',
+                    $categoria ? 'Flota '.$categoria : null,
+                ])->filter()->implode(' · ')),
+            ];
+        });
+    }
+
+    public function rutasMulti(Request $request): JsonResponse
+    {
+        $query = RutaMultiEntrega::query()
+            ->with(['transportista'])
+            ->withCount('paradas');
+
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->string('estado')->toString());
+        } else {
+            $query->whereIn('estado', ['planificada', 'en_ruta', 'completada']);
+        }
+
+        if ($request->filled('transportista_usuarioid')) {
+            $query->where('transportista_usuarioid', (int) $request->transportista_usuarioid);
+        }
+
+        if ($request->filled('q')) {
+            $like = '%'.$request->string('q')->trim().'%';
+            $query->where(function (Builder $w) use ($like) {
+                $w->where('nombre', 'like', $like)
+                    ->orWhereHas('transportista', function (Builder $t) use ($like) {
+                        $t->where('nombre', 'like', $like)
+                            ->orWhere('apellido', 'like', $like)
+                            ->orWhere('nombreusuario', 'like', $like);
+                    });
+            });
+        }
+
+        return $this->respuestaPaginada($request, $query->orderByDesc('created_at'), function (RutaMultiEntrega $r) {
+            $chofer = trim(($r->transportista?->nombre ?? '').' '.($r->transportista?->apellido ?? ''));
+
+            return [
+                'id' => $r->rutamultientregaid,
+                'label' => $r->nombre,
+                'meta' => implode(' · ', array_filter([
+                    ucfirst(str_replace('_', ' ', (string) ($r->estado ?? ''))),
+                    $chofer !== '' ? $chofer : null,
+                    ($r->paradas_count ?? 0).' parada(s)',
+                ])),
             ];
         });
     }
@@ -131,12 +237,21 @@ class CatalogoSelectorController extends Controller
     {
         $query = Lote::query()->with(['cultivo', 'usuario']);
 
-        if ($request->user()?->hasRole('agricultor')) {
-            $query->where('usuarioid', $request->user()->usuarioid);
+        if (UsuarioRol::debeAcotarPorAsignacion($request->user())) {
+            $query->where('usuarioid', (int) $request->user()->usuarioid);
+        } elseif (
+            UsuarioRol::esJefeAgricultor($request->user())
+            && ! UsuarioRol::esAdminGlobal($request->user())
+        ) {
+            $query->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($request->user()));
         }
 
         if ($request->filled('usuarioid')) {
             $query->where('usuarioid', (int) $request->usuarioid);
+        }
+
+        if ($request->filled('cultivoid')) {
+            $query->where('cultivoid', (int) $request->cultivoid);
         }
 
         if ($request->boolean('solo_cosecha')) {
@@ -192,6 +307,7 @@ class CatalogoSelectorController extends Controller
                         'meta' => $meta !== [] ? implode(' · ', $meta) : ($l->ubicacion ?: null),
                         'extra' => [
                             'responsable' => $responsable,
+                            'usuarioid' => $l->usuarioid,
                             'cultivo' => $l->cultivo?->nombre ?? 'Sin cultivo',
                             'superficie' => $l->superficie,
                         ],
@@ -225,6 +341,7 @@ class CatalogoSelectorController extends Controller
                 'meta' => $meta !== [] ? implode(' · ', $meta) : ($l->ubicacion ?: null),
                 'extra' => [
                     'responsable' => $responsable,
+                    'usuarioid' => $l->usuarioid,
                     'cultivo' => $l->cultivo?->nombre ?? 'Sin cultivo',
                     'superficie' => $l->superficie,
                 ],
@@ -462,6 +579,8 @@ class CatalogoSelectorController extends Controller
                     'tipo' => 'insumo',
                     'almacen' => $almacen,
                     'almacenid' => $insumo->almacenid,
+                    'stock' => (float) $insumo->stock,
+                    'unidad' => $unidad,
                 ],
             ]);
         }
@@ -491,6 +610,8 @@ class CatalogoSelectorController extends Controller
                     'tipo' => 'cosecha',
                     'almacen' => $almacen,
                     'almacenid' => $cosecha->almacenid,
+                    'stock' => (float) $cosecha->cantidad,
+                    'unidad' => $unidad,
                 ],
             ]);
         }
@@ -733,6 +854,30 @@ class CatalogoSelectorController extends Controller
         $query->where(function (Builder $w) use ($columnas, $like) {
             foreach ($columnas as $col) {
                 $w->orWhere($col, 'like', $like);
+            }
+        });
+    }
+
+    private function aplicarBusquedaTransportista(Builder $query, string $q, bool $esTransportista): void
+    {
+        if ($q === '') {
+            return;
+        }
+
+        $like = '%'.$q.'%';
+        $columnas = ['nombre', 'apellido', 'email', 'nombreusuario', 'telefono'];
+
+        $query->where(function (Builder $w) use ($columnas, $like, $esTransportista) {
+            foreach ($columnas as $col) {
+                $w->orWhere($col, 'like', $like);
+            }
+
+            if ($esTransportista) {
+                $w->orWhereHas('perfilTransportista.vehiculo', function (Builder $v) use ($like) {
+                    $v->where('placa', 'like', $like)
+                        ->orWhere('marca', 'like', $like)
+                        ->orWhere('modelo', 'like', $like);
+                });
             }
         });
     }

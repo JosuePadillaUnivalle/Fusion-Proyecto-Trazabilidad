@@ -1,503 +1,201 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard | AgroFusion')
-@section('page_title', 'Dashboard Principal')
+@section('title', 'Inicio | AgroFusion')
+@section('page_title', 'Inicio')
 
 @section('breadcrumbs')
-    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}" style="color: #2c5530;">Inicio</a></li>
-    <li class="breadcrumb-item active">Dashboard</li>
+    <li class="breadcrumb-item active">Inicio</li>
 @endsection
 
 @push('styles')
-    <style>
-        :root {
-            --primary-color: #2c5530;
-            --secondary-color: #4a7c59;
-            --accent-color: #e8f5e8;
-            --success-color: #28a745;
-            --warning-color: #ffc107;
-            --danger-color: #dc3545;
-            --info-color: #17a2b8;
-            --text-dark: #1a252f;
-            --text-light: #6c757d;
-            --border-color: #dee2e6;
-        }
-
-        .small-box {
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(0, 0, 0, 0.05);
-            transition: transform 0.3s ease;
-        }
-
-        .small-box:hover {
-            transform: translateY(-2px);
-        }
-
-        .small-box .icon {
-            font-size: 70px !important;
-        }
-
-        .small-box-green {
-            background: linear-gradient(135deg, var(--success-color), #34ce57) !important;
-        }
-
-        .small-box-blue {
-            background: linear-gradient(135deg, var(--info-color), #20c997) !important;
-        }
-
-        .small-box-yellow {
-            background: linear-gradient(135deg, var(--warning-color), #ffca2c) !important;
-        }
-
-        .small-box-red {
-            background: linear-gradient(135deg, var(--danger-color), #e74a3b) !important;
-        }
-
-        .card {
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            border: 1px solid var(--border-color);
-        }
-
-        .card-header {
-            background: white;
-            border-bottom: 2px solid #f1f3f4;
-            font-weight: 600;
-            color: var(--text-dark);
-        }
-
-        .recent-activity-item {
-            padding: 12px;
-            border-bottom: 1px solid #f1f3f4;
-            display: flex;
-            align-items: center;
-            transition: background 0.3s ease;
-        }
-
-        .recent-activity-item:hover {
-            background: #f8f9fc;
-        }
-
-        .recent-activity-item:last-child {
-            border-bottom: none;
-        }
-
-        .activity-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            font-size: 16px;
-            color: white;
-        }
-
-        .activity-icon.activity-siembra {
-            background: var(--success-color);
-        }
-
-        .activity-icon.activity-riego {
-            background: var(--info-color);
-        }
-
-        .activity-icon.activity-cosecha {
-            background: var(--warning-color);
-        }
-
-        .activity-icon.activity-fumigacion {
-            background: var(--danger-color);
-        }
-
-        .activity-icon.activity-labranza {
-            background: #6c757d;
-        }
-
-        .activity-icon.activity-fertilizacion {
-            background: #6f42c1;
-        }
-
-        .activity-icon.activity-plagas {
-            background: #e74a3b;
-        }
-
-        .activity-icon.activity-poda {
-            background: #fd7e14;
-        }
-
-        .activity-icon.activity-monitoreo {
-            background: #20c997;
-        }
-
-        .activity-icon.activity-default {
-            background: var(--primary-color);
-        }
-
-        .progress-group {
-            display: grid;
-            grid-template-columns: 6.5rem minmax(0, 1fr) 5.75rem;
-            align-items: center;
-            gap: 0 12px;
-            margin-bottom: 16px;
-        }
-
-        .progress-group .pg-label {
-            font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .progress-group .pg-value {
-            font-weight: 600;
-            text-align: right;
-            white-space: nowrap;
-            font-size: .9rem;
-        }
-
-        .progress-group .progress {
-            height: 10px;
-            border-radius: 5px;
-            margin: 0;
-            background: #e9ecef;
-        }
-
-        .progress-group .progress-bar {
-            border-radius: 5px;
-        }
-
-        .weather-fuente-badge {
-            display: inline-block;
-            font-size: 11px;
-            background: rgba(255,255,255,.2);
-            border-radius: 12px;
-            padding: 2px 8px;
-            margin-top: 6px;
-        }
-
-        .activity-info h6 {
-            margin: 0;
-            font-weight: 600;
-            color: var(--text-dark);
-        }
-
-        .activity-info small {
-            color: var(--text-light);
-            font-size: 12px;
-        }
-
-        .weather-widget {
-            background: linear-gradient(135deg, #74b9ff, #0984e3);
-            color: white;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-        }
-
-        .weather-widget .weather-temp {
-            font-size: 48px;
-            font-weight: 300;
-            margin: 10px 0;
-        }
-
-        .weather-widget .weather-desc {
-            opacity: 0.9;
-            margin-bottom: 15px;
-        }
-
-        .weather-details {
-            display: flex;
-            justify-content: space-between;
-            font-size: 14px;
-        }
-
-        .quick-actions .btn {
-            margin-bottom: 10px;
-            border-radius: 8px;
-            font-weight: 500;
-            padding: 12px 20px;
-        }
-
-        .btn-primary {
-            background: var(--primary-color);
-            border-color: var(--primary-color);
-        }
-
-        .btn-primary:hover {
-            background: var(--secondary-color);
-            border-color: var(--secondary-color);
-        }
-
-        .alert-item {
-            display: flex;
-            align-items: center;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 8px;
-            background: white;
-            border-left: 4px solid var(--warning-color);
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-        }
-
-        .alert-item.alert-item-agotado {
-            border-left-color: #dc3545;
-        }
-
-        .alert-icon {
-            width: 35px;
-            height: 35px;
-            border-radius: 50%;
-            background: var(--warning-color);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 12px;
-            font-size: 14px;
-        }
-
-        .alert-item-agotado .alert-icon {
-            background: #dc3545;
-        }
-
-        .alert-content h6 {
-            margin: 0;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .alert-content small {
-            color: var(--text-light);
-            font-size: 12px;
-        }
-
-        .production-chart-container {
-            position: relative;
-            flex: 1;
-            min-height: 0;
-            width: 100%;
-            overflow: hidden;
-        }
-
-        .production-chart-container canvas {
-            position: absolute !important;
-            left: 0;
-            top: 0;
-            width: 100% !important;
-            height: 100% !important;
-        }
-
-        .description-block {
-            text-align: center;
-            padding: 15px 0;
-        }
-
-        .description-header {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin: 5px 0;
-        }
-
-        .description-text {
-            font-size: 12px;
-            color: var(--text-light);
-            text-transform: uppercase;
-        }
-
-        .description-percentage {
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .dashboard-home > .row {
-            margin-bottom: 1.35rem;
-        }
-
-        .dashboard-home > .row:last-child {
-            margin-bottom: 0;
-        }
-
-        .dashboard-home .card {
-            margin-bottom: 0;
-            box-shadow: 0 2px 12px rgba(18, 38, 63, 0.07);
-        }
-
-        .dashboard-home .card-header {
-            padding: 1rem 1.35rem;
-        }
-
-        .dashboard-home .card-body {
-            padding: 1.25rem 1.5rem;
-        }
-
-        .dashboard-home .small-box {
-            margin-bottom: 0.75rem;
-        }
-
-        .dashboard-home .weather-widget {
-            padding: 1.5rem 1.25rem;
-        }
-
-        .dashboard-home .quick-actions .btn {
-            margin-bottom: 0.65rem;
-        }
-
-        .dashboard-home .quick-actions .btn:last-child {
-            margin-bottom: 0;
-        }
-    </style>
+@include('dashboard.partials.panel-accesos-styles')
+<style>
+.admin-home-wrap {
+    --rp-border: rgba(30, 64, 175, .15);
+    --rp-hero-bg: linear-gradient(135deg, #eff6ff 0%, #dbeafe 42%, #f8fafc 100%);
+    --rp-glow: radial-gradient(circle, rgba(59, 130, 246, .14) 0%, transparent 70%);
+    --rp-title: #1e3a8a;
+    --rp-icon-bg: linear-gradient(135deg, #2563eb, #3b82f6);
+    --rp-tile-hover: #93c5fd;
+}
+.admin-metric--lotes { background: linear-gradient(135deg, #15803d, #22c55e); }
+.admin-metric--prod { background: linear-gradient(135deg, #0369a1, #0ea5e9); }
+.admin-metric--inv { background: linear-gradient(135deg, #c2410c, #f59e0b); }
+.admin-metric--ventas { background: linear-gradient(135deg, #7c3aed, #8b5cf6); }
+.admin-chart-card { border: 0; border-radius: 16px; box-shadow: 0 8px 28px rgba(15,23,42,.08); margin-bottom: 1.25rem; }
+.admin-chart-card .card-header { background: #fafbfc; border-bottom: 1px solid #e8edf2; padding: .9rem 1.25rem; }
+.admin-chart-card .card-title { font-size: .95rem; font-weight: 700; margin: 0; color: #1e293b; }
+.production-chart-container { position: relative; height: 320px; }
+.admin-weather {
+    background: linear-gradient(135deg, #0ea5e9, #2563eb);
+    color: #fff; border-radius: 14px; padding: 1.25rem;
+    margin-bottom: 1rem; text-align: center;
+}
+.admin-weather .weather-temp { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+.admin-weather .weather-desc { opacity: .9; font-size: .9rem; }
+.admin-weather .weather-details { display: flex; justify-content: center; gap: 1.25rem; margin-top: .75rem; font-size: .8rem; opacity: .9; }
+.recent-activity-item {
+    display: flex; align-items: center; gap: .75rem;
+    padding: .85rem 1.15rem; border-bottom: 1px solid #f1f5f9;
+}
+.recent-activity-item:last-child { border-bottom: 0; }
+.activity-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0;
+}
+.activity-siembra { background: #22c55e; }
+.activity-riego { background: #0ea5e9; }
+.activity-cosecha { background: #f59e0b; }
+.activity-plagas { background: #ef4444; }
+.activity-fumigacion { background: #ef4444; }
+.activity-labranza { background: #64748b; }
+.activity-fertilizacion { background: #8b5cf6; }
+.activity-poda { background: #84cc16; }
+.activity-monitoreo { background: #6366f1; }
+.activity-default { background: #94a3b8; }
+.alert-item {
+    display: flex; gap: .75rem; padding: .85rem 1.15rem;
+    border-bottom: 1px solid #f1f5f9; align-items: flex-start;
+}
+.alert-item:last-child { border-bottom: 0; }
+.alert-icon {
+    width: 34px; height: 34px; border-radius: 8px; background: #fef3c7; color: #d97706;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.alert-item-agotado .alert-icon { background: #fee2e2; color: #dc2626; }
+.progress-group { margin-bottom: .85rem; }
+.progress-group:last-child { margin-bottom: 0; }
+.pg-label { font-size: .85rem; font-weight: 600; color: #334155; }
+.pg-value { font-size: .78rem; color: #64748b; }
+</style>
 @endpush
 
 @section('content')
-<div class="dashboard-home">
-    <!-- FILA 1: Métricas Principales (4 small-boxes) -->
-    <div class="row">
-        <div class="col-lg-3 col-6">
-            <div class="small-box small-box-green">
-                <div class="inner">
-                    <h3>{{ $stats['lotes_activos'] ?? 0 }}</h3>
-                    <p>Lotes Activos</p>
-                </div>
-                <div class="icon"><i class="fas fa-map-marked-alt"></i></div>
-                @can('lotes.view')
-                <a href="{{ route('lotes.index') }}" class="small-box-footer">
-                    Ver detalles <i class="fas fa-arrow-circle-right"></i>
-                </a>
-                @else
-                <span class="small-box-footer text-muted" style="cursor: default;">
-                    Sin acceso a lotes
-                </span>
-                @endcan
+<section class="content px-0 admin-home-wrap">
+    <div class="container-fluid px-0">
+
+        <div class="role-panel-hero position-relative" style="z-index:1">
+            <div class="role-panel-hero__title">
+                <i class="fas fa-chart-pie"></i>Centro de control
             </div>
+            <p class="role-panel-hero__sub">
+                Vista ejecutiva de AgroFusion · métricas filtrables por periodo y cultivo.
+            </p>
         </div>
 
-        <div class="col-lg-3 col-6">
-            <div class="small-box small-box-blue">
-                <div class="inner">
-                    <h3>{{ number_format($stats['produccion_mes_kg'] ?? 0, 0) }}<span style="font-size: 20px;">kg</span>
-                    </h3>
-                    <p>Produccion del Mes</p>
-                </div>
-                <div class="icon"><i class="fas fa-seedling"></i></div>
-                <a href="{{ route('producciones.index') }}" class="small-box-footer">
-                    Ver reportes <i class="fas fa-arrow-circle-right"></i>
-                </a>
+        @include('partials.dashboard-alertas')
+
+        @include('dashboard.partials.filtros', [
+            'filtros' => $filtros,
+            'cultivos' => $cultivos,
+            'lotes' => $lotes ?? collect(),
+            'estadosLote' => $estadosLote ?? collect(),
+            'mostrarCultivo' => true,
+            'mostrarLote' => true,
+            'mostrarEstadoLote' => true,
+            'mostrarRangoFechas' => true,
+            'actionUrl' => route('dashboard'),
+        ])
+
+        <div class="role-metrics">
+            <a href="{{ route('lotes.index') }}" class="role-metric admin-metric--lotes text-white text-decoration-none">
+                <i class="fas fa-map-marked-alt role-metric__icon"></i>
+                <div class="role-metric__val">{{ $stats['lotes_activos'] ?? 0 }}</div>
+                <p class="role-metric__lbl">Lotes activos</p>
+            </a>
+            <a href="{{ route('producciones.index') }}" class="role-metric admin-metric--prod text-white text-decoration-none">
+                <i class="fas fa-seedling role-metric__icon"></i>
+                <div class="role-metric__val">{{ number_format($stats['produccion_mes_kg'] ?? 0, 0) }}<span style="font-size:.9rem"> kg</span></div>
+                <p class="role-metric__lbl">Producción ({{ $filtros->etiquetaPeriodo() }})</p>
+            </a>
+            <a href="{{ route('insumos.index') }}" class="role-metric admin-metric--inv text-white text-decoration-none">
+                <i class="fas fa-exclamation-triangle role-metric__icon"></i>
+                <div class="role-metric__val">{{ $stats['insumos_stock_bajo'] ?? 0 }}</div>
+                <p class="role-metric__lbl">Alertas inventario</p>
+            </a>
+            @can('ventas.view')
+            <a href="{{ route('ventas.index') }}" class="role-metric admin-metric--ventas text-white text-decoration-none">
+                <i class="fas fa-dollar-sign role-metric__icon"></i>
+                <div class="role-metric__val">Bs.{{ number_format($stats['ventas_mes'] ?? 0, 0) }}</div>
+                <p class="role-metric__lbl">Ventas ({{ $filtros->etiquetaPeriodo() }})</p>
+            </a>
+            @else
+            <div class="role-metric admin-metric--ventas">
+                <i class="fas fa-dollar-sign role-metric__icon"></i>
+                <div class="role-metric__val">Bs.{{ number_format($stats['ventas_mes'] ?? 0, 0) }}</div>
+                <p class="role-metric__lbl">Ventas ({{ $filtros->etiquetaPeriodo() }})</p>
             </div>
+            @endcan
         </div>
 
-        <div class="col-lg-3 col-6">
-            <div class="small-box small-box-yellow">
-                <div class="inner">
-                    <h3>{{ $stats['insumos_stock_bajo'] ?? 0 }}</h3>
-                    <p>Alertas de Inventario</p>
-                </div>
-                <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
-                <a href="{{ route('insumos.index') }}" class="small-box-footer">
-                    Revisar inventario <i class="fas fa-arrow-circle-right"></i>
-                </a>
-            </div>
-        </div>
-
-        <div class="col-lg-3 col-6">
-            <div class="small-box small-box-red">
-                <div class="inner">
-                    <h3>Bs.{{ number_format($stats['ventas_mes'] ?? 0, 0) }}</h3>
-                    <p>Ventas del Mes</p>
-                </div>
-                <div class="icon"><i class="fas fa-dollar-sign"></i></div>
-                @can('ventas.view')
-                <a href="{{ route('ventas.index') }}" class="small-box-footer">
-                    Ver ventas <i class="fas fa-arrow-circle-right"></i>
-                </a>
-                @else
-                <span class="small-box-footer text-muted" style="cursor: default;">
-                    Sin acceso a ventas
-                </span>
-                @endcan
-            </div>
-        </div>
-    </div>
-
-    <!-- FILA 2: Gráfico de Producción + Clima y Acciones Rápidas -->
-    <div class="row">
-        <!-- Gráfico de Producción -->
-        <div class="col-md-8">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-chart-line mr-2"></i>
-                        Produccion de los Ultimos 6 Meses
-                    </h3>
-                </div>
-                <div class="card-body d-flex flex-column">
-                    <div class="production-chart-container">
-                        <canvas id="productionChart"></canvas>
+        <div class="row">
+            <div class="col-lg-8 mb-4">
+                <div class="card admin-chart-card h-100">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fas fa-chart-line text-primary mr-2"></i>Producción · {{ $etiquetaGrafico ?? $filtros->etiquetaGrafico() }}</h3>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Widget del Clima y Acciones Rápidas -->
-        <div class="col-md-4">
-            <!-- Clima Actual -->
-            <div class="card mb-3">
-                <div class="card-body p-0">
-                    <div class="weather-widget" id="weatherWidget">
-                        <h5><i class="fas fa-map-marker-alt mr-2"></i><span id="weatherCity">Santa Cruz, Bolivia</span></h5>
-                        <div class="weather-temp" id="weatherTemp">--°C</div>
-                        <div class="weather-desc" id="weatherDesc">Cargando...</div>
-                        <div class="weather-details">
-                            <div><i class="fas fa-tint mr-1"></i><span id="weatherHumedad">--%</span> Humedad</div>
-                            <div><i class="fas fa-wind mr-1"></i><span id="weatherViento">--</span> km/h</div>
+                    <div class="card-body">
+                        <div class="production-chart-container">
+                            <canvas id="productionChart"></canvas>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Acciones Rápidas -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-bolt mr-2"></i>
-                        Acciones Rapidas
-                    </h3>
+            <div class="col-lg-4 mb-4">
+                <div class="admin-weather" id="weatherWidget">
+                    <h5 class="mb-2" style="font-size:.9rem;font-weight:600"><i class="fas fa-map-marker-alt mr-1"></i><span id="weatherCity">Santa Cruz, Bolivia</span></h5>
+                    <div class="weather-temp" id="weatherTemp">--°C</div>
+                    <div class="weather-desc" id="weatherDesc">Cargando…</div>
+                    <div class="weather-details">
+                        <div><i class="fas fa-tint mr-1"></i><span id="weatherHumedad">--%</span> Humedad</div>
+                        <div><i class="fas fa-wind mr-1"></i><span id="weatherViento">--</span> km/h</div>
+                    </div>
                 </div>
-                <div class="card-body quick-actions">
-                    @can('lotes.create')
-                    <a href="{{ route('lotes.create') }}" class="btn btn-primary btn-block">
-                        <i class="fas fa-plus mr-2"></i>Nuevo Lote
-                    </a>
-                    @endcan
-                    @can('lotes.view')
-                    <a href="{{ route('actividades.create') }}" class="btn btn-success btn-block">
-                        <i class="fas fa-clipboard-list mr-2"></i>Registrar Actividad
-                    </a>
-                    @endcan
-                    @can('inventario.view')
-                    <a href="{{ route('insumos.index') }}" class="btn btn-info btn-block">
-                        <i class="fas fa-warehouse mr-2"></i>Gestionar Inventario
-                    </a>
-                    @endcan
+
+                <div class="card role-acc-card">
+                    <div class="role-acc-card__head">
+                        <h3><i class="fas fa-bolt text-warning mr-2"></i>Acciones rápidas</h3>
+                    </div>
+                    <div class="role-acc-grupo">
+                        <div class="role-acc-grid" style="grid-template-columns:1fr">
+                            @can('lotes.create')
+                            <a href="{{ route('lotes.create') }}" class="role-acc-tile">
+                                <span class="role-acc-tile__icon role-acc-tile__icon--prod"><i class="fas fa-plus"></i></span>
+                                <span><span class="role-acc-tile__lbl">Nuevo lote</span><span class="role-acc-tile__sub">Registrar parcela en campo</span></span>
+                            </a>
+                            @endcan
+                            @can('lotes.update')
+                            <a href="{{ route('actividades.create') }}" class="role-acc-tile">
+                                <span class="role-acc-tile__icon role-acc-tile__icon--prod"><i class="fas fa-tasks"></i></span>
+                                <span><span class="role-acc-tile__lbl">Registrar actividad</span><span class="role-acc-tile__sub">Siembra, riego, cosecha…</span></span>
+                            </a>
+                            @endcan
+                            @can('inventario.view')
+                            <a href="{{ route('insumos.index') }}" class="role-acc-tile">
+                                <span class="role-acc-tile__icon role-acc-tile__icon--adm"><i class="fas fa-flask"></i></span>
+                                <span><span class="role-acc-tile__lbl">Gestionar inventario</span><span class="role-acc-tile__sub">Insumos y stock</span></span>
+                            </a>
+                            @endcan
+                            @can('lote_produccion.create')
+                            <a href="{{ route('procesamiento.index') }}" class="role-acc-tile">
+                                <span class="role-acc-tile__icon role-acc-tile__icon--com"><i class="fas fa-flask"></i></span>
+                                <span><span class="role-acc-tile__lbl">Procesamiento de lote</span><span class="role-acc-tile__sub">Industrialización en planta</span></span>
+                            </a>
+                            @endcan
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- FILA 3: Actividades Recientes + Alertas del Sistema -->
-    <div class="row">
-        <!-- Actividades Recientes -->
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-history mr-2"></i>
-                        Actividades Recientes
-                    </h3>
-                </div>
-                <div class="card-body p-0">
-                    @forelse($actividadesRecientes as $act)
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card role-acc-card h-100 mb-0">
+                    <div class="role-acc-card__head">
+                        <h3><i class="fas fa-history text-secondary mr-2"></i>Actividades recientes</h3>
+                    </div>
+                    <div class="card-body p-0">
+                        @forelse($actividadesRecientes as $act)
                         @php
                             $uiActividad = \App\Support\DashboardPresentacion::actividadIcono($act->tipoActividad->nombre ?? null);
                             $fechaActividad = \App\Support\DashboardPresentacion::actividadFechaTexto($act->fechainicio);
@@ -506,183 +204,114 @@
                             <div class="activity-icon {{ $uiActividad['class'] }}">
                                 <i class="fas {{ $uiActividad['icon'] }}"></i>
                             </div>
-                            <div class="activity-info">
-                                <h6>{{ $act->tipoActividad->nombre ?? 'Actividad' }} - {{ $act->lote->nombre ?? 'Sin lote' }}
-                                </h6>
-                                <small>{{ $fechaActividad }}
-                                    • Por {{ trim(($act->usuario->nombre ?? 'Usuario').' '.($act->usuario->apellido ?? '')) }}</small>
+                            <div>
+                                <div class="font-weight-bold" style="font-size:.88rem">{{ $act->tipoActividad->nombre ?? 'Actividad' }} — {{ $act->lote->nombre ?? 'Sin lote' }}</div>
+                                <small class="text-muted">{{ $fechaActividad }} · {{ trim(($act->usuario->nombre ?? '').' '.($act->usuario->apellido ?? '')) }}</small>
                             </div>
                         </div>
-                    @empty
-                        <div class="p-4 text-center text-muted">
-                            <i class="fas fa-inbox fa-2x mb-2"></i>
-                            <p class="mb-0">No hay actividades recientes</p>
-                        </div>
-                    @endforelse
+                        @empty
+                        <div class="text-center text-muted py-4"><i class="fas fa-inbox d-block mb-2"></i>No hay actividades recientes</div>
+                        @endforelse
+                    </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Alertas del Sistema -->
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-bell mr-2"></i>
-                        Alertas del Sistema
-                    </h3>
-                </div>
-                <div class="card-body d-flex flex-column justify-content-center">
-                    @forelse($insumosStockBajo as $insumo)
+            <div class="col-md-6 mb-4">
+                <div class="card role-acc-card h-100 mb-0">
+                    <div class="role-acc-card__head">
+                        <h3><i class="fas fa-bell text-warning mr-2"></i>Alertas del sistema</h3>
+                    </div>
+                    <div class="card-body p-0">
+                        @forelse($insumosStockBajo as $insumo)
                         @php $stockAgotado = (float) $insumo->stock <= 0; @endphp
                         <div class="alert-item {{ $stockAgotado ? 'alert-item-agotado' : '' }}">
-                            <div class="alert-icon">
-                                <i class="fas {{ $stockAgotado ? 'fa-times' : 'fa-exclamation' }}"></i>
-                            </div>
-                            <div class="alert-content">
-                                <h6>{{ $stockAgotado ? 'Stock agotado' : 'Stock bajo' }}: {{ $insumo->nombre }}</h6>
-                                <small>
-                                    Stock actual: {{ number_format($insumo->stock, 2) }} {{ $insumo->unidadMedida->abreviatura ?? '' }}
-                                    @unless($stockAgotado)
-                                        (Menor a {{ \App\Support\InsumoCatalogo::UMBRAL_ALERTA_STOCK }})
-                                    @endunless
+                            <div class="alert-icon"><i class="fas {{ $stockAgotado ? 'fa-times' : 'fa-exclamation' }}"></i></div>
+                            <div>
+                                <div class="font-weight-bold" style="font-size:.88rem">{{ $stockAgotado ? 'Stock agotado' : 'Stock bajo' }}: {{ $insumo->nombre }}</div>
+                                <small class="text-muted">
+                                    {{ number_format($insumo->stock, 2) }} {{ $insumo->unidadMedida->abreviatura ?? '' }}
+                                    @unless($stockAgotado)(menor a {{ \App\Support\InsumoCatalogo::UMBRAL_ALERTA_STOCK }})@endunless
                                 </small>
                             </div>
                         </div>
-                    @empty
-                        <div class="text-center text-success py-3 my-auto">
-                            <i class="fas fa-check-circle fa-2x mb-2"></i>
-                            <p class="mb-0">No hay alertas pendientes</p>
-                        </div>
-                    @endforelse
+                        @empty
+                        <div class="text-center text-success py-4"><i class="fas fa-check-circle d-block mb-2"></i>Sin alertas pendientes</div>
+                        @endforelse
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- FILA 4: Top Cultivos por Producción -->
-    <div class="row">
-        <div class="col-lg-8 col-xl-6">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-trophy mr-2"></i>
-                        Top Cultivos por Produccion
-                    </h3>
+        @if($topCultivos->isNotEmpty())
+        <div class="card role-acc-card mb-0">
+            <div class="role-acc-card__head">
+                <h3><i class="fas fa-trophy text-warning mr-2"></i>Top cultivos por producción</h3>
+            </div>
+            <div class="card-body">
+                @php $colores = ['success','warning','info','danger','primary']; $maxProduccion = $topCultivos->max('total') ?: 1; @endphp
+                @foreach($topCultivos as $index => $cultivo)
+                <div class="progress-group">
+                    <div class="d-flex justify-content-between"><span class="pg-label">{{ $cultivo->nombre }}</span><span class="pg-value">{{ number_format($cultivo->total, 0) }} kg</span></div>
+                    <div class="progress" style="height:8px;border-radius:4px">
+                        <div class="progress-bar bg-{{ $colores[$index % 5] }}" style="width:{{ ($cultivo->total / $maxProduccion) * 100 }}%"></div>
+                    </div>
                 </div>
-                <div class="card-body d-flex flex-column justify-content-center py-4">
-                    @php
-                        $coloresProgress = ['success', 'warning', 'info', 'danger', 'primary'];
-                        $maxProduccion = $topCultivos->max('total') ?: 1;
-                    @endphp
-                    @forelse($topCultivos as $index => $cultivo)
-                        <div class="progress-group">
-                            <span class="pg-label">{{ $cultivo->nombre }}</span>
-                            <div class="progress progress-sm">
-                                <div class="progress-bar bg-{{ $coloresProgress[$index % 5] }}"
-                                    style="width: {{ ($cultivo->total / $maxProduccion) * 100 }}%"></div>
-                            </div>
-                            <span class="pg-value">{{ number_format($cultivo->total, 0) }} kg</span>
-                        </div>
-                    @empty
-                        <div class="text-center text-muted py-3 my-auto">
-                            <i class="fas fa-chart-bar fa-2x mb-2"></i>
-                            <p class="mb-0">No hay datos de produccion</p>
-                        </div>
-                    @endforelse
-                </div>
+                @endforeach
             </div>
         </div>
+        @endif
     </div>
-</div>
+</section>
 @endsection
 
 @push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    <script>
-        $(document).ready(function () {
-            // Cargar clima desde API
-            function cargarClima() {
-                $.ajax({
-                    url: '{{ route("api.clima") }}',
-                    method: 'GET',
-                    dataType: 'json',
-                    timeout: 10000,
-                }).done(function (data) {
-                    if (!data || !data.success) {
-                        $('#weatherDesc').text('Datos no disponibles');
-                        return;
-                    }
-                    $('#weatherTemp').text(data.temperatura + '°C');
-                    $('#weatherDesc').text(data.descripcion);
-                    $('#weatherHumedad').text(data.humedad + '%');
-                    $('#weatherViento').text(data.viento + ' km/h');
-                    $('#weatherCity').text((data.ciudad || 'Santa Cruz') + ', Bolivia');
-                    $('#weatherFuente').remove();
-                    if (data.fuente && data.fuente !== 'openweather') {
-                        const label = data.fuente === 'registro_local' ? 'Registro en campo' : 'Referencia local';
-                        $('#weatherWidget').append(
-                            '<div id="weatherFuente" class="weather-fuente-badge"><i class="fas fa-database mr-1"></i>' + label + '</div>'
-                        );
-                    }
-                    if (data.icono) {
-                        $('#weatherWidget').css('background', 'linear-gradient(135deg, #74b9ff, #0984e3)');
-                    }
-                }).fail(function () {
-                    $('#weatherTemp').text('28°C');
-                    $('#weatherDesc').text('Parcialmente nublado');
-                    $('#weatherHumedad').text('62%');
-                    $('#weatherViento').text('14 km/h');
-                    $('#weatherCity').text('Santa Cruz, Bolivia');
-                });
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+$(function () {
+    function cargarClima() {
+        $.ajax({
+            url: '{{ route("api.clima") }}',
+            method: 'GET',
+            dataType: 'json',
+            timeout: 10000,
+        }).done(function (data) {
+            if (!data || !data.success) {
+                $('#weatherDesc').text('Datos no disponibles');
+                return;
             }
-
-            cargarClima();
-            setInterval(cargarClima, 600000); // Actualizar cada 10 min
-
-            // Gráfico de Producción
-            var chartData = @json($chartData);
-
-            if (chartData.labels && chartData.labels.length > 0) {
-                var ctx = document.getElementById('productionChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: chartData.labels,
-                        datasets: chartData.datasets
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'top' }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                grid: { color: '#e5e5e5' }
-                            },
-                            x: {
-                                grid: { color: '#e5e5e5' }
-                            }
-                        },
-                        elements: {
-                            point: { radius: 6, hoverRadius: 8 }
-                        }
-                    }
-                });
-            } else {
-                $('#productionChart').parent().html('<div class="text-center text-muted py-5"><i class="fas fa-chart-line fa-3x mb-3 d-block"></i><p>No hay datos de produccion aun</p></div>');
-            }
-
-            // Efectos hover
-            $('.small-box').hover(
-                function () { $(this).css('transform', 'translateY(-2px)'); },
-                function () { $(this).css('transform', 'translateY(0)'); }
-            );
-
-            // Efecto de carga
-            $('.card').css('opacity', '0').animate({ 'opacity': '1' }, 800);
+            $('#weatherTemp').text(data.temperatura + '°C');
+            $('#weatherDesc').text(data.descripcion);
+            $('#weatherHumedad').text(data.humedad + '%');
+            $('#weatherViento').text(data.viento);
+            $('#weatherCity').text((data.ciudad || 'Santa Cruz') + ', Bolivia');
+        }).fail(function () {
+            $('#weatherTemp').text('28°C');
+            $('#weatherDesc').text('Parcialmente nublado');
+            $('#weatherHumedad').text('62%');
+            $('#weatherViento').text('14');
+            $('#weatherCity').text('Santa Cruz, Bolivia');
         });
-    </script>
+    }
+    cargarClima();
+
+    var chartData = @json($chartData);
+    if (chartData.labels && chartData.labels.length > 0) {
+        var ctx = document.getElementById('productionChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: { labels: chartData.labels, datasets: chartData.datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                    x: { grid: { color: '#f1f5f9' } }
+                }
+            }
+        });
+    } else {
+        $('#productionChart').parent().html('<div class="text-center text-muted py-5"><i class="fas fa-chart-line fa-2x mb-2 d-block"></i>Sin datos de producción aún</div>');
+    }
+});
+</script>
 @endpush

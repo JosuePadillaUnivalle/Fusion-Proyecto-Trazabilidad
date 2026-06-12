@@ -22,6 +22,50 @@ final class EnvioAsignacionEstadoCatalogo
         'entregada'   => ['entregada', 'entregado', 'recibido_planta'],
     ];
 
+    /**
+     * @return array<string, string>
+     */
+    public static function opcionesFiltro(): array
+    {
+        return [
+            'pendiente' => 'Pendiente',
+            'asignado' => 'Asignado',
+            'en_transporte_planta' => 'En transporte hacia planta',
+            'recibido_planta' => 'Recibido en planta',
+            'cancelado' => 'Cancelado',
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function estadosEquivalentes(string $estado): array
+    {
+        $key = strtolower(trim($estado));
+
+        return self::ALIASES[$key] ?? [$key];
+    }
+
+    public static function llegoADestino(?\App\Models\EnvioAsignacionMultiple $asignacion): bool
+    {
+        if ($asignacion === null) {
+            return false;
+        }
+
+        if ($asignacion->fecha_recepcion_planta) {
+            return true;
+        }
+
+        $estado = strtolower(trim((string) $asignacion->estado));
+
+        return in_array($estado, ['recibido_planta', 'entregado', 'entregada'], true);
+    }
+
+    public static function puedeGestionarAdmin(?\App\Models\EnvioAsignacionMultiple $asignacion): bool
+    {
+        return ! self::llegoADestino($asignacion);
+    }
+
     public static function etiqueta(?string $estado): string
     {
         $key = strtolower(trim((string) $estado));

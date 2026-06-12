@@ -74,6 +74,8 @@
 }
 #modalNuevoLote .btn-agregar-mp:hover { background: #dcfce7; }
 #modalNuevoLote .modal-footer { background: #fff; border-top: 1px solid #e5e7eb; padding: 1rem 1.5rem; }
+#modalNuevoLote #productoLote::-webkit-calendar-picker-indicator,
+#modalNuevoLote #productoLote::-webkit-list-button { display: none !important; }
 .pl-actions .btn { padding: .25rem .5rem; margin: 0 .15rem; }
 .pl-actions .btn-danger { background: #dc3545; border-color: #dc3545; color: #fff; }
 .pl-actions .btn-danger:hover { background: #c82333; color: #fff; }
@@ -343,7 +345,6 @@
     </div>
 </div>
 
-@include('partials.selector-catalogo-modal')
 @include('partials.selector-plantilla-transformacion-modal')
 @endcan
 

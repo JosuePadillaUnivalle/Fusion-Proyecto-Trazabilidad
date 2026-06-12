@@ -12,6 +12,11 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Solo ejemplos de capacitación / desarrollo.
+ * No se muestran en «Aplicación de insumos» (filtro RegistroDemo).
+ * Ejecutar manualmente: php artisan db:seed --class=DemoLoteInsumoEjemplosSeeder
+ */
 class DemoLoteInsumoEjemplosSeeder extends Seeder
 {
     public const MARK = '[demo-lote-insumo-ejemplo]';

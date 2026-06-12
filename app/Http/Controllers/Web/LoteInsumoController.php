@@ -8,37 +8,40 @@ use App\Models\Lote;
 use App\Models\Insumo;
 use App\Models\EstadoLoteInsumo;
 use App\Services\OperacionAgricolaAutomaticaService;
+use App\Support\RegistroDemo;
+use App\Support\UsuarioRol;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class LoteInsumoController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $q = LoteInsumo::query();
+        $baseQuery = $this->queryLoteInsumosVisibles($request);
 
         $stats = [
-            'total' => (clone $q)->count(),
-            'lotes' => (clone $q)->distinct()->count('loteid'),
-            'insumos' => (clone $q)->distinct()->count('insumoid'),
-            'cantidad_total' => (float) (clone $q)->sum('cantidadusada'),
+            'total' => (clone $baseQuery)->count(),
+            'lotes' => (clone $baseQuery)->distinct()->count('loteid'),
+            'insumos' => (clone $baseQuery)->distinct()->count('insumoid'),
+            'cantidad_total' => (float) (clone $baseQuery)->sum('cantidadusada'),
         ];
 
-        $estadosFiltro = (clone $q)
+        $estadosFiltro = (clone $baseQuery)
             ->join('estadoloteinsumo', 'loteinsumo.estadoloteinsumoid', '=', 'estadoloteinsumo.estadoloteinsumoid')
             ->whereNotNull('loteinsumo.estadoloteinsumoid')
             ->distinct()
             ->orderBy('estadoloteinsumo.nombre')
             ->pluck('estadoloteinsumo.nombre');
 
-        $encargadosFiltro = (clone $q)
+        $encargadosFiltro = (clone $baseQuery)
             ->join('usuario', 'loteinsumo.usuarioid', '=', 'usuario.usuarioid')
             ->whereNotNull('loteinsumo.usuarioid')
             ->distinct()
             ->orderBy('usuario.nombre')
             ->pluck('usuario.nombre');
 
-        $loteInsumos = LoteInsumo::with(['lote', 'insumo.unidadMedida', 'usuario', 'estado'])
+        $loteInsumos = (clone $baseQuery)
+            ->with(['lote', 'insumo.unidadMedida', 'usuario', 'estado'])
             ->orderBy('loteinsumoid', 'desc')
             ->paginate(15);
 
@@ -65,23 +68,20 @@ class LoteInsumoController extends Controller
             'insumoid.required' => 'Primero selecciona un insumo',
         ]);
 
+        $lote = Lote::findOrFail($data['loteid']);
+        $this->autorizarLoteInsumo($request, $lote);
+
         DB::beginTransaction();
 
         try {
-            // Obtener el lote para sacar el usuario responsable
-            $lote = Lote::findOrFail($data['loteid']);
-
-            // Obtener el insumo
             $insumo = Insumo::findOrFail($data['insumoid']);
 
-            // Validar que hay suficiente stock
             if ($insumo->stock < $data['cantidadusada']) {
                 return back()->withErrors([
-                    'cantidadusada' => "Stock insuficiente. Disponible: {$insumo->stock} {$insumo->unidadMedida->abreviatura}"
+                    'cantidadusada' => "Stock insuficiente. Disponible: {$insumo->stock} {$insumo->unidadMedida->abreviatura}",
                 ])->withInput();
             }
 
-            // Restar del stock
             $insumo->stock -= $data['cantidadusada'];
             $insumo->save();
 
@@ -100,10 +100,8 @@ class LoteInsumoController extends Controller
 
             DB::commit();
 
-            // Mensaje de éxito con información del stock
             $mensaje = "Aplicación registrada. Se descontaron {$data['cantidadusada']} {$insumo->unidadMedida->abreviatura} de {$insumo->nombre}.";
 
-            // Alerta si el stock quedó bajo
             if ($insumo->stockBajo()) {
                 $mensaje .= " ⚠️ ALERTA: Stock bajo ({$insumo->stock} {$insumo->unidadMedida->abreviatura})";
             }
@@ -112,28 +110,35 @@ class LoteInsumoController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withErrors(['error' => 'Error al registrar: ' . $e->getMessage()])->withInput();
+
+            return back()->withErrors(['error' => 'Error al registrar: '.$e->getMessage()])->withInput();
         }
     }
 
-    public function show(LoteInsumo $loteInsumo)
+    public function show(Request $request, LoteInsumo $loteInsumo)
     {
+        $this->autorizarLoteInsumoRegistro($request, $loteInsumo);
         $loteInsumo->load(['lote', 'insumo.unidadMedida', 'usuario', 'estado']);
+
         return view('lote_insumos.show', compact('loteInsumo'));
     }
 
-    public function edit(LoteInsumo $loteInsumo)
+    public function edit(Request $request, LoteInsumo $loteInsumo)
     {
-        $lotes = Lote::with('usuario')->get();
+        $this->autorizarLoteInsumoRegistro($request, $loteInsumo);
+
+        $lotes = $this->queryLotesParaInsumo($request)->get();
         $insumos = Insumo::with('unidadMedida')->get();
         $estados = EstadoLoteInsumo::all();
-        $usuarios = \App\Models\Usuario::all(); // Fix: Fetch users
+        $usuarios = \App\Models\Usuario::all();
 
         return view('lote_insumos.edit', compact('loteInsumo', 'lotes', 'insumos', 'estados', 'usuarios'));
     }
 
     public function update(Request $request, LoteInsumo $loteInsumo)
     {
+        $this->autorizarLoteInsumoRegistro($request, $loteInsumo);
+
         $data = $request->validate([
             'loteid' => 'required|exists:lote,loteid',
             'insumoid' => 'required|exists:insumo,insumoid',
@@ -142,13 +147,14 @@ class LoteInsumoController extends Controller
             'observaciones' => 'nullable|string|max:200',
         ]);
 
+        $lote = Lote::findOrFail($data['loteid']);
+        $this->autorizarLoteInsumo($request, $lote);
+
         DB::beginTransaction();
 
         try {
-            $lote = Lote::findOrFail($data['loteid']);
             $insumo = Insumo::findOrFail($data['insumoid']);
 
-            // Si cambió el insumo, devolver stock al anterior
             if ($loteInsumo->insumoid != $data['insumoid']) {
                 $insumoAnterior = Insumo::find($loteInsumo->insumoid);
                 if ($insumoAnterior) {
@@ -156,21 +162,19 @@ class LoteInsumoController extends Controller
                     $insumoAnterior->save();
                 }
 
-                // Validar stock del nuevo insumo
                 if ($insumo->stock < $data['cantidadusada']) {
                     return back()->withErrors([
-                        'cantidadusada' => "Stock insuficiente del nuevo insumo. Disponible: {$insumo->stock}"
+                        'cantidadusada' => "Stock insuficiente del nuevo insumo. Disponible: {$insumo->stock}",
                     ])->withInput();
                 }
 
                 $insumo->stock -= $data['cantidadusada'];
             } else {
-                // Mismo insumo: ajustar diferencia
                 $diferencia = $data['cantidadusada'] - $loteInsumo->cantidadusada;
 
                 if ($diferencia > 0 && $insumo->stock < $diferencia) {
                     return back()->withErrors([
-                        'cantidadusada' => "Stock insuficiente para aumentar. Disponible: {$insumo->stock}"
+                        'cantidadusada' => "Stock insuficiente para aumentar. Disponible: {$insumo->stock}",
                     ])->withInput();
                 }
 
@@ -195,21 +199,22 @@ class LoteInsumoController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withErrors(['error' => 'Error al actualizar: ' . $e->getMessage()])->withInput();
+
+            return back()->withErrors(['error' => 'Error al actualizar: '.$e->getMessage()])->withInput();
         }
     }
 
-    public function destroy(LoteInsumo $loteInsumo)
+    public function destroy(Request $request, LoteInsumo $loteInsumo)
     {
+        $this->autorizarLoteInsumoRegistro($request, $loteInsumo);
+
         DB::beginTransaction();
 
         try {
-            // Devolver el stock al inventario
             $insumo = Insumo::findOrFail($loteInsumo->insumoid);
             $insumo->stock += $loteInsumo->cantidadusada;
             $insumo->save();
 
-            // Eliminar el registro
             $loteInsumo->delete();
 
             DB::commit();
@@ -219,7 +224,70 @@ class LoteInsumoController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withErrors(['error' => 'Error al eliminar: ' . $e->getMessage()]);
+
+            return back()->withErrors(['error' => 'Error al eliminar: '.$e->getMessage()]);
+        }
+    }
+
+    private function queryLoteInsumosVisibles(Request $request)
+    {
+        $query = RegistroDemo::aplicarFiltroLoteInsumoOperativo(LoteInsumo::query());
+        $user = $request->user();
+
+        if (UsuarioRol::debeAcotarPorAsignacion($user)) {
+            $query->whereHas('lote', fn ($q) => $q->where('usuarioid', (int) $user->usuarioid));
+        } elseif (UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
+            $query->whereHas('lote', fn ($q) => $q->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($user)));
+        }
+
+        return $query;
+    }
+
+    private function queryLotesParaInsumo(Request $request)
+    {
+        $query = Lote::query()->with('usuario')->orderBy('nombre');
+        $user = $request->user();
+
+        if (UsuarioRol::debeAcotarPorAsignacion($user)) {
+            $query->where('usuarioid', (int) $user->usuarioid);
+        } elseif (UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
+            $query->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($user));
+        }
+
+        return $query;
+    }
+
+    private function autorizarLoteInsumoRegistro(Request $request, LoteInsumo $loteInsumo): void
+    {
+        $loteInsumo->loadMissing('lote');
+        if (! $loteInsumo->lote) {
+            abort(404);
+        }
+
+        $this->autorizarLoteInsumo($request, $loteInsumo->lote);
+    }
+
+    private function autorizarLoteInsumo(Request $request, Lote $lote): void
+    {
+        $user = $request->user();
+        if (! $user) {
+            abort(403);
+        }
+
+        if (UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
+            if (! in_array((int) $lote->usuarioid, UsuarioRol::idsUsuariosBajoJefeAgricultor($user), true)) {
+                abort(403, 'No tienes acceso a este lote.');
+            }
+
+            return;
+        }
+
+        if (! UsuarioRol::debeAcotarPorAsignacion($user)) {
+            return;
+        }
+
+        if ((int) $lote->usuarioid !== (int) $user->usuarioid) {
+            abort(403, 'No tienes acceso a este lote.');
         }
     }
 

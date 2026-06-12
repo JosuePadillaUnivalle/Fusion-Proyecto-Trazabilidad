@@ -7,106 +7,30 @@ use App\Models\EnvioAsignacionMultiple;
 use App\Models\Pedido;
 use App\Models\Usuario;
 use App\Models\Almacen;
+use App\Services\NotificacionUsuarioService;
 use App\Services\RecepcionPlantaEnvioService;
 use App\Support\AlmacenAmbito;
 use App\Support\EnvioAsignacionEstadoCatalogo;
 use App\Support\EnvioPedidoService;
+use App\Support\EnvioListadoService;
 use App\Support\PedidoCatalogo;
 use App\Support\RutaPorCallesService;
+use App\Support\UbicacionGpsParser;
 use App\Support\UsuarioRol;
+use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class PedidoController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): View|RedirectResponse
     {
-        $user = $request->user();
-        $esTransportista = UsuarioRol::esTransportista($user);
-        $filtroTransportista = (int) $request->query('transportista', 0);
-
-        $query = Pedido::query()
-            ->with(['detalles.insumo', 'envioAsignacion.transportista.perfilTransportista.vehiculo', 'envioAsignacion.asignadoPor'])
-            ->orderByDesc('pedidoid');
-
-        if ($esTransportista) {
-            $query->whereHas('envioAsignacion', function ($q) use ($user) {
-                $q->where('transportista_usuarioid', $user->usuarioid)
-                    ->whereNotNull('transportista_usuarioid');
-            });
-        } else {
-            if ($filtroTransportista > 0) {
-                $query->whereHas('envioAsignacion', function ($q) use ($filtroTransportista) {
-                    $q->where('transportista_usuarioid', $filtroTransportista);
-                });
-            }
-
-            if ($request->filled('transportista_nombre')) {
-                $nombre = $request->string('transportista_nombre')->trim()->toString();
-                $query->whereHas('envioAsignacion.transportista', function ($q) use ($nombre) {
-                    $q->where('nombre', 'like', "%{$nombre}%")
-                        ->orWhere('apellido', 'like', "%{$nombre}%")
-                        ->orWhere('nombreusuario', 'like', "%{$nombre}%")
-                        ->orWhereRaw("CONCAT(nombre, ' ', apellido) LIKE ?", ["%{$nombre}%"]);
-                });
-            }
-
-            if ($request->boolean('sin_asignar')) {
-                $query->where(function ($q) {
-                    $q->whereDoesntHave('envioAsignacion')
-                        ->orWhereHas('envioAsignacion', fn ($a) => $a->whereNull('transportista_usuarioid'));
-                });
-            }
+        if ($request->user()?->can('asignaciones.view')) {
+            return redirect()->route('logistica.asignaciones.listado', $request->query());
         }
 
-        if ($request->filled('q')) {
-            $term = $request->string('q')->trim()->toString();
-            $query->where(function ($w) use ($term) {
-                $w->where('numero_solicitud', 'like', "%{$term}%")
-                    ->orWhere('nombre_planta', 'like', "%{$term}%")
-                    ->orWhere('direccion_texto', 'like', "%{$term}%")
-                    ->orWhereHas('detalles', fn ($d) => $d->where('cultivo_personalizado', 'like', "%{$term}%"))
-                    ->orWhereHas('envioAsignacion.transportista', function ($t) use ($term) {
-                        $t->where('nombre', 'like', "%{$term}%")
-                            ->orWhere('apellido', 'like', "%{$term}%")
-                            ->orWhere('nombreusuario', 'like', "%{$term}%");
-                    });
-            });
-        }
-
-        if ($request->filled('estado')) {
-            $query->where('estado', $request->string('estado')->toString());
-        }
-
-        if ($request->filled('desde')) {
-            $query->whereDate('fechapedido', '>=', $request->string('desde')->toString());
-        }
-
-        if ($request->filled('hasta')) {
-            $query->whereDate('fechapedido', '<=', $request->string('hasta')->toString());
-        }
-
-        $pedidos = $query->get();
-
-        $transportistas = $esTransportista
-            ? collect()
-            : Usuario::query()
-                ->where('role', 'transportista')
-                ->where('activo', true)
-                ->orderBy('nombre')
-                ->orderBy('apellido')
-                ->get();
-
-        $estadosPedido = PedidoCatalogo::opcionesEstadoEnSelector();
-
-        return view('pedidos.index', compact(
-            'pedidos',
-            'transportistas',
-            'filtroTransportista',
-            'esTransportista',
-            'estadosPedido'
-        ));
+        return view('logistica.envios.index', EnvioListadoService::prepararListado($request));
     }
 
     public function create()
@@ -137,7 +61,42 @@ class PedidoController extends Controller
             'hubLng' => RutaPorCallesService::HUB_LNG,
             'filtroAlmacenesAgricola' => $filtroAlmacenesAgricola,
             'filtroAlmacenesPlanta' => $filtroAlmacenesPlanta,
+            'almacenesMapa' => $this->almacenesParaMapaEnvio(),
         ]);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function almacenesParaMapaEnvio(): array
+    {
+        $items = [];
+
+        foreach ([AlmacenAmbito::AGRICOLA, AlmacenAmbito::PLANTA] as $ambito) {
+            $almacenes = AlmacenAmbito::scope(
+                Almacen::query()->where('activo', true),
+                $ambito
+            )->orderBy('nombre')->get();
+
+            foreach ($almacenes as $almacen) {
+                $resuelto = UbicacionGpsParser::resolverAlmacen(
+                    (int) $almacen->almacenid,
+                    $almacen->nombre,
+                    $almacen->ubicacion
+                );
+
+                $items[] = [
+                    'id' => $almacen->almacenid,
+                    'label' => $almacen->nombre,
+                    'extra' => [
+                        'lat' => $resuelto['lat'],
+                        'lng' => $resuelto['lng'],
+                        'direccion' => $resuelto['direccion'],
+                        'ambito' => $almacen->ambito ?? $ambito,
+                    ],
+                ];
+            }
+        }
+
+        return $items;
     }
 
     public function store(Request $request)
@@ -151,6 +110,12 @@ class PedidoController extends Controller
             'direccion_texto' => 'nullable|string|max:255',
             'fechaEntregaDeseada' => 'nullable|date',
             'observaciones' => 'nullable|string',
+            'transportista_usuarioid' => 'required|integer|exists:usuario,usuarioid',
+            'vehiculoid' => 'required|integer|exists:vehiculo,vehiculoid',
+            'recogidas' => 'nullable|array|max:5',
+            'recogidas.*.latitud' => 'required|numeric|between:-90,90',
+            'recogidas.*.longitud' => 'required|numeric|between:-180,180',
+            'recogidas.*.direccion' => 'nullable|string|max:255',
             'detalles' => 'required|array|min:1',
             'detalles.*.producto_ref' => ['required', 'string', 'regex:/^(insumo|cosecha|cultivo):\d+$/'],
             'detalles.*.cantidad' => 'required|numeric|min:0.01',
@@ -159,9 +124,15 @@ class PedidoController extends Controller
             'detalles.*.producto_ref.regex' => 'Seleccione un producto válido de producción agrícola.',
         ]);
 
-        DB::transaction(function () use ($data) {
+        $transportistaId = (int) $data['transportista_usuarioid'];
+        $vehiculoId = (int) $data['vehiculoid'];
+        $recogidasExtra = array_values($data['recogidas'] ?? []);
+
+        $pedido = null;
+
+        DB::transaction(function () use ($data, $transportistaId, $vehiculoId, $recogidasExtra, &$pedido) {
             $detallesInput = $data['detalles'];
-            unset($data['detalles']);
+            unset($data['detalles'], $data['transportista_usuarioid'], $data['vehiculoid'], $data['recogidas']);
 
             $pedido = Pedido::create([
                 ...$data,
@@ -186,23 +157,56 @@ class PedidoController extends Controller
                 ]);
             }
 
-            EnvioAsignacionMultiple::firstOrCreate(
-                ['externo_envio_id' => $pedido->numero_solicitud],
-                EnvioAsignacionEstadoCatalogo::applyToAttributes([
-                    'pedidoid' => $pedido->pedidoid,
-                    'estado' => 'pendiente',
-                ])
+            $envio = EnvioPedidoService::programarTransportista(
+                $pedido,
+                $transportistaId,
+                $vehiculoId,
+                (int) auth()->id()
             );
+
+            if ($recogidasExtra !== []) {
+                EnvioPedidoService::crearRutaRecogidasMultiples(
+                    $pedido,
+                    $envio,
+                    $recogidasExtra,
+                    $transportistaId,
+                    (int) auth()->id()
+                );
+            }
         });
 
-        return redirect()->route('pedidos.index')->with('success', 'Pedido registrado. Producción agrícola debe aceptarlo y reservar stock antes de asignar transportista.');
+        app(NotificacionUsuarioService::class)->pedidoPendienteAgricola($pedido->fresh(['detalles']));
+
+        $mensaje = 'Envío registrado con transportista asignado.';
+        if ($recogidasExtra !== []) {
+            $totalRecogidas = count($recogidasExtra) + 1;
+            $mensaje .= " Ruta con {$totalRecogidas} punto(s) de recogida hacia planta.";
+        } else {
+            $mensaje .= ' Producción agrícola debe aceptarlo para activar la salida.';
+        }
+
+        return redirect()->route('logistica.asignaciones.listado')->with('success', $mensaje);
     }
 
     public function show($id)
     {
-        $pedido = Pedido::with(['detalles', 'envioAsignacion.transportista.perfilTransportista.vehiculo.tipoVehiculo', 'envioAsignacion.asignadoPor', 'aceptadoPor'])->findOrFail($id);
+        $pedido = Pedido::with([
+            'detalles',
+            'envioAsignacion.transportista.perfilTransportista.vehiculo.tipoVehiculo',
+            'envioAsignacion.asignadoPor',
+            'envioAsignacion.ruta.paradas',
+            'aceptadoPor',
+        ])->findOrFail($id);
 
-        return view('pedidos.show', compact('pedido'));
+        $trayectoPartes = EnvioPedidoService::trayectoPartesPedido($pedido);
+        if ($pedido->envioAsignacion) {
+            $pedido->envioAsignacion->setRelation('pedido', $pedido);
+            $paradasMapa = EnvioPedidoService::paradasMapaEnvio($pedido->envioAsignacion);
+        } else {
+            $paradasMapa = [];
+        }
+
+        return view('pedidos.show', compact('pedido', 'trayectoPartes', 'paradasMapa'));
     }
 
     public function edit(Pedido $pedido)
@@ -280,7 +284,7 @@ class PedidoController extends Controller
     {
         Pedido::findOrFail($id)->delete();
 
-        return redirect()->route('pedidos.index');
+        return redirect()->route('logistica.asignaciones.listado');
     }
 
     public function asignarTransportista(Request $request, Pedido $pedido): RedirectResponse
@@ -290,8 +294,10 @@ class PedidoController extends Controller
             'vehiculoid' => ['required', 'integer', 'exists:vehiculo,vehiculoid'],
         ]);
 
+        $envio = null;
+
         try {
-            EnvioPedidoService::asignarTransportistaYVehiculo(
+            $envio = EnvioPedidoService::asignarTransportistaYVehiculo(
                 $pedido,
                 (int) $data['transportista_usuarioid'],
                 (int) $data['vehiculoid'],
@@ -300,6 +306,10 @@ class PedidoController extends Controller
             );
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
+        }
+
+        if ($envio) {
+            app(NotificacionUsuarioService::class)->envioListoParaRecoger($envio->fresh(['pedido.detalles']));
         }
 
         $transportista = Usuario::find($data['transportista_usuarioid']);

@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Web\Envios;
 
 use App\Http\Controllers\Controller;
+use App\Models\PerfilTransportista;
 use App\Models\Usuario;
+use App\Support\TelefonoBolivia;
+use App\Support\TransportistaFlotaCatalogo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -42,6 +45,13 @@ class EnvioTransportistaController extends Controller
             }
         }
 
+        if ($request->filled('ambito_flota') && in_array($request->string('ambito_flota')->toString(), TransportistaFlotaCatalogo::valores(), true)) {
+            $ambito = $request->string('ambito_flota')->toString();
+            $q->whereHas('perfilTransportista', fn ($p) => $p->where('ambito_flota', $ambito));
+        }
+
+        $q->with('perfilTransportista.vehiculo');
+
         $transportistas = $q->orderByDesc('usuarioid')->paginate(15)->withQueryString();
 
         return view('envios.transportistas.index', [
@@ -71,13 +81,20 @@ class EnvioTransportistaController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $request->merge([
+            'telefono' => TelefonoBolivia::normalizar($request->input('telefono')),
+        ]);
+
         $data = $request->validate([
             'nombre' => 'required|string|max:100',
             'apellido' => 'nullable|string|max:100',
             'email' => 'required|email|max:150|unique:usuario,email',
             'nombreusuario' => 'nullable|string|max:80|unique:usuario,nombreusuario',
-            'telefono' => 'nullable|string|max:50',
+            'telefono' => ['nullable', 'string', 'max:50', 'regex:'.TelefonoBolivia::PATTERN],
             'password' => 'nullable|string|min:4|max:60',
+            'ambito_flota' => 'required|in:'.implode(',', TransportistaFlotaCatalogo::valores()),
+        ], [
+            'telefono.regex' => 'El teléfono debe usar el formato +591 seguido del número (ej. +591 76202982).',
         ]);
 
         $usuario = Usuario::create([
@@ -95,6 +112,12 @@ class EnvioTransportistaController extends Controller
         Role::findOrCreate('transportista', 'web');
         $usuario->assignRole('transportista');
 
+        PerfilTransportista::create([
+            'usuarioid' => $usuario->usuarioid,
+            'ambito_flota' => $data['ambito_flota'],
+            'disponible' => true,
+        ]);
+
         return redirect()
             ->route('envios.transportistas.show', $usuario)
             ->with('success', 'Transportista registrado correctamente.');
@@ -104,14 +127,20 @@ class EnvioTransportistaController extends Controller
     {
         $this->asegurarTransportista($transportista);
 
+        $request->merge([
+            'telefono' => TelefonoBolivia::normalizar($request->input('telefono')),
+        ]);
+
         $data = $request->validate([
             'nombre' => 'required|string|max:100',
             'apellido' => 'nullable|string|max:100',
             'email' => 'required|email|max:150|unique:usuario,email,'.$transportista->usuarioid.',usuarioid',
             'nombreusuario' => 'nullable|string|max:80|unique:usuario,nombreusuario,'.$transportista->usuarioid.',usuarioid',
-            'telefono' => 'nullable|string|max:50',
+            'telefono' => ['nullable', 'string', 'max:50', 'regex:'.TelefonoBolivia::PATTERN],
             'activo' => 'nullable|boolean',
             'password' => 'nullable|string|min:4|max:60',
+        ], [
+            'telefono.regex' => 'El teléfono debe usar el formato +591 seguido del número (ej. +591 76202982).',
         ]);
 
         $transportista->nombre = $data['nombre'];

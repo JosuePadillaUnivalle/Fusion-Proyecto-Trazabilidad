@@ -4,9 +4,13 @@ namespace App\Services;
 
 use App\Models\Actividad;
 use App\Models\AsignacionEtapaPlanta;
+use App\Models\EnvioAsignacionMultiple;
 use App\Models\Lote;
+use App\Models\Pedido;
 use App\Models\Usuario;
 use App\Models\UsuarioNotificacion;
+use App\Support\EnvioPedidoService;
+use App\Support\PedidoCatalogo;
 use App\Support\UsuarioRol;
 
 class NotificacionUsuarioService
@@ -71,6 +75,91 @@ class NotificacionUsuarioService
             'actividad',
             (int) $actividad->actividadid,
         );
+    }
+
+    public function llegadaDestinoReportada(EnvioAsignacionMultiple $asignacion, Usuario $transportista): void
+    {
+        $codigo = $asignacion->externo_envio_id ?? '#'.$asignacion->envioasignacionmultipleid;
+        $nombre = trim(($transportista->nombre ?? '').' '.($transportista->apellido ?? '')) ?: ($transportista->nombreusuario ?? 'Transportista');
+        $planta = $asignacion->pedido?->nombre_planta;
+
+        $mensaje = $planta
+            ? "{$nombre} reportó la llegada del envío {$codigo} a {$planta}."
+            : "{$nombre} reportó la llegada del envío {$codigo} a destino.";
+
+        $admins = Usuario::query()
+            ->where('activo', true)
+            ->where(function ($q) {
+                $q->whereIn('role', ['admin', 'Admin'])
+                    ->orWhereHas('roles', fn ($r) => $r->whereIn('name', ['admin', 'Admin']));
+            })
+            ->get();
+
+        foreach ($admins as $admin) {
+            $this->notificar(
+                $admin,
+                'envio_llegada_destino',
+                'Envío recibido en planta',
+                $mensaje,
+                route('logistica.asignaciones.listado', ['q' => $codigo], false),
+                'envio_asignacion',
+                (int) $asignacion->envioasignacionmultipleid,
+            );
+        }
+    }
+
+    public function envioListoParaRecoger(EnvioAsignacionMultiple $asignacion): void
+    {
+        if (! $asignacion->transportista_usuarioid) {
+            return;
+        }
+
+        $asignacion->loadMissing(['pedido.detalles']);
+        $codigo = $asignacion->externo_envio_id
+            ?? $asignacion->pedido?->numero_solicitud
+            ?? '#'.$asignacion->envioasignacionmultipleid;
+        $producto = $asignacion->pedido?->detalles?->first()?->cultivo_personalizado ?? 'Producto agrícola';
+        $destino = $asignacion->pedido
+            ? (EnvioPedidoService::etiquetaPlantaDestinoLista($asignacion->pedido) ?? 'planta de procesamiento')
+            : 'planta de procesamiento';
+
+        $this->notificar(
+            (int) $asignacion->transportista_usuarioid,
+            'envio_listo_recoger',
+            'Envío listo para recoger',
+            "El pedido {$codigo} ({$producto}) fue aceptado. Confirme la carga e inicie ruta hacia {$destino}.",
+            route('logistica.asignaciones.show', $asignacion, false),
+            'envio_asignacion',
+            (int) $asignacion->envioasignacionmultipleid,
+        );
+    }
+
+    public function pedidoPendienteAgricola(Pedido $pedido): void
+    {
+        if (! PedidoCatalogo::pendienteAprobacionAgricola($pedido)) {
+            return;
+        }
+
+        $pedido->loadMissing('detalles');
+        $producto = $pedido->detalles->first()?->cultivo_personalizado ?? 'Producto agrícola';
+        $totalKg = number_format((float) $pedido->detalles->sum('cantidad'), 2);
+
+        $jefes = Usuario::query()
+            ->where('activo', true)
+            ->whereHas('roles', fn ($q) => $q->where('name', 'jefe_agricultor'))
+            ->get();
+
+        foreach ($jefes as $jefe) {
+            $this->notificar(
+                $jefe,
+                'pedido_pendiente_agricola',
+                'Pedido pendiente de aceptar',
+                "La solicitud {$pedido->numero_solicitud} ({$producto}, {$totalKg} kg) espera aprobación de producción agrícola.",
+                route('agricola.pedidos.show', $pedido, false),
+                'pedido',
+                (int) $pedido->pedidoid,
+            );
+        }
     }
 
     public function etapaPlantaAsignada(AsignacionEtapaPlanta $asignacion): void
@@ -146,6 +235,15 @@ class NotificacionUsuarioService
         }
     }
 
+    /** Marca como leídas todas las notificaciones no leídas visibles para el usuario. */
+    public function marcarTodasLeidas(int $usuarioid, ?Usuario $usuario = null): int
+    {
+        $ahora = now();
+
+        return $this->queryNoLeidas($usuarioid, $usuario)
+            ->update(['leida_at' => $ahora]);
+    }
+
     /** Elimina alertas de tarea de transformación cuando la asignación ya fue completada. */
     public function descartarEtapaPlantaAsignada(int $asignacionId): void
     {
@@ -154,6 +252,17 @@ class NotificacionUsuarioService
             ->where('referencia_tipo', 'asignacion_etapa_planta')
             ->where('referencia_id', $asignacionId)
             ->delete();
+    }
+
+    /** Marca como leídas las alertas de actividad asignada cuando ya fue completada. */
+    public function descartarActividadAsignada(int $actividadId): void
+    {
+        UsuarioNotificacion::query()
+            ->where('tipo', 'actividad_asignada')
+            ->where('referencia_tipo', 'actividad')
+            ->where('referencia_id', $actividadId)
+            ->whereNull('leida_at')
+            ->update(['leida_at' => now()]);
     }
 
     private function enlaceInterno(?string $enlace): ?string

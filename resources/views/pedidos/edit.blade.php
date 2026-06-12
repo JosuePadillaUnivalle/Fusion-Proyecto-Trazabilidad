@@ -252,14 +252,13 @@
                 <button type="submit" class="btn btn-success px-4 py-2">
                     <i class="fas fa-save mr-1"></i> Guardar cambios
                 </button>
-                <a href="{{ route('pedidos.index') }}" class="btn btn-outline-secondary px-4 py-2">Cancelar</a>
+                <a href="{{ route('logistica.asignaciones.listado') }}" class="btn btn-outline-secondary px-4 py-2">Cancelar</a>
             </div>
         </form>
     </div>
 </section>
 
 @once
-    @include('partials.selector-catalogo-modal')
 @endonce
 @endsection
 

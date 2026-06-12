@@ -333,7 +333,7 @@ class PanelesPorRolModuloSeeder extends Seeder
             ]
         );
 
-        Pedido::updateOrCreate(
+        $pedidoPanel = Pedido::updateOrCreate(
             ['numero_solicitud' => 'MOD-PANEL-PED-PLANTA'],
             [
                 'nombre_planta' => 'Cliente Panel Planta Demo',
@@ -343,6 +343,17 @@ class PanelesPorRolModuloSeeder extends Seeder
                 'estado' => 'pendiente',
                 'fechapedido' => now(),
                 'observaciones' => self::MARK.' Pedido visible en panel planta.',
+            ]
+        );
+
+        DetallePedido::updateOrCreate(
+            [
+                'pedidoid' => $pedidoPanel->pedidoid,
+                'cultivo_personalizado' => 'Tomate demo panel',
+            ],
+            [
+                'cantidad' => 180,
+                'observaciones' => self::MARK,
             ]
         );
 

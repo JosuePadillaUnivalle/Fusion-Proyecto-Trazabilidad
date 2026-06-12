@@ -705,13 +705,39 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="small text-muted">Lote *</label>
-                                <select name="loteid" class="form-control form-control-sm" required>
+                                <select name="loteid" id="new-loteid" class="form-control form-control-sm" required>
                                     <option value="">Seleccionar...</option>
                                     @foreach($lotes as $lote)
-                                        <option value="{{ $lote->loteid }}">{{ $lote->nombre }} &mdash; {{ $lote->cultivo->nombre ?? 'Sin cultivo' }}</option>
+                                        <option value="{{ $lote->loteid }}" data-usuarioid="{{ $lote->usuarioid }}">
+                                            {{ $lote->nombre }} &mdash; {{ $lote->cultivo->nombre ?? 'Sin cultivo' }}
+                                        </option>
                                     @endforeach
                                 </select>
                             </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            @if(!empty($puedeDesignarResponsable))
+                                <div class="form-group">
+                                    <label class="small text-muted">Responsable *</label>
+                                    <select name="usuarioid" id="new-usuarioid" class="form-control form-control-sm" required>
+                                        <option value="">Seleccionar agricultor...</option>
+                                        @foreach($usuarios as $u)
+                                            <option value="{{ $u->usuarioid }}">{{ $u->nombre }} {{ $u->apellido }}</option>
+                                        @endforeach
+                                    </select>
+                                    <small class="text-muted">
+                                        @if(!empty($puedeDesignarResponsable) && !empty($esJefeAgricultorDesignando))
+                                            Asigne un agricultor de su equipo; él recibirá la alerta.
+                                        @else
+                                            El responsable recibirá una alerta en su panel.
+                                        @endif
+                                    </small>
+                                </div>
+                            @else
+                                <input type="hidden" name="usuarioid" value="{{ auth()->user()->usuarioid }}">
+                            @endif
                         </div>
                     </div>
                     <div class="row">
@@ -1105,6 +1131,19 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         aplicarFiltros();
     });
+
+    var newLote = document.getElementById('new-loteid');
+    var newUsuario = document.getElementById('new-usuarioid');
+    var idsResponsablesPermitidos = @json($usuarios->pluck('usuarioid')->map(fn ($id) => (int) $id)->values());
+    if (newLote && newUsuario) {
+        newLote.addEventListener('change', function () {
+            var opt = newLote.options[newLote.selectedIndex];
+            var uid = opt && opt.getAttribute('data-usuarioid');
+            if (uid && !newUsuario.value && idsResponsablesPermitidos.includes(Number(uid))) {
+                newUsuario.value = uid;
+            }
+        });
+    }
 });
 </script>
 @endpush

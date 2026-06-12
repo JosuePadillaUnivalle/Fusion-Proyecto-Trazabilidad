@@ -103,6 +103,53 @@ final class UsuarioRol
         return [];
     }
 
+    /** IDs de usuarios cuyos lotes/actividades ve un jefe agrícola (él + su equipo). */
+    public static function idsUsuariosBajoJefeAgricultor(?Usuario $jefe): array
+    {
+        if (! $jefe || ! self::esJefeAgricultor($jefe)) {
+            return [];
+        }
+
+        $ids = self::idsEmpleadosOperativosDeJefeAgricultor($jefe);
+        $ids[] = (int) $jefe->usuarioid;
+
+        return array_values(array_unique($ids));
+    }
+
+    /** Empleados agrícolas operativos bajo un jefe (sin incluir al jefe). */
+    public static function idsEmpleadosOperativosDeJefeAgricultor(?Usuario $jefe): array
+    {
+        if (! $jefe || ! self::esJefeAgricultor($jefe)) {
+            return [];
+        }
+
+        return Usuario::query()
+            ->where('supervisor_usuarioid', $jefe->usuarioid)
+            ->whereIn('role', self::rolesEmpleadosGestionables($jefe))
+            ->where('activo', true)
+            ->whereDoesntHave('roles', fn (Builder $q) => $q->where('name', 'jefe_agricultor'))
+            ->pluck('usuarioid')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    /** Usuario que puede ejecutar una actividad de campo (no jefe ni admin). */
+    public static function esResponsableActividadPermitido(?Usuario $user): bool
+    {
+        if (! $user || ! $user->activo) {
+            return false;
+        }
+
+        if (self::esAdminGlobal($user) || self::esJefeAgricultor($user)) {
+            return false;
+        }
+
+        $rolColumna = strtolower((string) ($user->role ?? ''));
+
+        return $rolColumna === 'agricultor' || $user->hasRole('agricultor');
+    }
+
     /** Rol operativo que un jefe puede asignar al crear empleados. */
     public static function rolEmpleadoAsignable(?Usuario $jefe): ?string
     {

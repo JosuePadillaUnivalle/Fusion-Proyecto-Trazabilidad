@@ -56,6 +56,7 @@ use App\Http\Controllers\Web\ProcesoPlantaController;
 use App\Http\Controllers\Web\MaquinaPlantaController;
 use App\Http\Controllers\Web\PlantillaTransformacionController;
 use App\Http\Controllers\Web\AsignacionMultipleController;
+use App\Http\Controllers\Web\LogisticaHubController;
 use App\Http\Controllers\Web\RutaMultiEntregaController;
 use App\Http\Controllers\Web\IncidenteEnvioController;
 use App\Http\Controllers\Web\DocumentoEntregaController;
@@ -96,14 +97,17 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/notificaciones/{notificacion}/leer', [DashboardController::class, 'marcarNotificacionLeida'])->name('notificaciones.leer');
+    Route::post('/notificaciones/descartar-todas', [DashboardController::class, 'descartarTodasNotificaciones'])->name('notificaciones.descartar-todas');
     Route::post('/notificaciones/{notificacion}/descartar', [DashboardController::class, 'descartarNotificacion'])->name('notificaciones.descartar');
     Route::get('/dashboard/panel-planta', [DashboardController::class, 'panelPlanta'])->name('dashboard.panel-planta');
     Route::get('/dashboard/panel-transportista', [DashboardController::class, 'panelTransportista'])->name('dashboard.panel-transportista');
-    Route::get('/dashboard/panel-almacen', [DashboardController::class, 'panelAlmacen'])->name('dashboard.panel-almacen');
+    Route::get('/dashboard/panel-agricola', [DashboardController::class, 'panelAgricola'])->name('dashboard.panel-agricola');
+    Route::get('/dashboard/panel-minorista', [DashboardController::class, 'panelMinorista'])->name('dashboard.panel-minorista');
 
     Route::prefix('catalogo-selector')->name('catalogo-selector.')->group(function () {
         Route::get('/usuarios', [CatalogoSelectorController::class, 'usuarios'])->name('usuarios');
         Route::get('/vehiculos', [CatalogoSelectorController::class, 'vehiculos'])->name('vehiculos');
+        Route::get('/rutas-multi', [CatalogoSelectorController::class, 'rutasMulti'])->name('rutas-multi');
         Route::get('/cultivos', [CatalogoSelectorController::class, 'cultivos'])->name('cultivos');
         Route::get('/lotes', [CatalogoSelectorController::class, 'lotes'])->name('lotes');
         Route::get('/insumos', [CatalogoSelectorController::class, 'insumos'])->name('insumos');
@@ -132,7 +136,7 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::get('actividades/{actividad}/edit', [ActividadController::class, 'edit'])->name('actividades.edit')->middleware('action.permission:lotes,update');
     Route::put('actividades/{actividad}', [ActividadController::class, 'update'])->name('actividades.update')->middleware('action.permission:lotes,update');
     Route::delete('actividades/{actividad}', [ActividadController::class, 'destroy'])->name('actividades.destroy')->middleware('action.permission:lotes,update');
-    Route::post('actividades/{actividad}/marcar-realizada', [ActividadController::class, 'marcarRealizada'])->name('actividades.marcar-realizada')->middleware('action.permission:lotes,update');
+    Route::post('actividades/{actividad}/marcar-realizada', [ActividadController::class, 'marcarRealizada'])->name('actividades.marcar-realizada');
     Route::get('climas/datos-tiempo', [ClimaController::class, 'datosTiempo'])->name('climas.datos-tiempo');
     Route::get('climas', [ClimaController::class, 'index'])->name('climas.index');
     Route::get('clima', [ClimaController::class, 'index'])->name('clima.index');
@@ -360,6 +364,11 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::post('pedidos/{pedido}/rechazar', [PedidoDistribucionController::class, 'rechazar'])->name('pedidos.rechazar')->middleware('action.permission:pedidos_distribucion,update');
         Route::post('pedidos/{pedido}/marcar-enviado', [PedidoDistribucionController::class, 'marcarEnviado'])->name('pedidos.marcar-enviado')->middleware('action.permission:pedidos_distribucion,update');
         Route::post('pedidos/{pedido}/confirmar-recepcion', [PedidoDistribucionController::class, 'confirmarRecepcion'])->name('pedidos.confirmar-recepcion')->middleware('action.permission:pedidos_distribucion,update');
+
+        Route::get('rutas-distribucion', [\App\Http\Controllers\Web\RutaDistribucionController::class, 'index'])->name('rutas.index')->middleware('action.permission:pedidos_distribucion,update');
+        Route::get('rutas-distribucion/create', [\App\Http\Controllers\Web\RutaDistribucionController::class, 'create'])->name('rutas.create')->middleware('action.permission:pedidos_distribucion,update');
+        Route::post('rutas-distribucion', [\App\Http\Controllers\Web\RutaDistribucionController::class, 'store'])->name('rutas.store')->middleware('action.permission:pedidos_distribucion,update');
+        Route::get('rutas-distribucion/{ruta}', [\App\Http\Controllers\Web\RutaDistribucionController::class, 'show'])->name('rutas.show')->middleware('action.permission:pedidos_distribucion,read');
     });
 
 
@@ -501,11 +510,21 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     // LOGISTICA OPERATIVA (SISTEMA PLANTA)
     // ==============================
     Route::prefix('logistica')->name('logistica.')->group(function () {
+        Route::get('/mas', [LogisticaHubController::class, 'mas'])
+            ->name('mas');
+        Route::get('/rutas/planificar', [LogisticaHubController::class, 'planificarRutas'])
+            ->name('rutas.planificar')
+            ->middleware('action.permission:rutas_multi,read');
         Route::get('/asignaciones', [AsignacionMultipleController::class, 'index'])
             ->name('asignaciones.index')
             ->middleware('action.permission:asignaciones,read');
+        Route::get('/asignaciones/listado', [AsignacionMultipleController::class, 'listado'])
+            ->name('asignaciones.listado');
         Route::get('/asignaciones/create', [AsignacionMultipleController::class, 'create'])
             ->name('asignaciones.create')
+            ->middleware('action.permission:asignaciones,create');
+        Route::get('/asignaciones/seleccionar-transportista', [AsignacionMultipleController::class, 'seleccionarTransportista'])
+            ->name('asignaciones.seleccionar-transportista')
             ->middleware('action.permission:asignaciones,create');
         Route::post('/asignaciones', [AsignacionMultipleController::class, 'store'])
             ->name('asignaciones.store')
@@ -516,11 +535,31 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::post('/asignaciones/asignar-automatica', [AsignacionMultipleController::class, 'asignarAutomatica'])
             ->name('asignaciones.asignar-automatica')
             ->middleware('action.permission:asignaciones,multiple');
+        Route::get('/asignaciones/{asignacion}', [AsignacionMultipleController::class, 'show'])
+            ->name('asignaciones.show')
+            ->whereNumber('asignacion')
+            ->middleware('action.permission:asignaciones,read');
+        Route::get('/asignaciones/{asignacion}/edit', [AsignacionMultipleController::class, 'edit'])
+            ->name('asignaciones.edit')
+            ->whereNumber('asignacion')
+            ->middleware('action.permission:asignaciones,update');
+        Route::put('/asignaciones/{asignacion}', [AsignacionMultipleController::class, 'update'])
+            ->name('asignaciones.update')
+            ->whereNumber('asignacion')
+            ->middleware('action.permission:asignaciones,update');
+        Route::delete('/asignaciones/{asignacion}', [AsignacionMultipleController::class, 'destroy'])
+            ->name('asignaciones.destroy')
+            ->whereNumber('asignacion')
+            ->middleware('action.permission:asignaciones,delete');
         Route::patch('/asignaciones/{asignacion}/en-transporte', [AsignacionMultipleController::class, 'markEnTransportePlanta'])
             ->name('asignaciones.en-transporte')
-            ->middleware('action.permission:asignaciones,update');
+            ->whereNumber('asignacion');
+        Route::patch('/asignaciones/{asignacion}/llegada-destino', [AsignacionMultipleController::class, 'markLlegadaDestino'])
+            ->name('asignaciones.llegada-destino')
+            ->whereNumber('asignacion');
         Route::patch('/asignaciones/{asignacion}/recepcion', [AsignacionMultipleController::class, 'markDelivered'])
             ->name('asignaciones.mark-delivered')
+            ->whereNumber('asignacion')
             ->middleware('action.permission:asignaciones,create');
 
         Route::get('/rutas-multi', [RutaMultiEntregaController::class, 'index'])
@@ -585,6 +624,9 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::post('/documentos', [DocumentoEntregaController::class, 'store'])
             ->name('documentos.store')
             ->middleware('action.permission:documentos,create');
+        Route::get('/documentos/{documento}/download', [DocumentoEntregaController::class, 'download'])
+            ->name('documentos.download')
+            ->middleware('action.permission:documentos,read');
         Route::get('/documentos/{documento}', [DocumentoEntregaController::class, 'show'])
             ->name('documentos.show')
             ->middleware('action.permission:documentos,read');
@@ -597,9 +639,6 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::delete('/documentos/{documento}', [DocumentoEntregaController::class, 'destroy'])
             ->name('documentos.destroy')
             ->middleware('action.permission:documentos,delete');
-        Route::get('/documentos/{documento}/download', [DocumentoEntregaController::class, 'download'])
-            ->name('documentos.download')
-            ->middleware('action.permission:documentos,read');
     });
 
     // ==============================

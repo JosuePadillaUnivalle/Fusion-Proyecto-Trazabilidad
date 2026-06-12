@@ -265,7 +265,6 @@
                                     <a href="{{ route('lotes.show', $l) }}" class="btn btn-default" title="Ver"><i class="fas fa-eye text-info"></i></a>
                                     @can('lotes.update')
                                     <a href="{{ route('lotes.edit', $l) }}" class="btn btn-default" title="Editar"><i class="fas fa-edit text-warning"></i></a>
-                                    @include('lotes.partials.btn-cambiar-estado', ['lote' => $l])
                                     @endcan
                                     @can('lotes.delete')
                                     <form action="{{ route('lotes.destroy', $l) }}" method="POST" class="d-inline on-submit-confirm">
@@ -321,7 +320,6 @@
                         <a href="{{ route('lotes.show', $l) }}" class="btn btn-default"><i class="fas fa-eye text-info"></i></a>
                         @can('lotes.update')
                         <a href="{{ route('lotes.edit', $l) }}" class="btn btn-default"><i class="fas fa-edit text-warning"></i></a>
-                        @include('lotes.partials.btn-cambiar-estado', ['lote' => $l])
                         @endcan
                         @can('lotes.delete')
                         <form action="{{ route('lotes.destroy', $l) }}" method="POST" class="d-inline on-submit-confirm">

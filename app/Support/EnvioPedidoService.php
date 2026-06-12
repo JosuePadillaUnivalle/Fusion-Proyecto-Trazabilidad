@@ -2,9 +2,12 @@
 
 namespace App\Support;
 
+use App\Models\Almacen;
 use App\Models\EnvioAsignacionMultiple;
 use App\Models\Pedido;
 use App\Models\PerfilTransportista;
+use App\Models\RutaMultiEntrega;
+use App\Models\RutaParada;
 use App\Models\Usuario;
 use App\Models\Vehiculo;
 use InvalidArgumentException;
@@ -167,6 +170,156 @@ final class EnvioPedidoService
         );
     }
 
+    /**
+     * Guarda chofer y vehículo antes de que producción agrícola acepte el pedido.
+     * El envío queda en estado pendiente hasta la aceptación.
+     */
+    public static function programarTransportista(
+        Pedido $pedido,
+        int $transportistaId,
+        int $vehiculoId,
+        int $programadoPorId
+    ): EnvioAsignacionMultiple {
+        $transportista = Usuario::query()
+            ->where('usuarioid', $transportistaId)
+            ->where('role', 'transportista')
+            ->where('activo', true)
+            ->first();
+
+        if (! $transportista) {
+            throw new InvalidArgumentException('El usuario seleccionado no es un transportista activo.');
+        }
+
+        $vehiculo = Vehiculo::query()
+            ->where('vehiculoid', $vehiculoId)
+            ->where('activo', true)
+            ->first();
+
+        if (! $vehiculo) {
+            throw new InvalidArgumentException('El vehículo seleccionado no está disponible.');
+        }
+
+        $envioExistente = EnvioAsignacionMultiple::query()
+            ->where(function ($q) use ($pedido) {
+                $q->where('pedidoid', $pedido->pedidoid)
+                    ->orWhere('externo_envio_id', $pedido->numero_solicitud);
+            })
+            ->first();
+
+        return EnvioAsignacionMultiple::updateOrCreate(
+            ['externo_envio_id' => $pedido->numero_solicitud],
+            EnvioAsignacionEstadoCatalogo::applyToAttributes([
+                'pedidoid' => $pedido->pedidoid,
+                'transportista_usuarioid' => $transportista->usuarioid,
+                'asignadopor_usuarioid' => $programadoPorId,
+                'vehiculo_ref' => $vehiculo->placa,
+                'estado' => 'pendiente',
+                'fecha_asignacion' => $envioExistente?->fecha_asignacion ?? now(),
+            ])
+        );
+    }
+
+    /**
+     * Crea ruta multientrega cuando hay varios puntos de recogida antes de la planta.
+     *
+     * @param  array<int, array{latitud: float|int|string, longitud: float|int|string, direccion?: string|null}>  $recogidasExtra
+     */
+    public static function crearRutaRecogidasMultiples(
+        Pedido $pedido,
+        EnvioAsignacionMultiple $envio,
+        array $recogidasExtra,
+        ?int $transportistaId,
+        int $creadoPorId
+    ): ?RutaMultiEntrega {
+        if ($recogidasExtra === []) {
+            return null;
+        }
+
+        $ruta = RutaMultiEntrega::create([
+            'nombre' => 'Recogidas '.$pedido->numero_solicitud,
+            'creadopor_usuarioid' => $creadoPorId,
+            'transportista_usuarioid' => $transportistaId,
+            'fecha_salida' => $pedido->fechaEntregaDeseada ?? now(),
+            'estado' => 'planificada',
+        ]);
+
+        $orden = 1;
+
+        RutaParada::create([
+            'rutamultientregaid' => $ruta->rutamultientregaid,
+            'orden' => $orden++,
+            'destino' => 'Recogida: '.($pedido->origen_direccion ?: 'Almacén agrícola 1'),
+            'pedidoid' => $pedido->pedidoid,
+            'externo_envio_id' => $pedido->numero_solicitud,
+            'latitud' => $pedido->origen_latitud,
+            'longitud' => $pedido->origen_longitud,
+            'estado' => 'pendiente',
+        ]);
+
+        foreach ($recogidasExtra as $idx => $recogida) {
+            RutaParada::create([
+                'rutamultientregaid' => $ruta->rutamultientregaid,
+                'orden' => $orden++,
+                'destino' => 'Recogida: '.($recogida['direccion'] ?? 'Almacén agrícola '.($idx + 2)),
+                'pedidoid' => $pedido->pedidoid,
+                'externo_envio_id' => $pedido->numero_solicitud,
+                'latitud' => (float) $recogida['latitud'],
+                'longitud' => (float) $recogida['longitud'],
+                'estado' => 'pendiente',
+            ]);
+        }
+
+        RutaParada::create([
+            'rutamultientregaid' => $ruta->rutamultientregaid,
+            'orden' => $orden,
+            'destino' => 'Entrega: '.($pedido->direccion_texto ?: 'Almacén de planta'),
+            'pedidoid' => $pedido->pedidoid,
+            'externo_envio_id' => $pedido->numero_solicitud,
+            'latitud' => $pedido->latitud,
+            'longitud' => $pedido->longitud,
+            'estado' => 'pendiente',
+        ]);
+
+        $ruta->load('paradas');
+        $geo = app(RutaPorCallesService::class)->rutaDesdeParadas($ruta->paradas);
+        if ($geo) {
+            $ruta->update(['rutageojson' => json_encode($geo)]);
+        }
+
+        $envio->update(['rutamultientregaid' => $ruta->rutamultientregaid]);
+
+        return $ruta;
+    }
+
+    /** Activa el chofer programado cuando el pedido ya fue aceptado por producción agrícola. */
+    public static function activarTransportistaProgramado(Pedido $pedido): void
+    {
+        if (! PedidoCatalogo::listoParaLogistica($pedido)) {
+            return;
+        }
+
+        $envio = EnvioAsignacionMultiple::query()
+            ->where(function ($q) use ($pedido) {
+                $q->where('pedidoid', $pedido->pedidoid)
+                    ->orWhere('externo_envio_id', $pedido->numero_solicitud);
+            })
+            ->first();
+
+        if (! $envio?->transportista_usuarioid) {
+            return;
+        }
+
+        $estado = strtolower(trim((string) ($envio->estado ?? '')));
+        if (in_array($estado, ['en_transporte_planta', 'en_ruta', 'en_transito', 'recibido_planta', 'entregado', 'entregada', 'asignado', 'asignada'], true)) {
+            return;
+        }
+
+        $envio->update(EnvioAsignacionEstadoCatalogo::applyToAttributes([
+            'estado' => 'asignado',
+            'fecha_asignacion' => $envio->fecha_asignacion ?? now(),
+        ]));
+    }
+
     public static function confirmarCargaHaciaPlanta(EnvioAsignacionMultiple $envio): void
     {
         if (! $envio->transportista_usuarioid) {
@@ -191,5 +344,453 @@ final class EnvioPedidoService
             'estado' => 'en_transporte_planta',
             'fecha_asignacion' => $envio->fecha_asignacion ?? now(),
         ]));
+    }
+
+    /**
+     * @return array{recogidas: array<int, string>, destino: ?string}|null
+     */
+    public static function trayectoPartesPedido(Pedido $pedido): ?array
+    {
+        $envio = $pedido->envioAsignacion;
+        if ($envio !== null) {
+            $envio->loadMissing(['ruta.paradas', 'pedido']);
+            $envio->setRelation('pedido', $pedido);
+
+            return self::trayectoPartes($envio);
+        }
+
+        $origen = self::etiquetaOrigenPedido($pedido);
+        $destino = self::etiquetaDestinoPedido($pedido);
+
+        if ($origen === null && $destino === null) {
+            return null;
+        }
+
+        return [
+            'recogidas' => $origen !== null ? [$origen] : [],
+            'destino' => $destino,
+        ];
+    }
+
+    /**
+     * @return array{recogidas: array<int, string>, destino: ?string}|null
+     */
+    public static function trayectoPartes(EnvioAsignacionMultiple $envio): ?array
+    {
+        $envio->loadMissing(['ruta.paradas', 'pedido']);
+        $pedido = $envio->pedido;
+        $ruta = $envio->ruta;
+
+        if ($ruta?->paradas?->isNotEmpty()) {
+            $paradas = $ruta->paradas->sortBy('orden')->values();
+            $recogidas = $paradas
+                ->filter(fn (RutaParada $p) => str_starts_with((string) $p->destino, 'Recogida:'))
+                ->map(fn (RutaParada $p) => self::etiquetaParada($p->destino, 'Recogida:'))
+                ->filter(fn (string $n) => $n !== '—')
+                ->values()
+                ->all();
+            $entrega = $paradas->first(fn (RutaParada $p) => str_starts_with((string) $p->destino, 'Entrega:'));
+            $destino = $entrega
+                ? self::etiquetaParada($entrega->destino, 'Entrega:')
+                : self::etiquetaDestinoPedido($pedido);
+
+            if ($destino === '—') {
+                $destino = null;
+            }
+
+            if ($recogidas !== [] || $destino !== null) {
+                return ['recogidas' => $recogidas, 'destino' => $destino];
+            }
+        }
+
+        $origen = self::etiquetaOrigenPedido($pedido);
+        $destino = self::etiquetaDestinoPedido($pedido);
+
+        if ($origen === null && $destino === null) {
+            return null;
+        }
+
+        return [
+            'recogidas' => $origen !== null ? [$origen] : [],
+            'destino' => $destino,
+        ];
+    }
+
+    public static function trayectoTexto(EnvioAsignacionMultiple $envio): ?string
+    {
+        $partes = self::trayectoPartes($envio);
+
+        if ($partes === null) {
+            return null;
+        }
+
+        $recogidas = $partes['recogidas'];
+        $destino = $partes['destino'];
+
+        if ($recogidas === [] && $destino === null) {
+            return null;
+        }
+
+        if ($recogidas === []) {
+            return $destino;
+        }
+
+        if ($destino === null) {
+            return count($recogidas) === 1
+                ? $recogidas[0]
+                : implode(' → ', $recogidas);
+        }
+
+        $textoRecogidas = count($recogidas) === 1
+            ? $recogidas[0]
+            : implode(' → ', $recogidas);
+
+        return $textoRecogidas.' a '.$destino;
+    }
+
+    /**
+     * @return array<int, array{lat: float, lng: float, orden: int, label: string}>
+     */
+    public static function paradasMapaEnvio(EnvioAsignacionMultiple $envio): array
+    {
+        $envio->loadMissing(['ruta.paradas', 'pedido']);
+
+        if ($envio->ruta?->paradas?->isNotEmpty()) {
+            $puntos = app(RutaPorCallesService::class)->paradasConCoordenadas($envio->ruta->paradas);
+
+            return array_values(array_map(fn (array $p) => [
+                'lat' => $p['lat'],
+                'lng' => $p['lng'],
+                'orden' => (int) ($p['orden'] ?? 0),
+                'label' => self::etiquetaMapaParada($p['label'] ?? 'Parada'),
+            ], $puntos));
+        }
+
+        $pedido = $envio->pedido;
+        if ($pedido === null) {
+            return [];
+        }
+
+        $puntos = [];
+        if ($pedido->origen_latitud !== null && $pedido->origen_longitud !== null) {
+            $puntos[] = [
+                'lat' => (float) $pedido->origen_latitud,
+                'lng' => (float) $pedido->origen_longitud,
+                'orden' => 1,
+                'label' => self::etiquetaOrigenPedido($pedido) ?? 'Origen',
+            ];
+        }
+        if ($pedido->latitud !== null && $pedido->longitud !== null) {
+            $puntos[] = [
+                'lat' => (float) $pedido->latitud,
+                'lng' => (float) $pedido->longitud,
+                'orden' => count($puntos) + 1,
+                'label' => self::etiquetaDestinoPedido($pedido) ?? 'Destino',
+            ];
+        }
+
+        return $puntos;
+    }
+
+    private static function etiquetaMapaParada(string $label): string
+    {
+        if (str_starts_with($label, 'Recogida:')) {
+            return self::etiquetaParada($label, 'Recogida:');
+        }
+
+        if (str_starts_with($label, 'Entrega:')) {
+            return self::etiquetaParada($label, 'Entrega:');
+        }
+
+        return self::nombreUbicacionLimpio($label) ?? $label;
+    }
+
+    private static function etiquetaParada(?string $destino, string $prefijo): string
+    {
+        $texto = trim((string) $destino);
+        if (str_starts_with($texto, $prefijo)) {
+            $texto = trim(substr($texto, strlen($prefijo)));
+        }
+
+        return self::nombreUbicacionLimpio($texto) ?? '—';
+    }
+
+    private static function etiquetaOrigenPedido(?Pedido $pedido): ?string
+    {
+        if ($pedido === null) {
+            return null;
+        }
+
+        $nombre = self::nombreUbicacionLimpio($pedido->origen_direccion);
+        if ($nombre !== null) {
+            return $nombre;
+        }
+
+        $nombre = self::resolverNombreAlmacenPorCoordenadas(
+            $pedido->origen_latitud !== null ? (float) $pedido->origen_latitud : null,
+            $pedido->origen_longitud !== null ? (float) $pedido->origen_longitud : null,
+            'agricola'
+        );
+        if ($nombre !== null) {
+            return $nombre;
+        }
+
+        if ($pedido->origen_latitud !== null && $pedido->origen_longitud !== null) {
+            return 'Almacén agrícola';
+        }
+
+        return null;
+    }
+
+    private static function etiquetaDestinoPedido(?Pedido $pedido): ?string
+    {
+        if ($pedido === null) {
+            return null;
+        }
+
+        $texto = $pedido->direccion_texto ?? $pedido->nombre_planta;
+        $nombre = self::nombreUbicacionLimpio($texto);
+        if ($nombre !== null) {
+            return $nombre;
+        }
+
+        $nombre = self::resolverNombreAlmacenPorCoordenadas(
+            $pedido->latitud !== null ? (float) $pedido->latitud : null,
+            $pedido->longitud !== null ? (float) $pedido->longitud : null,
+            'planta'
+        );
+        if ($nombre !== null) {
+            return $nombre;
+        }
+
+        if ($pedido->latitud !== null && $pedido->longitud !== null) {
+            return 'Almacén de planta';
+        }
+
+        return null;
+    }
+
+    public static function etiquetaPlantaDestinoPedido(Pedido $pedido): ?string
+    {
+        return self::etiquetaDestinoPedido($pedido);
+    }
+
+    /** Nombre corto de planta destino para tablas (solo almacén, sin dirección larga). */
+    public static function etiquetaPlantaDestinoLista(Pedido $pedido): ?string
+    {
+        if ($pedido->nombre_planta) {
+            $nombre = self::nombreUbicacionLimpio($pedido->nombre_planta);
+
+            return $nombre ? self::extraerNombreAlmacen($nombre) : trim($pedido->nombre_planta);
+        }
+
+        return self::etiquetaUbicacionLista(
+            $pedido->direccion_texto,
+            $pedido->latitud !== null ? (float) $pedido->latitud : null,
+            $pedido->longitud !== null ? (float) $pedido->longitud : null,
+            'planta'
+        );
+    }
+
+    /**
+     * @return array{recogidas: array<int, string>, destino: ?string}|null
+     */
+    public static function trayectoPartesListaPedido(Pedido $pedido): ?array
+    {
+        $partes = self::trayectoPartesPedido($pedido);
+        if ($partes === null) {
+            return null;
+        }
+
+        $recogidas = array_values(array_filter(array_map(
+            fn (string $rec) => self::acortarEtiquetaLista($rec),
+            $partes['recogidas']
+        )));
+
+        $destino = self::etiquetaPlantaDestinoLista($pedido)
+            ?? self::acortarEtiquetaLista($partes['destino'] ?? null);
+
+        if ($recogidas === [] && $destino === null) {
+            return null;
+        }
+
+        return [
+            'recogidas' => $recogidas,
+            'destino' => $destino,
+        ];
+    }
+
+    private static function resolverNombreAlmacenPorCoordenadas(?float $lat, ?float $lng, ?string $ambito = null): ?string
+    {
+        $almacen = self::buscarAlmacenPorCoordenadas($lat, $lng, $ambito);
+
+        return $almacen ? self::referenciaUbicacionAlmacen($almacen) : null;
+    }
+
+    private static function buscarAlmacenPorCoordenadas(?float $lat, ?float $lng, ?string $ambito = null): ?Almacen
+    {
+        if ($lat === null || $lng === null) {
+            return null;
+        }
+
+        $mejor = null;
+        $mejorDistancia = PHP_FLOAT_MAX;
+        $tolerancia = 0.008;
+
+        $query = Almacen::query()->where('activo', true);
+        if ($ambito !== null && $ambito !== '') {
+            $query->where('ambito', $ambito);
+        }
+
+        foreach ($query->get() as $almacen) {
+            $coords = UbicacionGpsParser::fromTexto($almacen->ubicacion);
+            if ($coords === null) {
+                continue;
+            }
+
+            $distancia = hypot($coords['lat'] - $lat, $coords['lng'] - $lng);
+            if ($distancia <= $tolerancia && $distancia < $mejorDistancia) {
+                $mejorDistancia = $distancia;
+                $mejor = $almacen;
+            }
+        }
+
+        return $mejor;
+    }
+
+    private static function etiquetaUbicacionLista(?string $texto, ?float $lat, ?float $lng, ?string $ambito): ?string
+    {
+        $limpio = self::nombreUbicacionLimpio($texto);
+        if ($limpio !== null && self::esEtiquetaCortaAlmacen($limpio)) {
+            return self::extraerNombreAlmacen($limpio);
+        }
+
+        $almacen = self::buscarAlmacenPorCoordenadas($lat, $lng, $ambito);
+        if ($almacen !== null) {
+            $nombre = trim((string) $almacen->nombre);
+
+            return $nombre !== '' ? $nombre : null;
+        }
+
+        if ($texto !== null && str_contains($texto, '·')) {
+            $parte = trim(explode('·', $texto, 2)[0]);
+
+            return self::extraerNombreAlmacen($parte);
+        }
+
+        if ($limpio !== null) {
+            return self::extraerNombreAlmacen($limpio);
+        }
+
+        if ($lat !== null && $lng !== null) {
+            return $ambito === 'planta' ? 'Almacén de planta' : 'Almacén agrícola';
+        }
+
+        return null;
+    }
+
+    private static function acortarEtiquetaLista(?string $texto): ?string
+    {
+        if ($texto === null || trim($texto) === '') {
+            return null;
+        }
+
+        $texto = trim($texto);
+        if (self::esEtiquetaCortaAlmacen($texto)) {
+            return self::extraerNombreAlmacen($texto);
+        }
+
+        if (str_contains($texto, ' — ') || str_contains($texto, '·')) {
+            return self::extraerNombreAlmacen($texto);
+        }
+
+        if (preg_match('/^(Almac[eé]n|Almacen)\s+/iu', $texto)) {
+            $segmento = trim(explode(',', $texto, 2)[0]);
+
+            return $segmento !== '' ? $segmento : $texto;
+        }
+
+        return $texto;
+    }
+
+    private static function esEtiquetaCortaAlmacen(string $texto): bool
+    {
+        if (preg_match('/^(Av\.|Avenida|Calle|Km|Carretera|GPS)/iu', $texto)) {
+            return false;
+        }
+
+        return mb_strlen($texto) <= 48;
+    }
+
+    private static function extraerNombreAlmacen(string $texto): string
+    {
+        if (str_contains($texto, ' — ')) {
+            return trim(explode(' — ', $texto, 2)[0]);
+        }
+
+        if (str_contains($texto, '·')) {
+            return trim(explode('·', $texto, 2)[0]);
+        }
+
+        if (str_contains($texto, ',')) {
+            return trim(explode(',', $texto, 2)[0]);
+        }
+
+        return trim($texto);
+    }
+
+    private static function referenciaUbicacionAlmacen(Almacen $almacen): string
+    {
+        $nombre = trim((string) $almacen->nombre);
+        $resuelto = UbicacionGpsParser::resolverAlmacen(
+            (int) $almacen->almacenid,
+            $almacen->nombre,
+            $almacen->ubicacion
+        );
+        $calle = self::nombreUbicacionLimpio($resuelto['direccion']);
+
+        if ($calle === null && str_contains((string) $resuelto['direccion'], '·')) {
+            $partes = explode('·', (string) $resuelto['direccion'], 2);
+            $calle = self::nombreUbicacionLimpio(trim($partes[1] ?? ''));
+        }
+
+        if ($calle !== null && $nombre !== '' && ! str_contains(mb_strtolower($calle), mb_strtolower($nombre))) {
+            return "{$nombre} — {$calle}";
+        }
+
+        if ($calle !== null) {
+            return $calle;
+        }
+
+        return $nombre !== '' ? $nombre : 'Ubicación registrada';
+    }
+
+    private static function nombreUbicacionLimpio(?string $texto): ?string
+    {
+        if ($texto === null) {
+            return null;
+        }
+
+        $texto = trim($texto);
+        if ($texto === '') {
+            return null;
+        }
+
+        if (str_contains($texto, '·')) {
+            $nombre = trim(explode('·', $texto, 2)[0]);
+            if ($nombre !== '') {
+                return $nombre;
+            }
+        }
+
+        if (preg_match('/^GPS\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?/i', $texto)) {
+            return null;
+        }
+
+        $sinGps = preg_replace('/\s*·\s*GPS\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?/i', '', $texto);
+        $sinGps = preg_replace('/\s*GPS\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?/i', '', (string) $sinGps);
+        $sinGps = trim((string) $sinGps, " ·");
+
+        return $sinGps !== '' ? $sinGps : null;
     }
 }

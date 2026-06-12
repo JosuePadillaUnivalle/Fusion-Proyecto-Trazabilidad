@@ -1,426 +1,418 @@
 @php
-
     $campos = $guias['campos'] ?? [];
-
     $esEdicion = isset($almacen);
-
     $ubicacionValor = old('ubicacion', $almacen->ubicacion ?? '');
-
     $nombreValor = old('nombre', $almacen->nombre ?? '');
-
     $descValor = old('descripcion', $almacen->descripcion ?? '');
-
     $capValor = old('capacidad', $almacen->capacidad ?? '');
-
+    $coordsInicial = \App\Support\UbicacionGpsParser::fromTexto($ubicacionValor);
+    $tieneGps = $coordsInicial !== null;
 @endphp
 
-
-
 @if($errors->any())
-
     <div class="alert alert-danger">
-
         <strong>No se pudo guardar:</strong>
-
         <ul class="mb-0 mt-2">
-
             @foreach($errors->all() as $error)
-
                 <li>{{ $error }}</li>
-
             @endforeach
-
         </ul>
-
     </div>
-
 @endif
 
-
-
 @push('styles')
-
 <style>
-
 .page-almacen-form .form-card {
-
     border: none;
-
     border-radius: 12px;
-
     box-shadow: 0 2px 14px rgba(0,0,0,.08);
-
 }
-
 .page-almacen-form .form-card .card-header {
-
     background: linear-gradient(135deg, #2c5530, #4a7c59);
-
     color: #fff;
-
     border-radius: 12px 12px 0 0 !important;
-
     padding: 1.1rem 1.25rem;
-
 }
-
 .page-almacen-form .guia-campo {
-
     background: #f8fbf8;
-
     border-left: 3px solid #2c5530;
-
     border-radius: 0 8px 8px 0;
-
     padding: 0.55rem 0.8rem;
-
     margin-top: 0.4rem;
-
     font-size: 0.84rem;
-
     color: #495057;
-
 }
-
 .page-almacen-form .form-control {
-
     border-radius: 8px;
-
     border: 2px solid #dee2e6;
-
     min-height: 44px;
-
 }
-
 .page-almacen-form .form-control:focus {
-
     border-color: #2c5530;
-
     box-shadow: 0 0 0 0.15rem rgba(44,85,48,.15);
-
 }
-
 .page-almacen-form .capacidad-addon {
-
     background: #e8f5e9;
-
     color: #2c5530;
-
     font-weight: 600;
-
     border: 2px solid #dee2e6;
-
     border-left: none;
-
 }
 
-#mapaAlmacenUbicacion { height: 320px; border-radius: 8px; }
-
+/* Panel ubicación + mapa inline */
+.alm-ubicacion-panel {
+    border: 1px solid #d1e7d4;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 4px 18px rgba(44, 85, 48, .07);
+    margin-bottom: 1.25rem;
+}
+.alm-ubicacion-panel__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .65rem;
+    padding: .85rem 1.1rem;
+    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 55%, #fff 100%);
+    border-bottom: 1px solid #d1e7d4;
+}
+.alm-ubicacion-panel__titulo {
+    font-size: .95rem;
+    font-weight: 700;
+    color: #14532d;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+.alm-ubicacion-panel__titulo i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+    color: #fff;
+    font-size: .8rem;
+}
+.alm-ubicacion-panel__hint {
+    font-size: .78rem;
+    color: #64748b;
+    margin: 0;
+}
+.alm-ubicacion-panel__mapa-wrap {
+    position: relative;
+    padding: .65rem .65rem 0;
+    background: #f8faf9;
+}
+#mapaAlmacenUbicacion {
+    height: 360px;
+    width: 100%;
+    border-radius: 12px;
+    border: 2px solid #d1e7d4;
+    background: #e8eef4;
+    z-index: 1;
+}
+.alm-ubicacion-panel__mapa-badge {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 500;
+    background: rgba(255,255,255,.94);
+    backdrop-filter: blur(4px);
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: .35rem .65rem;
+    font-size: .72rem;
+    font-weight: 600;
+    color: #475569;
+    box-shadow: 0 2px 8px rgba(15,23,42,.1);
+    pointer-events: none;
+}
+.alm-ubicacion-panel__mapa-badge i { color: #16a34a; }
+.alm-ubicacion-panel__coords {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+    padding: .75rem 1.1rem;
+    background: #fafbfc;
+    border-top: 1px solid #e8edf2;
+    border-bottom: 1px solid #e8edf2;
+}
+.alm-ubicacion-coord-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-family: ui-monospace, 'Cascadia Code', monospace;
+    font-size: .78rem;
+    font-weight: 700;
+    color: #15803d;
+    background: #ecfdf5;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: .35rem .7rem;
+    min-height: 34px;
+}
+.alm-ubicacion-coord-chip.is-empty {
+    color: #94a3b8;
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    font-weight: 600;
+    font-family: inherit;
+}
+.alm-ubicacion-coord-chip i { font-size: .75rem; }
+.alm-ubicacion-panel__coords .btn-centrar {
+    border-radius: 8px;
+    font-size: .78rem;
+    font-weight: 600;
+    padding: .35rem .75rem;
+    border-color: #cbd5e1;
+    color: #475569;
+}
+.alm-ubicacion-panel__coords .btn-centrar:hover {
+    border-color: #16a34a;
+    color: #15803d;
+    background: #f0fdf4;
+}
+.alm-ubicacion-panel__body {
+    padding: 1rem 1.1rem 1.1rem;
+}
+.alm-ubicacion-panel__body label {
+    font-size: .82rem;
+    font-weight: 600;
+    color: #334155;
+}
 </style>
-
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
 @endpush
-
-
 
 <div class="page-almacen-form">
-
     <div class="alert alert-light border mb-3">
-
         <i class="fas fa-warehouse text-success mr-1"></i>
-
         Registrá el depósito con su <strong>ubicación en mapa</strong> (clic en el mapa) y capacidad en <strong>kilogramos</strong>.
-
         @if(($ambito ?? '') === \App\Support\AlmacenAmbito::AGRICOLA)
-
             Las cosechas que envíes aquí se verán en <strong>Movimientos</strong> y descontarán espacio disponible.
-
         @endif
-
     </div>
 
-
-
     <div class="form-group">
-
         <label for="nombre">Nombre <span class="text-danger">*</span></label>
-
         <input type="text" name="nombre" id="nombre" class="form-control @error('nombre') is-invalid @enderror"
-
                maxlength="100" value="{{ $nombreValor }}" required placeholder="Ej: Almacén Norte">
-
         @if(!empty($campos['nombre']))<div class="guia-campo">{{ $campos['nombre'] }}</div>@endif
-
         @error('nombre')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-
     </div>
 
-
-
     <div class="form-group">
-
         <label for="descripcion">Descripción <span class="text-muted font-weight-normal">(opcional)</span></label>
-
         <input type="text" name="descripcion" id="descripcion" class="form-control @error('descripcion') is-invalid @enderror"
-
                maxlength="250" value="{{ $descValor }}" placeholder="Ej: Cámara para producto fresco">
-
         @if(!empty($campos['descripcion']))<div class="guia-campo">{{ $campos['descripcion'] }}</div>@endif
-
         @error('descripcion')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-
     </div>
 
-
-
-    <div class="form-group">
-
-        <label for="ubicacion">Ubicación</label>
-
-        <div class="input-group">
-
-            <div class="input-group-prepend">
-
-                <span class="input-group-text"><i class="fas fa-map-marker-alt"></i></span>
-
+    {{-- Ubicación con mapa inline --}}
+    <div class="alm-ubicacion-panel">
+        <div class="alm-ubicacion-panel__head">
+            <div>
+                <h4 class="alm-ubicacion-panel__titulo">
+                    <i class="fas fa-map-marked-alt"></i> Ubicación en mapa
+                </h4>
+                <p class="alm-ubicacion-panel__hint mb-0 mt-1">
+                    Hacé clic en el mapa para marcar el punto. Podés arrastrar el marcador para ajustar.
+                </p>
             </div>
-
-            <input type="text" name="ubicacion" id="ubicacion" class="form-control @error('ubicacion') is-invalid @enderror"
-
-                   maxlength="200" value="{{ $ubicacionValor }}" placeholder="Dirección o referencia física">
-
-            <div class="input-group-append">
-
-                <button type="button" id="btn-abrir-mapa-ubicacion" class="btn btn-outline-success">
-
-                    <i class="fas fa-map mr-1"></i>Buscar ubicación
-
-                </button>
-
-            </div>
-
         </div>
 
-        @if(!empty($campos['ubicacion']))<div class="guia-campo">{{ $campos['ubicacion'] }}</div>@endif
+        <div class="alm-ubicacion-panel__mapa-wrap">
+            <span class="alm-ubicacion-panel__mapa-badge">
+                <i class="fas fa-hand-pointer mr-1"></i> Clic para ubicar
+            </span>
+            <div id="mapaAlmacenUbicacion"></div>
+        </div>
 
-        <small id="ubicacion_detalle_hint" class="text-muted d-block mt-1">
+        <div class="alm-ubicacion-panel__coords">
+            <span id="coord_chip" class="alm-ubicacion-coord-chip {{ $tieneGps ? '' : 'is-empty' }}">
+                <i class="fas fa-crosshairs"></i>
+                <span id="coord_chip_text">
+                    @if($tieneGps)
+                        GPS {{ number_format($coordsInicial['lat'], 5) }}, {{ number_format($coordsInicial['lng'], 5) }}
+                    @else
+                        Sin punto marcado
+                    @endif
+                </span>
+            </span>
+            <button type="button" id="btn-centrar-scz" class="btn btn-outline-secondary btn-centrar ml-auto">
+                <i class="fas fa-location-arrow mr-1"></i> Centrar en Santa Cruz
+            </button>
+        </div>
 
-            Usá <strong>Buscar ubicación</strong> para abrir el mapa y marcar el punto con un clic.
-
-        </small>
-
-        @error('ubicacion')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-
+        <div class="alm-ubicacion-panel__body">
+            <label for="ubicacion">Dirección o referencia</label>
+            <div class="input-group">
+                <div class="input-group-prepend">
+                    <span class="input-group-text"><i class="fas fa-map-marker-alt text-success"></i></span>
+                </div>
+                <input type="text" name="ubicacion" id="ubicacion" class="form-control @error('ubicacion') is-invalid @enderror"
+                       maxlength="200" value="{{ $ubicacionValor }}" placeholder="Dirección, referencia o coordenadas GPS">
+            </div>
+            @if(!empty($campos['ubicacion']))<div class="guia-campo">{{ $campos['ubicacion'] }}</div>@endif
+            <small id="ubicacion_detalle_hint" class="text-muted d-block mt-2">
+                @if($tieneGps)
+                    Ubicación GPS fijada desde el mapa. Podés editar el texto si necesitás agregar una referencia.
+                @else
+                    El mapa guardará las coordenadas automáticamente al marcar el punto.
+                @endif
+            </small>
+            @error('ubicacion')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+        </div>
     </div>
 
-
-
-    <div class="form-group">
-
+    <div class="form-group mb-0">
         <label for="capacidad">Capacidad máxima (kg)</label>
-
         <div class="input-group">
-
             <input type="number" step="0.01" min="0" name="capacidad" id="capacidad"
-
                    class="form-control @error('capacidad') is-invalid @enderror"
-
                    value="{{ $capValor }}" placeholder="Ej: 50000">
-
             <div class="input-group-append">
-
                 <span class="input-group-text capacidad-addon">kg</span>
-
             </div>
-
         </div>
-
         @if(!empty($campos['capacidad']))<div class="guia-campo">{{ $campos['capacidad'] }}</div>@endif
-
         @error('capacidad')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-
     </div>
-
 </div>
-
-
-
-<div class="modal fade" id="modalMapaAlmacen" tabindex="-1">
-
-    <div class="modal-dialog modal-lg">
-
-        <div class="modal-content">
-
-            <div class="modal-header bg-success text-white py-2">
-
-                <h5 class="modal-title"><i class="fas fa-map mr-1"></i> Ubicación del almacén</h5>
-
-                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
-
-            </div>
-
-            <div class="modal-body p-2">
-
-                <p class="small text-muted mb-2 px-1">Hacé clic en el mapa para marcar el punto. Podés arrastrar el marcador.</p>
-
-                <div id="mapaAlmacenUbicacion"></div>
-
-            </div>
-
-            <div class="modal-footer py-2">
-
-                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cerrar</button>
-
-                <button type="button" class="btn btn-success btn-sm" id="btnConfirmarMapaAlmacen">Usar esta ubicación</button>
-
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
-
-
 
 @push('scripts')
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-
 $(function () {
-
     const inputUbic = document.getElementById('ubicacion');
-
     const hint = document.getElementById('ubicacion_detalle_hint');
+    const coordChip = document.getElementById('coord_chip');
+    const coordChipText = document.getElementById('coord_chip_text');
+    const DEFAULT_LAT = -17.7833;
+    const DEFAULT_LNG = -63.1821;
 
+    let latActual = DEFAULT_LAT;
+    let lngActual = DEFAULT_LNG;
     let mapaAlmacen = null;
-
     let marcadorAlmacen = null;
 
-    let latPendiente = -17.7833;
-
-    let lngPendiente = -63.1821;
-
-
-
-    const coordsInicial = @json(\App\Support\UbicacionGpsParser::fromTexto($ubicacionValor));
-
+    const coordsInicial = @json($coordsInicial);
     if (coordsInicial) {
-
-        latPendiente = coordsInicial.lat;
-
-        lngPendiente = coordsInicial.lng;
-
+        latActual = coordsInicial.lat;
+        lngActual = coordsInicial.lng;
     }
 
+    function formatoGps(lat, lng) {
+        return 'GPS ' + Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5);
+    }
 
+    function actualizarChip(lat, lng) {
+        if (!coordChip || !coordChipText) return;
+        coordChip.classList.remove('is-empty');
+        coordChipText.textContent = formatoGps(lat, lng);
+    }
+
+    function actualizarCampo(lat, lng) {
+        latActual = lat;
+        lngActual = lng;
+        if (inputUbic) {
+            inputUbic.value = formatoGps(lat, lng);
+        }
+        actualizarChip(lat, lng);
+        if (hint) {
+            hint.textContent = 'Ubicación GPS fijada desde el mapa. Podés editar el texto si necesitás agregar una referencia.';
+        }
+    }
+
+    function colocarMarcador(lat, lng, actualizarInput) {
+        latActual = lat;
+        lngActual = lng;
+        if (!mapaAlmacen) return;
+
+        if (marcadorAlmacen) {
+            mapaAlmacen.removeLayer(marcadorAlmacen);
+        }
+        marcadorAlmacen = L.marker([lat, lng], { draggable: true }).addTo(mapaAlmacen);
+        marcadorAlmacen.on('dragend', function (e) {
+            const p = e.target.getLatLng();
+            actualizarCampo(p.lat, p.lng);
+        });
+
+        if (actualizarInput !== false) {
+            actualizarCampo(lat, lng);
+        }
+    }
+
+    function parseGpsDesdeTexto(texto) {
+        const t = (texto || '').trim();
+        if (!t) return null;
+        let m = t.match(/GPS\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/i);
+        if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+        m = t.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+        if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+        return null;
+    }
 
     function initMapaAlmacen() {
-
         if (mapaAlmacen) {
-
             mapaAlmacen.invalidateSize();
-
             return;
-
         }
 
-        mapaAlmacen = L.map('mapaAlmacenUbicacion').setView([latPendiente, lngPendiente], 13);
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapaAlmacen);
-
-
-
-        function colocarMarcador(lat, lng) {
-
-            latPendiente = lat;
-
-            lngPendiente = lng;
-
-            if (marcadorAlmacen) mapaAlmacen.removeLayer(marcadorAlmacen);
-
-            marcadorAlmacen = L.marker([lat, lng], { draggable: true }).addTo(mapaAlmacen);
-
-            marcadorAlmacen.on('dragend', function (e) {
-
-                const p = e.target.getLatLng();
-
-                latPendiente = p.lat;
-
-                lngPendiente = p.lng;
-
-            });
-
-        }
-
-
+        mapaAlmacen = L.map('mapaAlmacenUbicacion').setView([latActual, lngActual], coordsInicial ? 14 : 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(mapaAlmacen);
 
         mapaAlmacen.on('click', function (e) {
-
-            colocarMarcador(e.latlng.lat, e.latlng.lng);
-
+            colocarMarcador(e.latlng.lat, e.latlng.lng, true);
         });
 
-
-
-        colocarMarcador(latPendiente, lngPendiente);
-
+        if (coordsInicial) {
+            colocarMarcador(latActual, lngActual, false);
+        }
     }
 
-
-
-    $('#btn-abrir-mapa-ubicacion').on('click', function () {
-
-        $('#modalMapaAlmacen').modal('show');
-
-    });
-
-
-
-    $('#modalMapaAlmacen').on('shown.bs.modal', function () {
-
-        setTimeout(initMapaAlmacen, 200);
-
-    });
-
-
-
-    $('#btnConfirmarMapaAlmacen').on('click', function () {
-
-        if (inputUbic) {
-
-            inputUbic.value = 'GPS ' + Number(latPendiente).toFixed(5) + ', ' + Number(lngPendiente).toFixed(5);
-
+    setTimeout(initMapaAlmacen, 150);
+    $(window).on('resize', function () {
+        if (mapaAlmacen) {
+            setTimeout(function () { mapaAlmacen.invalidateSize(); }, 100);
         }
-
-        if (hint) hint.textContent = 'Ubicación fijada desde el mapa.';
-
-        $('#modalMapaAlmacen').modal('hide');
-
     });
 
-
+    $('#btn-centrar-scz').on('click', function () {
+        if (!mapaAlmacen) return;
+        mapaAlmacen.setView([DEFAULT_LAT, DEFAULT_LNG], 12);
+    });
 
     if (inputUbic) {
-
-        inputUbic.addEventListener('input', function () {
-
-            if (hint && inputUbic.value.trim() === '') {
-
-                hint.textContent = 'Usá Buscar ubicación para abrir el mapa y marcar el punto con un clic.';
-
+        inputUbic.addEventListener('change', function () {
+            const parsed = parseGpsDesdeTexto(inputUbic.value);
+            if (parsed && mapaAlmacen) {
+                mapaAlmacen.setView([parsed.lat, parsed.lng], 14);
+                colocarMarcador(parsed.lat, parsed.lng, false);
+                actualizarChip(parsed.lat, parsed.lng);
+                if (hint) {
+                    hint.textContent = 'Coordenadas reconocidas en el texto.';
+                }
+            } else if (hint && inputUbic.value.trim() === '') {
+                coordChip.classList.add('is-empty');
+                coordChipText.textContent = 'Sin punto marcado';
+                hint.textContent = 'El mapa guardará las coordenadas automáticamente al marcar el punto.';
+                if (marcadorAlmacen && mapaAlmacen) {
+                    mapaAlmacen.removeLayer(marcadorAlmacen);
+                    marcadorAlmacen = null;
+                }
             }
-
         });
-
     }
-
 });
-
 </script>
-
 @endpush
-

@@ -40,7 +40,7 @@
             nuevo-can="vehiculos.create"
         />
 
-        <div id="filtrosVehiculos" class="filtros-panel collapse {{ request()->hasAny(['buscar','estado']) ? 'show' : '' }}">
+        <div id="filtrosVehiculos" class="filtros-panel collapse {{ request()->hasAny(['buscar','estado','ambito_flota']) ? 'show' : '' }}">
             <form method="GET" action="{{ route('envios.vehiculos') }}">
                 <div class="row align-items-end">
                     <div class="col-lg-5 col-md-6 mb-2 mb-md-0">
@@ -52,7 +52,16 @@
                             <input type="text" name="buscar" class="form-control" value="{{ request('buscar') }}" placeholder="Placa, marca o modelo">
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6 mb-2 mb-md-0">
+                    <div class="col-lg-2 col-md-6 mb-2 mb-md-0">
+                        <label class="small text-muted mb-1">Categoría</label>
+                        <select name="ambito_flota" class="form-control form-control-sm">
+                            <option value="">Todas</option>
+                            @foreach(\App\Support\TransportistaFlotaCatalogo::etiquetas() as $valor => $etiqueta)
+                            <option value="{{ $valor }}" @selected(request('ambito_flota') === $valor)>{{ \App\Support\TransportistaFlotaCatalogo::categoriaCorta($valor) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-lg-2 col-md-6 mb-2 mb-md-0">
                         <label class="small text-muted mb-1">Estado</label>
                         <select name="estado" class="form-control form-control-sm">
                             <option value="">Todos</option>
@@ -73,6 +82,7 @@
                 <thead>
                     <tr>
                         <th>Placa</th>
+                        <th>Categoría</th>
                         <th>Marca / modelo</th>
                         <th>Tipo</th>
                         <th>Estado</th>
@@ -91,8 +101,14 @@
                             : (str_contains($estadoLower, 'activ') ? 'badge-success' : 'badge-secondary');
                         $cap = $v->tipoVehiculo?->capacidad_kg;
                     @endphp
+                    @php $ambitoV = $v->ambito_flota ?? \App\Support\TransportistaFlotaCatalogo::AGRICOLA; @endphp
                     <tr>
                         <td><span class="badge badge-dark font-weight-bold">{{ $v->placa }}</span></td>
+                        <td>
+                            <span class="badge {{ \App\Support\TransportistaFlotaCatalogo::badgeClase($ambitoV) }} badge-estado">
+                                {{ \App\Support\TransportistaFlotaCatalogo::categoriaCorta($ambitoV) }}
+                            </span>
+                        </td>
                         <td>{{ trim(($v->marca ?? '').' '.($v->modelo ?? '')) ?: '—' }}</td>
                         <td>{{ $tipo }}</td>
                         <td><span class="badge badge-estado {{ $badgeEstado }}">{{ $estado }}</span></td>
@@ -111,7 +127,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">
+                        <td colspan="7" class="text-center text-muted py-4">
                             No hay vehículos registrados.
                             <a href="{{ route('envios.vehiculos.create') }}" class="d-block mt-2">Registrar vehículo</a>
                         </td>

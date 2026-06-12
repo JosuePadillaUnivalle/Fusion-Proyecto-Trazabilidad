@@ -18,6 +18,7 @@ class PedidoDistribucion extends Model
         'numero_solicitud',
         'puntoventaid',
         'almacen_planta_origenid',
+        'rutadistribucionid',
         'estado',
         'fechapedido',
         'fecha_entrega_deseada',
@@ -33,6 +34,7 @@ class PedidoDistribucion extends Model
         'pedidodistribucionid' => 'integer',
         'puntoventaid' => 'integer',
         'almacen_planta_origenid' => 'integer',
+        'rutadistribucionid' => 'integer',
         'fechapedido' => 'datetime',
         'fecha_entrega_deseada' => 'date',
         'fecha_aceptacion' => 'datetime',
@@ -65,6 +67,11 @@ class PedidoDistribucion extends Model
     public function detalles(): HasMany
     {
         return $this->hasMany(DetallePedidoDistribucion::class, 'pedidodistribucionid', 'pedidodistribucionid');
+    }
+
+    public function rutaDistribucion(): BelongsTo
+    {
+        return $this->belongsTo(RutaDistribucion::class, 'rutadistribucionid', 'rutadistribucionid');
     }
 
     public function getRouteKeyName(): string

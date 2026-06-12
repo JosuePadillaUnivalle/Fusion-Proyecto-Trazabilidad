@@ -41,6 +41,13 @@
         </div>
         <div class="card-body">
             <dl class="row mb-0">
+                <dt class="col-sm-3">Categoría</dt>
+                <dd class="col-sm-9">
+                    @php $ambitoV = $vehiculo->ambito_flota ?? \App\Support\TransportistaFlotaCatalogo::AGRICOLA; @endphp
+                    <span class="badge {{ \App\Support\TransportistaFlotaCatalogo::badgeClase($ambitoV) }}">
+                        {{ \App\Support\TransportistaFlotaCatalogo::categoriaCorta($ambitoV) }}
+                    </span>
+                </dd>
                 <dt class="col-sm-3">Marca / modelo</dt>
                 <dd class="col-sm-9">{{ trim(($vehiculo->marca ?? '').' '.($vehiculo->modelo ?? '')) ?: '—' }}</dd>
                 <dt class="col-sm-3">Año</dt>

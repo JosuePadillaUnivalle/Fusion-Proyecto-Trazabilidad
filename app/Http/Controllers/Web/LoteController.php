@@ -42,12 +42,7 @@ class LoteController extends Controller
             UsuarioRol::esJefeAgricultor($request->user())
             && ! UsuarioRol::esAdminGlobal($request->user())
         ) {
-            $empleadoIds = Usuario::query()
-                ->where('supervisor_usuarioid', $request->user()->usuarioid)
-                ->whereIn('role', UsuarioRol::rolesEmpleadosGestionables($request->user()))
-                ->pluck('usuarioid');
-
-            $query->whereIn('usuarioid', $empleadoIds);
+            $query->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($request->user()));
         }
 
         if ($request->filled('q')) {
@@ -474,14 +469,7 @@ class LoteController extends Controller
         }
 
         if (UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
-            $empleadoIds = Usuario::query()
-                ->where('supervisor_usuarioid', $user->usuarioid)
-                ->whereIn('role', UsuarioRol::rolesEmpleadosGestionables($user))
-                ->pluck('usuarioid')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-
-            if (! in_array((int) $lote->usuarioid, $empleadoIds, true)) {
+            if (! in_array((int) $lote->usuarioid, UsuarioRol::idsUsuariosBajoJefeAgricultor($user), true)) {
                 abort(403, 'No tienes acceso a este lote.');
             }
 

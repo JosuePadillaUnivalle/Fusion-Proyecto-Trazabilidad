@@ -51,7 +51,8 @@
                     <div class="col-md-6">
                         <div class="form-group">
                             <label>Teléfono</label>
-                            <input name="telefono" class="form-control" value="{{ old('telefono', $transportista->telefono) }}">
+                            <input name="telefono" class="form-control" value="{{ old('telefono', $transportista->telefono) }}" placeholder="+591 7XXXXXXX">
+                            <small class="text-muted">Formato Bolivia: +591 seguido del número.</small>
                         </div>
                     </div>
                     <div class="col-md-6">

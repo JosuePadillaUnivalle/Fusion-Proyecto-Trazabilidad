@@ -5,8 +5,28 @@
 <style>
 .x-card{border:0;border-radius:14px;box-shadow:0 8px 24px rgba(18,38,63,.08)}
 #mapaRutaEntrega { height: 520px; min-height: 520px; }
-.envio-mapa-item { cursor: pointer; }
-.envio-mapa-item.active { background: #e8f5e9; }
+.envio-mapa-item { cursor: pointer; padding: .65rem 1rem; }
+.envio-mapa-item.active { background: #e8f5e9; border-left: 3px solid #28a745; }
+.envio-mapa-item .custom-control { position: relative; z-index: 1; padding-left: 1.75rem; min-height: auto; }
+.envio-mapa-item .custom-control-input { z-index: 2; }
+.envio-mapa-item .custom-control-label {
+    position: relative;
+    z-index: 1;
+    padding-top: 0;
+    line-height: 1.45;
+    cursor: pointer;
+    width: 100%;
+}
+.envio-mapa-item .custom-control-label::before,
+.envio-mapa-item .custom-control-label::after {
+    top: .2rem;
+    left: -1.75rem;
+}
+.envio-mapa-item .custom-control-label strong,
+.envio-mapa-item .custom-control-label small {
+    display: block;
+    text-decoration: none !important;
+}
 </style>
 @endpush
 
@@ -17,7 +37,7 @@
             <h1 class="m-0">Mapa de envíos pendientes</h1>
             <p class="text-muted mb-0">Seleccione entregas en el mapa o en la lista y cree una ruta desde aquí.</p>
         </div>
-        <a href="{{ route('logistica.rutas.index') }}" class="btn btn-outline-secondary">
+        <a href="{{ route('logistica.rutas.planificar') }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left mr-1"></i> Volver
         </a>
     </div>
@@ -41,7 +61,7 @@
                     </div>
                     <div class="list-group list-group-flush" style="max-height:420px;overflow-y:auto" id="lista-envios-mapa">
                         @forelse($enviosMapa as $e)
-                            <label class="list-group-item envio-mapa-item mb-0 {{ $e['lat'] ? '' : 'text-muted' }}"
+                            <div class="list-group-item envio-mapa-item mb-0 {{ $e['lat'] ? '' : 'text-muted' }}"
                                 data-id="{{ $e['id'] }}"
                                 data-codigo="{{ $e['codigo'] }}"
                                 data-destino="{{ $e['destino'] }}"
@@ -51,13 +71,13 @@
                                 <div class="custom-control custom-checkbox">
                                     <input type="checkbox" class="custom-control-input chk-envio-mapa" id="env-{{ $e['id'] }}"
                                         @disabled(!$e['lat'])>
-                                    <span class="custom-control-label w-100">
-                                        <strong>{{ $e['codigo'] }}</strong><br>
+                                    <label class="custom-control-label" for="env-{{ $e['id'] }}">
+                                        <strong>{{ $e['codigo'] }}</strong>
                                         <small>{{ $e['destino'] ?? 'Sin destino' }}</small>
-                                        @if(!$e['lat'])<br><small class="text-warning">Sin coordenadas en pedido</small>@endif
-                                    </span>
+                                        @if(!$e['lat'])<small class="text-warning">Sin coordenadas en pedido</small>@endif
+                                    </label>
                                 </div>
-                            </label>
+                            </div>
                         @empty
                             <div class="list-group-item text-muted">No hay envíos pendientes sin ruta.</div>
                         @endforelse
@@ -105,15 +125,19 @@ function iniciarMapaEnvios() {
         }
         markers[e.id] = m;
         bounds.push([e.lat, e.lng]);
-        m.on('click', () => toggleEnvio(e.id, true));
+        m.on('click', () => {
+            const chk = document.getElementById(`env-${e.id}`);
+            if (chk && !chk.disabled) {
+                chk.checked = !chk.checked;
+                syncEnvioUI(e.id);
+            }
+        });
     });
     if (bounds.length) map.fitBounds(bounds, { padding: [40, 40] });
 
-    function toggleEnvio(id, fromMap) {
+    function syncEnvioUI(id) {
         const chk = document.querySelector(`#env-${id}`);
-        if (!chk || chk.disabled) return;
-        if (!fromMap) chk.checked = !chk.checked;
-        else chk.checked = !chk.checked;
+        if (!chk) return;
         const item = document.querySelector(`.envio-mapa-item[data-id="${id}"]`);
         item?.classList.toggle('active', chk.checked);
         const m = markers[id];
@@ -124,13 +148,17 @@ function iniciarMapaEnvios() {
     }
 
     document.querySelectorAll('.chk-envio-mapa').forEach(chk => {
-        chk.addEventListener('change', () => toggleEnvio(chk.id.replace('env-', ''), false));
+        chk.addEventListener('change', () => syncEnvioUI(chk.id.replace('env-', '')));
     });
     document.querySelectorAll('.envio-mapa-item').forEach(row => {
         row.addEventListener('click', (ev) => {
-            if (ev.target.type === 'checkbox') return;
+            if (ev.target.closest('input[type="checkbox"]') || ev.target.closest('label')) return;
             const id = row.dataset.id;
-            toggleEnvio(id, false);
+            const chk = document.getElementById(`env-${id}`);
+            if (chk && !chk.disabled) {
+                chk.checked = !chk.checked;
+                syncEnvioUI(id);
+            }
         });
     });
     const marcarTodos = document.getElementById('marcar-todos-mapa');
@@ -138,7 +166,7 @@ function iniciarMapaEnvios() {
         marcarTodos.addEventListener('change', () => {
             document.querySelectorAll('.chk-envio-mapa:not(:disabled)').forEach(c => {
                 c.checked = marcarTodos.checked;
-                toggleEnvio(c.id.replace('env-', ''), false);
+                syncEnvioUI(c.id.replace('env-', ''));
             });
         });
     }

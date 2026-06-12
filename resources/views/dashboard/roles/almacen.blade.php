@@ -44,7 +44,6 @@
                 @endcan
                 <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-secondary btn-block quick-link" href="{{ route('logistica.documentos.index') }}"><i class="fas fa-file-signature"></i>Notas de entrega</a></div>
                 <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-danger btn-block quick-link" href="{{ route('logistica.incidentes.create') }}"><i class="fas fa-exclamation-triangle"></i>Reportar incidente</a></div>
-                <div class="col-md-6 col-lg-3 mb-2"><a class="btn btn-dark btn-block quick-link" href="{{ route('logistica.rutas.index') }}"><i class="fas fa-satellite-dish"></i>Monitorización</a></div>
                 </div>
             </div>
         </div>

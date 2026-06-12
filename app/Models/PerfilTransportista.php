@@ -13,6 +13,7 @@ class PerfilTransportista extends Model
 
     protected $fillable = [
         'usuarioid',
+        'ambito_flota',
         'estadotransportistaid',
         'vehiculoid',
         'licencia',

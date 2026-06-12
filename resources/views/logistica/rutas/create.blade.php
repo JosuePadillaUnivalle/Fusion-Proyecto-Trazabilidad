@@ -5,26 +5,25 @@
 <style>
 .x-card{border:0;border-radius:14px;box-shadow:0 8px 24px rgba(18,38,63,.08)}
 .section-title{font-weight:700;color:#2c5530}
+#mapaRutaEntrega { height: 480px; min-height: 480px; }
 .envio-pick-row:hover{background:#f8fafc}
+.envio-pick-row.is-hidden{display:none!important}
+.envio-pick-row.is-selected{background:#e8f5e9}
+.envio-pick-row .custom-control{padding-left:1.75rem;min-height:auto}
+.envio-pick-row .custom-control-label{cursor:pointer;width:100%;line-height:1.4}
+.envio-pick-row .custom-control-label::before,
+.envio-pick-row .custom-control-label::after{top:.15rem;left:-1.75rem}
+.envio-mapa-marker.is-dimmed{opacity:.35}
+.envio-mapa-marker.is-dimmed .envio-mapa-marker-label{background:#94a3b8}
+.filtros-envios-ruta .form-control{height:calc(1.5em + .5rem + 2px)}
 </style>
 @endpush
-
-@php
-    $enviosMapaJson = $enviosParaRuta->map(function ($env) {
-        return [
-            'codigo' => $env->externo_envio_id,
-            'destino' => $env->pedido?->nombre_planta ?: $env->pedido?->direccion_texto,
-            'lat' => $env->pedido?->latitud ? (float) $env->pedido->latitud : null,
-            'lng' => $env->pedido?->longitud ? (float) $env->pedido->longitud : null,
-        ];
-    })->values();
-@endphp
 
 @section('content')
 <div class="content-header">
     <div class="container-fluid">
         <h1 class="m-0">Crear ruta de entrega</h1>
-        <p class="text-muted mb-0">Puede cargar los envíos pendientes con un clic o armar la ruta manualmente.</p>
+        <p class="text-muted mb-0">Seleccione envíos en el mapa o en la lista, filtre por nombre y arme el recorrido.</p>
     </div>
 </div>
 
@@ -45,47 +44,99 @@
 
         @if($enviosParaRuta->isNotEmpty())
         <div class="card x-card mb-3 border-success">
-            <div class="card-header bg-success text-white">
-                <h3 class="card-title mb-0"><i class="fas fa-magic mr-1"></i> Cargar envíos automáticamente</h3>
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center flex-wrap">
+                <h3 class="card-title mb-0"><i class="fas fa-map-marked-alt mr-1"></i> Envíos disponibles para ruta</h3>
+                <span class="badge badge-light text-success" id="badge-envios-visibles">{{ $enviosMapa->count() }} envíos</span>
             </div>
             <div class="card-body">
-                <p class="text-muted mb-2">Marque los envíos que van en esta ruta y pulse el botón. El sistema llenará las paradas por usted.</p>
-                <div class="table-responsive" style="max-height:280px;overflow-y:auto;">
-                    <table class="table table-sm table-hover mb-0">
-                        <thead class="thead-light sticky-top">
-                            <tr>
-                                <th style="width:40px"><input type="checkbox" id="marcar-todos-envios" title="Marcar todos"></th>
-                                <th>Código envío</th>
-                                <th>Destino</th>
-                                <th>Chofer actual</th>
-                                <th>Situación</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($enviosParaRuta as $env)
-                                <tr class="envio-pick-row">
-                                    <td>
-                                        <input type="checkbox" class="envio-ruta-check" value="{{ $env->envioasignacionmultipleid }}"
-                                            data-codigo="{{ $env->externo_envio_id }}"
-                                            data-destino="{{ $env->pedido?->nombre_planta ?: $env->pedido?->direccion_texto ?: 'Entrega '.$env->externo_envio_id }}"
-                                            data-pedido="{{ $env->pedidoid ?: '' }}"
-                                            data-chofer="{{ $env->transportista_usuarioid ?: '' }}"
-                                            data-lat="{{ $env->pedido?->latitud }}"
-                                            data-lng="{{ $env->pedido?->longitud }}">
-                                    </td>
-                                    <td><strong>{{ $env->externo_envio_id }}</strong></td>
-                                    <td>{{ $env->pedido?->nombre_planta ?: $env->pedido?->direccion_texto ?: '—' }}</td>
-                                    <td>{{ $env->transportista?->nombreusuario ?? 'Sin chofer' }}</td>
-                                    <td>{{ $env->estado }}</td>
-                                </tr>
+                <div class="row filtros-envios-ruta mb-3">
+                    <div class="col-md-5 mb-2 mb-md-0">
+                        <label class="small text-muted mb-1">Buscar por código, destino o chofer</label>
+                        <input type="search" id="buscar-envios-ruta" class="form-control form-control-sm"
+                            placeholder="Ej: Quillacollo, ENV-MOD, Carlos…" autocomplete="off">
+                    </div>
+                    <div class="col-md-3 mb-2 mb-md-0">
+                        <label class="small text-muted mb-1">Situación</label>
+                        <select id="filtro-estado-envios" class="form-control form-control-sm">
+                            <option value="">Todas</option>
+                            @foreach($enviosMapa->pluck('estado')->unique()->sort() as $est)
+                                <option value="{{ $est }}">{{ $est }}</option>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <div class="custom-control custom-checkbox mb-2">
+                            <input type="checkbox" class="custom-control-input" id="filtro-solo-ubicacion" checked>
+                            <label class="custom-control-label" for="filtro-solo-ubicacion">Solo con ubicación en mapa</label>
+                        </div>
+                    </div>
                 </div>
-                <button type="button" class="btn btn-success mt-3" id="btn-cargar-envios">
-                    <i class="fas fa-download mr-1"></i> Usar envíos seleccionados como paradas
-                </button>
+
+                <div class="row">
+                    <div class="col-lg-8 mb-3 mb-lg-0">
+                        <div id="mapaRutaEntrega"></div>
+                        <p class="ruta-mapa-leyenda mt-2 mb-0">
+                            <i class="fas fa-mouse-pointer mr-1"></i> Clic en un punto del mapa para marcar o desmarcar el envío.
+                            Los seleccionados se muestran en <span class="text-success font-weight-bold">verde</span>.
+                        </p>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="border rounded bg-light d-flex flex-column" style="max-height:480px;">
+                            <div class="p-2 border-bottom bg-white d-flex justify-content-between align-items-center">
+                                <strong class="small mb-0">Lista de envíos</strong>
+                                <input type="checkbox" id="marcar-todos-envios" title="Marcar todos los visibles">
+                            </div>
+                            <div class="overflow-auto flex-grow-1" id="lista-envios-ruta" style="max-height:360px;">
+                                @foreach($enviosMapa as $e)
+                                    <div class="envio-pick-row p-2 border-bottom"
+                                        data-id="{{ $e['id'] }}"
+                                        data-codigo="{{ $e['codigo'] }}"
+                                        data-destino="{{ $e['destino'] ?? '' }}"
+                                        data-pedido="{{ $e['pedidoid'] ?? '' }}"
+                                        data-chofer="{{ $e['chofer_id'] ?? '' }}"
+                                        data-chofer-nombre="{{ $e['chofer'] }}"
+                                        data-estado="{{ $e['estado'] }}"
+                                        data-lat="{{ $e['lat'] }}"
+                                        data-lng="{{ $e['lng'] }}"
+                                        data-tiene-ubicacion="{{ $e['lat'] && $e['lng'] ? '1' : '0' }}">
+                                        <div class="custom-control custom-checkbox">
+                                            <input type="checkbox" class="custom-control-input envio-ruta-check"
+                                                id="env-ruta-{{ $e['id'] }}"
+                                                value="{{ $e['id'] }}"
+                                                data-codigo="{{ $e['codigo'] }}"
+                                                data-destino="{{ $e['destino'] ?? ('Entrega '.$e['codigo']) }}"
+                                                data-pedido="{{ $e['pedidoid'] ?? '' }}"
+                                                data-chofer="{{ $e['chofer_id'] ?? '' }}"
+                                                data-lat="{{ $e['lat'] }}"
+                                                data-lng="{{ $e['lng'] }}"
+                                                @disabled(!$e['lat'] || !$e['lng'])>
+                                            <label class="custom-control-label" for="env-ruta-{{ $e['id'] }}">
+                                                <strong>{{ $e['codigo'] }}</strong>
+                                                <small class="d-block text-muted">{{ $e['destino'] ?? 'Sin destino' }}</small>
+                                                <small class="d-block">{{ $e['chofer'] }} · {{ $e['estado'] }}</small>
+                                                @if(!$e['lat'] || !$e['lng'])
+                                                    <small class="text-warning">Sin coordenadas — no aparece en mapa</small>
+                                                @elseif($e['ubicacion_aproximada'])
+                                                    <small class="text-info">Ubicación aproximada por ciudad</small>
+                                                @endif
+                                            </label>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <div class="p-2 border-top bg-white">
+                                <button type="button" class="btn btn-success btn-sm btn-block" id="btn-cargar-envios">
+                                    <i class="fas fa-download mr-1"></i> Usar seleccionados como paradas
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
+        </div>
+        @else
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle mr-1"></i> No hay envíos pendientes sin ruta. Puede crear la ruta manualmente abajo.
         </div>
         @endif
 
@@ -100,17 +151,18 @@
                                 <input name="nombre" id="nombre-ruta" class="form-control @error('nombre') is-invalid @enderror" required
                                     placeholder="Ej: Entregas zona sur - tarde" value="{{ old('nombre') }}">
                                 <div class="input-group-append">
-                                    <button type="button" class="btn btn-outline-secondary" id="btn-nombre-auto" title="Sugerir nombre con fecha de hoy">
-                                        <i class="fas fa-wand-magic-sparkles"></i> Sugerir
+                                    <button type="button" class="btn btn-outline-secondary" id="btn-nombre-auto" title="Sugerir nombre según fecha, paradas y chofer">
+                                        <i class="fas fa-magic"></i> Sugerir
                                     </button>
                                 </div>
                             </div>
+                            <small class="text-muted">Use «Sugerir» después de elegir envíos y chofer.</small>
                         </div>
                         <div class="col-md-3 form-group">
                             <label>Chofer asignado</label>
                             @php $drivers = \App\Models\Usuario::where('role','transportista')->where('activo', true)->orderBy('nombre')->get(); @endphp
                             <select name="transportista_usuarioid" id="chofer-ruta" class="form-control">
-                                <option value="">— Sin asignar aún —</option>
+                                <option value="">Sin asignar aún</option>
                                 @foreach($drivers as $d)
                                     <option value="{{ $d->usuarioid }}" @selected(old('transportista_usuarioid') == $d->usuarioid)>
                                         {{ $d->nombre }} {{ $d->apellido }}
@@ -126,10 +178,6 @@
                     </div>
 
                     <hr>
-                    <h5 class="section-title"><i class="fas fa-map mr-1"></i> Vista previa del recorrido</h5>
-                    <div id="mapaRutaEntrega" class="mb-3"></div>
-                    <p class="ruta-mapa-leyenda mb-3">El mapa muestra los envíos con ubicación (puntos grises). Marque envíos arriba para trazar la ruta por calles.</p>
-
                     <h5 class="section-title"><i class="fas fa-map-pin mr-1"></i> Paradas del recorrido</h5>
                     <p class="text-muted small mb-2">
                         Solo complete <strong>código de envío</strong> y/o <strong>lugar</strong>.
@@ -182,10 +230,12 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
 (() => {
-    const enviosCatalogo = @json($enviosMapaJson);
-    const hub = { lat: -16.5, lng: -68.15 };
+    const enviosCatalogo = @json($enviosMapa->values());
+    const hub = { lat: -17.7833, lng: -63.1821 };
     let mapaRuta = null;
-    let capasRuta = null;
+    let capasMarcadores = null;
+    let capasTrazado = null;
+    const markersPorId = {};
 
     function esperarMapaLibs(cb, intentos = 0) {
         if (window.L && window.RutaPorCalles) {
@@ -202,14 +252,64 @@ document.addEventListener('DOMContentLoaded', () => {
     function initMapaRuta() {
         const el = document.getElementById('mapaRutaEntrega');
         if (!el || mapaRuta) return mapaRuta;
-        mapaRuta = L.map(el, { scrollWheelZoom: true }).setView([hub.lat, hub.lng], 11);
+        mapaRuta = L.map(el, { scrollWheelZoom: true }).setView([hub.lat, hub.lng], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap',
         }).addTo(mapaRuta);
-        capasRuta = L.layerGroup().addTo(mapaRuta);
-        setTimeout(() => mapaRuta.invalidateSize(), 150);
+        capasMarcadores = L.layerGroup().addTo(mapaRuta);
+        capasTrazado = L.layerGroup().addTo(mapaRuta);
+        setTimeout(() => mapaRuta.invalidateSize(), 200);
         return mapaRuta;
+    }
+
+    function filtroActivo() {
+        const q = (document.getElementById('buscar-envios-ruta')?.value || '').trim().toLowerCase();
+        const estado = document.getElementById('filtro-estado-envios')?.value || '';
+        const soloUbic = document.getElementById('filtro-solo-ubicacion')?.checked ?? false;
+        return { q, estado, soloUbic };
+    }
+
+    function filaCoincideFiltro(row) {
+        const { q, estado, soloUbic } = filtroActivo();
+        const texto = [
+            row.dataset.codigo,
+            row.dataset.destino,
+            row.dataset.choferNombre,
+            row.dataset.estado,
+        ].join(' ').toLowerCase();
+
+        if (q && !texto.includes(q)) return false;
+        if (estado && row.dataset.estado !== estado) return false;
+        if (soloUbic && row.dataset.tieneUbicacion !== '1') return false;
+        return true;
+    }
+
+    function aplicarFiltrosLista() {
+        let visibles = 0;
+        document.querySelectorAll('.envio-pick-row').forEach(row => {
+            const ok = filaCoincideFiltro(row);
+            row.classList.toggle('is-hidden', !ok);
+            if (ok) visibles++;
+            const id = row.dataset.id;
+            const markerWrap = markersPorId[id];
+            if (markerWrap) {
+                markerWrap.classList.toggle('is-dimmed', !ok);
+            }
+        });
+        const badge = document.getElementById('badge-envios-visibles');
+        if (badge) badge.textContent = visibles + ' visibles';
+    }
+
+    function syncFilaSeleccion(id) {
+        const chk = document.getElementById(`env-ruta-${id}`);
+        const row = document.querySelector(`.envio-pick-row[data-id="${id}"]`);
+        if (row) row.classList.toggle('is-selected', !!chk?.checked);
+        const marker = markersPorId[id];
+        if (marker) {
+            const label = marker.querySelector('.envio-mapa-marker-label');
+            if (label) label.classList.toggle('is-selected', !!chk?.checked);
+        }
     }
 
     function puntosSeleccionados() {
@@ -225,50 +325,93 @@ document.addEventListener('DOMContentLoaded', () => {
                     lat,
                     lng,
                     orden: puntos.length + 1,
-                    label: c.dataset.destino || codigo,
+                    label: (c.dataset.destino || codigo),
                 });
             }
         });
         return puntos;
     }
 
-    async function actualizarMapaDesdeParadas() {
+    function dibujarMarcadoresDisponibles() {
         initMapaRuta();
-        if (!capasRuta || !mapaRuta) return;
+        if (!capasMarcadores || !mapaRuta) return;
+
+        Object.keys(markersPorId).forEach(k => delete markersPorId[k]);
+        capasMarcadores.clearLayers();
+        capasTrazado?.clearLayers();
+
+        const conCoords = enviosCatalogo.filter(e => e.lat && e.lng);
+        const bounds = [];
+
+        conCoords.forEach(e => {
+            const labelHtml = `<span class="envio-mapa-marker-label" data-env-id="${e.id}">${e.codigo}</span>`;
+            const buildIcon = (anchor) => L.divIcon({
+                className: 'envio-mapa-marker',
+                html: labelHtml,
+                iconAnchor: anchor || [0, 0],
+            });
+            const m = L.marker([e.lat, e.lng], { icon: buildIcon() }).addTo(capasMarcadores)
+                .bindPopup(`<strong>${e.codigo}</strong><br>${e.destino || ''}<br><small>${e.chofer}</small>`);
+            const el = m.getElement();
+            if (el) {
+                markersPorId[e.id] = el;
+                const w = el.offsetWidth || 120;
+                const h = el.offsetHeight || 24;
+                m.setIcon(buildIcon([Math.round(w / 2), h]));
+                syncFilaSeleccion(e.id);
+            }
+            bounds.push([e.lat, e.lng]);
+            m.on('click', () => {
+                const chk = document.getElementById(`env-ruta-${e.id}`);
+                if (chk && !chk.disabled) {
+                    chk.checked = !chk.checked;
+                    syncFilaSeleccion(e.id);
+                    actualizarRutaTrazada();
+                }
+            });
+        });
+
+        aplicarFiltrosLista();
+
+        if (bounds.length) {
+            mapaRuta.fitBounds(L.latLngBounds(bounds), { padding: [36, 36] });
+        } else {
+            mapaRuta.setView([hub.lat, hub.lng], 6);
+        }
+    }
+
+    async function actualizarRutaTrazada() {
+        initMapaRuta();
+        if (!capasMarcadores || !capasTrazado || !mapaRuta) return;
 
         const puntos = puntosSeleccionados();
+        capasTrazado.clearLayers();
 
         if (puntos.length === 0) {
-            capasRuta.clearLayers();
-            enviosCatalogo.filter(e => e.lat && e.lng).forEach(e => {
-                L.circleMarker([e.lat, e.lng], {
-                    radius: 6,
-                    color: '#94a3b8',
-                    fillColor: '#cbd5e1',
-                    fillOpacity: 0.85,
-                    weight: 2,
-                }).bindPopup(`<strong>${e.codigo}</strong><br>${e.destino || ''}<br><em>Seleccione para incluir en la ruta</em>`)
-                    .addTo(capasRuta);
-            });
-            const conUbicacion = enviosCatalogo.filter(e => e.lat && e.lng);
-            if (conUbicacion.length) {
-                const bounds = L.latLngBounds(conUbicacion.map(e => [e.lat, e.lng]));
-                mapaRuta.fitBounds(bounds.pad(0.15));
-            } else {
-                mapaRuta.setView([hub.lat, hub.lng], 11);
-            }
+            dibujarMarcadoresDisponibles();
             return;
+        }
+
+        if (Object.keys(markersPorId).length === 0) {
+            dibujarMarcadoresDisponibles();
         }
 
         if (puntos.length === 1) {
-            capasRuta.clearLayers();
-            RutaPorCalles.drawOnMap(mapaRuta, capasRuta, puntos, null);
-            mapaRuta.setView([puntos[0].lat, puntos[0].lng], 14);
+            if (window.RutaPorCalles) {
+                RutaPorCalles.drawOnMap(mapaRuta, capasTrazado, puntos, null);
+            }
+            mapaRuta.setView([puntos[0].lat, puntos[0].lng], 13);
+            enviosCatalogo.filter(e => e.lat && e.lng).forEach(e => syncFilaSeleccion(e.id));
             return;
         }
 
-        const routeResult = await RutaPorCalles.fetchRoute(puntos);
-        RutaPorCalles.drawOnMap(mapaRuta, capasRuta, puntos, routeResult);
+        const routeResult = window.RutaPorCalles
+            ? await RutaPorCalles.fetchRoute(puntos)
+            : null;
+        if (window.RutaPorCalles) {
+            RutaPorCalles.drawOnMap(mapaRuta, capasTrazado, puntos, routeResult);
+        }
+        enviosCatalogo.filter(e => e.lat && e.lng).forEach(e => syncFilaSeleccion(e.id));
     }
 
     const wrapper = document.getElementById('paradas-wrapper');
@@ -304,27 +447,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    addBtn.addEventListener('click', () => nuevaFilaParada('', '', '', null));
+    if (addBtn) {
+        addBtn.addEventListener('click', () => nuevaFilaParada('', '', '', null));
+    }
 
-    wrapper.addEventListener('click', (e) => {
-        if (e.target.classList.contains('remove-parada')) {
-            e.target.closest('.parada-item').remove();
-        }
-    });
+    if (wrapper) {
+        wrapper.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-parada')) {
+                e.target.closest('.parada-item').remove();
+            }
+        });
+    }
 
     const marcarTodos = document.getElementById('marcar-todos-envios');
     if (marcarTodos) {
         marcarTodos.addEventListener('change', function () {
-            document.querySelectorAll('.envio-ruta-check').forEach(c => { c.checked = marcarTodos.checked; });
+            document.querySelectorAll('.envio-pick-row:not(.is-hidden) .envio-ruta-check:not(:disabled)').forEach(c => {
+                c.checked = marcarTodos.checked;
+                const id = c.id.replace('env-ruta-', '');
+                syncFilaSeleccion(id);
+            });
+            actualizarRutaTrazada();
         });
     }
+
+    document.querySelectorAll('.envio-ruta-check').forEach(c => {
+        c.addEventListener('change', () => {
+            syncFilaSeleccion(c.id.replace('env-ruta-', ''));
+            actualizarRutaTrazada();
+        });
+    });
+
+    document.querySelectorAll('.envio-pick-row').forEach(row => {
+        row.addEventListener('click', (ev) => {
+            if (ev.target.closest('input[type="checkbox"]') || ev.target.closest('label')) return;
+            const id = row.dataset.id;
+            const chk = document.getElementById(`env-ruta-${id}`);
+            if (chk && !chk.disabled) {
+                chk.checked = !chk.checked;
+                syncFilaSeleccion(id);
+                actualizarRutaTrazada();
+            }
+        });
+    });
+
+    ['buscar-envios-ruta', 'filtro-estado-envios', 'filtro-solo-ubicacion'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const evt = el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input';
+        el.addEventListener(evt, aplicarFiltrosLista);
+    });
 
     const btnCargar = document.getElementById('btn-cargar-envios');
     if (btnCargar) {
         btnCargar.addEventListener('click', () => {
             const checks = Array.from(document.querySelectorAll('.envio-ruta-check:checked'));
             if (!checks.length) {
-                alert('Marque al menos un envío de la lista superior.');
+                alert('Marque al menos un envío en el mapa o en la lista.');
                 return;
             }
             wrapper.innerHTML = '';
@@ -337,18 +516,47 @@ document.addEventListener('DOMContentLoaded', () => {
                     c.getAttribute('data-chofer')
                 );
             });
-            const nombre = document.getElementById('nombre-ruta');
-            if (nombre && !nombre.value.trim()) {
-                nombre.value = 'Ruta ' + new Date().toLocaleDateString('es-BO') + ' (' + checks.length + ' entregas)';
-            }
+            sugerirNombreRuta();
             document.getElementById('form-ruta').scrollIntoView({ behavior: 'smooth' });
-            actualizarMapaDesdeParadas();
         });
     }
 
-    document.querySelectorAll('.envio-ruta-check').forEach(c => {
-        c.addEventListener('change', actualizarMapaDesdeParadas);
-    });
+    function sugerirNombreRuta() {
+        const nombre = document.getElementById('nombre-ruta');
+        if (!nombre) return;
+        const chofer = document.getElementById('chofer-ruta');
+        const fecha = new Date().toLocaleDateString('es-BO');
+        const checks = document.querySelectorAll('.envio-ruta-check:checked');
+        const n = checks.length;
+        const partes = ['Entregas', fecha];
+        if (n > 0) {
+            partes.push(n + ' parada' + (n === 1 ? '' : 's'));
+            const destinos = Array.from(checks).map(c => (c.dataset.destino || '').trim()).filter(Boolean);
+            if (destinos.length === 1) {
+                partes.push(destinos[0]);
+            } else if (destinos.length > 1) {
+                partes.push(destinos[0] + ' y otros');
+            }
+        }
+        if (chofer?.value) {
+            const txt = chofer.options[chofer.selectedIndex]?.text?.trim();
+            if (txt && txt !== 'Sin asignar aún') partes.push(txt);
+        }
+        nombre.value = partes.join(' — ');
+    }
+
+    const btnNombre = document.getElementById('btn-nombre-auto');
+    if (btnNombre) {
+        btnNombre.addEventListener('click', sugerirNombreRuta);
+    }
+
+    const choferSel = document.getElementById('chofer-ruta');
+    if (choferSel) {
+        choferSel.addEventListener('change', () => {
+            const nombre = document.getElementById('nombre-ruta');
+            if (nombre && !nombre.value.trim()) sugerirNombreRuta();
+        });
+    }
 
     const desdeMapa = sessionStorage.getItem('ruta_desde_mapa');
     if (desdeMapa) {
@@ -359,38 +567,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 wrapper.innerHTML = '';
                 idx = 0;
                 items.forEach(it => nuevaFilaParada(it.destino, it.codigo, it.pedidoid, null));
-                const nombre = document.getElementById('nombre-ruta');
-                if (nombre && !nombre.value.trim()) {
-                    nombre.value = 'Ruta desde mapa ' + new Date().toLocaleDateString('es-BO');
-                }
                 items.forEach(it => {
                     document.querySelectorAll('.envio-ruta-check').forEach(c => {
-                        if (c.dataset.codigo === it.codigo) c.checked = true;
+                        if (c.dataset.codigo === it.codigo) {
+                            c.checked = true;
+                            syncFilaSeleccion(c.id.replace('env-ruta-', ''));
+                        }
                     });
                 });
-                setTimeout(actualizarMapaDesdeParadas, 300);
+                sugerirNombreRuta();
+                setTimeout(actualizarRutaTrazada, 400);
             }
         } catch (e) {}
     }
 
-    document.getElementById('btn-nombre-auto').addEventListener('click', () => {
-        const chofer = document.getElementById('chofer-ruta');
-        const textoChofer = chofer.options[chofer.selectedIndex]?.text?.trim() || 'sin chofer';
-        const fecha = new Date().toLocaleDateString('es-BO');
-        document.getElementById('nombre-ruta').value = 'Entregas ' + fecha + ' — ' + textoChofer;
-    });
-
-    document.getElementById('form-ruta').addEventListener('submit', function () {
-        document.querySelectorAll('.parada-pedido').forEach(function (input) {
-            if (!input.value || input.value === '0') {
-                input.removeAttribute('name');
-            }
+    const formRuta = document.getElementById('form-ruta');
+    if (formRuta) {
+        formRuta.addEventListener('submit', function () {
+            document.querySelectorAll('.parada-pedido').forEach(function (input) {
+                if (!input.value || input.value === '0') {
+                    input.removeAttribute('name');
+                }
+            });
         });
-    });
+    }
 
     esperarMapaLibs(() => {
         initMapaRuta();
-        actualizarMapaDesdeParadas();
+        dibujarMarcadoresDisponibles();
     });
 })();
 });

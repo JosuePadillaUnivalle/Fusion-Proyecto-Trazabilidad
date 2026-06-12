@@ -7,6 +7,7 @@ use App\Models\Insumo;
 use App\Models\Pedido;
 use App\Models\ProduccionAlmacenamiento;
 use App\Models\TipoInsumo;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 final class PedidoCatalogo
@@ -20,12 +21,24 @@ final class PedidoCatalogo
     /** Estados en los que logística puede asignar transportista o avanzar el envío. */
     public static function estadosListosParaLogistica(): array
     {
-        return ['confirmado', 'en produccion'];
+        return ['confirmado'];
     }
 
     public static function pendienteAprobacionAgricola(Pedido $pedido): bool
     {
         return in_array($pedido->estado, ['sin asignacion', 'pendiente'], true);
+    }
+
+    public static function queryOperativosLogistica(): Builder
+    {
+        return self::aplicarFiltroLogistica(Pedido::query());
+    }
+
+    public static function contarPendientesAgricola(): int
+    {
+        return self::queryOperativosLogistica()
+            ->whereIn('estado', ['sin asignacion', 'pendiente'])
+            ->count();
     }
 
     public static function listoParaLogistica(?Pedido $pedido): bool
@@ -124,6 +137,21 @@ final class PedidoCatalogo
                 'titulo' => self::etiquetaEstado($pedido->estado),
             ],
         };
+    }
+
+    /**
+     * Pedidos operativos de logística: con al menos un ítem y no internos de planta (INT-*).
+     */
+    public static function aplicarFiltroLogistica(Builder $query): Builder
+    {
+        return $query
+            ->where('numero_solicitud', 'not like', 'INT-%')
+            ->whereHas('detalles', fn (Builder $d) => $d->where('cantidad', '>', 0));
+    }
+
+    public static function esPedidoInternoPlanta(Pedido $pedido): bool
+    {
+        return str_starts_with((string) $pedido->numero_solicitud, 'INT-');
     }
 
     public static function etiquetaEstado(string $estado): string

@@ -346,7 +346,6 @@
         #modalSelectorCatalogo .modal-body { max-height: 65vh; overflow-y: auto; }
     </style>
     @endpush
-    @include('partials.selector-catalogo-modal')
     @push('scripts')
     <script src="{{ asset('js/selector-catalogo.js') }}"></script>
     @endpush

@@ -9,7 +9,8 @@
 
 @section('content')
 <div class="content-header">
-    <div class="container-fluid">
+    <div class="container-fluid d-flex flex-wrap justify-content-between align-items-start">
+        <div>
         <h1 class="m-0">
             @can('rutas_multi.create')
                 Rutas de entrega
@@ -24,6 +25,10 @@
                 Rutas que la empresa le asignó para repartir pedidos.
             @endcan
         </p>
+        </div>
+        <a href="{{ route('logistica.rutas.planificar') }}" class="btn btn-outline-secondary btn-sm mt-2 mt-md-0">
+            <i class="fas fa-arrow-left mr-1"></i> Planificar rutas
+        </a>
     </div>
 </div>
 

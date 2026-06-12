@@ -159,6 +159,25 @@
                                     {{ $evento['completada'] ? 'Completada' : 'Pendiente' }}
                                 </span>
                             @endif
+                            @if(
+                                !empty($evento['actividadid'])
+                                && isset($evento['completada'])
+                                && ! $evento['completada']
+                                && in_array((int) $evento['actividadid'], $actividades_marcables_ids ?? [], true)
+                            )
+                                <form action="{{ route('actividades.marcar-realizada', $evento['actividadid']) }}" method="POST"
+                                      class="d-inline ml-2">
+                                    @csrf
+                                    <button type="button" class="btn btn-success btn-sm py-0 px-2"
+                                            data-confirm-modal
+                                            data-confirm-title="¿Marcar como completada?"
+                                            data-confirm-message="Se completará «{{ $evento['titulo'] }}» y se quitará la alerta del agricultor asignado."
+                                            data-confirm-tone="success"
+                                            title="Marcar como completada">
+                                        <i class="fas fa-check mr-1"></i> Completar
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     @empty
                         <div class="empty-timeline">
@@ -173,6 +192,8 @@
 
     @include('lotes.partials.detalle-actions')
 </div>
+
+@include('partials.modal-confirmar-accion')
 @endsection
 
 @push('scripts')

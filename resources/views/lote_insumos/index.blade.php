@@ -196,7 +196,7 @@
                         <tr>
                             <td colspan="7" class="text-center text-muted py-5">
                                 <i class="fas fa-clipboard-list fa-2x mb-2 text-light d-block"></i>
-                                No hay aplicaciones registradas.
+                                No hay aplicaciones reales registradas. Los ejemplos de demostración del sistema no se muestran aquí.
                                 @can('inventario.create')
                                 <a href="{{ route('lote-insumos.create') }}" class="d-block mt-2">Registrar primera aplicación</a>
                                 @endcan
@@ -275,7 +275,7 @@
                     </div>
                 </div>
             @empty
-                <div class="col-12 text-center text-muted py-5">No hay aplicaciones registradas.</div>
+                <div class="col-12 text-center text-muted py-5">No hay aplicaciones reales registradas. Los ejemplos de demostración del sistema no se muestran aquí.</div>
             @endforelse
             </div>
         </div>

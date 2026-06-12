@@ -957,6 +957,9 @@
     $pendientesSolicitudes = $isAdmin
         ? \App\Models\Usuario::where('estado_cuenta', \App\Support\CuentaEstado::PENDIENTE)->count()
         : 0;
+    $pedidosPendientesJefeAgr = ($esJefeAgr && ! $isAdmin && $authUser?->can('pedidos.view'))
+        ? \App\Support\PedidoCatalogo::contarPendientesAgricola()
+        : 0;
     $roleCss     = strtolower($userRole);
 @endphp
 
@@ -1013,7 +1016,16 @@
                     if (! ($esJefeAgr && ! $isAdmin)) {
                         $prodAgrOpen = $prodAgrOpen || request()->routeIs('agricola.pedidos.*');
                     }
-                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'plantillas-transformacion.*', 'maquinas-planta.*', 'procesamiento.*', 'almacen-planta.*', 'pedidos.*');
+                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'plantillas-transformacion.*', 'maquinas-planta.*', 'procesamiento.*', 'tareas-planta.*');
+                    $envListadoActivo = request()->routeIs(
+                        'logistica.asignaciones.listado',
+                        'logistica.asignaciones.show',
+                        'logistica.asignaciones.edit',
+                        'pedidos.index',
+                        'pedidos.show',
+                        'pedidos.edit',
+                        'pedidos.create'
+                    );
                     $puedeProdPlanta = $isAdmin || $esPlantaOperativo;
                     $showProdAgricola = ! $esPlantaOperativo && ! $esTransportistaOperativo && (
                         $isAdmin
@@ -1031,14 +1043,23 @@
                         'asignaciones.view', 'rutas_multi.view', 'rutas_multi.create',
                         'documentos.view', 'incidentes.view',
                     ];
+                    $puedeReportesLogistica = $isAdmin || ($authUser && $authUser->canany([
+                        'documentos.view', 'incidentes.view', 'envios.view',
+                    ]));
+                    $logMasOpen = request()->routeIs(
+                        'logistica.documentos.*',
+                        'logistica.incidentes.*',
+                        'envios.reportes-distribucion'
+                    );
                     $envOpen = request()->routeIs(
                         'envios.*',
-                        'pedidos.*',
+                        'pedidos.create',
+                        'pedidos.show',
+                        'pedidos.edit',
                         'logistica.asignaciones.*',
-                        'logistica.rutas.*',
                         'logistica.documentos.*',
                         'logistica.incidentes.*'
-                    );
+                    ) || $logMasOpen || request()->routeIs('pedidos.index');
                     $puedeEnvios = $isAdmin || ($authUser && $authUser->hasAnyPermission($envPerm));
                     $showOperLogistica = $isAdmin || $esTransportistaOperativo || (
                         $puedeEnvios && ! $esPlantaOperativo && ! $esAgricultorOperativo && ! $esJefeAgr
@@ -1048,6 +1069,17 @@
 
                 @if($showProdAgricola)
                 <span class="ag-nav-label">Producción agrícola</span>
+
+                @can('panel_agricultor.view')
+                @if($esJefeAgr || $isAdmin)
+                <li class="ag-nav-li">
+                    <a href="{{ route('dashboard.panel-agricola') }}" class="ag-nav-a {{ request()->routeIs('dashboard.panel-agricola') ? 'active' : '' }}">
+                        <i class="ag-nav-icon fas fa-tractor"></i>
+                        <span class="ag-nav-text">Panel Agrícola</span>
+                    </a>
+                </li>
+                @endif
+                @endcan
 
                 {{-- Lotes & Actividades --}}
                 @canany(['lotes.view','lotes.create','lotes.update','lotes.delete'])
@@ -1060,10 +1092,10 @@
                     </a>
                     <ul class="ag-subnav {{ $lotesOpen ? 'open' : '' }}" id="sub-lotes">
                         @can('lotes.view')
-                        <li class="ag-sub-li"><a href="{{ route('lotes.index') }}" class="ag-sub-a {{ request()->routeIs('lotes.index') ? 'active' : '' }}">Lotes</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('lotes.index') }}" class="ag-sub-a {{ request()->routeIs('lotes.index', 'lotes.show', 'lotes.edit', 'lotes.create') ? 'active' : '' }}">Lotes</a></li>
                         <li class="ag-sub-li"><a href="{{ route('lotes.mapa') }}" class="ag-sub-a {{ request()->routeIs('lotes.mapa') ? 'active' : '' }}">Mapa de lotes</a></li>
                         @endcan
-                        <li class="ag-sub-li"><a href="{{ route('actividades.index') }}" class="ag-sub-a {{ request()->routeIs('actividades.index') ? 'active' : '' }}">Actividades</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('actividades.index') }}" class="ag-sub-a {{ request()->routeIs('actividades.index', 'actividades.show', 'actividades.edit', 'actividades.create') ? 'active' : '' }}">Actividades</a></li>
                         <li class="ag-sub-li"><a href="{{ route('actividades.calendario') }}" class="ag-sub-a {{ request()->routeIs('actividades.calendario') ? 'active' : '' }}">Calendario</a></li>
                     </ul>
                 </li>
@@ -1105,7 +1137,7 @@
                 @php $invOpen = request()->routeIs('insumos.*','lote-insumos.*'); @endphp
                 <li class="ag-nav-li">
                     <a href="#" class="ag-nav-a {{ $invOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-inv">
-                        <i class="ag-nav-icon fas fa-warehouse"></i>
+                        <i class="ag-nav-icon fas fa-boxes"></i>
                         <span class="ag-nav-text">Inventario</span>
                         <i class="ag-nav-arrow fas fa-chevron-right"></i>
                     </a>
@@ -1119,7 +1151,7 @@
                 @if($puedeAlmacenAgricola)
                 <li class="ag-nav-li">
                     <a href="#" class="ag-nav-a {{ $almAgrOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-alm-agr">
-                        <i class="ag-nav-icon fas fa-tractor"></i>
+                        <i class="ag-nav-icon fas fa-warehouse"></i>
                         <span class="ag-nav-text">Almacén agrícola</span>
                         <i class="ag-nav-arrow fas fa-chevron-right"></i>
                     </a>
@@ -1141,6 +1173,9 @@
                     <a href="{{ route('agricola.pedidos.index') }}" class="ag-nav-a {{ request()->routeIs('agricola.pedidos.*') ? 'active' : '' }}">
                         <i class="ag-nav-icon fas fa-shopping-cart"></i>
                         <span class="ag-nav-text">Pedidos</span>
+                        @if($pedidosPendientesJefeAgr > 0)
+                            <span class="badge badge-warning ml-auto">{{ $pedidosPendientesJefeAgr }}</span>
+                        @endif
                     </a>
                 </li>
                 @endif
@@ -1163,30 +1198,37 @@
                         <i class="ag-nav-arrow fas fa-chevron-right"></i>
                     </a>
                     <ul class="ag-subnav {{ $envOpen ? 'open' : '' }}" id="sub-env">
-                        @can('asignaciones.create')
-                        <li class="ag-sub-li"><a href="{{ route('logistica.asignaciones.create') }}" class="ag-sub-a {{ request()->routeIs('logistica.asignaciones.*') ? 'active' : '' }}">Asignar envíos</a></li>
-                        @endcan
-                        @if($isAdmin || auth()->user()?->can('rutas_multi.create'))
-                        <li class="ag-sub-li"><a href="{{ route('logistica.rutas.mapa') }}" class="ag-sub-a {{ request()->routeIs('logistica.rutas.mapa') ? 'active' : '' }}">Mapa de envíos</a></li>
+                        @if(auth()->user()?->can('asignaciones.view') || auth()->user()?->can('pedidos.view'))
+                        <li class="ag-sub-li"><a href="{{ route('logistica.asignaciones.listado') }}" class="ag-sub-a {{ $envListadoActivo ? 'active' : '' }}">{{ auth()->user()?->hasRole('transportista') ? 'Mis envíos' : 'Envíos' }}</a></li>
                         @endif
+                        {{-- Rutas multientrega ocultas: el flujo operativo es almacén agrícola → planta (un solo trayecto). --}}
+                        @unless(auth()->user()?->hasRole('transportista'))
                         @if($isAdmin || auth()->user()?->can('transportistas.view'))
                         <li class="ag-sub-li"><a href="{{ route('envios.transportistas') }}" class="ag-sub-a {{ request()->routeIs('envios.transportistas*') ? 'active' : '' }}">Transportistas</a></li>
                         @endif
                         @if($isAdmin || auth()->user()?->can('vehiculos.view'))
                         <li class="ag-sub-li"><a href="{{ route('envios.vehiculos') }}" class="ag-sub-a {{ request()->routeIs('envios.vehiculos*') ? 'active' : '' }}">Vehículos</a></li>
                         @endif
-                        @can('documentos.view')
-                        <li class="ag-sub-li"><a href="{{ route('logistica.documentos.index') }}" class="ag-sub-a {{ request()->routeIs('logistica.documentos.*') ? 'active' : '' }}">Documentos entrega</a></li>
-                        @endcan
-                        @can('incidentes.view')
-                        <li class="ag-sub-li"><a href="{{ route('logistica.incidentes.index') }}" class="ag-sub-a {{ request()->routeIs('logistica.incidentes.*') ? 'active' : '' }}">Incidentes</a></li>
-                        @endcan
-                        @if(($isAdmin || auth()->user()?->can('envios.view')) && !auth()->user()?->hasRole('transportista'))
-                        <li class="ag-sub-li"><a href="{{ route('envios.reportes-distribucion') }}" class="ag-sub-a {{ request()->routeIs('envios.reportes-distribucion') ? 'active' : '' }}">Reportes distribución</a></li>
+                        @endunless
+                        @if($puedeReportesLogistica)
+                        <li class="ag-sub-li">
+                            <a href="#" class="ag-sub-a {{ $logMasOpen ? 'group-open' : '' }}" data-toggle-sub="sub-log-mas">
+                                Reportes
+                                <i class="fas fa-chevron-right ag-sub-arrow"></i>
+                            </a>
+                            <ul class="ag-subnav ag-subnav-nested {{ $logMasOpen ? 'open' : '' }}" id="sub-log-mas">
+                                @can('documentos.view')
+                                <li class="ag-sub-li"><a href="{{ route('logistica.documentos.index') }}" class="ag-sub-a {{ request()->routeIs('logistica.documentos.*') ? 'active' : '' }}">Documentos entrega</a></li>
+                                @endcan
+                                @can('incidentes.view')
+                                <li class="ag-sub-li"><a href="{{ route('logistica.incidentes.index') }}" class="ag-sub-a {{ request()->routeIs('logistica.incidentes.*') ? 'active' : '' }}">Incidentes</a></li>
+                                @endcan
+                                @if(($isAdmin || auth()->user()?->can('envios.view')) && ! auth()->user()?->hasRole('transportista'))
+                                <li class="ag-sub-li"><a href="{{ route('envios.reportes-distribucion') }}" class="ag-sub-a {{ request()->routeIs('envios.reportes-distribucion') ? 'active' : '' }}">Reportes distribución</a></li>
+                                @endif
+                            </ul>
+                        </li>
                         @endif
-                        @can('pedidos.view')
-                        <li class="ag-sub-li"><a href="{{ route('pedidos.index') }}" class="ag-sub-a {{ request()->routeIs('pedidos.*') ? 'active' : '' }}">Pedidos</a></li>
-                        @endcan
                     </ul>
                 </li>
                 @endif
@@ -1199,7 +1241,7 @@
                 <li class="ag-nav-li"><a href="{{ route('dashboard.panel-planta') }}" class="ag-nav-a {{ request()->routeIs('dashboard.panel-planta') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-industry"></i><span class="ag-nav-text">Panel Planta</span></a></li>
                 @endcan
 
-                @if($puedeProdPlanta || $puedeAlmacenPlanta)
+                @if($puedeProdPlanta)
                 <li class="ag-nav-li">
                     <a href="#" class="ag-nav-a {{ $prodPlaMenuOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-prod-pla">
                         <i class="ag-nav-icon fas fa-cogs"></i>
@@ -1207,7 +1249,6 @@
                         <i class="ag-nav-arrow fas fa-chevron-right"></i>
                     </a>
                     <ul class="ag-subnav {{ $prodPlaMenuOpen ? 'open' : '' }}" id="sub-prod-pla">
-                        @if($puedeProdPlanta)
                         @can('lote_produccion.view')
                         <li class="ag-sub-li"><a href="{{ route('procesamiento.index') }}" class="ag-sub-a {{ request()->routeIs('procesamiento.*') ? 'active' : '' }}">Procesamiento de Lote</a></li>
                         @endcan
@@ -1217,35 +1258,36 @@
                         <li class="ag-sub-li"><a href="{{ route('procesos-planta.index') }}" class="ag-sub-a {{ request()->routeIs('procesos-planta.*') ? 'active' : '' }}">Procesos de planta</a></li>
                         <li class="ag-sub-li"><a href="{{ route('plantillas-transformacion.index') }}" class="ag-sub-a {{ request()->routeIs('plantillas-transformacion.*') ? 'active' : '' }}">Procesos de transformación</a></li>
                         <li class="ag-sub-li"><a href="{{ route('maquinas-planta.index') }}" class="ag-sub-a {{ request()->routeIs('maquinas-planta.*') ? 'active' : '' }}">Máquinas de planta</a></li>
-                        @endif
-                        @if($puedeAlmacenPlanta)
-                        <li class="ag-sub-li">
-                            <a href="#" class="ag-sub-a {{ $almPlaOpen ? 'group-open' : '' }}" data-toggle-sub="sub-alm-pla">
-                                Almacén de planta
-                                <i class="fas fa-chevron-right ag-sub-arrow"></i>
-                            </a>
-                            <ul class="ag-subnav ag-subnav-nested {{ $almPlaOpen ? 'open' : '' }}" id="sub-alm-pla">
-                                <li class="ag-sub-li"><a href="{{ route('almacen-planta.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-planta.index', 'almacen-planta.show', 'almacen-planta.create', 'almacen-planta.edit') ? 'active' : '' }}">Almacenes</a></li>
-                                @can('almacen.movimientos.view')
-                                <li class="ag-sub-li"><a href="{{ route('almacen-planta.movimientos.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-planta.movimientos.*') && !request()->routeIs('almacen-planta.movimientos.reportes') ? 'active' : '' }}">Movimientos</a></li>
-                                @endcan
-                                @can('almacen.reportes.view')
-                                <li class="ag-sub-li"><a href="{{ route('almacen-planta.movimientos.reportes') }}" class="ag-sub-a {{ request()->routeIs('almacen-planta.movimientos.reportes') ? 'active' : '' }}">Reportes</a></li>
-                                @endcan
-                            </ul>
-                        </li>
-                        @endif
+                    </ul>
+                </li>
+                @endif
+
+                @if($puedeAlmacenPlanta)
+                <li class="ag-nav-li">
+                    <a href="#" class="ag-nav-a {{ $almPlaOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-alm-pla">
+                        <i class="ag-nav-icon fas fa-dolly"></i>
+                        <span class="ag-nav-text">Almacén de planta</span>
+                        <i class="ag-nav-arrow fas fa-chevron-right"></i>
+                    </a>
+                    <ul class="ag-subnav {{ $almPlaOpen ? 'open' : '' }}" id="sub-alm-pla">
+                        <li class="ag-sub-li"><a href="{{ route('almacen-planta.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-planta.index', 'almacen-planta.show', 'almacen-planta.create', 'almacen-planta.edit') ? 'active' : '' }}">Almacenes</a></li>
+                        @can('almacen.movimientos.view')
+                        <li class="ag-sub-li"><a href="{{ route('almacen-planta.movimientos.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-planta.movimientos.*') && !request()->routeIs('almacen-planta.movimientos.reportes') ? 'active' : '' }}">Movimientos</a></li>
+                        @endcan
+                        @can('almacen.reportes.view')
+                        <li class="ag-sub-li"><a href="{{ route('almacen-planta.movimientos.reportes') }}" class="ag-sub-a {{ request()->routeIs('almacen-planta.movimientos.reportes') ? 'active' : '' }}">Reportes</a></li>
+                        @endcan
                     </ul>
                 </li>
                 @endif
                 @endif
 
                 @can('pedidos.view')
-                @if($esPlantaOperativo && ! $isAdmin)
+                @if($esPlantaOperativo && ! $isAdmin && ! auth()->user()?->can('asignaciones.view'))
                 <li class="ag-nav-li">
-                    <a href="{{ route('pedidos.index') }}" class="ag-nav-a {{ request()->routeIs('pedidos.*') ? 'active' : '' }}">
-                        <i class="ag-nav-icon fas fa-shopping-cart"></i>
-                        <span class="ag-nav-text">Pedidos</span>
+                    <a href="{{ route('pedidos.index') }}" class="ag-nav-a {{ $envListadoActivo ? 'active' : '' }}">
+                        <i class="ag-nav-icon fas fa-truck"></i>
+                        <span class="ag-nav-text">Envíos</span>
                     </a>
                 </li>
                 @endif
@@ -1268,6 +1310,16 @@
 
                 @if($puedePuntoVentaMenu || $puedePedidosDistMenu)
                 <span class="ag-nav-label">Punto de venta</span>
+
+                @if($esMinoristaOperativo || $isAdmin)
+                <li class="ag-nav-li">
+                    <a href="{{ route('dashboard.panel-minorista') }}" class="ag-nav-a {{ request()->routeIs('dashboard.panel-minorista') ? 'active' : '' }}">
+                        <i class="ag-nav-icon fas fa-shopping-basket"></i>
+                        <span class="ag-nav-text">Panel Minorista</span>
+                    </a>
+                </li>
+                @endif
+
                 <li class="ag-nav-li">
                     <a href="#" class="ag-nav-a {{ $pvMenuOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-pv">
                         <i class="ag-nav-icon fas fa-store"></i>
@@ -1282,7 +1334,12 @@
                         @endif
                         @if($puedePedidosDistMenu)
                         <li class="ag-sub-li">
-                            <a href="{{ route('punto-venta.pedidos.index') }}" class="ag-sub-a {{ request()->routeIs('punto-venta.pedidos.*') ? 'active' : '' }}">Pedidos de distribución</a>
+                            <a href="{{ route('punto-venta.pedidos.index') }}" class="ag-sub-a {{ request()->routeIs('punto-venta.pedidos.*') && !request()->routeIs('punto-venta.rutas.*') ? 'active' : '' }}">Pedidos de distribución</a>
+                        </li>
+                        @endif
+                        @if(\App\Support\UsuarioRol::puedeGestionarDistribucionPlanta($authUser))
+                        <li class="ag-sub-li">
+                            <a href="{{ route('punto-venta.rutas.index') }}" class="ag-sub-a {{ request()->routeIs('punto-venta.rutas.*') ? 'active' : '' }}">Planificar distribución</a>
                         </li>
                         @endif
                     </ul>
@@ -1416,6 +1473,10 @@
         </main>
 
         @include('partials.modal-bienvenida')
+        @include('partials.modal-aviso')
+        @once
+            @include('partials.selector-catalogo-modal')
+        @endonce
 
         {{-- FOOTER --}}
         <footer class="ag-footer">

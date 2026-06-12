@@ -46,6 +46,19 @@
     </div>
     <div class="col-md-3">
         <div class="form-group">
+            <label>Categoría <span class="text-danger">*</span></label>
+            <select name="ambito_flota" class="form-control" required>
+                @foreach(\App\Support\TransportistaFlotaCatalogo::etiquetas() as $valor => $etiqueta)
+                <option value="{{ $valor }}" @selected(old('ambito_flota', $v?->ambito_flota ?? 'agricola') === $valor)>
+                    {{ \App\Support\TransportistaFlotaCatalogo::categoriaCorta($valor) }}
+                </option>
+                @endforeach
+            </select>
+            <small class="form-text text-muted">Agrícola: flota de envíos a planta. Planta: reparto a minoristas.</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="form-group">
             <label>Estado operativo</label>
             <select name="estadovehiculoid" class="form-control">
                 <option value="">— Seleccionar —</option>

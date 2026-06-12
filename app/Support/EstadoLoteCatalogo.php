@@ -152,13 +152,11 @@ class EstadoLoteCatalogo
                 'loteid' => $lote->loteid,
                 'tipo' => 'Siembra',
                 'return' => $return,
-                'completar' => 1,
             ]),
             'en_crecimiento' => route('actividades.create', [
                 'loteid' => $lote->loteid,
                 'tipo' => 'Riego',
                 'return' => $return,
-                'completar' => 1,
             ]),
             'cosechado' => route('producciones.create', [
                 'loteid' => $lote->loteid,

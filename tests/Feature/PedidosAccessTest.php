@@ -39,7 +39,8 @@ class PedidosAccessTest extends TestCase
         $admin = $this->createUser('admin');
         $this->actingAs($admin);
 
-        $this->get(route('pedidos.index'))->assertOk();
+        $this->get(route('pedidos.index'))->assertRedirect(route('logistica.asignaciones.listado'));
+        $this->get(route('logistica.asignaciones.listado'))->assertOk();
         $this->get(route('pedidos.create'))->assertOk();
     }
 

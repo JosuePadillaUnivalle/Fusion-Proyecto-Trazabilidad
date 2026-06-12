@@ -38,7 +38,7 @@ class RutaMultiEntregaController extends Controller
     {
         $enviosParaRuta = EnvioAsignacionMultiple::query()
             ->with(['pedido:pedidoid,nombre_planta,direccion_texto,latitud,longitud', 'transportista:usuarioid,nombre,apellido,nombreusuario'])
-            ->whereNotIn('estado', ['entregado', 'cancelado'])
+            ->whereNotIn('estado', ['entregado', 'cancelado', 'cancelada'])
             ->where(function ($q) {
                 $q->whereNull('rutamultientregaid')
                     ->orWhere('rutamultientregaid', 0);
@@ -47,7 +47,25 @@ class RutaMultiEntregaController extends Controller
             ->limit(80)
             ->get();
 
-        return view('logistica.rutas.create', compact('enviosParaRuta'));
+        $enviosMapa = $enviosParaRuta->map(function (EnvioAsignacionMultiple $envio) {
+            $coords = $this->rutasCalles->coordsDesdePedido($envio->pedido);
+
+            return [
+                'id' => $envio->envioasignacionmultipleid,
+                'codigo' => $envio->externo_envio_id,
+                'destino' => $envio->pedido?->nombre_planta ?: $envio->pedido?->direccion_texto,
+                'estado' => $envio->estado,
+                'chofer' => trim(($envio->transportista?->nombre ?? '').' '.($envio->transportista?->apellido ?? ''))
+                    ?: ($envio->transportista?->nombreusuario ?? 'Sin chofer'),
+                'chofer_id' => $envio->transportista_usuarioid,
+                'pedidoid' => $envio->pedidoid,
+                'lat' => $coords['lat'] ?? null,
+                'lng' => $coords['lng'] ?? null,
+                'ubicacion_aproximada' => (bool) ($coords['aproximada'] ?? false),
+            ];
+        });
+
+        return view('logistica.rutas.create', compact('enviosParaRuta', 'enviosMapa'));
     }
 
     public function store(Request $request): RedirectResponse

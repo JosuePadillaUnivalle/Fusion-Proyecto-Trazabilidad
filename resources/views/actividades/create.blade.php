@@ -9,21 +9,10 @@
         <h3 class="card-title"><i class="fas fa-tasks mr-2"></i>Registrar Actividad</h3>
     </div>
 
-    @if($errors->any())
-        <div class="alert alert-danger m-3">
-            <ul class="mb-0">
-                @foreach($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
-
     <form action="{{ route('actividades.store') }}" method="POST">
         @csrf
         @if(!empty($returnUrl))
             <input type="hidden" name="return" value="{{ $returnUrl }}">
-            <input type="hidden" name="completar" value="1">
         @endif
         <div class="card-body">
             <div class="row">
@@ -42,14 +31,35 @@
                         'required' => true,
                     ])
 
-                    <div class="form-group">
-                        <label><i class="fas fa-user mr-1"></i> Responsable</label>
-                        <input type="text" id="responsable_display" class="form-control bg-light" readonly 
-                               placeholder="Se asigna automaticamente al seleccionar el lote">
-                        <small class="form-text text-muted">
-                            <i class="fas fa-info-circle"></i> El responsable se toma automaticamente del lote
-                        </small>
-                    </div>
+                    @if(!empty($puedeDesignarResponsable))
+                        @include('partials.selector-catalogo', [
+                            'id' => 'actividad_responsable',
+                            'name' => 'usuarioid',
+                            'label' => 'Responsable',
+                            'icon' => 'fa-user',
+                            'value' => old('usuarioid', $responsableInicial ?? ''),
+                            'labelSelected' => $responsableLabel ?? '',
+                            'endpoint' => route('catalogo-selector.usuarios'),
+                            'params' => $responsableSelectorParams ?? ['roles' => 'agricultor'],
+                            'title' => 'Seleccionar responsable',
+                            'searchPlaceholder' => 'Nombre, correo o usuario…',
+                            'help' => ! empty($esJefeAgricultorDesignando)
+                                ? 'Asigne un agricultor de su equipo. Usted supervisa; el empleado recibirá la alerta y será el responsable.'
+                                : 'Elija el agricultor operativo que ejecutará la actividad. Recibirá una alerta en su panel.',
+                            'required' => true,
+                        ])
+                    @else
+                        <div class="form-group">
+                            <label><i class="fas fa-user mr-1"></i> Responsable</label>
+                            <input type="text" class="form-control bg-light" readonly
+                                   value="{{ $responsableLabel ?? '' }}"
+                                   placeholder="Usted es el responsable">
+                            <input type="hidden" name="usuarioid" value="{{ auth()->user()->usuarioid }}">
+                            <small class="form-text text-muted">
+                                <i class="fas fa-info-circle"></i> Usted queda asignado automáticamente como responsable
+                            </small>
+                        </div>
+                    @endif
 
                     <div class="form-group">
                         <label><i class="fas fa-clipboard-list mr-1"></i> Tipo de Actividad <span class="text-danger">*</span></label>
@@ -85,6 +95,27 @@
                                   placeholder="Opcional...">{{ old('observaciones') }}</textarea>
                     </div>
 
+                    @if(empty($puedeDesignarResponsable))
+                        <div class="form-group mb-0">
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" class="custom-control-input" id="completar_ahora" name="completar" value="1"
+                                    @checked(old('completar', request()->boolean('completar')))>
+                                <label class="custom-control-label" for="completar_ahora">
+                                    Ya realicé esta actividad (marcar como completada al guardar)
+                                </label>
+                            </div>
+                            <small class="form-text text-muted">
+                                Si solo la registra para después, déjela sin marcar; quedará pendiente en su panel.
+                            </small>
+                        </div>
+                    @else
+                        <div class="alert alert-light border small mb-0">
+                            <i class="fas fa-bell text-info mr-1"></i>
+                            La actividad quedará <strong>pendiente</strong> hasta que el agricultor asignado la marque como completada
+                            (usted también puede completarla después desde Actividades).
+                        </div>
+                    @endif
+
                 </div>
 
                 <div class="col-md-4">
@@ -97,7 +128,16 @@
                                 <i class="fas fa-calendar mr-1"></i> <strong>Fecha inicio:</strong> Se registra automaticamente (ahora)
                             </p>
                             <p class="small text-muted mb-0">
-                                <i class="fas fa-user mr-1"></i> <strong>Responsable:</strong> Se asigna del lote seleccionado
+                                <i class="fas fa-user mr-1"></i> <strong>Responsable:</strong>
+                                @if(!empty($puedeDesignarResponsable))
+                                    @if(!empty($esJefeAgricultorDesignando))
+                                        Usted asigna a un empleado; él recibe la alerta
+                                    @else
+                                        Lo designa quien registra; el agricultor recibe alerta
+                                    @endif
+                                @else
+                                    Usted (agricultor asignado al lote)
+                                @endif
                             </p>
                         </div>
                     </div>
@@ -138,7 +178,17 @@
 <script>
 document.getElementById('selector_wrap_actividad_lote')?.addEventListener('selector-catalogo:change', function (e) {
     const extra = e.detail.extra || {};
-    document.getElementById('responsable_display').value = extra.responsable || 'Sin responsable asignado';
+    @if(!empty($puedeDesignarResponsable))
+    const idsResponsablesPermitidos = @json(
+        ($usuariosResponsables ?? collect())->pluck('usuarioid')->map(fn ($id) => (int) $id)->values()
+    );
+    if (extra.usuarioid && idsResponsablesPermitidos.includes(Number(extra.usuarioid)) && window.CatalogoSelector) {
+        const respInput = document.querySelector('#selector_wrap_actividad_responsable .selector-catalogo-value');
+        if (!respInput || !respInput.value) {
+            window.CatalogoSelector.setValue('actividad_responsable', extra.usuarioid, extra.responsable || '');
+        }
+    }
+    @endif
 });
 </script>
 @endpush
