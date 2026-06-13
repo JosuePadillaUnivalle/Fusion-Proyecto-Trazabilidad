@@ -22,6 +22,10 @@ return new class extends Migration
                 $table->unsignedBigInteger('almacen_planta_origenid');
                 $table->unsignedBigInteger('transportista_usuarioid');
                 $table->unsignedBigInteger('vehiculoid')->nullable();
+                $table->decimal('costo_bs', 12, 2)->nullable();
+                $table->timestamp('simulacion_inicio_at')->nullable();
+                $table->unsignedInteger('simulacion_duracion_seg')->nullable();
+                $table->json('simulacion_geojson')->nullable();
                 $table->unsignedBigInteger('creado_por_usuarioid')->nullable();
                 $table->string('estado', 30)->default('planificada');
                 $table->timestamp('fecha_salida')->nullable();
@@ -32,6 +36,21 @@ return new class extends Migration
                 $table->foreign('transportista_usuarioid')->references('usuarioid')->on('usuario');
                 $table->foreign('vehiculoid')->references('vehiculoid')->on('vehiculo');
                 $table->foreign('creado_por_usuarioid')->references('usuarioid')->on('usuario');
+            });
+        } else {
+            Schema::table('ruta_distribucion', function (Blueprint $table) {
+                if (! Schema::hasColumn('ruta_distribucion', 'costo_bs')) {
+                    $table->decimal('costo_bs', 12, 2)->nullable()->after('vehiculoid');
+                }
+                if (! Schema::hasColumn('ruta_distribucion', 'simulacion_inicio_at')) {
+                    $table->timestamp('simulacion_inicio_at')->nullable()->after('costo_bs');
+                }
+                if (! Schema::hasColumn('ruta_distribucion', 'simulacion_duracion_seg')) {
+                    $table->unsignedInteger('simulacion_duracion_seg')->nullable()->after('simulacion_inicio_at');
+                }
+                if (! Schema::hasColumn('ruta_distribucion', 'simulacion_geojson')) {
+                    $table->json('simulacion_geojson')->nullable()->after('simulacion_duracion_seg');
+                }
             });
         }
 

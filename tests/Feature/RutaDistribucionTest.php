@@ -147,12 +147,13 @@ class RutaDistribucionTest extends TestCase
             'almacen_planta_origenid' => $almacen->almacenid,
             'transportista_usuarioid' => $chofer->usuarioid,
             'vehiculoid' => $vehiculo->vehiculoid,
+            'costo_bs' => 250.50,
             'pedidos' => [$pedido->pedidodistribucionid],
         ]);
 
         $response->assertRedirect();
         $pedido->refresh();
         $this->assertNotNull($pedido->rutadistribucionid);
-        $this->assertSame(PedidoDistribucionCatalogo::ESTADO_EN_TRANSITO, $pedido->estado);
+        $this->assertSame(PedidoDistribucionCatalogo::ESTADO_CONFIRMADO, $pedido->estado);
     }
 }

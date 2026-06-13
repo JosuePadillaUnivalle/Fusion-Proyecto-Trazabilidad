@@ -41,7 +41,7 @@ class ApiAccessTest extends TestCase
         Sanctum::actingAs($admin);
 
         $this->getJson('/api/pedidos')->assertOk();
-        $this->getJson('/api/ventas')->assertOk();
+        $this->getJson('/api/insumos')->assertOk();
         $this->getJson('/api/certificaciones')->assertOk();
     }
 
