@@ -64,7 +64,7 @@ class RegistroCuentaTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_transportista_debe_indicar_tipo_licencia(): void
+    public function test_transportista_debe_indicar_licencias(): void
     {
         $base = [
             'nombre' => 'Pedro',
@@ -78,9 +78,9 @@ class RegistroCuentaTest extends TestCase
             'password_confirmation' => 'secret123',
         ];
 
-        $this->post(route('register.post'), $base)->assertSessionHasErrors('tipo_licencia');
+        $this->post(route('register.post'), $base)->assertSessionHasErrors('licencias');
 
-        $response = $this->post(route('register.post'), $base + ['tipo_licencia' => 'C']);
+        $response = $this->post(route('register.post'), $base + ['licencias' => ['C']]);
         $response->assertRedirect(route('register.enviado'));
         $this->assertDatabaseHas('usuario', [
             'email' => 'pedro.transportista@test.local',
