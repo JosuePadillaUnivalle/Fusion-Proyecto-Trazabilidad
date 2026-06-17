@@ -10,6 +10,7 @@ use App\Models\ProduccionAlmacenamiento;
 use App\Models\UnidadMedida;
 use App\Support\InsumoCatalogo;
 use App\Support\ProductoPlantaCatalogo;
+use Illuminate\Validation\ValidationException;
 
 class AlmacenCapacidadService
 {
@@ -138,6 +139,28 @@ class AlmacenCapacidadService
         }
 
         return $this->convertirAKg($cantidad, $lote->unidadMedida);
+    }
+
+    public function validarIngresoKg(Almacen $almacen, float $cantidadKg, string $campo = 'cantidad'): void
+    {
+        if ($cantidadKg <= 0) {
+            return;
+        }
+
+        $capacidadKg = $this->capacidadKg($almacen);
+        if ($capacidadKg <= 0) {
+            return;
+        }
+
+        $resumen = $this->resumen($almacen);
+        if ($cantidadKg > $resumen['disponible_kg'] + 0.001) {
+            throw ValidationException::withMessages([
+                $campo => 'La cantidad supera la capacidad disponible del almacén «'.$almacen->nombre.'». '
+                    .'Capacidad: '.number_format($capacidadKg, 2).' kg · Ocupado: '
+                    .number_format($resumen['ocupado_kg'], 2).' kg · Disponible: '
+                    .number_format($resumen['disponible_kg'], 2).' kg.',
+            ]);
+        }
     }
 
     private function nombreProductoLote(?LoteProduccionPedido $lote): ?string

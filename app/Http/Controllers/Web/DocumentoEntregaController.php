@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\DocumentoEntrega;
 use App\Support\DocumentoEntregaArchivo;
+use App\Support\DocumentoEntregaCatalogo;
 use App\Support\DocumentoEntregaTransportista;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class DocumentoEntregaController extends Controller
     {
         $q = DocumentoEntrega::query()
             ->with(['usuario', 'pedido'])
+            ->tap(fn ($query) => DocumentoEntregaCatalogo::aplicarFiltroOperativo($query))
             ->orderByDesc('created_at');
 
         $user = auth()->user();
@@ -59,27 +61,20 @@ class DocumentoEntregaController extends Controller
             $q->whereDate('created_at', '<=', $request->string('hasta')->toString());
         }
 
+        $resumenDocumentos = [
+            'total' => (clone $q)->count(),
+            'pods' => (clone $q)->where('tipo_documento', 'pod')->count(),
+            'hoy' => (clone $q)->whereDate('created_at', today())->count(),
+        ];
+
         $documentos = $q->paginate(15)->withQueryString();
 
-        $tiposDisponibles = DocumentoEntrega::query()
-            ->select('tipo_documento')
-            ->distinct()
-            ->orderBy('tipo_documento')
-            ->pluck('tipo_documento');
-
-        $usuariosCarga = DocumentoEntrega::query()
-            ->with('usuario')
-            ->whereNotNull('usuarioid')
-            ->get()
-            ->pluck('usuario')
-            ->filter()
-            ->unique('usuarioid')
-            ->sortBy('nombreusuario');
+        $tiposDocumento = DocumentoEntregaCatalogo::tiposDocumento();
 
         return view('logistica.documentos.index', compact(
             'documentos',
-            'tiposDisponibles',
-            'usuariosCarga'
+            'tiposDocumento',
+            'resumenDocumentos'
         ));
     }
 

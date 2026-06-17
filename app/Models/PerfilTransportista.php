@@ -18,6 +18,7 @@ class PerfilTransportista extends Model
         'vehiculoid',
         'licencia',
         'tipo_licencia',
+        'licencias_json',
         'fecha_vencimiento_licencia',
         'disponible',
     ];
@@ -28,6 +29,7 @@ class PerfilTransportista extends Model
         'estadotransportistaid'      => 'integer',
         'vehiculoid'                 => 'integer',
         'fecha_vencimiento_licencia' => 'date',
+        'licencias_json' => 'array',
         'disponible'                 => 'boolean',
     ];
 

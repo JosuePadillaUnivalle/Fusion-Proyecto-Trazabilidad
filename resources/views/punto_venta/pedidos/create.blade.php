@@ -73,7 +73,24 @@
     font-size: .8rem;
     flex-shrink: 0;
 }
+.pedido-dist-page .pdv-form-block-icon--minorista { background: #e0e7ff; color: #4338ca; }
 .pedido-dist-page .pdv-form-block-icon--destino { background: #dbeafe; color: #1d4ed8; }
+.pedido-dist-page .pdv-minorista-pick {
+    border: 2px dashed #c7d2fe;
+    border-radius: 12px;
+    padding: .75rem 1rem;
+    background: #f8fafc;
+    margin-bottom: .75rem;
+}
+.pedido-dist-page .pdv-minorista-pick.is-selected {
+    border-style: solid;
+    border-color: #a5b4fc;
+    background: #eef2ff;
+}
+.pedido-dist-page .pdv-destino-pick.is-locked {
+    opacity: .55;
+    pointer-events: none;
+}
 .pedido-dist-page .pdv-form-block-icon--producto { background: #fef3c7; color: #b45309; }
 .pedido-dist-page .pdv-form-block-icon--datos { background: #f3e8ff; color: #7c3aed; }
 .pedido-dist-page .pdv-form-block-title {
@@ -89,77 +106,149 @@
     margin: .1rem 0 0;
 }
 .pedido-dist-page .pdv-destino-pick {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: .65rem;
-    border: 1px solid #dbe3ea;
-    border-radius: 10px;
-    background: #fff;
-    padding: .55rem .65rem;
+    gap: .85rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #f8fafc 0%, #fff 100%);
+    padding: .85rem 1rem;
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
 }
-.pedido-dist-page .pdv-destino-pick.is-empty { background: #f8fafc; }
+.pedido-dist-page .pdv-destino-pick.is-empty {
+    background: #f8fafc;
+    border-style: dashed;
+}
+.pedido-dist-page .pdv-destino-pick.is-selected {
+    border-color: #86efac;
+    background: linear-gradient(135deg, #f0fdf4 0%, #fff 100%);
+    box-shadow: 0 8px 22px rgba(22, 163, 74, .08);
+}
 .pedido-dist-page .pdv-destino-pick-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 9px;
-    background: #dbeafe;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
     color: #1d4ed8;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    font-size: .9rem;
+    font-size: 1.1rem;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.65);
+}
+.pedido-dist-page .pdv-destino-pick.is-selected .pdv-destino-pick-icon {
+    background: linear-gradient(135deg, #bbf7d0, #86efac);
+    color: #166534;
 }
 .pedido-dist-page .pdv-destino-pick-body {
     flex: 1;
     min-width: 0;
 }
+.pedido-dist-page .pdv-destino-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .66rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: .2rem;
+}
+.pedido-dist-page .pdv-destino-pick.is-selected .pdv-destino-kicker {
+    color: #166534;
+}
 .pedido-dist-page .pdv-destino-nombre {
     display: block;
-    font-weight: 700;
-    font-size: .9rem;
+    font-weight: 800;
+    font-size: 1rem;
     color: #0f172a;
     line-height: 1.25;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 .pedido-dist-page .pdv-destino-nombre.is-placeholder {
     color: #94a3b8;
     font-weight: 500;
+    font-size: .92rem;
+}
+.pedido-dist-page .pdv-destino-ubicacion {
+    display: flex;
+    align-items: flex-start;
+    gap: .35rem;
+    margin-top: .35rem;
+    font-size: .78rem;
+    color: #475569;
+    line-height: 1.35;
+}
+.pedido-dist-page .pdv-destino-ubicacion i {
+    color: #16a34a;
+    margin-top: .15rem;
+    flex-shrink: 0;
+}
+.pedido-dist-page .pdv-destino-ubicacion.is-empty {
+    color: #94a3b8;
+    font-style: italic;
+}
+.pedido-dist-page .pdv-destino-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .45rem;
+    margin-top: .45rem;
+}
+.pedido-dist-page .pdv-destino-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    padding: .15rem .5rem;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #166534;
+    font-size: .68rem;
+    font-weight: 700;
 }
 .pedido-dist-page .pdv-destino-map-link {
     display: inline-flex;
     align-items: center;
     gap: .3rem;
-    margin-top: .15rem;
-    padding: 0;
-    border: 0;
-    background: none;
+    padding: .2rem .55rem;
+    border: 1px solid #bbf7d0;
+    border-radius: 999px;
+    background: #fff;
     color: #166534;
-    font-size: .74rem;
-    font-weight: 600;
-    text-decoration: underline;
+    font-size: .72rem;
+    font-weight: 700;
     cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
 }
-.pedido-dist-page .pdv-destino-map-link:hover { color: #14532d; }
+.pedido-dist-page .pdv-destino-map-link:hover {
+    background: #f0fdf4;
+    border-color: #86efac;
+}
 .pedido-dist-page .pdv-destino-map-link:disabled {
     color: #94a3b8;
-    text-decoration: none;
+    border-color: #e2e8f0;
+    background: #f8fafc;
     cursor: not-allowed;
 }
 .pedido-dist-page .pdv-destino-actions {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
     gap: .35rem;
     flex-shrink: 0;
 }
 .pedido-dist-page .pdv-destino-btn {
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: .78rem;
     font-weight: 700;
-    padding: .35rem .7rem;
+    padding: .45rem .85rem;
     white-space: nowrap;
+}
+.pedido-dist-page .pdv-destino-btn--ghost {
+    color: #64748b;
+    border-color: #cbd5e1;
 }
 #modalMapaPdvDestino .pdv-mapa-wrap {
     height: 340px;
@@ -216,6 +305,61 @@
 .pedido-dist-page .pdv-form-block .form-group {
     margin-bottom: 0;
 }
+.pedido-dist-page .pdv-producto-cantidad-row > [class*="col-"] {
+    display: flex;
+    flex-direction: column;
+}
+.pedido-dist-page .pdv-producto-cantidad-row .selector-catalogo-wrapper,
+.pedido-dist-page .pdv-producto-cantidad-row .pdv-cantidad-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+}
+.pedido-dist-page .pdv-producto-cantidad-row .selector-catalogo-wrapper .input-group,
+.pedido-dist-page .pdv-producto-cantidad-row .pdv-cantidad-wrap.input-group {
+    width: 100%;
+}
+.pedido-dist-page .pdv-producto-cantidad-row .input-group .form-control,
+.pedido-dist-page .pdv-producto-cantidad-row .input-group .btn,
+.pedido-dist-page .pdv-producto-cantidad-row .input-group .input-group-text {
+    min-height: 40px;
+    border-width: 2px;
+    border-color: #e2e8f0;
+}
+.pedido-dist-page .pdv-producto-cantidad-row .input-group .form-control {
+    border-radius: 10px 0 0 10px;
+    font-size: .95rem;
+    font-weight: 600;
+}
+.pedido-dist-page .pdv-producto-cantidad-row .input-group .btn {
+    border-radius: 0 10px 10px 0;
+    font-weight: 600;
+}
+.pedido-dist-page .pdv-producto-cantidad-row .input-group .form-control:focus {
+    border-color: #22c55e;
+    box-shadow: none;
+}
+.pedido-dist-page .pdv-producto-cantidad-row .input-group:focus-within .btn,
+.pedido-dist-page .pdv-producto-cantidad-row .input-group:focus-within .input-group-text {
+    border-color: #22c55e;
+}
+.pedido-dist-page .pdv-unidad-append {
+    background: #ecfdf5;
+    color: #047857;
+    font-weight: 700;
+    font-size: .85rem;
+    border-radius: 0 10px 10px 0;
+    min-width: 56px;
+    justify-content: center;
+}
+.pedido-dist-page .pdv-unidad-append.text-muted {
+    background: #f8fafc;
+    color: #94a3b8;
+    border-color: #e2e8f0;
+}
+.pedido-dist-page .pdv-producto-cantidad-row .form-text {
+    min-height: 1.25rem;
+    margin-top: .35rem;
+}
 .pedido-dist-page .pdv-field-readonly {
     border-radius: 10px;
     border: 1px solid #e2e8f0;
@@ -238,6 +382,7 @@
     border-color: #22c55e;
     box-shadow: 0 0 0 .15rem rgba(34,197,94,.12);
 }
+/* legacy: cantidad sin input-group */
 .pedido-dist-page .pdv-footer {
     background: #f8fafc;
     border-top: 1px solid #e8f0ea;
@@ -309,10 +454,40 @@
                     <div class="pdv-form-block-head">
                         <div class="pdv-form-block-icon pdv-form-block-icon--destino"><i class="fas fa-store"></i></div>
                         <div>
-                            <h3 class="pdv-form-block-title">Punto de venta destino</h3>
-                            <p class="pdv-form-block-sub">Elija a qué local llegará el pedido</p>
+                            <h3 class="pdv-form-block-title">Destino del pedido</h3>
+                            <p class="pdv-form-block-sub">
+                                @if($esAdmin ?? false)
+                                    Designe el minorista y el punto de venta que recibirá la solicitud
+                                @else
+                                    Elija a qué local llegará el pedido
+                                @endif
+                            </p>
                         </div>
                     </div>
+
+                    @if($esAdmin ?? false)
+                        <div class="pdv-minorista-pick {{ ($oldMinoristaLabel ?? '') ? 'is-selected' : '' }}" id="pdvMinoristaPick">
+                            <label class="pdv-field-label mb-2">Minorista <span class="text-danger">*</span></label>
+                            @include('partials.selector-catalogo', [
+                                'id' => 'dist_minorista',
+                                'name' => 'minorista_usuarioid',
+                                'value' => old('minorista_usuarioid', $oldMinoristaId ?? ''),
+                                'labelSelected' => $oldMinoristaLabel ?? '',
+                                'endpoint' => route('catalogo-selector.usuarios'),
+                                'params' => ['roles' => 'minorista'],
+                                'title' => 'Buscar minorista',
+                                'searchPlaceholder' => 'Nombre, usuario o correo…',
+                                'searchLabel' => 'Buscar minorista',
+                                'modalIcon' => 'fa-user-tie',
+                                'rowIcon' => 'fa-user-tie',
+                                'required' => true,
+                                'inputGroup' => true,
+                            ])
+                            <small class="text-muted d-block mt-2">
+                                Primero elija el comercio minorista; luego podrá seleccionar uno de sus puntos de venta.
+                            </small>
+                        </div>
+                    @endif
 
                     @if(($esMinorista ?? false) && ($puntosMinorista ?? collect())->isEmpty())
                         <div class="alert alert-warning py-2 mb-0 small">
@@ -320,21 +495,42 @@
                             <a href="{{ route('punto-venta.puntos.create') }}">Crear punto de venta</a>
                         </div>
                     @else
-                        <label class="pdv-field-label mb-2">Destino <span class="text-danger">*</span></label>
-                        <div class="pdv-destino-pick {{ ($oldPuntoLabel ?? '') ? '' : 'is-empty' }}" id="pdvDestinoPick">
+                        <label class="pdv-field-label mb-2">Punto de venta <span class="text-danger">*</span></label>
+                        <div class="pdv-destino-pick {{ ($oldPuntoLabel ?? '') ? 'is-selected' : 'is-empty' }} {{ ($esAdmin ?? false) && empty($oldMinoristaId) ? 'is-locked' : '' }}" id="pdvDestinoPick">
                             <div class="pdv-destino-pick-icon"><i class="fas fa-store"></i></div>
                             <div class="pdv-destino-pick-body">
+                                <div class="pdv-destino-kicker">
+                                    <i class="fas fa-map-pin"></i>
+                                    <span id="pdvDestinoKicker">{{ ($oldPuntoLabel ?? '') ? 'Punto de venta seleccionado' : 'Sin destino asignado' }}</span>
+                                </div>
                                 <span class="pdv-destino-nombre {{ ($oldPuntoLabel ?? '') ? '' : 'is-placeholder' }}" id="pdvDestinoNombre">
-                                    {{ $oldPuntoLabel ?: 'Seleccione un punto de venta' }}
+                                    {{ $oldPuntoLabel ?: 'Seleccione el local que recibirá el pedido' }}
                                 </span>
-                                <button type="button" class="pdv-destino-map-link" id="btnVerMapaPdvDestino"
-                                    @if(empty($puntosVentaMapa)) disabled @endif>
-                                    <i class="fas fa-map-marked-alt"></i> Ver ubicación en mapa
-                                </button>
+                                <div class="pdv-destino-ubicacion {{ ($oldPuntoResumen ?? '') ? '' : 'is-empty' }}" id="pdvDestinoUbicacion">
+                                    @if($oldPuntoResumen ?? '')
+                                        <i class="fas fa-location-dot"></i>
+                                        <span>{{ $oldPuntoResumen }}</span>
+                                    @else
+                                        <span>La dirección aparecerá al elegir un punto de venta.</span>
+                                    @endif
+                                </div>
+                                <div class="pdv-destino-meta-row">
+                                    <span class="pdv-destino-badge d-none" id="pdvDestinoBadge">
+                                        <i class="fas fa-check-circle"></i> Listo para solicitar
+                                    </span>
+                                    <button type="button" class="pdv-destino-map-link" id="btnVerMapaPdvDestino"
+                                        @if(empty($puntosVentaMapa)) disabled @endif>
+                                        <i class="fas fa-map-marked-alt"></i> Ver en mapa
+                                    </button>
+                                </div>
                             </div>
                             <div class="pdv-destino-actions">
-                                <button type="button" class="btn btn-outline-success pdv-destino-btn" id="btnBuscarPdvDestino">
-                                    <i class="fas fa-search mr-1"></i>Buscar
+                                <button type="button" class="btn btn-outline-success pdv-destino-btn" id="btnBuscarPdvDestino"
+                                    @if(($esAdmin ?? false) && empty($oldMinoristaId)) disabled @endif>
+                                    <i class="fas fa-search mr-1"></i>Elegir destino
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary pdv-destino-btn pdv-destino-btn--ghost d-none" id="btnCambiarPdvDestino">
+                                    Cambiar
                                 </button>
                             </div>
                         </div>
@@ -345,26 +541,19 @@
                                 'value' => old('puntoventaid', $oldPuntoId ?? ''),
                                 'labelSelected' => $oldPuntoLabel,
                                 'endpoint' => route('catalogo-selector.puntos-venta'),
-                                'title' => ($esMinorista ?? false) ? 'Mis puntos de venta' : 'Buscar punto de venta',
+                                'title' => ($esMinorista ?? false) ? 'Mis puntos de venta' : 'Puntos de venta del minorista',
                                 'searchPlaceholder' => ($esMinorista ?? false)
                                     ? 'Nombre o dirección del punto…'
-                                    : 'Nombre, dirección o minorista…',
+                                    : 'Nombre o dirección del punto…',
                                 'searchLabel' => 'Buscar punto de venta',
                                 'modalIcon' => 'fa-store',
                                 'rowIcon' => 'fa-store',
                                 'colDetalle' => 'Ubicación',
                                 'required' => true,
                                 'inputGroup' => true,
-                                'filter' => (! ($esMinorista ?? false) && $minoristasFiltro->isNotEmpty()) ? [
-                                    'param' => 'minorista_usuarioid',
-                                    'options' => array_merge(
-                                        [['value' => '', 'label' => 'Todos los minoristas']],
-                                        $minoristasFiltro->map(fn ($m) => [
-                                            'value' => (string) $m->usuarioid,
-                                            'label' => trim($m->nombre.' '.$m->apellido),
-                                        ])->all()
-                                    ),
-                                ] : null,
+                                'params' => ($esAdmin ?? false) && ! empty($oldMinoristaId)
+                                    ? ['minorista_usuarioid' => (string) $oldMinoristaId]
+                                    : [],
                             ])
                         </div>
                     @endif
@@ -397,8 +586,8 @@
                             <p class="pdv-form-block-sub">Qué necesita y en qué cantidad</p>
                         </div>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group col-md-7">
+                    <div class="form-row pdv-producto-cantidad-row">
+                        <div class="form-group col-md-6">
                             <label class="pdv-field-label">Producto (stock planta) <span class="text-danger">*</span></label>
                             @include('partials.selector-catalogo', [
                                 'id' => 'dist_producto_planta',
@@ -414,14 +603,14 @@
                             ])
                             <small id="txtStockDisponible" class="form-text text-success font-weight-bold"></small>
                         </div>
-                        <div class="form-group col-md-5">
-                            <label class="pdv-field-label d-flex align-items-center justify-content-between" for="cantidad">
-                                <span>Cantidad <span class="text-danger">*</span></span>
-                                <span class="pdv-unidad-badge pdv-unidad-badge--inline {{ $oldProductoUnidad ? '' : 'd-none' }}" id="badgeUnidad">{{ $oldProductoUnidad }}</span>
-                            </label>
-                            <div class="pdv-cantidad-wrap">
+                        <div class="form-group col-md-6">
+                            <label class="pdv-field-label" for="cantidad">Cantidad <span class="text-danger">*</span></label>
+                            <div class="pdv-cantidad-wrap input-group">
                                 <input type="number" step="0.01" min="0.01" name="cantidad" id="cantidad" class="form-control" required
                                     value="{{ old('cantidad') }}" placeholder="0.00">
+                                <div class="input-group-append">
+                                    <span class="input-group-text pdv-unidad-append {{ $oldProductoUnidad ? '' : 'text-muted' }}" id="badgeUnidad">{{ $oldProductoUnidad ?: '—' }}</span>
+                                </div>
                             </div>
                             <small class="form-text text-muted" id="txtAyudaCantidad">
                                 @if($oldProductoUnidad)
@@ -489,25 +678,94 @@
     var unidadActual = @json($oldProductoUnidad ?: '');
     var puntosVentaMapa = @json($puntosVentaMapa ?? []);
     var pdvSeleccionadoId = @json(old('puntoventaid', $oldPuntoId ?? ''));
+    var esAdmin = @json($esAdmin ?? false);
+    var minoristaSeleccionadoId = @json(old('minorista_usuarioid', $oldMinoristaId ?? ''));
+
+    function puntosMapaFiltrados() {
+        if (!esAdmin || !minoristaSeleccionadoId) {
+            return puntosVentaMapa;
+        }
+        return puntosVentaMapa.filter(function (p) {
+            return String(p.minorista_usuarioid) === String(minoristaSeleccionadoId);
+        });
+    }
+
+    function limpiarPdvDestino() {
+        var wrap = getPdvWrap();
+        if (!wrap) return;
+        wrap.querySelector('.selector-catalogo-value').value = '';
+        var display = wrap.querySelector('.selector-catalogo-label');
+        if (display) {
+            display.value = '';
+            display.classList.add('text-muted');
+        }
+        if (window.CatalogoSelector) {
+            CatalogoSelector.clear('dist_punto_venta');
+        }
+        actualizarDestinoVisible('', '', {});
+    }
+
+    function syncBloqueoDestinoAdmin() {
+        if (!esAdmin) return;
+        var pickEl = document.getElementById('pdvDestinoPick');
+        var btnBuscar = document.getElementById('btnBuscarPdvDestino');
+        var btnMapa = document.getElementById('btnVerMapaPdvDestino');
+        var bloqueado = !minoristaSeleccionadoId;
+        if (pickEl) pickEl.classList.toggle('is-locked', bloqueado);
+        if (btnBuscar) btnBuscar.disabled = bloqueado;
+        if (btnMapa) btnMapa.disabled = bloqueado || !puntosMapaFiltrados().length;
+    }
+
+    function paramsPuntoVenta() {
+        if (esAdmin && minoristaSeleccionadoId) {
+            return { minorista_usuarioid: String(minoristaSeleccionadoId) };
+        }
+        return {};
+    }
 
     function getPdvWrap() {
         return document.getElementById('selector_wrap_dist_punto_venta');
     }
 
-    function actualizarDestinoVisible(id, label) {
+    function actualizarDestinoVisible(id, label, extra) {
         var nombreEl = document.getElementById('pdvDestinoNombre');
         var pickEl = document.getElementById('pdvDestinoPick');
+        var ubicacionEl = document.getElementById('pdvDestinoUbicacion');
+        var kickerEl = document.getElementById('pdvDestinoKicker');
+        var badgeEl = document.getElementById('pdvDestinoBadge');
+        var btnCambiar = document.getElementById('btnCambiarPdvDestino');
         if (!nombreEl || !pickEl) return;
 
+        extra = extra || {};
+        var resumen = extra.ubicacion_resumen || extra.direccion || '';
         pdvSeleccionadoId = id ? String(id) : '';
+
         if (id && label) {
             nombreEl.textContent = label;
             nombreEl.classList.remove('is-placeholder');
             pickEl.classList.remove('is-empty');
+            pickEl.classList.add('is-selected');
+            if (kickerEl) kickerEl.textContent = 'Punto de venta seleccionado';
+            if (badgeEl) badgeEl.classList.remove('d-none');
+            if (btnCambiar) btnCambiar.classList.remove('d-none');
+            if (ubicacionEl) {
+                ubicacionEl.classList.remove('is-empty');
+                ubicacionEl.innerHTML = resumen
+                    ? '<i class="fas fa-location-dot"></i><span>' + resumen + '</span>'
+                    : '<span>Sin dirección registrada para este punto.</span>';
+            }
         } else {
-            nombreEl.textContent = 'Seleccione un punto de venta';
+            nombreEl.textContent = 'Seleccione el local que recibirá el pedido';
             nombreEl.classList.add('is-placeholder');
             pickEl.classList.add('is-empty');
+            pickEl.classList.remove('is-selected');
+            if (kickerEl) kickerEl.textContent = 'Sin destino asignado';
+            if (badgeEl) badgeEl.classList.add('d-none');
+            if (btnCambiar) btnCambiar.classList.add('d-none');
+            if (ubicacionEl) {
+                ubicacionEl.classList.add('is-empty');
+                ubicacionEl.innerHTML = '<span>La dirección aparecerá al elegir un punto de venta.</span>';
+            }
         }
     }
 
@@ -522,7 +780,10 @@
             display.value = pdv.label;
             display.classList.remove('text-muted');
         }
-        actualizarDestinoVisible(pdv.id, pdv.label);
+        actualizarDestinoVisible(pdv.id, pdv.label, {
+            ubicacion_resumen: pdv.resumen || '',
+            direccion: pdv.direccion || '',
+        });
         wrap.dispatchEvent(new CustomEvent('selector-catalogo:change', {
             bubbles: true,
             detail: {
@@ -548,13 +809,8 @@
         var unidad = (extra && extra.unidad) ? String(extra.unidad).trim() : '';
         unidadActual = unidad;
         if (badge) {
-            if (unidad) {
-                badge.textContent = unidad;
-                badge.classList.remove('d-none');
-            } else {
-                badge.textContent = '';
-                badge.classList.add('d-none');
-            }
+            badge.textContent = unidad || '—';
+            badge.classList.toggle('text-muted', !unidad);
         }
         if (ayuda) {
             ayuda.textContent = unidad
@@ -583,6 +839,17 @@
         var capasPdvMapa = null;
 
         document.getElementById('btnBuscarPdvDestino')?.addEventListener('click', function () {
+            if (esAdmin && !minoristaSeleccionadoId) {
+                alert('Primero seleccione el minorista.');
+                return;
+            }
+            CatalogoSelector.open('dist_punto_venta');
+        });
+        document.getElementById('btnCambiarPdvDestino')?.addEventListener('click', function () {
+            if (esAdmin && !minoristaSeleccionadoId) {
+                alert('Primero seleccione el minorista.');
+                return;
+            }
             CatalogoSelector.open('dist_punto_venta');
         });
 
@@ -600,7 +867,7 @@
             var lista = document.getElementById('listaPdvMapaDestino');
             if (!lista) return;
             lista.innerHTML = '';
-            puntosVentaMapa.forEach(function (pdv) {
+            puntosMapaFiltrados().forEach(function (pdv) {
                 var chip = document.createElement('button');
                 chip.type = 'button';
                 chip.className = 'pdv-mapa-chip' + (String(pdvSeleccionadoId) === String(pdv.id) ? ' is-active' : '');
@@ -621,7 +888,7 @@
             if (!mapaPdv || !capasPdvMapa) return;
             capasPdvMapa.clearLayers();
             var bounds = [];
-            var conCoords = puntosVentaMapa.filter(function (p) {
+            var conCoords = puntosMapaFiltrados().filter(function (p) {
                 return p.lat != null && p.lng != null && !isNaN(parseFloat(p.lat)) && !isNaN(parseFloat(p.lng));
             });
 
@@ -650,7 +917,11 @@
         }
 
         function abrirMapaPdvDestino() {
-            if (!puntosVentaMapa.length) return;
+            if (esAdmin && !minoristaSeleccionadoId) {
+                alert('Primero seleccione el minorista.');
+                return;
+            }
+            if (!puntosMapaFiltrados().length) return;
             window.jQuery('#modalMapaPdvDestino').modal('show');
         }
 
@@ -686,8 +957,63 @@
 
         if (pdvWrap) {
             pdvWrap.addEventListener('selector-catalogo:change', function (e) {
-                actualizarDestinoVisible(e.detail?.id, e.detail?.label);
+                actualizarDestinoVisible(e.detail?.id, e.detail?.label, e.detail?.extra || {});
             });
+        }
+
+        @if($esAdmin ?? false)
+        var minoristaWrap = document.getElementById('selector_wrap_dist_minorista');
+        CatalogoSelector.register('dist_minorista', {
+            endpoint: @json(route('catalogo-selector.usuarios')),
+            title: 'Minorista',
+            searchPlaceholder: 'Nombre, usuario o correo…',
+            params: { roles: 'minorista' },
+            onSelect: function (item) {
+                minoristaSeleccionadoId = item.id ? String(item.id) : '';
+                document.getElementById('pdvMinoristaPick')?.classList.toggle('is-selected', !!minoristaSeleccionadoId);
+                if (CatalogoSelector.instances.dist_punto_venta) {
+                    CatalogoSelector.instances.dist_punto_venta.params = paramsPuntoVenta();
+                }
+                limpiarPdvDestino();
+                syncBloqueoDestinoAdmin();
+            },
+        });
+        if (minoristaWrap) {
+            minoristaWrap.addEventListener('selector-catalogo:change', function (e) {
+                minoristaSeleccionadoId = e.detail?.id ? String(e.detail.id) : '';
+                document.getElementById('pdvMinoristaPick')?.classList.toggle('is-selected', !!minoristaSeleccionadoId);
+                if (CatalogoSelector.instances.dist_punto_venta) {
+                    CatalogoSelector.instances.dist_punto_venta.params = paramsPuntoVenta();
+                }
+                if (!minoristaSeleccionadoId) {
+                    limpiarPdvDestino();
+                }
+                syncBloqueoDestinoAdmin();
+            });
+        }
+        CatalogoSelector.register('dist_punto_venta', {
+            endpoint: @json(route('catalogo-selector.puntos-venta')),
+            title: 'Puntos de venta del minorista',
+            searchPlaceholder: 'Nombre o dirección del punto…',
+            params: paramsPuntoVenta(),
+            onSelect: function (item) {
+                actualizarDestinoVisible(item.id, item.label, item.extra || {});
+            },
+        });
+        syncBloqueoDestinoAdmin();
+        @endif
+
+        if (pdvSeleccionadoId) {
+            var pdvInicial = buscarPdvEnMapa(pdvSeleccionadoId);
+            if (pdvInicial) {
+                actualizarDestinoVisible(pdvInicial.id, pdvInicial.label, {
+                    ubicacion_resumen: pdvInicial.resumen || '',
+                    direccion: pdvInicial.direccion || '',
+                });
+            } else if (@json($oldPuntoLabel ?? '')) {
+                document.getElementById('pdvDestinoBadge')?.classList.remove('d-none');
+                document.getElementById('btnCambiarPdvDestino')?.classList.remove('d-none');
+            }
         }
 
         @if($esAdmin ?? false)
@@ -727,6 +1053,14 @@
         }
 
         document.getElementById('formPedidoDist').addEventListener('submit', function (e) {
+            if (esAdmin) {
+                var minoristaOk = document.querySelector('#selector_wrap_dist_minorista .selector-catalogo-value')?.value;
+                if (!minoristaOk) {
+                    e.preventDefault();
+                    alert('Seleccione el minorista destino.');
+                    return;
+                }
+            }
             var pdvOk = document.querySelector('#selector_wrap_dist_punto_venta .selector-catalogo-value')?.value;
             if (!pdvOk) {
                 e.preventDefault();

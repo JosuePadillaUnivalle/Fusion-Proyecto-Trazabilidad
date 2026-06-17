@@ -62,6 +62,16 @@
 .page-insumo-show .alerta-banner.critico { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
 .page-insumo-show .alerta-banner.atencion { background: #fff3cd; border: 1px solid #ffeeba; color: #856404; }
 .page-insumo-show .alerta-banner.ok { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+.page-insumo-show .insumo-imagen-grande {
+    width: 100%;
+    max-height: 340px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 4px 18px rgba(0,0,0,.1);
+    background: #f8f9fa;
+}
+.page-insumo-show .insumo-imagen-wrap { margin-bottom: 1.25rem; }
 </style>
 @endpush
 
@@ -81,6 +91,13 @@
                     </a>
                 </div>
                 <div class="card-body">
+                    <div class="insumo-imagen-wrap text-center">
+                        <img src="{{ $insumo->imagenSrc(520) }}"
+                             alt="{{ $insumo->nombre }}"
+                             class="insumo-imagen-grande"
+                             loading="lazy">
+                    </div>
+
                     <div class="alerta-banner mb-4 {{ $claseStock === 'low' ? 'critico' : ($claseStock === 'medium' ? 'atencion' : 'ok') }}">
                         @if($claseStock === 'low')
                             <i class="fas fa-exclamation-triangle mr-1"></i>

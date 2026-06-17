@@ -522,6 +522,28 @@
             this.page = current;
         },
 
+        syncFiltrosField(wrapper, itemId, label) {
+            if (!wrapper || !wrapper.classList.contains('selector-catalogo--filtros')) {
+                return;
+            }
+
+            const display = wrapper.querySelector('.selector-catalogo-label');
+            const clearBtn = wrapper.querySelector('.selector-filtros-field__clear');
+            const cfg = this.instances[wrapper.id.replace('selector_wrap_', '')] || {};
+            const hasValue = itemId !== '' && itemId !== null && itemId !== undefined;
+
+            if (display) {
+                display.classList.toggle('is-empty', !hasValue);
+                if (!hasValue) {
+                    display.placeholder = cfg.placeholderEmpty || cfg.emptyLabel || 'Opcional — sin asignar';
+                }
+            }
+
+            if (clearBtn) {
+                clearBtn.classList.toggle('is-hidden', !hasValue);
+            }
+        },
+
         select(item) {
             const id = this.activeId;
             if (!id) {
@@ -545,9 +567,13 @@
                     if (cfg.allowEmpty && item.id === '') {
                         display.value = '';
                         display.placeholder = cfg.placeholderEmpty || cfg.emptyLabel || 'Opcional — sin asignar';
-                        display.classList.add('text-muted');
+                        display.classList.add('text-muted', 'is-empty');
+                    } else {
+                        display.classList.remove('is-empty');
                     }
                 }
+
+                this.syncFiltrosField(wrapper, item.id, item.label);
             }
 
             const finalize = () => {
@@ -587,6 +613,8 @@
             const display = wrapper.querySelector('.selector-catalogo-label');
             display.value = label;
             display.classList.toggle('text-muted', !value);
+            display.classList.toggle('is-empty', !value);
+            this.syncFiltrosField(wrapper, value, label);
             wrapper.dispatchEvent(new CustomEvent('selector-catalogo:change', {
                 bubbles: true,
                 detail: { id: value, label },

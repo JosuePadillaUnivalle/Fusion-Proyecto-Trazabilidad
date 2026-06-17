@@ -54,7 +54,7 @@ class AuthController extends Controller
         $user->ultimologin = now();
         $user->save();
 
-        return redirect()->route('dashboard')->with('success', 'Bienvenido.');
+        return redirect()->route('dashboard');
     }
 
     public function showRegisterForm()
@@ -84,19 +84,30 @@ class AuthController extends Controller
             'telefono' => ['required', 'string', 'max:20', 'regex:'.RegistroValidacion::TELEFONO],
             'ci_nit' => ['required', 'string', 'max:30', 'regex:'.RegistroValidacion::CI_NIT, 'unique:usuario,ci_nit'],
             'rol_solicitado' => ['required', Rule::in(CuentaEstado::rolesRegistroPublico())],
-            'tipo_licencia' => [
-                Rule::requiredIf($esTransportista),
-                'nullable',
-                'string',
-                'max:20',
-                Rule::in(TiposLicenciaBolivia::codigos()),
-            ],
+            'licencias_todas' => ['nullable', 'boolean'],
+            'licencias' => ['nullable', 'array'],
+            'licencias.*' => ['string', Rule::in(TiposLicenciaBolivia::codigosVehiculo())],
             'carta_motivacion' => 'required|string|min:30|max:2000',
             'password' => 'required|string|min:6|confirmed',
         ], array_merge(RegistroValidacion::mensajes(), [
-            'tipo_licencia.required' => 'Indica el tipo de licencia de conducir.',
-            'tipo_licencia.in' => 'Selecciona un tipo de licencia válido en Bolivia (M, P, A, B, C o T).',
+            'licencias.*.in' => 'Selecciona licencias de vehículo válidas (P, A, B, C o T).',
         ]));
+
+        $licenciasJson = null;
+        $tipoLicenciaPrincipal = null;
+        if ($esTransportista) {
+            $licencias = TiposLicenciaBolivia::resolverDesdeSolicitud(
+                $request->boolean('licencias_todas'),
+                $request->input('licencias', [])
+            );
+            if ($licencias === []) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'licencias' => 'Indica al menos una licencia de vehículo o marca «Tiene todas las licencias».',
+                ]);
+            }
+            $licenciasJson = $licencias;
+            $tipoLicenciaPrincipal = TiposLicenciaBolivia::licenciaPrincipal($licencias);
+        }
 
         $nombreusuario = app(UsuarioUsernameService::class)->generarTemporalSolicitud();
 
@@ -107,7 +118,8 @@ class AuthController extends Controller
             'nombreusuario' => $nombreusuario,
             'telefono' => $data['telefono'],
             'ci_nit' => $data['ci_nit'],
-            'tipo_licencia' => $esTransportista ? $data['tipo_licencia'] : null,
+            'tipo_licencia' => $tipoLicenciaPrincipal,
+            'licencias_json' => $licenciasJson,
             'carta_motivacion' => $data['carta_motivacion'],
             'rol_solicitado' => $data['rol_solicitado'],
             'passwordhash' => Hash::make($data['password']),

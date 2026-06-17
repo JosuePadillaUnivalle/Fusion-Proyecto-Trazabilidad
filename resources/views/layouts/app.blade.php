@@ -1058,7 +1058,7 @@
                     if (! ($esJefeAgr && ! $isAdmin)) {
                         $prodAgrOpen = $prodAgrOpen || request()->routeIs('agricola.pedidos.*');
                     }
-                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'plantillas-transformacion.*', 'maquinas-planta.*', 'procesamiento.*', 'tareas-planta.*');
+                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'plantillas-transformacion.*', 'maquinas-planta.*', 'procesamiento.*', 'tareas-planta.*', 'certificaciones-planta.*');
                     $envListadoActivo = request()->routeIs(
                         'logistica.asignaciones.listado',
                         'logistica.asignaciones.show',
@@ -1287,7 +1287,8 @@
                     </a>
                     <ul class="ag-subnav {{ $prodPlaMenuOpen ? 'open' : '' }}" id="sub-prod-pla">
                         @can('lote_produccion.view')
-                        <li class="ag-sub-li"><a href="{{ route('procesamiento.index') }}" class="ag-sub-a {{ request()->routeIs('procesamiento.*') ? 'active' : '' }}">Procesamiento de Lote</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('procesamiento.index') }}" class="ag-sub-a {{ request()->routeIs('procesamiento.*') && ! request()->routeIs('certificaciones-planta.*') ? 'active' : '' }}">Procesamiento de Lote</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('certificaciones-planta.index') }}" class="ag-sub-a {{ request()->routeIs('certificaciones-planta.*') ? 'active' : '' }}">Certificaciones</a></li>
                         @endcan
                         @if($authUser && \App\Support\UsuarioRol::esOperarioPlanta($authUser))
                         <li class="ag-sub-li"><a href="{{ route('tareas-planta.index') }}" class="ag-sub-a {{ request()->routeIs('tareas-planta.*') ? 'active' : '' }}">Mis tareas de transformación</a></li>
@@ -1499,6 +1500,7 @@
         @include('partials.modal-bienvenida')
         @include('partials.modal-aviso')
         @once
+            @include('partials.selector-catalogo-assets')
             @include('partials.selector-catalogo-modal')
         @endonce
 

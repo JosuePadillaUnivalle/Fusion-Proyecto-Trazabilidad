@@ -19,13 +19,26 @@
     <div class="modulo-filtros-panel collapse show" id="filtrosInventarioPdv">
         <form method="GET" action="{{ route('punto-venta.inventario.index') }}" class="form-row align-items-end">
             <div class="form-group col-md-4 mb-2 mb-md-0">
-                <label>Punto de venta</label>
-                <select name="puntoventaid" class="form-control form-control-sm">
-                    <option value="">Todos mis puntos</option>
-                    @foreach($puntos as $pdv)
-                        <option value="{{ $pdv->puntoventaid }}" @selected($filtroPdv == $pdv->puntoventaid)>{{ $pdv->nombre }}</option>
-                    @endforeach
-                </select>
+                @include('partials.selector-catalogo', [
+                    'id' => 'inv_filtro_pdv',
+                    'name' => 'puntoventaid',
+                    'value' => $filtroPdv ?? '',
+                    'labelSelected' => $filtroPdvNombre ?? '',
+                    'endpoint' => route('catalogo-selector.puntos-venta'),
+                    'title' => 'Filtrar por punto de venta',
+                    'label' => 'Punto de venta',
+                    'icon' => 'fa-store',
+                    'searchPlaceholder' => 'Nombre, dirección o minorista…',
+                    'searchLabel' => 'Buscar punto de venta',
+                    'allowEmpty' => true,
+                    'emptyLabel' => 'Todos mis puntos',
+                    'placeholderEmpty' => 'Todos mis puntos',
+                    'modalIcon' => 'fa-store',
+                    'rowIcon' => 'fa-store',
+                    'colNombre' => 'Punto de venta',
+                    'colDetalle' => 'Minorista / ubicación',
+                    'variant' => 'filtros',
+                ])
             </div>
             <div class="form-group col-md-5 mb-2 mb-md-0">
                 <label>Buscar producto</label>

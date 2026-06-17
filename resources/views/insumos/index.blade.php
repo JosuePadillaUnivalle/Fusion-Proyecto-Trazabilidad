@@ -17,6 +17,21 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+}
+.page-insumos .products-list .product-img img,
+.page-insumos .insumo-thumb {
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    background: #f8f9fa;
+}
+.page-insumos .insumo-cell {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
 }
 .page-insumos .stock-badge-high { background: #d4edda; color: #155724; }
 .page-insumos .stock-badge-medium { background: #fff3cd; color: #856404; }
@@ -29,7 +44,7 @@
 
 <div class="alert alert-light border py-2 mb-3 small">
     <i class="fas fa-info-circle text-success mr-1"></i>
-    Catálogo de <strong>insumos del campo</strong> (bodega agrícola general): material de siembra, fertilizantes, pesticidas y riego.
+    Catálogo de <strong>insumos del campo</strong> (bodega agrícola general): material de siembra, fertilizantes y control de plagas.
     Los productos cosechados se gestionan en <strong>Lotes</strong> y <strong>Almacén agrícola → Movimientos</strong>.
     Al usarlos en un lote, registre una <strong>Actividad</strong>.
 </div>
@@ -107,8 +122,8 @@
                     <label class="small text-muted mb-1">Tipo</label>
                     <select id="filterTipo" class="form-control form-control-sm">
                         <option value="">Todos los tipos</option>
-                        @foreach($insumos->pluck('tipo.nombre')->filter()->unique()->sort() as $tipoNombre)
-                            <option value="{{ strtolower($tipoNombre) }}">{{ $tipoNombre }}</option>
+                        @foreach($tiposFiltro ?? [] as $tipoFiltro)
+                            <option value="{{ strtolower($tipoFiltro->nombre) }}">{{ $tipoFiltro->nombre }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -156,7 +171,12 @@
                             data-tipo="{{ strtolower($i->tipo->nombre ?? '') }}"
                             data-unidad="{{ strtolower($i->unidadMedida->nombre ?? '') }}"
                             data-stockclass="{{ $rowStockClass }}">
-                            <td><strong class="text-success">{{ $i->nombre }}</strong></td>
+                            <td>
+                                <div class="insumo-cell">
+                                    <img src="{{ $i->imagenSrc(128) }}" alt="{{ $i->nombre }}" class="insumo-thumb" loading="lazy">
+                                    <strong class="text-success mb-0">{{ $i->nombre }}</strong>
+                                </div>
+                            </td>
                             <td>{{ $i->tipo->nombre ?? '—' }}</td>
                             <td>{{ $i->unidadMedida->nombre ?? '—' }}</td>
                             <td>
@@ -207,15 +227,7 @@
             @forelse($insumos as $i)
                 @php
                     $stockClass = \App\Support\InsumoCatalogo::claseStock((float) $i->stock);
-                    $icon = 'box';
-                    $slugTipo = \App\Support\InsumoCatalogo::slugFromNombreTipo($i->tipo->nombre ?? '');
-                    $icon = match ($slugTipo) {
-                        'material_siembra' => 'seedling',
-                        'fertilizantes' => 'flask',
-                        'pesticidas' => 'bug',
-                        'material_riego' => 'tint',
-                        default => 'box',
-                    };
+                    $imagenSrc = $i->imagenSrc(128);
                     $outline = $stockClass === 'low' ? 'danger' : ($stockClass === 'medium' ? 'warning' : 'success');
                 @endphp
                 <div class="search-item border-bottom"
@@ -226,7 +238,7 @@
                     <ul class="products-list product-list-in-card pl-2 pr-2 mb-0">
                         <li class="item">
                             <div class="product-img bg-light rounded">
-                                <i class="fas fa-{{ $icon }} text-{{ $outline }}"></i>
+                                <img src="{{ $imagenSrc }}" alt="{{ $i->nombre }}" loading="lazy">
                             </div>
                             <div class="product-info">
                                 <a href="{{ route('insumos.show', $i) }}" class="product-title">
@@ -332,6 +344,13 @@ $(function () {
         aplicarFiltros();
         $('#filtrosInsumosPanel').collapse('show');
     });
+
+    var urlStock = new URLSearchParams(window.location.search).get('stock');
+    if (urlStock === 'bajo' || urlStock === 'low') {
+        $('#filterStock').val('low');
+        $('#filtrosInsumosPanel').addClass('show');
+        aplicarFiltros();
+    }
 
     $('.on-submit-confirm').on('submit', function (e) {
         e.preventDefault();

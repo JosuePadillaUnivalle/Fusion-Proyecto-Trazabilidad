@@ -3,6 +3,10 @@
 @section('title', 'Editar documento | AgroFusion')
 @section('page_title', 'Editar documento')
 
+@push('styles')
+@include('logistica.partials.ops-reportes-styles')
+@endpush
+
 @section('content')
 <section class="content">
     <div class="container-fluid px-3 px-lg-4">
@@ -35,7 +39,10 @@
                         </div>
                         <div class="col-md-8 form-group">
                             <label class="small font-weight-bold">Reemplazar archivo <span class="text-muted">(opcional)</span></label>
-                            <input type="file" name="archivo" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                            @include('logistica.partials.ops-file-input', [
+                                'inputId' => 'docEntregaArchivoEdit',
+                                'placeholder' => 'Sin cambios — elija otro archivo',
+                            ])
                         </div>
                     </div>
                     <button class="btn btn-success"><i class="fas fa-save mr-1"></i>Guardar</button>

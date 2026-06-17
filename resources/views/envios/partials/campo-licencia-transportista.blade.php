@@ -1,18 +1,24 @@
 @php
     $t = $transportista ?? null;
-    $tipoLicencia = old('tipo_licencia', $t?->tipo_licencia ?? $t?->perfilTransportista?->tipo_licencia ?? '');
     $numLicencia = old('licencia', $t?->perfilTransportista?->licencia ?? '');
+    $licenciasActuales = old('licencias', $t?->licencias_json ?? $t?->perfilTransportista?->licencias_json ?? []);
+    if (is_string($licenciasActuales)) {
+        $decoded = json_decode($licenciasActuales, true);
+        $licenciasActuales = is_array($decoded) ? $decoded : [];
+    }
+    if ($licenciasActuales === [] && ($t?->tipo_licencia ?? $t?->perfilTransportista?->tipo_licencia)) {
+        $licenciasActuales = [$t->tipo_licencia ?? $t->perfilTransportista->tipo_licencia];
+    }
+    $licenciasTodas = (bool) old('licencias_todas', count(\App\Support\TiposLicenciaBolivia::normalizarLista($licenciasActuales)) === count(\App\Support\TiposLicenciaBolivia::codigosVehiculo()));
 @endphp
-<div class="col-md-3">
+<div class="col-md-8">
     <div class="form-group">
-        <label>Tipo de licencia <span class="text-danger">*</span></label>
-        <select name="tipo_licencia" class="form-control" required>
-            <option value="">— Seleccionar —</option>
-            @foreach(\App\Support\TiposLicenciaBolivia::todos() as $codigo => $descripcion)
-            <option value="{{ $codigo }}" @selected($tipoLicencia === $codigo)>{{ $codigo }} — {{ $descripcion }}</option>
-            @endforeach
-        </select>
-        <small class="text-muted">Clasificación boliviana (M, P, A, B, C, T).</small>
+        @include('envios.partials.campo-licencias-checkboxes', [
+            'licenciasActuales' => $licenciasActuales,
+            'licenciasTodas' => $licenciasTodas,
+            'inputPrefix' => 'edit_',
+            'licenciasTema' => 'light',
+        ])
     </div>
 </div>
 <div class="col-md-3">

@@ -88,6 +88,22 @@
     border: 2px solid #6ee7b7;
     background: linear-gradient(135deg, #ecfdf5, #d1fae5);
 }
+.pdv-flota-panel {
+    border-radius: 12px;
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    background: #fafafa;
+    margin-bottom: 1rem;
+}
+.pdv-flota-panel--chofer { border-color: #bfdbfe; background: linear-gradient(160deg, #f8fbff 0%, #eff6ff 100%); }
+.pdv-flota-panel--vehiculo { border-color: #a7f3d0; background: linear-gradient(160deg, #f6fffb 0%, #ecfdf5 100%); }
+.pdv-flota-panel .panel-icon {
+    width: 30px; height: 30px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; margin-right: 0.4rem;
+}
+.pdv-flota-panel--chofer .panel-icon { background: #dbeafe; color: #1d4ed8; }
+.pdv-flota-panel--vehiculo .panel-icon { background: #d1fae5; color: #047857; }
 </style>
 @endpush
 
@@ -98,6 +114,10 @@
         $pendientePlanta = \App\Support\PedidoDistribucionCatalogo::pendienteAprobacionPlanta($pedido);
         $unidad = $det?->insumo?->unidadMedida?->abreviatura ?? '';
         $stockOk = $erroresStock === [];
+        $transportistaEfectivo = $pedido->transportista ?? $pedido->rutaDistribucion?->transportista;
+        $vehiculoEfectivo = $pedido->vehiculo ?? $pedido->rutaDistribucion?->vehiculo;
+        $puedeDespacharDirecto = \App\Support\PedidoDistribucionCatalogo::puedeDespacharDirecto($pedido);
+        $enRutaPlanificada = $pedido->estado === 'confirmado' && $pedido->rutadistribucionid !== null;
         $pasos = [
             ['num' => 1, 'icon' => 'fa-paper-plane', 'label' => 'Solicitud minorista', 'hecho' => true, 'activo' => false],
             ['num' => 2, 'icon' => 'fa-industry', 'label' => 'Revisión planta', 'hecho' => in_array($pedido->estado, ['confirmado', 'en_transito', 'recibido'], true), 'activo' => $pendientePlanta],
@@ -207,6 +227,19 @@
                         <dt class="col-sm-4">Enviado</dt>
                         <dd class="col-sm-8">{{ $pedido->fecha_envio->format('d/m/Y H:i') }}</dd>
                         @endif
+                        @if($transportistaEfectivo)
+                        <dt class="col-sm-4">Transportista</dt>
+                        <dd class="col-sm-8">{{ trim($transportistaEfectivo->nombre.' '.$transportistaEfectivo->apellido) }}</dd>
+                        @endif
+                        @if($vehiculoEfectivo)
+                        <dt class="col-sm-4">Vehículo</dt>
+                        <dd class="col-sm-8">
+                            {{ $vehiculoEfectivo->placa }}
+                            @if($vehiculoEfectivo->marca || $vehiculoEfectivo->modelo)
+                                <span class="text-muted">— {{ trim(($vehiculoEfectivo->marca ?? '').' '.($vehiculoEfectivo->modelo ?? '')) }}</span>
+                            @endif
+                        </dd>
+                        @endif
                         @if($pedido->fecha_recepcion)
                         <dt class="col-sm-4">Recibido en PDV</dt>
                         <dd class="col-sm-8">{{ $pedido->fecha_recepcion->format('d/m/Y H:i') }}</dd>
@@ -259,21 +292,67 @@
                     </form>
                 </div>
             </div>
-            @elseif($puedeGestionarPlanta && \App\Support\PedidoDistribucionCatalogo::puedeMarcarEnviado($pedido))
+            @elseif($puedeGestionarPlanta && $puedeDespacharDirecto)
             <div class="card pdv-card card-outline card-success mb-3">
                 <div class="card-header bg-white py-2"><h3 class="card-title mb-0 font-weight-bold"><i class="fas fa-shipping-fast text-success mr-1"></i> Envío a PDV</h3></div>
                 <div class="card-body">
-                    <p class="text-muted small mb-3">El pedido fue aceptado. Marque cuando el producto salga de planta hacia el minorista.</p>
-                    <form method="POST" action="{{ route('punto-venta.pedidos.marcar-enviado', $pedido) }}">
+                    <p class="text-muted small mb-3">
+                        Asigne un <strong>transportista de flota planta</strong> y su <strong>vehículo</strong> antes de marcar la salida hacia el minorista.
+                    </p>
+                    <form method="POST" action="{{ route('punto-venta.pedidos.marcar-enviado', $pedido) }}" id="formDespachoPedidoPdv">
                         @csrf
+                        <div class="pdv-flota-panel pdv-flota-panel--chofer">
+                            <label class="small font-weight-bold mb-2 d-block">
+                                <span class="panel-icon"><i class="fas fa-id-card"></i></span>
+                                Chofer planta <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="text" id="txtTransportistaPedidoPdv" class="form-control bg-white" readonly
+                                       placeholder="Buscar transportista de planta…" value="{{ old('transportista_label') }}" required>
+                                <div class="input-group-append">
+                                    <button type="button" class="btn btn-primary" id="btnBuscarTransportistaPedidoPdv" title="Buscar chofer">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <input type="hidden" name="transportista_usuarioid" id="transportista_pedido_pdv_id"
+                                   value="{{ old('transportista_usuarioid') }}" required>
+                        </div>
+                        <div class="pdv-flota-panel pdv-flota-panel--vehiculo">
+                            <label class="small font-weight-bold mb-2 d-block">
+                                <span class="panel-icon"><i class="fas fa-truck"></i></span>
+                                Vehículo <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="text" id="txtVehiculoPedidoPdv" class="form-control bg-white" readonly
+                                       placeholder="Seleccione el vehículo del chofer…" required>
+                                <div class="input-group-append">
+                                    <button type="button" class="btn btn-success" id="btnBuscarVehiculoPedidoPdv" disabled title="Buscar vehículo">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <input type="hidden" name="vehiculoid" id="vehiculo_pedido_pdv_id" value="{{ old('vehiculoid') }}" required>
+                            <p class="small text-muted mb-0 mt-2"><i class="fas fa-info-circle mr-1"></i>Primero elija el chofer; luego asigne su vehículo de planta.</p>
+                        </div>
                         <button type="button" class="btn btn-success btn-block btn-lg"
-                                data-confirm-modal
-                                data-confirm-tone="success"
+                                id="btnConfirmarDespachoPedidoPdv"
                                 data-confirm-title="Marcar envío en tránsito"
-                                data-confirm-message="¿Confirmar que el envío salió de planta hacia el punto de venta?">
+                                data-confirm-message="¿Confirmar salida de planta con el transportista y vehículo asignados?"
+                                data-confirm-tone="success">
                             <i class="fas fa-shipping-fast mr-1"></i> Marcar en tránsito
                         </button>
                     </form>
+                </div>
+            </div>
+            @elseif($puedeGestionarPlanta && $enRutaPlanificada)
+            <div class="card pdv-card card-outline card-info mb-3">
+                <div class="card-body small mb-0">
+                    <i class="fas fa-route mr-1 text-info"></i>
+                    Este pedido está incluido en una <strong>ruta de distribución</strong>.
+                    Inicie la ruta desde
+                    <a href="{{ route('punto-venta.rutas.index') }}">Rutas planta → minoristas</a>
+                    para marcarlo en tránsito.
                 </div>
             </div>
             @elseif($puedeAnunciarLlegada ?? false)
@@ -329,4 +408,92 @@
     </div>
 
     @include('partials.modal-confirmar-accion')
+    @include('partials.selector-catalogo-assets')
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('formDespachoPedidoPdv');
+    if (!form || !window.CatalogoSelector) return;
+
+    if (!CatalogoSelector.modalEl) {
+        CatalogoSelector.init();
+    }
+
+    const inputTransportista = document.getElementById('transportista_pedido_pdv_id');
+    const inputVehiculo = document.getElementById('vehiculo_pedido_pdv_id');
+    const btnVehiculo = document.getElementById('btnBuscarVehiculoPedidoPdv');
+    const btnConfirmar = document.getElementById('btnConfirmarDespachoPedidoPdv');
+
+    CatalogoSelector.register('pdv_pedido_transportista', {
+        endpoint: @json(route('catalogo-selector.usuarios')),
+        title: 'Transportista de planta',
+        searchPlaceholder: 'Nombre o correo…',
+        searchLabel: 'Buscar chofer',
+        modalIcon: 'fa-id-card',
+        rowIcon: 'fa-user-tie',
+        theme: 'planta',
+        colNombre: 'Chofer',
+        colDetalle: 'Contacto',
+        params: { roles: 'transportista', ambito_flota: 'planta' },
+        onSelect: function (item) {
+            inputTransportista.value = item.id;
+            document.getElementById('txtTransportistaPedidoPdv').value = item.label;
+            inputVehiculo.value = '';
+            document.getElementById('txtVehiculoPedidoPdv').value = '';
+            btnVehiculo.disabled = false;
+            CatalogoSelector.instances.pdv_pedido_vehiculo.params = {
+                transportista_usuarioid: item.id,
+                solo_transportista: '1',
+            };
+        },
+    });
+
+    CatalogoSelector.register('pdv_pedido_vehiculo', {
+        endpoint: @json(route('catalogo-selector.vehiculos')),
+        title: 'Vehículo de reparto',
+        searchPlaceholder: 'Placa, marca o modelo…',
+        searchLabel: 'Buscar vehículo',
+        modalIcon: 'fa-truck',
+        rowIcon: 'fa-truck',
+        theme: 'vehiculo',
+        colNombre: 'Placa',
+        colDetalle: 'Vehículo',
+        params: { transportista_usuarioid: inputTransportista?.value || '', solo_transportista: '1' },
+        onSelect: function (item) {
+            inputVehiculo.value = item.id;
+            document.getElementById('txtVehiculoPedidoPdv').value = item.label;
+        },
+    });
+
+    document.getElementById('btnBuscarTransportistaPedidoPdv')?.addEventListener('click', function () {
+        CatalogoSelector.open('pdv_pedido_transportista');
+    });
+    btnVehiculo?.addEventListener('click', function () {
+        if (inputTransportista.value) {
+            CatalogoSelector.open('pdv_pedido_vehiculo');
+        }
+    });
+
+    btnConfirmar?.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (!inputTransportista.value) {
+            window.ModalConfirmar?.aviso({ titulo: 'Falta chofer', mensaje: 'Asigne un transportista de flota planta.', tono: 'warning' });
+            return;
+        }
+        if (!inputVehiculo.value) {
+            window.ModalConfirmar?.aviso({ titulo: 'Falta vehículo', mensaje: 'Asigne el vehículo del chofer antes de marcar en tránsito.', tono: 'warning' });
+            return;
+        }
+        window.ModalConfirmar.abrir(
+            form,
+            btnConfirmar.getAttribute('data-confirm-title'),
+            btnConfirmar.getAttribute('data-confirm-message'),
+            btnConfirmar.getAttribute('data-confirm-tone') || 'success'
+        );
+    });
+});
+</script>
+@endpush

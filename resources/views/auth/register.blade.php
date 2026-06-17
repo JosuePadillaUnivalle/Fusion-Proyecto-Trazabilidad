@@ -182,18 +182,12 @@
         </div>
     </div>
 
-    <div id="campos-transportista" class="form-group" style="display: none;">
-        <label for="tipo_licencia">Tipo de licencia de conducir <span class="text-danger">*</span></label>
-        <div class="input-wrapper">
-            <select id="tipo_licencia" name="tipo_licencia" class="form-control">
-                <option value="">Selecciona…</option>
-                @foreach($tiposLicencia ?? config('tipos_licencia_bolivia', []) as $codigo => $descripcion)
-                <option value="{{ $codigo }}" @selected(old('tipo_licencia') === $codigo)>{{ $codigo }} — {{ $descripcion }}</option>
-                @endforeach
-            </select>
-            <i class="fas fa-id-card"></i>
-        </div>
-        <small class="text-muted">Solo para quienes se registran como transportista.</small>
+    <div id="campos-transportista" style="display: none;">
+        @include('envios.partials.campo-licencias-checkboxes', [
+            'tiposLicencia' => $tiposLicencia ?? config('tipos_licencia_bolivia', []),
+            'inputPrefix' => 'reg_',
+            'licenciasTema' => 'dark',
+        ])
     </div>
 
     @php
@@ -295,7 +289,6 @@
 <script>
 (function () {
     var bloque = document.getElementById('campos-transportista');
-    var select = document.getElementById('tipo_licencia');
     var radios = document.querySelectorAll('input[name="rol_solicitado"]');
     var telefonoHidden = document.getElementById('telefono');
     var telefonoPrefijo = document.getElementById('telefono_prefijo');
@@ -308,9 +301,11 @@
         var rol = document.querySelector('input[name="rol_solicitado"]:checked');
         var esTransportista = rol && rol.value === 'transportista';
         bloque.style.display = esTransportista ? 'block' : 'none';
-        select.required = esTransportista;
         if (!esTransportista) {
-            select.value = '';
+            bloque.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+                cb.checked = false;
+                cb.disabled = false;
+            });
         }
     }
 

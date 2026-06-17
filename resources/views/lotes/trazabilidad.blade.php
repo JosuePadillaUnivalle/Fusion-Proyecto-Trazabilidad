@@ -13,6 +13,9 @@
 @push('styles')
     @include('lotes.partials.detalle-styles')
     @include('lotes.partials.trazabilidad-styles')
+    @if($puede_enviar_almacen ?? false)
+        @include('partials.almacen-envio-styles')
+    @endif
 @endpush
 
 @section('content')
@@ -45,7 +48,18 @@
                             : ($step['eventos'].' evento(s)');
                         if (!empty($step['url'])) {
                             $titulo = 'Ir a '.$step['label'].' — '.$titulo;
+                        } elseif (($step['key'] ?? '') === 'siembra' && ($step['estado'] ?? '') === 'next' && ($puede_asignar_siembra ?? false)) {
+                            $titulo = 'Asignar quién va a sembrar';
+                        } elseif (($step['key'] ?? '') === 'siembra' && in_array($step['estado'] ?? '', ['active', 'next'], true) && !empty($actividad_siembra_pendiente)) {
+                            $titulo = 'Siembra asignada — pendiente de realizar';
+                        } elseif (($step['key'] ?? '') === 'certificacion' && ($puede_certificar_campo ?? false)) {
+                            $titulo = 'Certificar el lote — formulario abajo';
+                        } elseif (($step['key'] ?? '') === 'envio_almacen' && ($puede_enviar_almacen ?? false)) {
+                            $titulo = 'Abrir formulario para enviar al almacén';
                         }
+                        $siembraPendienteId = (int) ($actividad_siembra_pendiente['actividadid'] ?? 0);
+                        $puedeCompletarSiembra = $siembraPendienteId > 0
+                            && in_array($siembraPendienteId, $actividades_marcables_ids ?? [], true);
                     @endphp
                     @if(!empty($step['url']))
                         <a href="{{ $step['url'] }}" class="fase-step {{ $step['estado'] }} fase-step-link" title="{{ $titulo }}">
@@ -60,6 +74,38 @@
                                 <span class="badge badge-fase-count">{{ $step['eventos'] }}</span>
                             @endif
                         </a>
+                    @elseif(($step['key'] ?? '') === 'siembra' && ($step['estado'] ?? '') === 'next' && ($puede_asignar_siembra ?? false))
+                        <a href="#" role="button" class="fase-step {{ $step['estado'] }} fase-step-link"
+                           data-toggle="modal" data-target="#modalAsignarSiembra" title="{{ $titulo }}">
+                            <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
+                            {{ $step['label'] }}
+                            <span class="d-block small mt-1"><i class="fas fa-arrow-right"></i> Siguiente</span>
+                        </a>
+                    @elseif(($step['key'] ?? '') === 'siembra' && !empty($actividad_siembra_pendiente) && $puedeCompletarSiembra)
+                        <button type="button"
+                                class="fase-step {{ $step['estado'] }} fase-step-link btn-completar-evidencia"
+                                data-action="{{ route('actividades.marcar-realizada', $siembraPendienteId) }}"
+                                data-titulo="{{ $actividad_siembra_pendiente['titulo'] ?? 'Siembra' }}"
+                                data-lote="{{ $lote->nombre }}"
+                                data-scroll-to="historial-eventos"
+                                title="Marcar siembra como realizada con foto">
+                            <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
+                            {{ $step['label'] }}
+                            <span class="d-block small mt-1"><i class="fas fa-camera"></i> Completar</span>
+                        </button>
+                    @elseif(($step['key'] ?? '') === 'certificacion' && ($puede_certificar_campo ?? false))
+                        <a href="#panel-certificacion-campo" class="fase-step {{ $step['estado'] }} fase-step-link" title="{{ $titulo }}">
+                            <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
+                            {{ $step['label'] }}
+                            <span class="d-block small mt-1"><i class="fas fa-certificate"></i> Certificar</span>
+                        </a>
+                    @elseif(($step['key'] ?? '') === 'envio_almacen' && ($puede_enviar_almacen ?? false))
+                        <button type="button" class="fase-step {{ $step['estado'] }} fase-step-link"
+                                data-toggle="modal" data-target="#modalEnviarAlmacenCampo" title="{{ $titulo }}">
+                            <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
+                            {{ $step['label'] }}
+                            <span class="d-block small mt-1"><i class="fas fa-warehouse"></i> Enviar</span>
+                        </button>
                     @else
                         <div class="fase-step {{ $step['estado'] }}" title="{{ $titulo }}">
                             <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
@@ -98,17 +144,63 @@
                 <p class="text-center small text-muted mb-3">
                     <i class="fas fa-lock mr-1"></i>
                     @if(($actividades_pendientes_count ?? 0) > 0)
-                        Hay {{ $actividades_pendientes_count }} actividad(es) pendiente(s). Complételas para habilitar «Ir a {{ $siguiente_fase_label }}».
+                        Hay {{ $actividades_pendientes_count }} actividad(es) esencial(es) pendiente(s) (riego, plagas o fertilización). Complételas para habilitar «Ir a {{ $siguiente_fase_label }}».
                     @else
-                        Complete riego, control de plagas y fertilización para habilitar «Ir a {{ $siguiente_fase_label }}».
+                        Complete y marque como realizadas las actividades de riego, control de plagas y fertilización para habilitar «Ir a {{ $siguiente_fase_label }}».
                     @endif
                 </p>
                 @endif
+            @elseif(($puede_asignar_siembra ?? false) && ($siguiente_fase ?? '') === 'siembra')
+                <div class="text-center mb-3">
+                    <button type="button" class="btn btn-success btn-sm" data-toggle="modal" data-target="#modalAsignarSiembra">
+                        <i class="fas fa-user-plus mr-1"></i> Asignar {{ $siguiente_fase_label }}
+                    </button>
+                </div>
+            @elseif(!empty($actividad_siembra_pendiente) && in_array((int) ($actividad_siembra_pendiente['actividadid'] ?? 0), $actividades_marcables_ids ?? [], true))
+                <div class="text-center mb-3">
+                    <button type="button" class="btn btn-success btn-sm btn-completar-evidencia"
+                            data-action="{{ route('actividades.marcar-realizada', $actividad_siembra_pendiente['actividadid']) }}"
+                            data-titulo="{{ $actividad_siembra_pendiente['titulo'] ?? 'Siembra' }}"
+                            data-lote="{{ $lote->nombre }}"
+                            data-scroll-to="historial-eventos">
+                        <i class="fas fa-camera mr-1"></i> Completar {{ $siguiente_fase_label ?: 'Siembra' }}
+                    </button>
+                </div>
+            @elseif(!empty($actividad_siembra_pendiente))
+                <p class="text-center small text-muted mb-3">
+                    <i class="fas fa-hourglass-half mr-1"></i>
+                    Siembra asignada a <strong>{{ $actividad_siembra_pendiente['responsable'] ?? '—' }}</strong> — pendiente de realizar.
+                </p>
+            @elseif($puede_certificar_campo ?? false)
+                <div class="text-center mb-3">
+                    <a href="#panel-certificacion-campo" class="btn btn-sm font-weight-bold text-white" style="background:#7c3aed">
+                        <i class="fas fa-certificate mr-1"></i> Certificar lote
+                    </a>
+                </div>
+            @elseif($puede_enviar_almacen ?? false)
+                <div class="text-center mb-3">
+                    <button type="button" class="btn btn-warning btn-sm font-weight-bold text-dark"
+                            data-toggle="modal" data-target="#modalEnviarAlmacenCampo">
+                        <i class="fas fa-warehouse mr-1"></i> Enviar al almacén
+                    </button>
+                </div>
             @elseif(!empty($url_siguiente_fase) && !empty($siguiente_fase_label))
                 <div class="text-center mb-3">
                     <a href="{{ $url_siguiente_fase }}" class="btn btn-success btn-sm">
                         <i class="fas fa-forward mr-1"></i> Ir a {{ $siguiente_fase_label }}
                     </a>
+                </div>
+            @endif
+
+            @if($puede_certificar_campo ?? false)
+                @include('lotes.partials.panel-certificar-campo')
+            @elseif(($certificacion_campo ?? null) && ($certificacion_campo->esNoConforme() ?? false))
+                <div class="alert alert-warning border mb-3" id="panel-certificacion-campo">
+                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                    Lote marcado como <strong>No conforme</strong>.
+                    @if($certificacion_campo->observaciones)
+                        Motivo: {{ $certificacion_campo->observaciones }}
+                    @endif
                 </div>
             @endif
 
@@ -174,6 +266,18 @@
                         </li>
                         @endforeach
                     </ul>
+                    @endif
+
+                    @if(!empty($panel['acciones']))
+                    <ul class="list-unstyled trz-checklist mb-0">
+                        @foreach($panel['acciones'] as $paso)
+                        <li class="is-pending">
+                            <i class="fas fa-arrow-right text-success mr-2"></i>{{ $paso }}
+                        </li>
+                        @endforeach
+                    </ul>
+                    @elseif(!empty($panel['resumen_corto']))
+                    <p class="small text-muted mb-0">{{ $panel['resumen_corto'] }}</p>
                     @endif
 
                 </div>
@@ -295,6 +399,12 @@
 
 @include('partials.modal-completar-evidencia')
 @include('partials.modal-ver-evidencia')
+@if(($puede_asignar_siembra ?? false) || $errors->has('usuarioid') || $errors->has('siembra'))
+    @include('lotes.partials.modal-asignar-siembra')
+@endif
+@if(($puede_enviar_almacen ?? false) || $errors->has('almacenid') || $errors->has('produccionid'))
+    @include('lotes.partials.modal-enviar-almacen-campo')
+@endif
 @endsection
 
 @push('scripts')
@@ -313,6 +423,18 @@
     window.addEventListener('hashchange', function () {
         if (window.location.hash === '#historial-eventos') scrollToHistorial();
     });
+
+    @if($errors->has('usuarioid') || $errors->has('siembra'))
+    if (window.jQuery) {
+        window.jQuery('#modalAsignarSiembra').modal('show');
+    }
+    @endif
+
+    @if($errors->has('almacenid') || $errors->has('produccionid'))
+    if (window.jQuery) {
+        window.jQuery('#modalEnviarAlmacenCampo').modal('show');
+    }
+    @endif
 })();
 </script>
 @endpush

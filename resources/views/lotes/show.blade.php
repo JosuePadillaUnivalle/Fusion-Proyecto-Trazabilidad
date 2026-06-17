@@ -18,54 +18,60 @@
     @include('lotes.partials.detalle-stats')
     @include('lotes.partials.detalle-nav')
 
-    <div class="card lote-section-card">
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    @include('lotes.partials.datos-lote-panel')
-                </div>
-                <div class="col-md-6">
-                    @if($lote->imagenurl)
-                        <h5 class="mb-3"><i class="fas fa-image mr-2 text-success"></i>Imagen</h5>
-                        <div class="text-center mb-4">
-                            <img src="{{ $lote->imagenurl }}" alt="Lote" class="img-fluid rounded shadow-sm" style="max-height: 300px;">
-                        </div>
-                    @endif
-                    <h5 class="mb-3"><i class="fas fa-chart-pie mr-2 text-success"></i>Resumen operativo</h5>
-                    <div class="row">
-                        <div class="col-6 mb-3">
-                            <div class="p-3 bg-light rounded text-center">
-                                <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
-                                <h4 class="mb-0">{{ $estadisticas['actividades_completadas'] }}</h4>
-                                <small class="text-muted">Actividades completadas</small>
-                            </div>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <div class="p-3 bg-light rounded text-center">
-                                <i class="fas fa-clock text-warning fa-2x mb-2"></i>
-                                <h4 class="mb-0">{{ $estadisticas['actividades_pendientes'] }}</h4>
-                                <small class="text-muted">Pendientes</small>
-                            </div>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <div class="p-3 bg-light rounded text-center">
-                                <i class="fas fa-flask text-info fa-2x mb-2"></i>
-                                <h4 class="mb-0">{{ $estadisticas['total_insumos'] }}</h4>
-                                <small class="text-muted">Aplicaciones</small>
-                            </div>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <div class="p-3 bg-light rounded text-center">
-                                <i class="fas fa-leaf text-success fa-2x mb-2"></i>
-                                <h4 class="mb-0">{{ number_format($estadisticas['produccion_total'], 0) }}</h4>
-                                <small class="text-muted">Kg producidos</small>
-                            </div>
-                        </div>
+    <div class="row lote-content-grid">
+        <div class="col-lg-6 mb-4 mb-lg-0">
+            @include('lotes.partials.datos-lote-panel')
+        </div>
+        <div class="col-lg-6">
+            @if($lote->imagenurl)
+            <div class="lote-op-panel mb-4">
+                <div class="lote-op-panel__head">
+                    <div class="lote-op-panel__head-icon lote-op-panel__head-icon--photo"><i class="fas fa-image"></i></div>
+                    <div>
+                        <h3 class="lote-op-panel__title">Imagen del lote</h3>
                     </div>
-                    <a href="{{ route('lotes.trazabilidad', $lote) }}" class="btn btn-success btn-block">
-                        <i class="fas fa-project-diagram mr-1"></i> Ver trazabilidad
-                    </a>
                 </div>
+                <div class="lote-op-panel__photo">
+                    <img src="{{ $lote->imagenurl }}" alt="Lote {{ $lote->nombre }}" class="img-fluid">
+                </div>
+            </div>
+            @endif
+
+            <div class="lote-op-panel">
+                <div class="lote-op-panel__head">
+                    <div class="lote-op-panel__head-icon"><i class="fas fa-chart-pie"></i></div>
+                    <div>
+                        <h3 class="lote-op-panel__title">Resumen operativo</h3>
+                        <p class="lote-op-panel__subtitle">Actividad reciente en campo</p>
+                    </div>
+                </div>
+                <div class="lote-op-grid">
+                    <div class="lote-op-stat">
+                        <div class="lote-op-stat__icon lote-op-stat__icon--green"><i class="fas fa-check-circle"></i></div>
+                        <div class="lote-op-stat__val">{{ $estadisticas['actividades_completadas'] }}</div>
+                        <div class="lote-op-stat__lbl">Completadas</div>
+                    </div>
+                    <div class="lote-op-stat">
+                        <div class="lote-op-stat__icon lote-op-stat__icon--amber"><i class="fas fa-clock"></i></div>
+                        <div class="lote-op-stat__val">{{ $estadisticas['actividades_pendientes'] }}</div>
+                        <div class="lote-op-stat__lbl">Pendientes</div>
+                    </div>
+                    <div class="lote-op-stat">
+                        <div class="lote-op-stat__icon lote-op-stat__icon--blue"><i class="fas fa-flask"></i></div>
+                        <div class="lote-op-stat__val">{{ $estadisticas['total_insumos'] }}</div>
+                        <div class="lote-op-stat__lbl">Aplicaciones</div>
+                    </div>
+                    <div class="lote-op-stat">
+                        <div class="lote-op-stat__icon lote-op-stat__icon--teal"><i class="fas fa-leaf"></i></div>
+                        <div class="lote-op-stat__val">{{ number_format($estadisticas['produccion_total'], 0) }}</div>
+                        <div class="lote-op-stat__lbl">Kg producidos</div>
+                    </div>
+                </div>
+                <a href="{{ route('lotes.trazabilidad', $lote) }}" class="lote-op-panel__cta">
+                    <i class="fas fa-project-diagram"></i>
+                    Ver trazabilidad completa
+                    <i class="fas fa-arrow-right lote-op-panel__cta-arrow"></i>
+                </a>
             </div>
         </div>
     </div>

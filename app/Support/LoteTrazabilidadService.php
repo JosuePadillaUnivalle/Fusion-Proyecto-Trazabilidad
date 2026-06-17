@@ -3,10 +3,13 @@
 namespace App\Support;
 
 use App\Models\Actividad;
+use App\Models\Almacen;
 use App\Models\CertificacionLote;
 use App\Models\Cultivo;
 use App\Models\EstadoLoteTipo;
 use App\Models\Lote;
+use App\Models\Produccion;
+use App\Models\ProduccionAlmacenamiento;
 use App\Models\Usuario;
 use App\Support\EstadoLoteCatalogo;
 use Carbon\Carbon;
@@ -128,7 +131,7 @@ class LoteTrazabilidadService
         $faseActual = $this->resolverFaseActual($lote);
         $faseTipo = $this->faseDeTipoActividad($nombre);
 
-        if ($faseTipo !== null && $faseTipo !== $faseActual) {
+        if ($faseTipo !== null && ! $this->tipoActividadPermitidoEnFase($tipoNombre, $faseActual)) {
             $labelActual = self::FASES[$faseActual]['label'] ?? ucfirst($faseActual);
 
             return "El lote está en fase «{$labelActual}». No puede registrar «{$tipoNombre}» porque pertenece a una fase anterior o distinta.";
@@ -166,7 +169,11 @@ class LoteTrazabilidadService
             return true;
         }
 
-        return $faseTipo === $faseActual;
+        if ($faseTipo === $faseActual) {
+            return true;
+        }
+
+        return $this->siguienteFase($faseActual) === $faseTipo;
     }
 
     private function faseDeTipoActividad(string $nombre): ?string
@@ -210,12 +217,17 @@ class LoteTrazabilidadService
         return null;
     }
 
+    private function returnUrlTrazabilidad(Lote $lote): string
+    {
+        return route('lotes.trazabilidad', $lote, absolute: false);
+    }
+
     /**
      * URL para registrar actividades de la fase «En crecimiento» (sin saltar a cosecha).
      */
     public function urlAsignarActividadEnCrecimiento(Lote $lote): string
     {
-        $return = route('lotes.trazabilidad', $lote);
+        $return = $this->returnUrlTrazabilidad($lote);
         $params = [
             'loteid' => $lote->loteid,
             'return' => $return,
@@ -234,25 +246,46 @@ class LoteTrazabilidadService
      */
     public function urlAccionFase(Lote $lote, string $faseKey): ?string
     {
-        $return = route('lotes.trazabilidad', $lote);
+        $return = $this->returnUrlTrazabilidad($lote);
 
         return match ($faseKey) {
-            'siembra' => route('lotes.siembra.create', [
-                'lote' => $lote->loteid,
-                'return' => $return,
-            ]),
+            'siembra' => null,
             'en_crecimiento' => $this->urlAsignarActividadEnCrecimiento($lote),
             'cosecha' => route('producciones.create', [
                 'loteid' => $lote->loteid,
                 'return' => $return,
             ]),
-            'certificacion' => route('certificaciones.index'),
-            'envio_almacen' => route('producciones.create', [
-                'loteid' => $lote->loteid,
-                'return' => $return,
-            ]),
+            'certificacion' => null,
+            'envio_almacen' => null,
             default => null,
         };
+    }
+
+    public function produccionPendienteAlmacen(Lote $lote): ?Produccion
+    {
+        $lote->loadMissing(['producciones.almacenamientos', 'producciones.unidadMedida', 'producciones.almacenDestino.tipoAlmacen']);
+
+        return $lote->producciones
+            ->sortByDesc(fn (Produccion $p) => $p->fechacosecha ?? $p->produccionid)
+            ->first(fn (Produccion $p) => $p->almacenamientos->isEmpty());
+    }
+
+    public function puedeCertificarCampo(Lote $lote): bool
+    {
+        $lote->loadMissing('producciones');
+        $cert = app(CertificacionCampoService::class);
+
+        return $this->resolverFaseActual($lote) === 'certificacion'
+            && ! $cert->fueEvaluado($lote)
+            && $lote->producciones->isNotEmpty();
+    }
+
+    public function puedeEnviarAlmacenCampo(Lote $lote): bool
+    {
+        $cert = app(CertificacionCampoService::class);
+
+        return $cert->estaCertificado($lote)
+            && $this->produccionPendienteAlmacen($lote) !== null;
     }
 
     public function siguienteTipoActividadCrecimiento(Lote $lote): ?string
@@ -299,10 +332,34 @@ class LoteTrazabilidadService
             ->values();
     }
 
+    public function esActividadCrecimientoEsencial(Actividad $actividad): bool
+    {
+        $nombre = mb_strtolower(trim($actividad->tipoActividad->nombre ?? ''));
+
+        return str_contains($nombre, 'riego')
+            || str_contains($nombre, 'regad')
+            || str_contains($nombre, 'fumig')
+            || str_contains($nombre, 'plaga')
+            || str_contains($nombre, 'fitosanit')
+            || str_contains($nombre, 'fertiliz');
+    }
+
+    /** @return Collection<int, Actividad> */
+    public function actividadesPendientesEsencialesCrecimiento(Lote $lote): Collection
+    {
+        $lote->loadMissing('actividades.tipoActividad');
+
+        return $lote->actividades
+            ->whereNull('fechafin')
+            ->filter(fn (Actividad $actividad) => $this->esActividadCrecimientoEsencial($actividad))
+            ->sortByDesc('fechainicio')
+            ->values();
+    }
+
     public function puedeIrACosecha(Lote $lote): bool
     {
-        return $this->actividadesPendientes($lote)->isEmpty()
-            && $this->puedeRegistrarCosecha($lote);
+        return $this->puedeRegistrarCosecha($lote)
+            && $this->actividadesPendientesEsencialesCrecimiento($lote)->isEmpty();
     }
 
     /**
@@ -342,6 +399,7 @@ class LoteTrazabilidadService
             'meta_label' => $pend['siguiente_label'] ?? null,
             'meta_progreso' => $pend['progreso_siguiente'] ?? null,
             'fases_despues' => array_slice($pend['fases_restantes'] ?? [], 1),
+            'acciones' => $pend['acciones'] ?? [],
             'hitos' => $hitos,
             'actividades_abiertas' => $actividadesAbiertas,
             'completo' => (bool) ($pend['completo'] ?? false),
@@ -390,6 +448,26 @@ class LoteTrazabilidadService
 
         return $estado === 'sembrado'
             || $this->actividadCompletadaConKeywords($lote, ['siembra']);
+    }
+
+    public function siembraCompletada(Lote $lote): bool
+    {
+        $lote->loadMissing(['estadoTipo', 'actividades.tipoActividad']);
+
+        return $this->milestoneSiembra($lote);
+    }
+
+    public function actividadSiembraPendiente(Lote $lote): ?Actividad
+    {
+        $lote->loadMissing('actividades.tipoActividad');
+
+        return $lote->actividades
+            ->whereNull('fechafin')
+            ->first(function (Actividad $actividad) {
+                $nombre = mb_strtolower(trim($actividad->tipoActividad->nombre ?? ''));
+
+                return str_contains($nombre, 'siembra');
+            });
     }
 
     private function milestoneRegado(Lote $lote): bool
@@ -487,19 +565,40 @@ class LoteTrazabilidadService
         }
 
         if ($faseActual === 'envio_almacen') {
-            $acciones = [
-                'Registrar el ingreso del producto cosechado al almacén',
-                'Indicar almacén, cantidad y condiciones de conservación',
-            ];
+            $prod = $this->produccionPendienteAlmacen($lote);
+            $prod?->loadMissing('almacenDestino.tipoAlmacen');
+            $acciones = $this->accionesSugeridas($lote, $faseActual, null);
+
+            if ($prod?->almacenDestino) {
+                array_unshift(
+                    $acciones,
+                    'Destino previsto: '.$prod->almacenDestino->nombre.' (elegido en la cosecha)'
+                );
+            }
 
             return [
                 'completo' => false,
-                'siguiente_fase' => null,
-                'siguiente_label' => null,
+                'siguiente_fase' => 'envio_almacen',
+                'siguiente_label' => self::FASES['envio_almacen']['label'],
                 'progreso_siguiente' => 100,
                 'fases_restantes' => [],
                 'acciones' => $acciones,
-                'resumen' => 'Último paso: enviar la cosecha al almacén (100 %)',
+                'resumen' => 'Confirme el envío de la cosecha al almacén agrícola',
+            ];
+        }
+
+        $certService = app(CertificacionCampoService::class);
+        if ($faseActual === 'certificacion' && ! $certService->fueEvaluado($lote)) {
+            $acciones = $this->accionesSugeridas($lote, $faseActual, null);
+
+            return [
+                'completo' => false,
+                'siguiente_fase' => 'certificacion',
+                'siguiente_label' => self::FASES['certificacion']['label'],
+                'progreso_siguiente' => $this->progresoFase('certificacion'),
+                'fases_restantes' => [self::FASES['envio_almacen']['label']],
+                'acciones' => $acciones,
+                'resumen' => 'Evalúe el lote como Certificado o No conforme',
             ];
         }
 
@@ -556,15 +655,17 @@ class LoteTrazabilidadService
 
         switch ($faseActual) {
             case 'preparacion':
-                $pasos[] = 'Registrar la siembra del lote';
+                $pasos[] = 'Asignar quién va a sembrar el lote';
                 $pasos[] = 'Programar labranza o preparación del suelo si aplica';
                 break;
 
             case 'siembra':
-                if (! $lote->fechasiembra) {
-                    $pasos[] = 'Confirmar fecha de siembra en el lote';
+                $siembraPendiente = $this->actividadSiembraPendiente($lote);
+                if ($siembraPendiente) {
+                    $pasos[] = 'Completar la siembra asignada (con foto de evidencia)';
+                } else {
+                    $pasos[] = 'Asignar quién va a sembrar el lote';
                 }
-                $pasos[] = 'Registrar actividades de siembra completadas';
                 break;
 
             case 'en_crecimiento':
@@ -599,16 +700,21 @@ class LoteTrazabilidadService
                         $pasos[] = 'Motivo: '.$cert->ultima($lote)->observaciones;
                     }
                 } else {
-                    $pasos[] = 'Evaluar el lote en Certificaciones (Certificado o No conforme)';
+                    $pasos[] = 'Evaluar el lote como Certificado o No conforme (formulario de abajo)';
                     $pasos[] = 'Si hay daños, plagas o calidad deficiente, marque No conforme';
                 }
                 break;
 
             case 'envio_almacen':
-                if ($lote->producciones->flatMap->almacenamientos->isEmpty()) {
-                    $pasos[] = 'Registrar el ingreso del producto al almacén';
+                $prod = $this->produccionPendienteAlmacen($lote);
+                if ($prod?->almacenDestino) {
+                    $pasos[] = 'Confirmar envío a «'.$prod->almacenDestino->nombre.'» (elegido en cosecha)';
+                } else {
+                    $pasos[] = 'Seleccionar el almacén agrícola de destino';
                 }
-                $pasos[] = 'Verificar stock y condiciones de conservación';
+                if ($lote->producciones->flatMap->almacenamientos->isEmpty()) {
+                    $pasos[] = 'Registrar el ingreso con el botón «Enviar al almacén»';
+                }
                 break;
         }
 
@@ -980,7 +1086,14 @@ class LoteTrazabilidadService
 
             $url = null;
             if ($estado === 'next' || ($estado === 'active' && ! $completo)) {
-                $url = $this->urlAccionFase($lote, $key);
+                $candidata = $this->urlAccionFase($lote, $key);
+                if ($key === 'cosecha' && $faseActual === 'en_crecimiento' && ! $this->puedeIrACosecha($lote)) {
+                    $url = null;
+                } elseif ($key === 'envio_almacen' && ! app(CertificacionCampoService::class)->estaCertificado($lote)) {
+                    $url = null;
+                } else {
+                    $url = $candidata;
+                }
             }
 
             $esFaseUnica = in_array($key, self::FASES_UNICAS, true);
@@ -1021,6 +1134,17 @@ class LoteTrazabilidadService
 
         $siguienteFase = $this->siguienteFase($faseActual);
         $urlSiguienteFase = $siguienteFase ? $this->urlAccionFase($lote, $siguienteFase) : null;
+        $puedeCertificarCampo = $this->puedeCertificarCampo($lote);
+        $puedeEnviarAlmacen = $this->puedeEnviarAlmacenCampo($lote);
+        $produccionPendienteAlmacen = $this->produccionPendienteAlmacen($lote);
+        if ($puedeCertificarCampo || $puedeEnviarAlmacen) {
+            $urlSiguienteFase = null;
+        }
+        $certCampo = app(CertificacionCampoService::class);
+        $siembraPendiente = $this->actividadSiembraPendiente($lote);
+        if ($siembraPendiente) {
+            $siembraPendiente->loadMissing('usuario');
+        }
         $urlAsignarActividad = $faseActual === 'en_crecimiento'
             ? $this->urlAsignarActividadEnCrecimiento($lote)
             : null;
@@ -1042,12 +1166,26 @@ class LoteTrazabilidadService
             'siguiente_fase' => $siguienteFase,
             'siguiente_fase_label' => $siguienteFase ? (self::FASES[$siguienteFase]['label'] ?? $siguienteFase) : null,
             'url_siguiente_fase' => $urlSiguienteFase,
+            'puede_certificar_campo' => $puedeCertificarCampo,
+            'puede_enviar_almacen' => $puedeEnviarAlmacen,
+            'produccion_pendiente_almacen' => $produccionPendienteAlmacen,
+            'certificacion_campo' => $certCampo->ultima($lote),
+            'puede_asignar_siembra' => $siguienteFase === 'siembra'
+                && ! $this->siembraCompletada($lote)
+                && $siembraPendiente === null,
+            'actividad_siembra_pendiente' => $siembraPendiente ? [
+                'actividadid' => (int) $siembraPendiente->actividadid,
+                'titulo' => $siembraPendiente->descripcion ?: ($siembraPendiente->tipoActividad->nombre ?? 'Siembra'),
+                'responsable' => trim(($siembraPendiente->usuario->nombre ?? '').' '.($siembraPendiente->usuario->apellido ?? '')) ?: null,
+            ] : null,
             'url_asignar_actividad' => $urlAsignarActividad,
             'siguiente_actividad_crecimiento' => $siguienteActividadCrecimiento,
             'puede_ir_a_cosecha' => $faseActual === 'en_crecimiento' && $siguienteFase === 'cosecha'
                 ? $this->puedeIrACosecha($lote)
                 : true,
-            'actividades_pendientes_count' => $this->actividadesPendientes($lote)->count(),
+            'actividades_pendientes_count' => $faseActual === 'en_crecimiento'
+                ? $this->actividadesPendientesEsencialesCrecimiento($lote)->count()
+                : $this->actividadesPendientes($lote)->count(),
             'panel_pendientes' => $this->panelPendientesLegible($lote, $faseActual),
             'chart_por_fase' => [
                 'labels' => $porFase->keys()->map(fn ($k) => self::FASES[$k]['label'] ?? $k)->values()->all(),
@@ -1325,6 +1463,79 @@ class LoteTrazabilidadService
         return [
             'labels' => $porMes->keys()->map(fn ($ym) => Carbon::parse($ym.'-01')->translatedFormat('M Y'))->values()->all(),
             'data' => $porMes->values()->all(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function datosFormularioEnvioAlmacen(Lote $lote): array
+    {
+        AlmacenAmbito::asegurarAmbitosEnRegistros();
+        $capacidadService = app(\App\Services\AlmacenCapacidadService::class);
+
+        $almacenesTodos = AlmacenAmbito::scope(
+            Almacen::with(['tipoAlmacen', 'unidadMedida', 'almacenamientos'])
+                ->where('activo', true)
+                ->where('capacidad', '>', 0),
+            AlmacenAmbito::AGRICOLA
+        )->get();
+
+        $usoPorAlmacen = ProduccionAlmacenamiento::query()
+            ->selectRaw('almacenid, COUNT(*) as total')
+            ->groupBy('almacenid')
+            ->pluck('total', 'almacenid');
+
+        $almacenes = $almacenesTodos->count() <= 4
+            ? $almacenesTodos->values()
+            : $almacenesTodos
+                ->sortByDesc(fn (Almacen $a) => (int) ($usoPorAlmacen[$a->almacenid] ?? 0))
+                ->take(4)
+                ->values();
+
+        $resumenesCapacidad = $almacenesTodos
+            ->mapWithKeys(fn (Almacen $a) => [$a->almacenid => $capacidadService->resumen($a)])
+            ->all();
+
+        $almacenesCatalogo = $almacenesTodos->map(function (Almacen $almacen) use ($capacidadService) {
+            $resumen = $capacidadService->resumen($almacen);
+            $resuelto = UbicacionGpsParser::resolverAlmacen(
+                (int) $almacen->almacenid,
+                $almacen->nombre,
+                $almacen->ubicacion
+            );
+
+            return [
+                'id' => $almacen->almacenid,
+                'nombre' => $almacen->nombre,
+                'tipo' => $almacen->tipoAlmacen->nombre ?? 'General',
+                'ubicacion' => $almacen->ubicacion,
+                'disponible' => $resumen['disponible_kg'],
+                'capacidad' => $resumen['capacidad_kg'],
+                'um' => 'kg',
+                'tags' => strtolower($almacen->nombre.' '.($almacen->tipoAlmacen->nombre ?? '').' '.($almacen->ubicacion ?? '')),
+                'lat' => $resuelto['lat'],
+                'lng' => $resuelto['lng'],
+                'direccion' => $resuelto['direccion'],
+                'ubicacion_estimada' => $resuelto['estimada'],
+            ];
+        })->values()->all();
+
+        $produccion = $this->produccionPendienteAlmacen($lote);
+        $almacenDestinoId = old('almacenid') ?: $produccion?->almacendestinoid;
+        $almacenDestino = $almacenDestinoId
+            ? $almacenesTodos->firstWhere('almacenid', (int) $almacenDestinoId)
+            : null;
+
+        return [
+            'almacenes' => $almacenes,
+            'almacenesTodos' => $almacenesTodos,
+            'almacenesCatalogo' => $almacenesCatalogo,
+            'resumenesCapacidad' => $resumenesCapacidad,
+            'produccion_pendiente_almacen' => $produccion,
+            'almacen_destino_id' => $almacenDestinoId ? (int) $almacenDestinoId : null,
+            'almacen_destino_preseleccionado' => $almacenDestino,
+            'almacen_destino_resumen' => $almacenDestino
+                ? ($resumenesCapacidad[$almacenDestino->almacenid] ?? null)
+                : null,
         ];
     }
 }

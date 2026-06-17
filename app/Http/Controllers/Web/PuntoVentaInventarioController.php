@@ -58,6 +58,9 @@ class PuntoVentaInventarioController extends Controller
             'puntos' => $puntos,
             'insumos' => $insumos,
             'filtroPdv' => $request->integer('puntoventaid') ?: null,
+            'filtroPdvNombre' => $request->filled('puntoventaid')
+                ? ($puntos->firstWhere('puntoventaid', (int) $request->puntoventaid)?->nombre ?? '')
+                : '',
             'filtroQ' => $request->string('q')->toString(),
         ]);
     }

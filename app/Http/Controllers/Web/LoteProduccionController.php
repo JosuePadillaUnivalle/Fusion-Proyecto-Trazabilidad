@@ -15,6 +15,7 @@ use App\Models\UnidadMedida;
 use App\Models\Usuario;
 use App\Services\AlmacenCapacidadService;
 use App\Services\LoteProduccionPlantaService;
+use App\Services\ProductoPlantaInventarioService;
 use App\Support\AlmacenAmbito;
 use App\Support\AlmacenajeLoteCondiciones;
 use App\Support\AsignacionEtapaPlantaService;
@@ -37,6 +38,7 @@ class LoteProduccionController extends Controller
         private readonly LoteProduccionPlantaService $loteService,
         private readonly LoteProduccionTrazabilidadService $trazabilidad,
         private readonly LoteProduccionTransformacionService $transformacion,
+        private readonly ProductoPlantaInventarioService $inventarioPlanta,
         private readonly AlmacenCapacidadService $capacidadService,
         private readonly AsignacionEtapaPlantaService $asignacionEtapa,
     ) {}
@@ -54,13 +56,12 @@ class LoteProduccionController extends Controller
             ->orderByDesc('fecha_creacion');
 
         if ($productoFiltro !== '') {
-            $key = mb_strtolower($productoFiltro);
-            $lotesQuery->where(function ($q) use ($key) {
+            $term = '%'.mb_strtolower($productoFiltro).'%';
+            $lotesQuery->where(function ($q) use ($term) {
                 if (\Illuminate\Support\Facades\Schema::hasColumn('lote_produccion_pedido', 'producto')) {
-                    $q->whereRaw('LOWER(TRIM(producto)) = ?', [$key]);
-                } else {
-                    $q->whereRaw('LOWER(nombre) LIKE ?', [$key.' - lote %']);
+                    $q->whereRaw('LOWER(producto) LIKE ?', [$term]);
                 }
+                $q->orWhereRaw('LOWER(nombre) LIKE ?', [$term]);
             });
         }
 
@@ -186,7 +187,7 @@ class LoteProduccionController extends Controller
 
         $dash = $this->trazabilidad->dashboardLote($loteProduccion);
         $procesosPlanta = ProcesoPlantaCatalogo::paraTransformacion();
-        $procesosDisponibles = $procesosPlanta;
+        $procesosDisponibles = $this->transformacion->procesosDisponiblesParaAsignar($loteProduccion);
         $procesosUsadosIds = $this->transformacion->procesosRegistradosIds($loteProduccion);
         $maquinasPlanta = MaquinaPlanta::query()->where('activo', true)->orderBy('nombre')->get();
         $mapaCompatibilidad = MaquinaProcesoCompatibilidad::mapaSelectores();
@@ -194,6 +195,10 @@ class LoteProduccionController extends Controller
             Almacen::with(['tipoAlmacen', 'unidadMedida', 'almacenamientos'])->where('activo', true),
             AlmacenAmbito::PLANTA
         )->orderBy('nombre')->get();
+        $resumenesCapacidadPlanta = [];
+        foreach ($almacenesPlanta as $almacenPlanta) {
+            $resumenesCapacidadPlanta[$almacenPlanta->almacenid] = $this->capacidadService->resumen($almacenPlanta);
+        }
         $condicionesAlmacenaje = AlmacenajeLoteCondiciones::opciones();
 
         $cantidadProductoAlmacen = (float) ($loteProduccion->cantidad_objetivo ?? 0);
@@ -236,6 +241,7 @@ class LoteProduccionController extends Controller
             'maquinasPlanta' => $maquinasPlanta,
             'mapaCompatibilidad' => $mapaCompatibilidad,
             'almacenesPlanta' => $almacenesPlanta,
+            'resumenesCapacidadPlanta' => $resumenesCapacidadPlanta,
             'condicionesAlmacenaje' => $condicionesAlmacenaje,
             'cantidadProductoAlmacen' => $cantidadProductoAlmacen,
             'cantidadProductoAlmacenKg' => $cantidadProductoAlmacenKg,
@@ -247,6 +253,8 @@ class LoteProduccionController extends Controller
             'operadoresPlanta' => $operadoresPlanta,
             'asignacionesPendientesLote' => $asignacionesPendientesLote,
             'puedeAsignarNuevaEtapa' => $puedeAsignarEtapa && $this->asignacionEtapa->puedeAsignar($loteProduccion),
+            'mensajeBloqueoAsignacion' => $this->transformacion->mensajeBloqueoAsignacion($loteProduccion),
+            'ordenEtapaActual' => $this->transformacion->ordenPasoActual($loteProduccion),
         ]));
     }
 
@@ -278,24 +286,69 @@ class LoteProduccionController extends Controller
         Request $request,
         LoteProduccionPedido $loteProduccion,
         AsignacionEtapaPlanta $asignacion,
-    ): RedirectResponse {
+    ): RedirectResponse|JsonResponse {
         abort_unless(UsuarioRol::gestionaPlanta($request->user()) || $request->user()?->hasRole('admin'), 403);
 
         if ((int) $asignacion->loteproduccionpedidoid !== (int) $loteProduccion->loteproduccionpedidoid) {
             abort(404);
         }
 
+        $respondeJson = $request->expectsJson() || $request->ajax();
+
         try {
-            $this->asignacionEtapa->completarPorSupervisor($asignacion, $request->user());
+            $registro = $this->asignacionEtapa->completarPorSupervisor($asignacion, $request->user());
         } catch (\InvalidArgumentException $e) {
+            if ($respondeJson) {
+                return response()->json(['ok' => false, 'message' => $e->getMessage()], 422);
+            }
+
             return back()->with('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            if ($respondeJson) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'No se pudo completar la etapa. '.$e->getMessage(),
+                ], 500);
+            }
+
+            throw $e;
         }
 
+        $asignacion->load(['proceso', 'maquina', 'operador']);
+        $loteProduccion->refresh();
         $proceso = $asignacion->proceso?->nombre ?? 'etapa';
+        $mensaje = "«{$proceso}» marcada como completada. La alerta del operario fue retirada.";
+
+        if ($respondeJson) {
+            $registro->load(['procesoMaquina.proceso', 'procesoMaquina.maquina', 'usuario']);
+            $etapas = $this->transformacion->timeline($loteProduccion);
+            $ultima = $etapas[count($etapas) - 1] ?? null;
+
+            return response()->json([
+                'ok' => true,
+                'message' => $mensaje,
+                'asignacion_id' => (int) $asignacion->asignacionetapaplantaid,
+                'etapa' => $ultima ? [
+                    'numero' => $ultima['numero'],
+                    'proceso' => $ultima['proceso'],
+                    'maquina' => $ultima['maquina'],
+                    'inicio_fmt' => $ultima['inicio']?->format('d/m/Y H:i'),
+                    'fin_fmt' => $ultima['fin']?->format('d/m/Y H:i'),
+                    'operador' => $ultima['operador'],
+                    'observaciones' => $ultima['observaciones'],
+                    'es_cierre' => ! empty($ultima['es_cierre']),
+                ] : null,
+                'transformacion_completa' => $this->trazabilidad->transformacionCompleta($loteProduccion),
+                'ruta_plantilla' => $this->transformacion->rutaPlantilla($loteProduccion),
+                'mensaje_bloqueo' => $this->transformacion->mensajeBloqueoAsignacion($loteProduccion),
+                'puede_asignar_nueva' => $this->asignacionEtapa->puedeAsignar($loteProduccion),
+                'asignaciones_pendientes_count' => $this->transformacion->asignacionesPendientes($loteProduccion)->count(),
+            ]);
+        }
 
         return redirect()
             ->route('procesamiento.show', $loteProduccion)
-            ->with('success', "«{$proceso}» marcada como completada. La alerta del operario fue retirada.");
+            ->with('success', $mensaje);
     }
 
     public function registrarEtapa(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse
@@ -385,7 +438,12 @@ class LoteProduccionController extends Controller
         $data = $request->validate([
             'razon' => ['required', 'string', Rule::in(EvaluacionFinalLoteProduccion::RAZONES)],
             'observaciones' => ['nullable', 'string', 'max:500'],
+            'recomendaciones' => ['nullable', 'string', 'max:2000'],
         ]);
+
+        if ($data['razon'] === EvaluacionFinalLoteProduccion::RAZON_NO_CONFORME && blank($data['observaciones'] ?? null)) {
+            return back()->withErrors(['observaciones' => 'Indique el motivo del no conforme.'])->withInput();
+        }
 
         EvaluacionFinalLoteProduccion::updateOrCreate(
             ['loteproduccionpedidoid' => $loteProduccion->loteproduccionpedidoid],
@@ -393,6 +451,7 @@ class LoteProduccionController extends Controller
                 'inspector_usuarioid' => $request->user()->usuarioid,
                 'razon' => $data['razon'],
                 'observaciones' => $data['observaciones'] ?? null,
+                'recomendaciones' => $data['recomendaciones'] ?? null,
                 'fecha_evaluacion' => now(),
             ]
         );
@@ -405,8 +464,12 @@ class LoteProduccionController extends Controller
             $mensaje = 'Lote certificado. Ya puede registrar el almacenaje del producto terminado.';
         }
 
+        $redirect = $request->input('redirect_to') === 'certificaciones-planta'
+            ? route('certificaciones-planta.index')
+            : route('procesamiento.show', $loteProduccion);
+
         return redirect()
-            ->route('procesamiento.show', $loteProduccion)
+            ->to($redirect)
             ->with('success', $mensaje);
     }
 
@@ -464,6 +527,8 @@ class LoteProduccionController extends Controller
                 ?: 'Producto terminado: '.$loteProduccion->nombre,
             'fecha_almacenaje' => now(),
         ]);
+
+        $this->inventarioPlanta->sincronizarLoteAlmacenado($loteProduccion, $almacen);
 
         $loteProduccion->update([
             'cantidad_objetivo' => $cantidad,

@@ -11,10 +11,11 @@ use PHPUnit\Framework\TestCase;
 
 class TransporteCapacidadServiceTest extends TestCase
 {
-    public function test_licencia_moto_no_autoriza_camion(): void
+    public function test_licencia_particular_no_autoriza_camion(): void
     {
-        $this->assertFalse(LicenciaConduccionCatalogo::puedeConducir('M', 'C'));
+        $this->assertFalse(LicenciaConduccionCatalogo::puedeConducir('P', 'C'));
         $this->assertTrue(LicenciaConduccionCatalogo::puedeConducir('C', 'B'));
+        $this->assertTrue(LicenciaConduccionCatalogo::puedeConducirConLicencias(['A', 'B'], 'B'));
     }
 
     public function test_volumen_estimado_desde_peso(): void

@@ -62,6 +62,18 @@
     margin-bottom: .5rem;
     cursor: pointer;
     transition: border-color .15s;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+.act-det-insumo-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
 }
 .act-det-insumo-card:hover { border-color: #86efac; }
 .act-det-insumo-card.is-selected {
@@ -279,7 +291,9 @@
             const card = document.createElement('div');
             card.className = 'act-det-insumo-card' + (seleccionados.has(item.id) ? ' is-selected' : '');
             card.dataset.id = item.id;
-            card.innerHTML = '<strong>' + item.nombre + '</strong><br><small class="text-muted">Disponible: ' + fmtNum(item.stock) + ' ' + item.unidad + '</small>';
+            card.innerHTML =
+                '<img src="' + (item.imagen || '') + '" alt="" class="act-det-insumo-thumb" loading="lazy">' +
+                '<div><strong>' + item.nombre + '</strong><br><small class="text-muted">Disponible: ' + fmtNum(item.stock) + ' ' + item.unidad + '</small></div>';
             card.addEventListener('click', function () {
                 if (maxInsumos === 1) {
                     lista.querySelectorAll('.act-det-insumo-card').forEach(function (c) { c.classList.remove('is-selected'); });
@@ -452,7 +466,9 @@
                 const card = document.createElement('div');
                 card.className = 'act-det-insumo-card';
                 card.dataset.id = item.id;
-                card.innerHTML = '<strong>' + item.nombre + '</strong><br><small class="text-muted">En bodega: ' + fmtNum(item.stock) + ' ' + item.unidad + '</small>';
+                card.innerHTML =
+                    '<img src="' + (item.imagen || '') + '" alt="" class="act-det-insumo-thumb" loading="lazy">' +
+                    '<div><strong>' + item.nombre + '</strong><br><small class="text-muted">En bodega: ' + fmtNum(item.stock) + ' ' + item.unidad + '</small></div>';
                 card.addEventListener('click', function () {
                     cont.querySelectorAll('.act-det-insumo-card').forEach(function (c) { c.classList.remove('is-selected'); });
                     card.classList.add('is-selected');

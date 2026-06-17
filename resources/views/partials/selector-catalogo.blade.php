@@ -26,9 +26,11 @@
     $colDetalle = $colDetalle ?? null;
     $colNombre = $colNombre ?? null;
     $theme = $theme ?? null;
+    $variant = $variant ?? 'filtros';
+    $esVarianteFiltros = $variant !== 'legacy';
 @endphp
 
-<div class="selector-catalogo-wrapper {{ $inputGroup ? 'flex-grow-1 w-100 mb-0' : 'form-group' }}" id="selector_wrap_{{ $id }}">
+<div class="selector-catalogo-wrapper {{ $inputGroup ? 'flex-grow-1 w-100 mb-0' : 'form-group' }}{{ $esVarianteFiltros ? ' selector-catalogo--filtros' : '' }}" id="selector_wrap_{{ $id }}">
     @if($showLabel)
         <label class="small font-weight-bold mb-1 d-block">
             @if($icon)<i class="fas {{ $icon }} mr-1"></i>@endif
@@ -36,6 +38,39 @@
             @if($required)<span class="text-danger">*</span>@endif
         </label>
     @endif
+
+    @if($esVarianteFiltros)
+        <div class="selector-filtros-field" role="combobox" aria-haspopup="dialog" aria-expanded="false">
+            <input type="text"
+                   class="selector-filtros-field__input selector-catalogo-label {{ ! $tieneSeleccion ? 'is-empty' : '' }}"
+                   value="{{ $tieneSeleccion ? $labelSelected : '' }}"
+                   placeholder="{{ $allowEmpty ? $placeholderEmpty : 'Elegir…' }}"
+                   readonly
+                   tabindex="-1">
+            <input type="hidden"
+                   name="{{ $name }}"
+                   value="{{ $value }}"
+                   class="selector-catalogo-value"
+                   @if($required) required @endif>
+            <div class="selector-filtros-field__actions">
+                @if($allowEmpty)
+                    <button type="button"
+                            class="selector-filtros-field__clear{{ $tieneSeleccion ? '' : ' is-hidden' }}"
+                            data-selector-clear="{{ $id }}"
+                            title="Quitar filtro"
+                            aria-label="Quitar filtro">
+                        <i class="fas fa-times"></i>
+                    </button>
+                @endif
+                <button type="button"
+                        class="selector-filtros-field__open"
+                        data-selector-open="{{ $id }}"
+                        title="Abrir catálogo">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+        </div>
+    @else
     <div class="input-group{{ $size === 'sm' ? ' input-group-sm' : '' }}">
         <input type="text"
                class="form-control selector-catalogo-label{{ $size === 'sm' ? ' form-control-sm' : '' }} {{ ! $tieneSeleccion ? 'text-muted' : '' }}"
@@ -59,6 +94,7 @@
             @endif
         </div>
     </div>
+    @endif
     @if($help && ! $showLabel)
         <p class="campo-guia mb-0">{{ $help }}</p>
     @endif

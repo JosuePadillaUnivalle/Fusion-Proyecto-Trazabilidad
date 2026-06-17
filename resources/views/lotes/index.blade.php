@@ -85,23 +85,38 @@
     flex-shrink: 0;
     margin-right: 1rem;
 }
-.page-lotes .btn-actions .btn {
-    padding: 0.2rem 0.45rem;
-    line-height: 1.2;
+.page-lotes .lote-acciones {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: .35rem;
+}
+.page-lotes .lote-acciones .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 8px;
+    line-height: 1;
+    border-width: 1px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
+}
+.page-lotes .lote-acciones .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(15, 23, 42, .1);
+}
+.page-lotes .lote-acciones form {
+    display: inline-flex;
+    margin: 0;
 }
 .page-lotes .card-header .badge-registros {
     font-size: 0.78rem;
     font-weight: 500;
     padding: 0.35em 0.65em;
     white-space: nowrap;
-}
-.page-lotes .filtros-panel .selector-catalogo-wrapper .input-group .form-control {
-    height: calc(1.8125rem + 2px);
-    font-size: .875rem;
-}
-.page-lotes .filtros-panel .selector-catalogo-wrapper .btn {
-    padding: .25rem .65rem;
-    font-size: .8rem;
 }
 </style>
 @endpush
@@ -204,6 +219,7 @@
                             'modalIcon' => 'fa-seedling',
                             'rowIcon' => 'fa-seedling',
                             'inputGroup' => true,
+                            'variant' => 'filtros',
                         ])
                     </div>
                     <div class="col-lg-2 col-md-3 col-6 mb-2">
@@ -239,6 +255,7 @@
                             'rowIcon' => 'fa-user',
                             'colDetalle' => 'Correo',
                             'inputGroup' => true,
+                            'variant' => 'filtros',
                         ])
                     </div>
                 </div>
@@ -285,18 +302,18 @@
                             <td class="text-right font-weight-bold">@superficie($l->superficie, 1)</td>
                             <td class="text-muted small">{{ Str::limit($l->ubicacion_visible, 28) }}</td>
                             <td class="text-center">
-                                <div class="btn-group btn-group-sm btn-actions">
-                                    <a href="{{ route('lotes.show', $l) }}" class="btn btn-default" title="Ver"><i class="fas fa-eye text-info"></i></a>
+                                <div class="lote-acciones">
+                                    <a href="{{ route('lotes.show', $l) }}" class="btn btn-outline-info" title="Ver"><i class="fas fa-eye"></i></a>
                                     @if($loteCerrado)
-                                        <a href="{{ route('lotes.trazabilidad', $l) }}" class="btn btn-default" title="Trazabilidad del lote"><i class="fas fa-route text-success"></i></a>
+                                        <a href="{{ route('lotes.trazabilidad', $l) }}" class="btn btn-outline-success" title="Trazabilidad del lote"><i class="fas fa-route"></i></a>
                                     @else
                                         @can('lotes.update')
-                                        <a href="{{ route('lotes.edit', $l) }}" class="btn btn-default" title="Editar"><i class="fas fa-edit text-warning"></i></a>
+                                        <a href="{{ route('lotes.edit', $l) }}" class="btn btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>
                                         @endcan
                                         @can('lotes.delete')
-                                        <form action="{{ route('lotes.destroy', $l) }}" method="POST" class="d-inline on-submit-confirm">
+                                        <form action="{{ route('lotes.destroy', $l) }}" method="POST" class="on-submit-confirm">
                                             @csrf @method('DELETE')
-                                            <button type="submit" class="btn btn-default" title="Eliminar"><i class="fas fa-trash text-danger"></i></button>
+                                            <button type="submit" class="btn btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
                                         </form>
                                         @endcan
                                     @endif
@@ -345,18 +362,18 @@
                         </div>
                     </div>
                     <span class="badge badge-{{ $badge }} mr-2 d-none d-md-inline">{{ ucfirst($estadoNombre) }}</span>
-                    <div class="btn-group btn-group-sm btn-actions flex-shrink-0">
-                        <a href="{{ route('lotes.show', $l) }}" class="btn btn-default"><i class="fas fa-eye text-info"></i></a>
+                    <div class="lote-acciones flex-shrink-0">
+                        <a href="{{ route('lotes.show', $l) }}" class="btn btn-outline-info" title="Ver"><i class="fas fa-eye"></i></a>
                         @if($loteCerrado)
-                            <a href="{{ route('lotes.trazabilidad', $l) }}" class="btn btn-default" title="Trazabilidad"><i class="fas fa-route text-success"></i></a>
+                            <a href="{{ route('lotes.trazabilidad', $l) }}" class="btn btn-outline-success" title="Trazabilidad"><i class="fas fa-route"></i></a>
                         @else
                             @can('lotes.update')
-                            <a href="{{ route('lotes.edit', $l) }}" class="btn btn-default"><i class="fas fa-edit text-warning"></i></a>
+                            <a href="{{ route('lotes.edit', $l) }}" class="btn btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>
                             @endcan
                             @can('lotes.delete')
-                            <form action="{{ route('lotes.destroy', $l) }}" method="POST" class="d-inline on-submit-confirm">
+                            <form action="{{ route('lotes.destroy', $l) }}" method="POST" class="on-submit-confirm">
                                 @csrf @method('DELETE')
-                                <button type="submit" class="btn btn-default"><i class="fas fa-trash text-danger"></i></button>
+                                <button type="submit" class="btn btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
                             </form>
                             @endcan
                         @endif

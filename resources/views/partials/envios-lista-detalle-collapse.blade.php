@@ -19,23 +19,26 @@
         $textoFiltro = strtolower(implode(' ', array_filter([
             (string) ($envio['externo_envio_id'] ?? ''),
             (string) ($envio['nombre_remitente'] ?? ''),
-            (string) ($envio['estado'] ?? ''),
+            (string) ($envio['estado_etiqueta'] ?? $envio['estado'] ?? ''),
             (string) ($envio['destino'] ?? ''),
         ])));
+        $estadoVisible = $envio['estado_etiqueta'] ?? $envio['estado'] ?? '';
+        $detalleUrl = $envio['ver_url']
+            ?? (isset($envio['id']) ? route('logistica.asignaciones.show', $envio['id']) : '#');
     @endphp
     <li class="list-group-item d-flex justify-content-between align-items-center py-2 fila-detalle-envio"
         data-texto="{{ $textoFiltro }}">
         <span>
             <strong>{{ $envio['externo_envio_id'] ?? '#'.$envio['id'] }}</strong>
             <span class="text-muted small ml-2">{{ $envio['nombre_remitente'] ?? '' }}</span>
-            @if(!empty($envio['estado']))
-                <span class="badge badge-light border ml-1 text-capitalize">{{ $envio['estado'] }}</span>
+            @if($estadoVisible !== '')
+                <span class="badge badge-light border ml-1">{{ $estadoVisible }}</span>
             @endif
             @if(!empty($envio['destino']))
                 <span class="text-muted small d-block mt-1"><i class="fas fa-map-marker-alt mr-1"></i>{{ $envio['destino'] }}</span>
             @endif
         </span>
-        <a href="{{ url('/envios/'.$envio['id']) }}" class="btn btn-outline-success btn-sm flex-shrink-0 ml-2" title="Ver detalle">
+        <a href="{{ $detalleUrl }}" class="btn btn-outline-success btn-sm flex-shrink-0 ml-2" title="Ver detalle">
             <i class="fas fa-eye mr-1"></i> Detalle
         </a>
     </li>

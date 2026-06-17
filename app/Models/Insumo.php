@@ -23,8 +23,10 @@ class Insumo extends Model
         'actorid',
         'preciounitario',
         'descripcion',
+        'imagenurl',
         'dosis_por_ha',
         'dosis_unidad',
+        'semillas_por_kg',
         'almacenid',
         'codigo_trazabilidad',
     ];
@@ -38,6 +40,7 @@ class Insumo extends Model
         'stockminimo'    => 'float',
         'preciounitario' => 'float',
         'dosis_por_ha'   => 'float',
+        'semillas_por_kg' => 'float',
         'almacenid' => 'integer',
     ];
 
@@ -124,5 +127,10 @@ class Insumo extends Model
     public function stockBajo(): bool
     {
         return \App\Support\InsumoCatalogo::stockCritico((float) $this->stock);
+    }
+
+    public function imagenSrc(int $width = 256): string
+    {
+        return \App\Support\InsumoImagenCatalogo::urlPara($this, $width);
     }
 }

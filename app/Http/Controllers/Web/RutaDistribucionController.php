@@ -44,6 +44,8 @@ class RutaDistribucionController extends Controller
     {
         $this->autorizarPlanificador();
 
+        $this->rutas->sincronizarEstadosRutasActivas();
+
         $tab = $request->string('tab')->toString();
         if (! in_array($tab, ['todos', 'pedidos', 'en_ruta', 'historial'], true)) {
             $tab = 'todos';
@@ -74,6 +76,11 @@ class RutaDistribucionController extends Controller
 
         if ($tab === 'en_ruta') {
             $rutasQuery->where('estado', RutaDistribucionCatalogo::ESTADO_EN_RUTA);
+        } elseif ($tab === 'historial') {
+            $rutasQuery->whereIn('estado', [
+                RutaDistribucionCatalogo::ESTADO_COMPLETADA,
+                RutaDistribucionCatalogo::ESTADO_CANCELADA,
+            ]);
         }
 
         if ($mostrarRutas && $request->filled('buscar')) {

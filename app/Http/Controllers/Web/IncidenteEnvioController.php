@@ -51,6 +51,12 @@ class IncidenteEnvioController extends Controller
             $q->whereDate('created_at', '<=', $request->string('hasta')->toString());
         }
 
+        $resumenIncidentes = [
+            'total' => (clone $q)->count(),
+            'activos' => (clone $q)->whereIn('estado', ['abierto', 'pendiente'])->count(),
+            'resueltos' => (clone $q)->where('estado', 'resuelto')->count(),
+        ];
+
         $incidentes = $q->paginate(15)->withQueryString();
 
         $tiposDisponibles = IncidenteEnvio::query()
@@ -61,7 +67,8 @@ class IncidenteEnvioController extends Controller
 
         return view('logistica.incidentes.index', compact(
             'incidentes',
-            'tiposDisponibles'
+            'tiposDisponibles',
+            'resumenIncidentes'
         ));
     }
 

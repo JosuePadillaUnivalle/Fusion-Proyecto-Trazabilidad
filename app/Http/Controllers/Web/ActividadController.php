@@ -72,10 +72,12 @@ class ActividadController extends Controller
         $actividades = $query->orderByDesc('actividadid')->paginate(15)->withQueryString();
 
         $filtros = $request->only(['q', 'estado', 'loteid', 'tipoactividadid']);
-        $lotes = Lote::orderBy('nombre')->get(['loteid', 'nombre']);
+        $loteFiltroNombre = $request->filled('loteid')
+            ? (Lote::whereKey((int) $request->loteid)->value('nombre') ?? '')
+            : '';
         $tiposActividad = TipoActividad::orderBy('nombre')->get();
 
-        return view('actividades.index', compact('actividades', 'stats', 'filtros', 'lotes', 'tiposActividad'));
+        return view('actividades.index', compact('actividades', 'stats', 'filtros', 'loteFiltroNombre', 'tiposActividad'));
     }
 
     /**
@@ -108,6 +110,7 @@ class ActividadController extends Controller
         $usuarios = $this->usuariosResponsablesActividad($request);
         $puedeDesignarResponsable = $this->puedeDesignarResponsableActividad($user);
         $esJefeAgricultorDesignando = $user && UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user);
+        $responsableSelectorParams = $this->paramsSelectorResponsableActividad($user);
 
         $tiposActividad = TipoActividad::orderBy('nombre')->get();
 
@@ -119,6 +122,7 @@ class ActividadController extends Controller
             'tiposActividad',
             'puedeDesignarResponsable',
             'esJefeAgricultorDesignando',
+            'responsableSelectorParams',
         ));
     }
 
@@ -222,7 +226,7 @@ class ActividadController extends Controller
         $faseActual = $this->trazabilidad->resolverFaseActual($lote);
         $bloqueo = $this->trazabilidad->mensajeActividadNoPermitida($lote, $tipoSiembra->nombre);
 
-        if ($faseActual !== 'siembra' || $bloqueo !== null) {
+        if (! $this->trazabilidad->tipoActividadPermitidoEnFase($tipoSiembra->nombre, $faseActual) || $bloqueo !== null) {
             return redirect()
                 ->route('lotes.trazabilidad', $lote)
                 ->with('error', $bloqueo ?? 'Este lote no está en fase de siembra.');
@@ -293,6 +297,30 @@ class ActividadController extends Controller
         ]);
 
         return $this->store($request);
+    }
+
+    public function asignarSiembra(Request $request, Lote $lote)
+    {
+        $this->autorizarLoteParaActividad($request, $lote);
+        $lote->loadMissing('usuario');
+
+        try {
+            $responsableId = $this->resolverUsuarioidActividad($request, $lote);
+            app(\App\Services\LoteSiembraService::class)->asignar(
+                $lote,
+                $responsableId,
+                $request->user()?->usuarioid
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()
+                ->route('lotes.trazabilidad', $lote)
+                ->withErrors($e->errors())
+                ->withInput();
+        }
+
+        return redirect()
+            ->route('lotes.trazabilidad', $lote)
+            ->with('success', 'Siembra asignada. El agricultor responsable podrá marcarla como realizada con una foto.');
     }
 
     public function store(Request $request)
@@ -391,6 +419,9 @@ class ActividadController extends Controller
         $mensaje = "Actividad de {$tipo->nombre} registrada para el lote {$lote->nombre}.{$msgEstado}";
 
         $returnUrl = $this->validReturnUrl($request->input('return'));
+        if (! $returnUrl && $request->boolean('desde_trazabilidad')) {
+            $returnUrl = route('lotes.trazabilidad', $lote, absolute: false);
+        }
         if ($returnUrl) {
             return redirect($returnUrl)->with('success', $mensaje);
         }
@@ -540,6 +571,15 @@ class ActividadController extends Controller
             }
 
             $estadoAplicado = $this->loteEstadoPorActividad->aplicarDesdeActividad($actividad);
+
+            $actividad->loadMissing(['lote', 'tipoActividad']);
+            $tipoNombre = mb_strtolower(trim($actividad->tipoActividad->nombre ?? ''));
+            if (str_contains($tipoNombre, 'siembra') && $actividad->lote && ! $actividad->lote->fechasiembra) {
+                $actividad->lote->fechasiembra = now()->toDateString();
+                $actividad->lote->fechamodificacion = now();
+                $actividad->lote->save();
+            }
+
             $this->notificaciones->descartarActividadAsignada((int) $actividad->actividadid);
             $mensajeEstado = $estadoAplicado
                 ? " El lote «{$actividad->lote->nombre}» cambió a «{$estadoAplicado}»."
@@ -767,6 +807,7 @@ class ActividadController extends Controller
         $lote = $act->lote->nombre ?? 'Sin lote';
         $pendiente = $act->fechafin === null;
         $inicio = Carbon::parse($act->fechainicio);
+        $hora = $inicio->format('H:i');
 
         return [
             'id' => (string) $act->actividadid,
@@ -781,6 +822,8 @@ class ActividadController extends Controller
                 'loteid' => $act->loteid,
                 'responsable' => trim(($act->usuario->nombre ?? '').' '.($act->usuario->apellido ?? '')),
                 'usuarioid' => $act->usuarioid,
+                'hora' => $hora,
+                'horaTimestamp' => $inicio->timestamp,
                 'fechainicioFmt' => $inicio->format('d/m/Y H:i'),
                 'fechafin' => $pendiente ? null : Carbon::parse($act->fechafin)->format('d/m/Y H:i'),
                 'pendiente' => $pendiente,
@@ -797,12 +840,32 @@ class ActividadController extends Controller
         }
 
         $return = trim($return);
-        $appUrl = rtrim((string) config('app.url'), '/');
-        if (! str_starts_with($return, '/') && ! str_starts_with($return, $appUrl)) {
-            return null;
+
+        if (str_starts_with($return, '/') && ! str_starts_with($return, '//')) {
+            return $return;
         }
 
-        return $return;
+        foreach (array_filter([
+            rtrim((string) config('app.url'), '/'),
+            rtrim((string) config('app.public_url', ''), '/'),
+        ]) as $base) {
+            if ($base !== '' && str_starts_with($return, $base)) {
+                $path = parse_url($return, PHP_URL_PATH) ?: '';
+                $query = parse_url($return, PHP_URL_QUERY);
+                $fragment = parse_url($return, PHP_URL_FRAGMENT);
+                $normalized = $path;
+                if ($query) {
+                    $normalized .= '?'.$query;
+                }
+                if ($fragment) {
+                    $normalized .= '#'.$fragment;
+                }
+
+                return $normalized !== '' ? $normalized : $return;
+            }
+        }
+
+        return null;
     }
 
 }

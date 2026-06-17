@@ -184,6 +184,12 @@
 .modulo-prod .cos-chip--rose { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
 .modulo-prod .cos-chip--slate { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
 .modulo-prod .cos-chip--sky { background: #ecfeff; color: #0e7490; border-color: #a5f3fc; }
+.modulo-prod #filtrosProduccionPanel .selector-catalogo-wrapper {
+    margin-bottom: 0;
+}
+.modulo-prod #filtrosProduccionPanel .filtros-form-actions {
+    margin-top: 0;
+}
 </style>
 
 @endpush
@@ -290,57 +296,50 @@
 
 
 
-        <div id="filtrosProduccionPanel" class="filtros-panel collapse {{ request()->hasAny(['buscar','loteid','destinoid','fecha_desde','fecha_hasta']) ? 'show' : '' }}">
+        <div id="filtrosProduccionPanel" class="filtros-panel collapse {{ request()->hasAny(['buscar','loteid','fecha_desde','fecha_hasta']) ? 'show' : '' }}">
 
             <form method="GET" action="{{ route('producciones.index') }}">
 
-                <div class="row">
+                <div class="row align-items-end">
 
                     <div class="col-lg-4 col-md-6 mb-2">
 
                         <label class="small text-muted mb-1">Buscar</label>
 
-                        <input type="text" name="buscar" class="form-control form-control-sm" value="{{ request('buscar') }}" placeholder="Lote, semilla, destino…">
+                        <input type="text" name="buscar" class="form-control form-control-sm" value="{{ request('buscar') }}" placeholder="Lote, semilla, responsable…">
 
                     </div>
 
-                    <div class="col-lg-2 col-md-6 mb-2">
+                    <div class="col-lg-4 col-md-6 mb-2">
 
                         <label class="small text-muted mb-1">Lote cosechado</label>
 
-                        <select name="loteid" class="form-control form-control-sm">
-
-                            <option value="">Todos</option>
-
-                            @foreach($lotesFiltro ?? [] as $l)
-
-                                <option value="{{ $l->loteid }}" @selected(request('loteid') == $l->loteid)>{{ $l->nombre }}</option>
-
-                            @endforeach
-
-                        </select>
-
-                    </div>
-
-                    <div class="col-lg-2 col-md-6 mb-2">
-
-                        <label class="small text-muted mb-1">Destino</label>
-
-                        <select name="destinoid" class="form-control form-control-sm">
-
-                            <option value="">Todos</option>
-
-                            @foreach($destinosFiltro ?? [] as $d)
-
-                                <option value="{{ $d->destinoproduccionid }}" @selected(request('destinoid') == $d->destinoproduccionid)>{{ $d->nombre }}</option>
-
-                            @endforeach
-
-                        </select>
+                        @include('partials.selector-catalogo', [
+                            'id' => 'cos_filtro_lote',
+                            'name' => 'loteid',
+                            'value' => request('loteid'),
+                            'labelSelected' => $loteFiltroSeleccionado?->nombre ?? '',
+                            'endpoint' => route('catalogo-selector.lotes'),
+                            'params' => ['loteids' => ($loteIdsCosechadosFilter ?? collect())->implode(',')],
+                            'title' => 'Seleccionar lote cosechado',
+                            'searchPlaceholder' => 'Nombre, código o ubicación…',
+                            'searchLabel' => 'Buscar lote cosechado',
+                            'modalIcon' => 'fa-map-marked-alt',
+                            'rowIcon' => 'fa-seedling',
+                            'colNombre' => 'Lote',
+                            'colDetalle' => 'Cultivo / código',
+                            'allowEmpty' => true,
+                            'emptyLabel' => 'Todos los lotes',
+                            'placeholderEmpty' => 'Todos los lotes cosechados',
+                            'size' => 'sm',
+                            'inputGroup' => true,
+                            'showLabel' => false,
+                            'variant' => 'filtros',
+                        ])
 
                     </div>
 
-                    <div class="col-lg-2 col-md-6 mb-2">
+                    <div class="col-lg-2 col-md-4 mb-2">
 
                         <label class="small text-muted mb-1">Desde</label>
 
@@ -348,7 +347,7 @@
 
                     </div>
 
-                    <div class="col-lg-2 col-md-6 mb-2">
+                    <div class="col-lg-2 col-md-4 mb-2">
 
                         <label class="small text-muted mb-1">Hasta</label>
 
@@ -356,7 +355,7 @@
 
                     </div>
 
-                    <div class="col-lg-12">
+                    <div class="col-lg-4 col-md-4 mb-2">
 
                         <x-filtros-form-actions :limpiar-url="route('producciones.index', ['filtros_abiertos' => 1])" />
 

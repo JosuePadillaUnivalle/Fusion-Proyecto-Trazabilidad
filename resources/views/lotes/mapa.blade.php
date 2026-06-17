@@ -16,7 +16,7 @@
         --primary-color: #2c5530;
         --secondary-color: #4a7c59;
         --accent-color: #e8f5e8;
-        --success-color: #28a745;
+        --success-color: #5c7a52;
         --warning-color: #ffc107;
         --danger-color: #dc3545;
         --info-color: #17a2b8;
@@ -62,6 +62,17 @@
         border: 1px solid var(--border-color);
         border-radius: 6px;
         font-size: 13px;
+    }
+    .map-filters .selector-catalogo-wrapper {
+        margin-bottom: 0;
+    }
+    .map-filters .selector-catalogo-wrapper .input-group-sm .form-control,
+    .map-filters .selector-catalogo-wrapper .btn-sm {
+        font-size: 12px;
+        min-height: 32px;
+    }
+    .map-filters .filtros-form-actions {
+        margin-top: 4px;
     }
     .filter-group select:focus, .filter-group input:focus {
         border-color: var(--primary-color);
@@ -116,8 +127,8 @@
         padding: 15px;
         border-radius: 10px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-        min-width: 300px;
-        max-width: 350px;
+        min-width: 320px;
+        max-width: 380px;
         display: none;
     }
     .lot-info-header {
@@ -140,15 +151,38 @@
     .close-panel:hover { background: #f1f3f4; color: var(--text-dark); }
 
     .lot-detail {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 6px 0;
+        display: grid;
+        grid-template-columns: 108px minmax(0, 1fr);
+        gap: .35rem .75rem;
+        align-items: start;
+        padding: 7px 0;
         border-bottom: 1px solid #f8f9fc;
     }
     .lot-detail:last-child { border-bottom: none; }
-    .lot-detail-label { font-weight: 600; color: var(--text-dark); font-size: 13px; }
-    .lot-detail-value { color: var(--text-light); font-size: 13px; }
+    .lot-detail-label {
+        font-weight: 600;
+        color: var(--text-dark);
+        font-size: 13px;
+        line-height: 1.35;
+    }
+    .lot-detail-value {
+        color: var(--text-light);
+        font-size: 13px;
+        line-height: 1.4;
+        text-align: right;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        min-width: 0;
+    }
+    .lot-detail--ubicacion .lot-detail-value {
+        text-align: left;
+    }
+    .lot-detail--estado {
+        align-items: center;
+    }
+    .lot-detail--estado .lot-status-badge {
+        justify-self: end;
+    }
 
     .lot-status-badge {
         padding: 4px 10px;
@@ -160,25 +194,108 @@
     .status-disponible { background: rgba(108, 117, 125, 0.2); color: #6c757d; }
     .status-preparacion { background: rgba(23, 162, 184, 0.2); color: var(--info-color); }
     .status-sembrado { background: rgba(0, 123, 255, 0.2); color: #007bff; }
-    .status-produccion { background: rgba(40, 167, 69, 0.2); color: var(--success-color); }
+    .status-produccion { background: rgba(92, 122, 82, 0.18); color: var(--success-color); }
     .status-cosechado { background: rgba(255, 193, 7, 0.2); color: #d39e00; }
     .status-descanso { background: rgba(52, 58, 64, 0.2); color: #343a40; }
 
-    .lot-actions { margin-top: 12px; padding-top: 12px; border-top: 2px solid #f1f3f4; }
-    .lot-action-btn { width: 100%; margin-bottom: 6px; border-radius: 6px; font-weight: 500; font-size: 13px; }
-    .lot-action-btn:last-child { margin-bottom: 0; }
-
-    .statistics-panel {
-        background: white;
-        border-radius: 10px;
-        padding: 15px 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    .lot-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 2px solid #f1f3f4;
     }
-    .stat-item { text-align: center; padding: 10px; }
-    .stat-number { font-size: 24px; font-weight: 700; color: var(--primary-color); margin-bottom: 3px; }
-    .stat-label { font-size: 12px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-divider { border-left: 2px solid #f1f3f4; height: 50px; margin: auto; }
+    .lot-action-btn {
+        width: 100%;
+        margin: 0 !important;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13px;
+        display: block;
+        box-sizing: border-box;
+    }
+
+    .mapa-kpi-panel {
+        margin-bottom: 20px;
+    }
+    .mapa-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+    }
+    .mapa-kpi-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 16px 18px;
+        background: #fff;
+        border: 1px solid #e8ecef;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, .04);
+        transition: box-shadow .2s ease, transform .15s ease;
+    }
+    .mapa-kpi-card:hover {
+        box-shadow: 0 8px 22px rgba(44, 85, 48, .08);
+        transform: translateY(-1px);
+    }
+    .mapa-kpi-card__icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.05rem;
+        flex-shrink: 0;
+    }
+    .mapa-kpi-card--total .mapa-kpi-card__icon {
+        background: #eef2f7;
+        color: #475569;
+    }
+    .mapa-kpi-card--produccion .mapa-kpi-card__icon {
+        background: #ecfdf5;
+        color: #059669;
+    }
+    .mapa-kpi-card--cosecha .mapa-kpi-card__icon {
+        background: #fffbeb;
+        color: #b45309;
+    }
+    .mapa-kpi-card--hectareas .mapa-kpi-card__icon {
+        background: #f0fdf4;
+        color: #2c5530;
+    }
+    .mapa-kpi-card__body {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+    .mapa-kpi-card__value {
+        font-size: 1.65rem;
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -.02em;
+        color: var(--text-dark);
+    }
+    .mapa-kpi-card--produccion .mapa-kpi-card__value { color: #059669; }
+    .mapa-kpi-card--cosecha .mapa-kpi-card__value { color: #b45309; }
+    .mapa-kpi-card--hectareas .mapa-kpi-card__value { color: #2c5530; }
+    .mapa-kpi-card__label {
+        font-size: .72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: #94a3b8;
+    }
+    @media (max-width: 992px) {
+        .mapa-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 520px) {
+        .mapa-kpi-grid { grid-template-columns: 1fr; }
+        .mapa-kpi-card { padding: 14px 16px; }
+        .mapa-kpi-card__value { font-size: 1.45rem; }
+    }
 
     .btn-primary { background: var(--primary-color); border-color: var(--primary-color); }
     .btn-primary:hover { background: var(--secondary-color); border-color: var(--secondary-color); }
@@ -195,45 +312,378 @@
     }
     .lot-ranking-item:last-child { border-bottom: none; }
 
-    .alert-geo-item {
+    .mapa-panel-inferior {
+        margin-top: 1.25rem;
+    }
+    .mapa-panel-inferior__card {
+        border: none;
+        border-radius: 14px;
+        box-shadow: 0 4px 20px rgba(15, 23, 42, .07);
+        overflow: hidden;
+        height: 100%;
+    }
+    .mapa-panel-inferior__head {
         display: flex;
         align-items: center;
-        padding: 10px;
-        margin-bottom: 8px;
-        border-radius: 8px;
+        justify-content: space-between;
+        gap: .75rem;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #eef2f7;
+        background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
     }
-    .alert-geo-item:last-child { margin-bottom: 0; }
+    .mapa-panel-inferior__head h3 {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
+    }
+    .mapa-panel-inferior__head p {
+        margin: .15rem 0 0;
+        font-size: .78rem;
+        color: var(--text-light);
+    }
+    .mapa-panel-inferior__badge {
+        background: #ecfdf5;
+        color: #166534;
+        border: 1px solid #bbf7d0;
+        border-radius: 999px;
+        font-size: .72rem;
+        font-weight: 700;
+        padding: .25rem .65rem;
+        white-space: nowrap;
+    }
+    .mapa-ranking-list {
+        padding: .35rem 1rem 1rem;
+    }
+    .mapa-ranking-row {
+        display: grid;
+        grid-template-columns: 36px minmax(0, 1fr) auto;
+        gap: .75rem;
+        align-items: center;
+        padding: .75rem .85rem;
+        border-radius: 12px;
+        border: 1px solid transparent;
+        transition: background .15s, border-color .15s, transform .15s;
+        cursor: pointer;
+    }
+    .mapa-ranking-row + .mapa-ranking-row { margin-top: .45rem; }
+    .mapa-ranking-row:hover {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+        transform: translateY(-1px);
+    }
+    .mapa-ranking-pos {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: .82rem;
+        font-weight: 800;
+        color: #475569;
+        background: #f1f5f9;
+        border: 2px solid #e2e8f0;
+    }
+    .mapa-ranking-row--1 .mapa-ranking-pos { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+    .mapa-ranking-row--2 .mapa-ranking-pos { background: #f1f5f9; border-color: #cbd5e1; color: #334155; }
+    .mapa-ranking-row--3 .mapa-ranking-pos { background: #ffedd5; border-color: #fdba74; color: #9a3412; }
+    .mapa-ranking-nombre {
+        font-size: .92rem;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.25;
+    }
+    .mapa-ranking-meta {
+        font-size: .76rem;
+        color: #64748b;
+        margin-top: .15rem;
+    }
+    .mapa-ranking-stats { text-align: right; }
+    .mapa-ranking-kg {
+        font-size: .95rem;
+        font-weight: 800;
+        color: #15803d;
+        line-height: 1.2;
+    }
+    .mapa-ranking-ha {
+        font-size: .74rem;
+        color: #94a3b8;
+        margin-top: .1rem;
+    }
+    .mapa-tools-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .65rem;
+        padding: 1rem 1.15rem 1.15rem;
+    }
+    @media (min-width: 992px) {
+        .mapa-tools-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    .mapa-tool-tile {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: .45rem;
+        min-height: 88px;
+        padding: .75rem .5rem;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        color: #334155;
+        font-size: .76rem;
+        font-weight: 600;
+        text-align: center;
+        line-height: 1.25;
+        transition: background .15s, border-color .15s, transform .15s, box-shadow .15s;
+        cursor: pointer;
+        text-decoration: none !important;
+    }
+    .mapa-tool-tile:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(15, 23, 42, .08);
+        color: #0f172a;
+    }
+    .mapa-tool-tile__icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+    .mapa-tool-tile--blue { border-color: #bfdbfe; }
+    .mapa-tool-tile--blue:hover { background: #eff6ff; border-color: #93c5fd; }
+    .mapa-tool-tile--blue .mapa-tool-tile__icon { background: #dbeafe; color: #1d4ed8; }
+    .mapa-tool-tile--green { border-color: #bbf7d0; }
+    .mapa-tool-tile--green:hover { background: #f0fdf4; border-color: #86efac; }
+    .mapa-tool-tile--green .mapa-tool-tile__icon { background: #dcfce7; color: #15803d; }
+    .mapa-tool-tile--teal { border-color: #a5f3fc; }
+    .mapa-tool-tile--teal:hover { background: #ecfeff; border-color: #67e8f9; }
+    .mapa-tool-tile--teal .mapa-tool-tile__icon { background: #cffafe; color: #0e7490; }
+    .mapa-tool-tile--amber { border-color: #fde68a; }
+    .mapa-tool-tile--amber:hover { background: #fffbeb; border-color: #fcd34d; }
+    .mapa-tool-tile--amber .mapa-tool-tile__icon { background: #fef3c7; color: #b45309; }
+    .mapa-tool-tile--slate { border-color: #e2e8f0; }
+    .mapa-tool-tile--slate:hover { background: #f8fafc; border-color: #cbd5e1; }
+    .mapa-tool-tile--slate .mapa-tool-tile__icon { background: #f1f5f9; color: #475569; }
+    .mapa-tool-tile--dark { border-color: #cbd5e1; }
+    .mapa-tool-tile--dark:hover { background: #f8fafc; border-color: #94a3b8; }
+    .mapa-tool-tile--dark .mapa-tool-tile__icon { background: #e2e8f0; color: #1e293b; }
+    .mapa-ranking-empty {
+        text-align: center;
+        color: #94a3b8;
+        padding: 2rem 1rem;
+    }
+
+    .mapa-lote-marker-wrap { background: transparent; border: none; }
+    .mapa-lote-marker {
+        width: 28px;
+        height: 28px;
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        border: 2px solid #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,.28);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 12px;
+    }
+    .mapa-lote-marker i { transform: rotate(45deg); font-size: 11px; }
+    .mapa-lote-marker--grupo {
+        border-radius: 50%;
+        transform: none;
+        font-weight: 700;
+        font-size: 13px;
+    }
+    .mapa-lote-marker--grupo span { line-height: 1; }
+
+    .leaflet-tooltip.mapa-export-label-pane {
+        background: #fff;
+        border: 1px solid #14532d;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, .18);
+        padding: 0;
+        pointer-events: none;
+        opacity: 1 !important;
+    }
+    .leaflet-tooltip.mapa-export-label-pane::before { border-top-color: #14532d; }
+    .mapa-export-label {
+        padding: .4rem .55rem;
+        max-width: 190px;
+    }
+    .mapa-export-label strong {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        color: #14532d;
+        line-height: 1.25;
+    }
+    .mapa-export-label span {
+        display: block;
+        font-size: 9px;
+        color: #64748b;
+        line-height: 1.3;
+    }
+    .mapa-export-mode .leaflet-control-zoom { visibility: hidden; }
+
+    .leaflet-tooltip.mapa-lote-tooltip-pane {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, .14);
+        padding: 0;
+        color: #1e293b;
+        pointer-events: none;
+    }
+    .leaflet-tooltip.mapa-lote-tooltip-pane::before { border-top-color: #e2e8f0; }
+    .mapa-lote-tooltip {
+        padding: .55rem .7rem;
+        max-width: 280px;
+        min-width: 220px;
+        overflow: hidden;
+    }
+    .mapa-lote-tooltip strong { display: block; font-size: .88rem; margin-bottom: .2rem; color: #14532d; }
+    .mapa-lote-tooltip__meta {
+        font-size: .76rem;
+        color: #64748b;
+        line-height: 1.35;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        white-space: normal;
+    }
+    .mapa-lote-tooltip__lista {
+        list-style: none;
+        margin: .45rem 0 0;
+        padding: 0;
+        max-height: none;
+        overflow: visible;
+    }
+    .mapa-lote-tooltip__lista li {
+        padding: .35rem 0;
+        border-top: 1px solid #f1f5f9;
+    }
+    .mapa-lote-tooltip__lista li:first-child { border-top: 0; padding-top: 0; }
+    .mapa-lote-tooltip__nombre { display: block; font-size: .8rem; font-weight: 600; color: #0f172a; }
+    .mapa-lote-tooltip__mas {
+        margin-top: .45rem;
+        padding-top: .4rem;
+        border-top: 1px dashed #e2e8f0;
+        font-size: .78rem;
+        font-weight: 700;
+        color: #64748b;
+        text-align: center;
+    }
+    .mapa-grupo-lista {
+        max-height: none;
+        overflow: visible;
+    }
+    .mapa-grupo-lista--scroll {
+        max-height: 210px;
+        overflow-y: auto;
+        padding-right: .25rem;
+        margin-right: -.15rem;
+    }
+    .mapa-grupo-lista--scroll::-webkit-scrollbar { width: 5px; }
+    .mapa-grupo-lista--scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 999px;
+    }
+    .mapa-grupo-item {
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+        padding: .55rem .65rem !important;
+    }
+    .mapa-grupo-item:hover { border-color: #86efac !important; background: #f0fdf4 !important; }
+    .panel-grupo-intro {
+        font-size: .82rem;
+        color: #64748b;
+        margin-bottom: .65rem;
+    }
+
+    .mapa-export-loading {
+        position: absolute;
+        inset: 0;
+        z-index: 2000;
+        background: rgba(255, 255, 255, .82);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .mapa-export-loading__box {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, .12);
+        font-weight: 600;
+        color: #334155;
+    }
+    .mapa-share-modal .modal-content {
+        border: 0;
+        border-radius: 14px;
+        overflow: hidden;
+    }
+    .mapa-share-modal .modal-header {
+        background: linear-gradient(135deg, #14532d, #166534);
+        color: #fff;
+        border: 0;
+    }
+    .mapa-share-modal .close { color: #fff; opacity: .9; text-shadow: none; }
+    .mapa-share-modal .modal-body { padding: 1.25rem; }
+    .mapa-share-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+    .mapa-share-feedback {
+        border-radius: 10px;
+        font-size: .88rem;
+        margin-bottom: 0;
+    }
+    .mapa-toast-msg {
+        position: fixed;
+        right: 1.25rem;
+        bottom: 1.25rem;
+        z-index: 3000;
+        min-width: 260px;
+        max-width: 420px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, .18);
+    }
 </style>
 @endpush
 
 @section('content')
 <!-- Panel de Estadísticas -->
-<div class="statistics-panel">
-    <div class="row align-items-center">
-        <div class="col-md-2 stat-item">
-            <div class="stat-number">{{ $stats['total'] }}</div>
-            <div class="stat-label">Total Lotes</div>
+<div class="mapa-kpi-panel">
+    <div class="mapa-kpi-grid">
+        <div class="mapa-kpi-card mapa-kpi-card--total">
+            <div class="mapa-kpi-card__icon"><i class="fas fa-th-large"></i></div>
+            <div class="mapa-kpi-card__body">
+                <span class="mapa-kpi-card__value">{{ $stats['total'] }}</span>
+                <span class="mapa-kpi-card__label">Total lotes</span>
+            </div>
         </div>
-        <div class="col-md-1 d-none d-md-flex align-items-center">
-            <div class="stat-divider"></div>
+        <div class="mapa-kpi-card mapa-kpi-card--produccion">
+            <div class="mapa-kpi-card__icon"><i class="fas fa-seedling"></i></div>
+            <div class="mapa-kpi-card__body">
+                <span class="mapa-kpi-card__value">{{ $stats['en_produccion'] }}</span>
+                <span class="mapa-kpi-card__label">En producción</span>
+            </div>
         </div>
-        <div class="col-md-2 stat-item">
-            <div class="stat-number text-success">{{ $stats['en_produccion'] }}</div>
-            <div class="stat-label">En Produccion</div>
+        <div class="mapa-kpi-card mapa-kpi-card--cosecha">
+            <div class="mapa-kpi-card__icon"><i class="fas fa-wheat-awn"></i></div>
+            <div class="mapa-kpi-card__body">
+                <span class="mapa-kpi-card__value">{{ $stats['cosechados'] }}</span>
+                <span class="mapa-kpi-card__label">Cosechados</span>
+            </div>
         </div>
-        <div class="col-md-1 d-none d-md-flex align-items-center">
-            <div class="stat-divider"></div>
-        </div>
-        <div class="col-md-2 stat-item">
-            <div class="stat-number text-warning">{{ $stats['cosechados'] }}</div>
-            <div class="stat-label">Cosechados</div>
-        </div>
-        <div class="col-md-1 d-none d-md-flex align-items-center">
-            <div class="stat-divider"></div>
-        </div>
-        <div class="col-md-2 stat-item">
-            <div class="stat-number">{{ number_format($stats['hectareas'], 1) }}</div>
-            <div class="stat-label">Hectareas Total</div>
+        <div class="mapa-kpi-card mapa-kpi-card--hectareas">
+            <div class="mapa-kpi-card__icon"><i class="fas fa-ruler-combined"></i></div>
+            <div class="mapa-kpi-card__body">
+                <span class="mapa-kpi-card__value">{{ number_format((int) round($stats['hectareas']), 0, ',', '.') }}</span>
+                <span class="mapa-kpi-card__label">Hectáreas total</span>
+            </div>
         </div>
     </div>
 </div>
@@ -273,21 +723,46 @@
                         </h6>
                         <div class="filter-group">
                             <label>Propietario</label>
-                            <select class="form-control form-control-sm" id="filtroUsuario">
-                                <option value="">Todos</option>
-                                @foreach($usuarios as $u)
-                                    <option value="{{ $u->usuarioid }}">{{ $u->nombre }} {{ $u->apellido }}</option>
-                                @endforeach
-                            </select>
+                            @include('partials.selector-catalogo', [
+                                'id' => 'mapa_filtro_propietario',
+                                'name' => 'mapa_filtro_usuarioid',
+                                'value' => '',
+                                'labelSelected' => '',
+                                'endpoint' => route('catalogo-selector.usuarios'),
+                                'params' => ['roles' => 'agricultor,jefe_agricultor'],
+                                'title' => 'Filtrar por propietario',
+                                'searchPlaceholder' => 'Nombre, correo o usuario…',
+                                'searchLabel' => 'Buscar propietario',
+                                'allowEmpty' => true,
+                                'emptyLabel' => 'Todos los propietarios',
+                                'placeholderEmpty' => 'Todos los propietarios',
+                                'size' => 'sm',
+                                'inputGroup' => true,
+                                'showLabel' => false,
+                                'variant' => 'filtros',
+                            ])
                         </div>
                         <div class="filter-group">
                             <label>Cultivo</label>
-                            <select class="form-control form-control-sm" id="filtroCultivo">
-                                <option value="">Todos</option>
-                                @foreach($cultivos as $c)
-                                    <option value="{{ $c->cultivoid }}">{{ $c->nombre }}</option>
-                                @endforeach
-                            </select>
+                            @include('partials.selector-catalogo', [
+                                'id' => 'mapa_filtro_cultivo',
+                                'name' => 'mapa_filtro_cultivoid',
+                                'value' => '',
+                                'labelSelected' => '',
+                                'endpoint' => route('catalogo-selector.cultivos'),
+                                'title' => 'Filtrar por cultivo',
+                                'searchPlaceholder' => 'Nombre del cultivo…',
+                                'searchLabel' => 'Buscar cultivo',
+                                'allowEmpty' => true,
+                                'emptyLabel' => 'Todos los cultivos',
+                                'placeholderEmpty' => 'Todos los cultivos',
+                                'size' => 'sm',
+                                'inputGroup' => true,
+                                'showLabel' => false,
+                                'modalIcon' => 'fa-seedling',
+                                'rowIcon' => 'fa-leaf',
+                                'variant' => 'filtros',
+                            ])
                         </div>
                         <div class="filter-group">
                             <label>Estado</label>
@@ -298,14 +773,14 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="row mt-2">
-                            <div class="col-6">
-                                <button class="btn btn-primary btn-sm btn-block" onclick="aplicarFiltros()">
+                        <div class="row mt-2 mx-0">
+                            <div class="col-6 pl-0">
+                                <button type="button" class="btn btn-primary btn-sm btn-block" onclick="aplicarFiltros()">
                                     <i class="fas fa-search"></i> Aplicar
                                 </button>
                             </div>
-                            <div class="col-6">
-                                <button class="btn btn-outline-secondary btn-sm btn-block" onclick="limpiarFiltros()">
+                            <div class="col-6 pr-0">
+                                <button type="button" class="btn btn-outline-secondary btn-sm btn-block" onclick="limpiarFiltros()">
                                     <i class="fas fa-times"></i> Limpiar
                                 </button>
                             </div>
@@ -345,40 +820,59 @@
                     <div class="lot-info-panel" id="lotInfoPanel">
                         <div class="lot-info-header">
                             <span class="lot-info-title" id="panelLoteName">Nombre del Lote</span>
-                            <button class="close-panel" onclick="cerrarPanel()">
+                            <button type="button" class="close-panel" onclick="cerrarPanel()">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
-                        <div class="lot-detail">
-                            <span class="lot-detail-label">Estado</span>
-                            <span id="panelEstado" class="lot-status-badge status-produccion">En Produccion</span>
+                        <div id="panelGrupoWrap" class="d-none">
+                            <p class="panel-grupo-intro" id="panelGrupoIntro"></p>
+                            <div id="panelGrupoLista" class="mapa-grupo-lista"></div>
                         </div>
-                        <div class="lot-detail">
-                            <span class="lot-detail-label">Propietario</span>
-                            <span class="lot-detail-value" id="panelPropietario">-</span>
-                        </div>
-                        <div class="lot-detail">
-                            <span class="lot-detail-label">Cultivo</span>
-                            <span class="lot-detail-value" id="panelCultivo">-</span>
-                        </div>
-                        <div class="lot-detail">
-                            <span class="lot-detail-label">Superficie</span>
-                            <span class="lot-detail-value" id="panelSuperficie">—</span>
-                        </div>
-                        <div class="lot-detail">
-                            <span class="lot-detail-label">Ubicacion</span>
-                            <span class="lot-detail-value" id="panelUbicacion">-</span>
-                        </div>
-                        <div class="lot-actions">
-                            <a href="#" id="btnVerDetalle" class="btn btn-primary btn-sm lot-action-btn">
-                                <i class="fas fa-eye mr-1"></i> Ver Detalle
-                            </a>
-                            <a href="#" id="btnEditar" class="btn btn-outline-secondary btn-sm lot-action-btn">
-                                <i class="fas fa-edit mr-1"></i> Editar Lote
-                            </a>
-                            <a href="{{ route('actividades.create') }}" class="btn btn-outline-success btn-sm lot-action-btn">
-                                <i class="fas fa-plus mr-1"></i> Nueva Actividad
-                            </a>
+                        <div id="panelDetalleUnico">
+                            <div class="lot-detail lot-detail--estado">
+                                <span class="lot-detail-label">Estado</span>
+                                <span id="panelEstado" class="lot-status-badge status-produccion">En Produccion</span>
+                            </div>
+                            <div class="lot-detail">
+                                <span class="lot-detail-label">Lote</span>
+                                <span class="lot-detail-value" id="panelLoteId">—</span>
+                            </div>
+                            <div class="lot-detail">
+                                <span class="lot-detail-label">Propietario</span>
+                                <span class="lot-detail-value" id="panelPropietario">-</span>
+                            </div>
+                            <div class="lot-detail">
+                                <span class="lot-detail-label">Cultivo</span>
+                                <span class="lot-detail-value" id="panelCultivo">-</span>
+                            </div>
+                            <div class="lot-detail">
+                                <span class="lot-detail-label">Superficie</span>
+                                <span class="lot-detail-value" id="panelSuperficie">—</span>
+                            </div>
+                            <div class="lot-detail lot-detail--ubicacion">
+                                <span class="lot-detail-label">Ubicacion</span>
+                                <span class="lot-detail-value" id="panelUbicacion">-</span>
+                            </div>
+                            <div class="lot-detail" id="panelCodigoRow" style="display:none;">
+                                <span class="lot-detail-label">Trazabilidad</span>
+                                <span class="lot-detail-value" id="panelCodigo" style="font-family:ui-monospace,monospace;font-size:.78rem;">—</span>
+                            </div>
+                            <div class="lot-actions">
+                                <button type="button" class="btn btn-outline-secondary btn-sm lot-action-btn d-none" id="btnVolverGrupo" onclick="volverPanelGrupo()">
+                                    <i class="fas fa-arrow-left mr-1"></i> Volver a la lista
+                                </button>
+                                <a href="#" id="btnVerDetalle" class="btn btn-primary btn-sm lot-action-btn">
+                                    <i class="fas fa-eye mr-1"></i> Ver detalle
+                                </a>
+                                <a href="#" id="btnTrazabilidad" class="btn btn-outline-success btn-sm lot-action-btn">
+                                    <i class="fas fa-route mr-1"></i> Trazabilidad
+                                </a>
+                                @can('lotes.update')
+                                <a href="#" id="btnEditar" class="btn btn-outline-secondary btn-sm lot-action-btn">
+                                    <i class="fas fa-edit mr-1"></i> Editar lote
+                                </a>
+                                @endcan
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -387,171 +881,123 @@
     </div>
 </div>
 
-<!-- Fila de Ranking y Alertas -->
-<div class="row mt-3">
-    <!-- Top Lotes por Producción -->
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-trophy mr-2 text-warning"></i>
-                    Top Lotes por Produccion
-                </h3>
-            </div>
-            <div class="card-body">
-                @forelse($topLotes as $lote)
-                    <div class="lot-ranking-item">
-                        <div>
-                            <strong style="color: var(--text-dark);">{{ $lote->nombre }}</strong>
-                            <br>
-                            <small style="color: var(--text-light);">
-                                {{ $lote->usuario->nombre ?? '' }} {{ $lote->usuario->apellido ?? '' }} 
-                                • {{ $lote->cultivo->nombre ?? 'Sin cultivo' }}
-                            </small>
-                        </div>
-                        <div class="text-right">
-                            <span style="color: var(--success-color); font-weight: 600;">
-                                {{ number_format($lote->total_produccion, 0) }} kg
-                            </span>
-                            <br>
-                            <small style="color: var(--text-light);">{{ $lote->superficie_etiqueta }}</small>
-                        </div>
+<!-- Panel inferior: ranking + herramientas -->
+<div class="mapa-panel-inferior">
+    <div class="row">
+        <div class="col-lg-7 mb-3 mb-lg-0">
+            <div class="card mapa-panel-inferior__card">
+                <div class="mapa-panel-inferior__head">
+                    <div>
+                        <h3><i class="fas fa-trophy text-warning mr-2"></i>Top lotes por producción</h3>
+                        <p>Mayor volumen cosechado registrado en el sistema</p>
                     </div>
-                @empty
-                    <div class="text-center text-muted py-3">
-                        <i class="fas fa-chart-bar fa-2x mb-2"></i>
-                        <p class="mb-0">No hay datos de produccion</p>
-                    </div>
-                @endforelse
+                    <span class="mapa-panel-inferior__badge">{{ $topLotes->count() }} en ranking</span>
+                </div>
+                <div class="mapa-ranking-list">
+                    @forelse($topLotes as $index => $lote)
+                        <div class="mapa-ranking-row mapa-ranking-row--{{ min($index + 1, 3) }}"
+                             role="button"
+                             tabindex="0"
+                             @if($lote->latitud && $lote->longitud)
+                                 onclick="enfocarLoteEnMapa({{ $lote->latitud }}, {{ $lote->longitud }}, {{ $lote->loteid }})"
+                                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();enfocarLoteEnMapa({{ $lote->latitud }}, {{ $lote->longitud }}, {{ $lote->loteid }});}"
+                             @endif>
+                            <div class="mapa-ranking-pos">{{ $index + 1 }}</div>
+                            <div>
+                                <div class="mapa-ranking-nombre">{{ $lote->nombre }}</div>
+                                <div class="mapa-ranking-meta">
+                                    <i class="fas fa-user mr-1"></i>{{ trim(($lote->usuario->nombre ?? '') . ' ' . ($lote->usuario->apellido ?? '')) ?: 'Sin propietario' }}
+                                    · {{ $lote->cultivo->nombre ?? 'Sin cultivo' }}
+                                </div>
+                            </div>
+                            <div class="mapa-ranking-stats">
+                                <div class="mapa-ranking-kg">{{ number_format($lote->total_produccion, 0, ',', '.') }} kg</div>
+                                <div class="mapa-ranking-ha">{{ $lote->superficie_etiqueta }}</div>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="mapa-ranking-empty">
+                            <i class="fas fa-chart-bar fa-2x mb-2 d-block"></i>
+                            No hay datos de producción todavía
+                        </div>
+                    @endforelse
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Alertas Geográficas -->
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-exclamation-triangle mr-2 text-danger"></i>
-                    Alertas Geograficas
-                </h3>
-            </div>
-            <div class="card-body">
-                @forelse($lotesSinCoordenadas as $lote)
-                    <div class="alert-geo-item" style="background: rgba(255, 193, 7, 0.1); border-left: 4px solid var(--warning-color);">
-                        <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--warning-color); color: white; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px;">
-                            <i class="fas fa-map-marker-alt"></i>
-                        </div>
-                        <div style="flex: 1;">
-                            <h6 style="margin: 0; font-size: 13px; font-weight: 600; color: var(--text-dark);">Sin ubicacion: {{ $lote->nombre }}</h6>
-                            <small style="color: var(--text-light); font-size: 11px;">
-                                <i class="fas fa-user mr-1"></i>{{ $lote->usuario->nombre ?? 'Sin asignar' }} — {{ $lote->superficie_etiqueta }}
-                            </small>
-                        </div>
-                        @can('lotes.update')
-                        <a href="{{ route('lotes.edit', $lote) }}" class="btn btn-sm btn-outline-warning">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        @endcan
+        <div class="col-lg-5">
+            <div class="card mapa-panel-inferior__card">
+                <div class="mapa-panel-inferior__head">
+                    <div>
+                        <h3><i class="fas fa-tools text-secondary mr-2"></i>Herramientas del mapa</h3>
+                        <p>Acciones rápidas sobre la vista geográfica</p>
                     </div>
-                @empty
-                    <div class="text-center text-success py-3">
-                        <i class="fas fa-check-circle fa-2x mb-2"></i>
-                        <p class="mb-0">Todos los lotes tienen ubicacion</p>
-                    </div>
-                @endforelse
-
-                @if($alertasClimaticas->count() > 0)
-                    @foreach($alertasClimaticas as $alerta)
-                        <div class="alert-geo-item" style="background: rgba(220, 53, 69, 0.1); border-left: 4px solid var(--danger-color);">
-                            <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--danger-color); color: white; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px;">
-                                <i class="fas fa-cloud-rain"></i>
-                            </div>
-                            <div style="flex: 1;">
-                                <h6 style="margin: 0; font-size: 13px; font-weight: 600; color: var(--text-dark);">{{ $alerta->tipo ?? 'Alerta climatica' }}</h6>
-                                <small style="color: var(--text-light); font-size: 11px;">
-                                    <i class="fas fa-map-marker-alt mr-1"></i>{{ $alerta->lote->nombre ?? '' }}
-                                </small>
-                            </div>
-                            <button class="btn btn-sm btn-outline-danger" onclick="enfocarLote({{ $alerta->lote->latitud ?? 0 }}, {{ $alerta->lote->longitud ?? 0 }})">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
-                    @endforeach
-                @endif
-
-                @foreach($lotesStockBajo as $lote)
-                    <div class="alert-geo-item" style="background: rgba(23, 162, 184, 0.1); border-left: 4px solid var(--info-color);">
-                        <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--info-color); color: white; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px;">
-                            <i class="fas fa-box"></i>
-                        </div>
-                        <div style="flex: 1;">
-                            <h6 style="margin: 0; font-size: 13px; font-weight: 600; color: var(--text-dark);">Requiere insumos: {{ $lote->nombre }}</h6>
-                            <small style="color: var(--text-light); font-size: 11px;">
-                                <i class="fas fa-road mr-1"></i>{{ $lote->ubicacion_visible }}
-                            </small>
-                        </div>
-                        @if($lote->latitud && $lote->longitud)
-                            <button class="btn btn-sm btn-outline-info" onclick="enfocarLote({{ $lote->latitud }}, {{ $lote->longitud }})">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        @endif
-                    </div>
-                @endforeach
+                </div>
+                <div class="mapa-tools-grid">
+                    <button type="button" class="mapa-tool-tile mapa-tool-tile--blue" onclick="exportarMapa()">
+                        <span class="mapa-tool-tile__icon"><i class="fas fa-download"></i></span>
+                        Exportar mapa
+                    </button>
+                    <button type="button" class="mapa-tool-tile mapa-tool-tile--green" onclick="imprimirMapa()">
+                        <span class="mapa-tool-tile__icon"><i class="fas fa-print"></i></span>
+                        Imprimir mapa
+                    </button>
+                    <button type="button" class="mapa-tool-tile mapa-tool-tile--teal" onclick="compartirMapa()">
+                        <span class="mapa-tool-tile__icon"><i class="fas fa-share-alt"></i></span>
+                        Compartir
+                    </button>
+                    <a href="{{ route('producciones.index') }}" class="mapa-tool-tile mapa-tool-tile--amber">
+                        <span class="mapa-tool-tile__icon"><i class="fas fa-chart-bar"></i></span>
+                        Ver reportes
+                    </a>
+                    <button type="button" class="mapa-tool-tile mapa-tool-tile--slate" onclick="toggleCapaSatelite()">
+                        <span class="mapa-tool-tile__icon"><i class="fas fa-satellite"></i></span>
+                        Vista satélite
+                    </button>
+                    <button type="button" class="mapa-tool-tile mapa-tool-tile--dark" onclick="toggleFullscreen()">
+                        <span class="mapa-tool-tile__icon"><i class="fas fa-expand"></i></span>
+                        Pantalla completa
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Herramientas del Mapa -->
-<div class="row mt-3">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-tools mr-2"></i>
-                    Herramientas del Mapa
-                </h3>
+<div class="modal fade mapa-share-modal" id="modalCompartirMapa" tabindex="-1" role="dialog" aria-labelledby="modalCompartirMapaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalCompartirMapaLabel">
+                    <i class="fas fa-share-alt mr-2"></i>Compartir mapa de lotes
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-2 col-sm-4 col-6 mb-2">
-                        <button class="btn btn-outline-primary btn-block" onclick="exportarMapa()">
-                            <i class="fas fa-download mr-2"></i>
-                            Exportar Mapa
-                        </button>
-                    </div>
-                    <div class="col-md-2 col-sm-4 col-6 mb-2">
-                        <button class="btn btn-outline-success btn-block" onclick="window.print()">
-                            <i class="fas fa-print mr-2"></i>
-                            Imprimir Mapa
-                        </button>
-                    </div>
-                    <div class="col-md-2 col-sm-4 col-6 mb-2">
-                        <button class="btn btn-outline-info btn-block" onclick="compartirMapa()">
-                            <i class="fas fa-share mr-2"></i>
-                            Compartir
-                        </button>
-                    </div>
-                    <div class="col-md-2 col-sm-4 col-6 mb-2">
-                        <a href="{{ route('producciones.index') }}" class="btn btn-outline-warning btn-block">
-                            <i class="fas fa-chart-bar mr-2"></i>
-                            Ver Reportes
-                        </a>
-                    </div>
-                    <div class="col-md-2 col-sm-4 col-6 mb-2">
-                        <button class="btn btn-outline-secondary btn-block" onclick="toggleCapaSatelite()">
-                            <i class="fas fa-satellite mr-2"></i>
-                            Vista Satelite
-                        </button>
-                    </div>
-                    <div class="col-md-2 col-sm-4 col-6 mb-2">
-                        <button class="btn btn-outline-dark btn-block" onclick="toggleFullscreen()">
-                            <i class="fas fa-expand mr-2"></i>
-                            Pantalla Completa
+            <div class="modal-body">
+                <p class="text-muted small mb-3">Envíe el enlace a otra persona para que abra esta misma vista del mapa.</p>
+                <label class="small font-weight-bold text-muted mb-1" for="shareMapaUrl">Enlace del mapa</label>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="shareMapaUrl" readonly>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-success" id="btnCopiarEnlaceMapa">
+                            <i class="fas fa-copy mr-1"></i>Copiar
                         </button>
                     </div>
                 </div>
+                <div class="mapa-share-actions">
+                    <a href="#" target="_blank" rel="noopener" class="btn btn-success btn-sm" id="shareMapaWhatsapp">
+                        <i class="fab fa-whatsapp mr-1"></i>WhatsApp
+                    </a>
+                    <a href="#" class="btn btn-outline-secondary btn-sm" id="shareMapaEmail">
+                        <i class="fas fa-envelope mr-1"></i>Correo
+                    </a>
+                </div>
+                <div class="alert alert-success mapa-share-feedback mt-3 d-none" id="shareMapaFeedback" role="status"></div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
             </div>
         </div>
     </div>
@@ -560,110 +1006,297 @@
 
 @push('scripts')
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script>
-// Datos de lotes desde PHP
 var lotesData = @json($lotesConCoordenadas);
-
-// Colores por estado
-var coloresEstado = {
-    'disponible': '#6c757d',
-    'en preparación': '#17a2b8',
-    'sembrado': '#007bff',
-    'en producción': '#28a745',
-    'cosechado': '#ffc107',
-    'en descanso': '#343a40'
+var mapaStatsPdf = @json($stats);
+var rutasLote = {
+    show: @json(route('lotes.show', ['lote' => '__ID__'])),
+    edit: @json(route('lotes.edit', ['lote' => '__ID__'])),
+    trazabilidad: @json(route('lotes.trazabilidad', ['lote' => '__ID__']))
 };
 
-// Capas del mapa
+var coloresEstado = {
+    'disponible': '#8b9099',
+    'en preparación': '#5a8a96',
+    'en preparacion': '#5a8a96',
+    'sembrado': '#4a6fa5',
+    'en producción': '#5c7a52',
+    'en produccion': '#5c7a52',
+    'cosechado': '#b8933a',
+    'en descanso': '#4a4f54'
+};
+
 var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
 });
-
 var sateliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: '© Esri'
 });
 
-// Inicializar mapa
-var map = L.map('map', {
-    layers: [osmLayer]
-}).setView([-17.7833, -63.1821], 10);
-
+var map = L.map('map', { layers: [osmLayer] }).setView([-17.7833, -63.1821], 10);
 var currentLayer = 'osm';
 var markers = [];
 var circles = [];
+var grupoActual = null;
+var lotesMapaActivos = lotesData;
+var exportacionMapaEstado = null;
+var MAPA_GRUPO_VISIBLE = 3;
 
-// Función para calcular radio según hectáreas
-function calcularRadio(ha) {
-    return Math.sqrt(ha * 10000 / Math.PI);
+function obtenerConstructorPdf() {
+    if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+    if (typeof window.jsPDF === 'function') return window.jsPDF;
+    if (window.jspdf && typeof window.jspdf === 'function') return window.jspdf;
+    return null;
 }
 
-// Función para agregar lotes al mapa
+function urlLote(plantilla, id) {
+    return plantilla.replace('__ID__', id);
+}
+
+function escapeHtml(texto) {
+    return String(texto == null ? '' : texto)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function normalizarEstado(estado) {
+    return String(estado || 'disponible').toLowerCase().trim()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function valorSelectorFiltro(id) {
+    var wrap = document.getElementById('selector_wrap_' + id);
+    if (!wrap) return '';
+    var input = wrap.querySelector('.selector-catalogo-value');
+    return input ? input.value : '';
+}
+
+function calcularRadio(ha) {
+    return Math.sqrt((ha || 1) * 10000 / Math.PI);
+}
+
+function claveCoordenada(lote) {
+    return Number(lote.latitud).toFixed(5) + ',' + Number(lote.longitud).toFixed(5);
+}
+
+function agruparLotesPorUbicacion(lotes) {
+    var mapa = {};
+    lotes.forEach(function (lote) {
+        var key = claveCoordenada(lote);
+        if (!mapa[key]) mapa[key] = [];
+        mapa[key].push(lote);
+    });
+    return Object.keys(mapa).map(function (key) { return mapa[key]; });
+}
+
+function htmlLineaLoteGrupo(lote) {
+    return '<strong>' + escapeHtml(lote.nombre) + '</strong><br>'
+        + '<small class="text-muted">' + escapeHtml((lote.propietario || '').trim()) + ' · ' + escapeHtml(lote.cultivo || '—') + ' · ' + escapeHtml(lote.estado || '') + '</small>';
+}
+
+function htmlTooltipGrupo(grupo) {
+    if (grupo.length === 1) {
+        var lote = grupo[0];
+        return '<div class="mapa-lote-tooltip">'
+            + '<strong>' + escapeHtml(lote.nombre) + '</strong>'
+            + '<div class="mapa-lote-tooltip__meta">' + escapeHtml(lote.cultivo || 'Sin cultivo') + ' · ' + escapeHtml(lote.estado || '') + '</div>'
+            + '<div class="mapa-lote-tooltip__meta">' + escapeHtml(lote.propietario || '') + '</div>'
+            + '<div class="mapa-lote-tooltip__meta">' + escapeHtml(lote.superficie_etiqueta || '') + '</div>'
+            + '</div>';
+    }
+
+    var visibles = grupo.slice(0, MAPA_GRUPO_VISIBLE);
+    var restantes = grupo.length - MAPA_GRUPO_VISIBLE;
+    var html = '<div class="mapa-lote-tooltip"><strong>' + grupo.length + ' lotes en esta zona</strong><ul class="mapa-lote-tooltip__lista">';
+    visibles.forEach(function (lote) {
+        html += '<li><span class="mapa-lote-tooltip__nombre">' + escapeHtml(lote.nombre) + '</span>'
+            + '<span class="mapa-lote-tooltip__meta">' + escapeHtml((lote.propietario || '').trim()) + ' · ' + escapeHtml(lote.cultivo || '—') + ' · ' + escapeHtml(lote.estado || '') + '</span></li>';
+    });
+    html += '</ul>';
+    if (restantes > 0) {
+        html += '<div class="mapa-lote-tooltip__mas">+' + restantes + '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function crearIconoMarcador(grupo) {
+    var lote = grupo[0];
+    var color = coloresEstado[normalizarEstado(lote.estado)] || '#6c757d';
+
+    if (grupo.length > 1) {
+        return L.divIcon({
+            className: 'mapa-lote-marker-wrap',
+            html: '<div class="mapa-lote-marker mapa-lote-marker--grupo" style="background:' + color + '"><span>' + grupo.length + '</span></div>',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
+        });
+    }
+
+    return L.divIcon({
+        className: 'mapa-lote-marker-wrap',
+        html: '<div class="mapa-lote-marker" style="background:' + color + '"><i class="fas fa-map-marker-alt"></i></div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 28]
+    });
+}
+
+function bindInteraccionesCapa(capa, grupo) {
+    capa._grupoLotes = grupo;
+    capa.bindTooltip(htmlTooltipGrupo(grupo), {
+        direction: 'top',
+        offset: [0, -10],
+        opacity: 1,
+        className: 'mapa-lote-tooltip-pane',
+        sticky: true,
+        interactive: false
+    });
+
+    capa.on('click', function () {
+        if (grupo.length === 1) {
+            mostrarPanelLote(grupo[0]);
+        } else {
+            mostrarPanelGrupo(grupo);
+        }
+    });
+}
+
 function cargarLotes(lotes) {
-    // Limpiar markers anteriores
-    markers.forEach(m => map.removeLayer(m));
-    circles.forEach(c => map.removeLayer(c));
+    lotesMapaActivos = lotes;
+    markers.forEach(function (m) { map.removeLayer(m); });
+    circles.forEach(function (c) { map.removeLayer(c); });
     markers = [];
     circles = [];
+    cerrarPanel();
 
-    lotes.forEach(function(lote) {
-        var estado = lote.estado ? lote.estado.toLowerCase() : 'disponible';
+    lotes.forEach(function (lote) {
+        var estado = normalizarEstado(lote.estado);
         var color = coloresEstado[estado] || '#6c757d';
-
-        // Crear círculo para representar el área
         var circle = L.circle([lote.latitud, lote.longitud], {
             color: color,
             fillColor: color,
-            fillOpacity: 0.4,
+            fillOpacity: 0.35,
+            weight: 2,
             radius: calcularRadio(lote.superficie || 1)
         }).addTo(map);
         circles.push(circle);
+    });
 
-        // Crear marcador
-        var marker = L.marker([lote.latitud, lote.longitud]).addTo(map);
+    agruparLotesPorUbicacion(lotes).forEach(function (grupo) {
+        var lote = grupo[0];
+        var marker = L.marker([lote.latitud, lote.longitud], {
+            icon: crearIconoMarcador(grupo),
+            zIndexOffset: grupo.length > 1 ? 500 : 100
+        }).addTo(map);
+        marker._grupoLotes = grupo;
         markers.push(marker);
+        bindInteraccionesCapa(marker, grupo);
 
-        // Popup básico
-        marker.bindPopup('<b>' + lote.nombre + '</b><br>' + (lote.ubicacion_visible || lote.ubicacion || '') + '<br>' + (lote.superficie_etiqueta || lote.superficie + ' hectáreas'));
-
-        // Click para mostrar panel
-        marker.on('click', function() {
-            mostrarPanelLote(lote);
-        });
-
-        circle.on('click', function() {
-            mostrarPanelLote(lote);
+        circles.filter(function (circle) {
+            var latLng = circle.getLatLng();
+            return claveCoordenada({ latitud: latLng.lat, longitud: latLng.lng }) === claveCoordenada(lote);
+        }).forEach(function (circle) {
+            bindInteraccionesCapa(circle, grupo);
         });
     });
 
-    // Ajustar vista si hay lotes
-    if (lotes.length > 0) {
-        var group = new L.featureGroup(markers);
-        map.fitBounds(group.getBounds().pad(0.1));
+    if (markers.length > 0) {
+        map.fitBounds(L.featureGroup(markers).getBounds().pad(0.1));
     }
 }
 
-// Mostrar panel de información del lote
-function mostrarPanelLote(lote) {
-    document.getElementById('panelLoteName').textContent = lote.nombre;
-    document.getElementById('panelPropietario').textContent = lote.propietario || '-';
-    document.getElementById('panelCultivo').textContent = lote.cultivo || 'Sin cultivo';
-    document.getElementById('panelSuperficie').textContent = lote.superficie_etiqueta || (lote.superficie + ' hectáreas');
-    document.getElementById('panelUbicacion').textContent = lote.ubicacion_visible || lote.ubicacion || 'Sin ubicación';
-    
-    var estado = lote.estado ? lote.estado.toLowerCase() : 'disponible';
-    var estadoClass = 'status-' + estado.replace('en ', '').replace('ó', 'o');
-    var panelEstado = document.getElementById('panelEstado');
-    panelEstado.className = 'lot-status-badge ' + estadoClass;
-    panelEstado.textContent = lote.estado || 'Disponible';
+function claseEstadoBadge(estado) {
+    var norm = normalizarEstado(estado);
+    if (norm.indexOf('prepar') >= 0) return 'status-preparacion';
+    if (norm.indexOf('producc') >= 0) return 'status-produccion';
+    if (norm.indexOf('cosech') >= 0) return 'status-cosechado';
+    if (norm.indexOf('descans') >= 0) return 'status-descanso';
+    if (norm.indexOf('sembr') >= 0) return 'status-sembrado';
+    return 'status-disponible';
+}
 
-    document.getElementById('btnVerDetalle').href = '/lotes/' + lote.id;
-    document.getElementById('btnEditar').href = '/lotes/' + lote.id + '/edit';
+function mostrarPanelGrupo(grupo) {
+    grupoActual = grupo;
+    document.getElementById('panelGrupoWrap').classList.remove('d-none');
+    document.getElementById('panelDetalleUnico').classList.add('d-none');
+    document.getElementById('panelLoteName').textContent = grupo.length + ' lotes en la misma zona';
+
+    var lista = document.getElementById('panelGrupoLista');
+    var usarScroll = grupo.length > MAPA_GRUPO_VISIBLE;
+
+    document.getElementById('panelGrupoIntro').textContent = usarScroll
+        ? 'Seleccione un lote. Deslice la lista para ver más.'
+        : 'Seleccione un lote para ver el detalle completo.';
+
+    lista.className = 'mapa-grupo-lista' + (usarScroll ? ' mapa-grupo-lista--scroll' : '');
+    lista.innerHTML = '';
+
+    grupo.forEach(function (lote) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mapa-grupo-item btn btn-light btn-sm btn-block text-left mb-2';
+        btn.innerHTML = htmlLineaLoteGrupo(lote);
+        btn.addEventListener('click', function () {
+            mostrarPanelLote(lote, true);
+        });
+        lista.appendChild(btn);
+    });
 
     document.getElementById('lotInfoPanel').style.display = 'block';
 }
 
+function mostrarPanelLote(lote, desdeGrupo) {
+    if (!desdeGrupo) {
+        grupoActual = [lote];
+    }
+
+    document.getElementById('panelGrupoWrap').classList.add('d-none');
+    document.getElementById('panelDetalleUnico').classList.remove('d-none');
+    document.getElementById('panelLoteName').textContent = lote.nombre;
+    document.getElementById('panelLoteId').textContent = '#' + lote.id;
+    document.getElementById('panelPropietario').textContent = (lote.propietario || '').trim() || '—';
+    document.getElementById('panelCultivo').textContent = lote.cultivo || 'Sin cultivo';
+    document.getElementById('panelSuperficie').textContent = lote.superficie_etiqueta || (lote.superficie + ' ha');
+    document.getElementById('panelUbicacion').textContent = lote.ubicacion_visible || lote.ubicacion || 'Sin ubicación';
+
+    var panelEstado = document.getElementById('panelEstado');
+    panelEstado.className = 'lot-status-badge ' + claseEstadoBadge(lote.estado);
+    panelEstado.textContent = lote.estado || 'Disponible';
+
+    var codigoRow = document.getElementById('panelCodigoRow');
+    if (lote.codigo_trazabilidad) {
+        codigoRow.style.display = '';
+        document.getElementById('panelCodigo').textContent = lote.codigo_trazabilidad;
+    } else {
+        codigoRow.style.display = 'none';
+    }
+
+    document.getElementById('btnVerDetalle').href = urlLote(rutasLote.show, lote.id);
+    document.getElementById('btnTrazabilidad').href = urlLote(rutasLote.trazabilidad, lote.id);
+    var btnEditar = document.getElementById('btnEditar');
+    if (btnEditar) btnEditar.href = urlLote(rutasLote.edit, lote.id);
+
+    var btnVolver = document.getElementById('btnVolverGrupo');
+    if (btnVolver) {
+        btnVolver.classList.toggle('d-none', !(desdeGrupo && grupoActual && grupoActual.length > 1));
+    }
+
+    document.getElementById('lotInfoPanel').style.display = 'block';
+}
+
+function volverPanelGrupo() {
+    if (grupoActual && grupoActual.length > 1) {
+        mostrarPanelGrupo(grupoActual);
+    }
+}
+
 function cerrarPanel() {
     document.getElementById('lotInfoPanel').style.display = 'none';
+    grupoActual = null;
 }
 
 function toggleFilters() {
@@ -673,22 +1306,21 @@ function toggleFilters() {
 
 function centerMap() {
     if (markers.length > 0) {
-        var group = new L.featureGroup(markers);
-        map.fitBounds(group.getBounds().pad(0.1));
+        map.fitBounds(L.featureGroup(markers).getBounds().pad(0.1));
     } else {
         map.setView([-17.7833, -63.1821], 10);
     }
 }
 
 function aplicarFiltros() {
-    var usuario = document.getElementById('filtroUsuario').value;
-    var cultivo = document.getElementById('filtroCultivo').value;
+    var usuario = valorSelectorFiltro('mapa_filtro_propietario');
+    var cultivo = valorSelectorFiltro('mapa_filtro_cultivo');
     var estado = document.getElementById('filtroEstado').value;
 
-    var lotesFiltrados = lotesData.filter(function(lote) {
-        if (usuario && lote.usuarioid != usuario) return false;
-        if (cultivo && lote.cultivoid != cultivo) return false;
-        if (estado && lote.estadoid != estado) return false;
+    var lotesFiltrados = lotesData.filter(function (lote) {
+        if (usuario && String(lote.usuarioid) !== String(usuario)) return false;
+        if (cultivo && String(lote.cultivoid) !== String(cultivo)) return false;
+        if (estado && String(lote.estadoid) !== String(estado)) return false;
         return true;
     });
 
@@ -696,18 +1328,26 @@ function aplicarFiltros() {
 }
 
 function limpiarFiltros() {
-    document.getElementById('filtroUsuario').value = '';
-    document.getElementById('filtroCultivo').value = '';
+    if (window.CatalogoSelector) {
+        CatalogoSelector.clear('mapa_filtro_propietario');
+        CatalogoSelector.clear('mapa_filtro_cultivo');
+    }
     document.getElementById('filtroEstado').value = '';
     cargarLotes(lotesData);
 }
 
-// Enfocar en un lote específico
 function enfocarLote(lat, lng) {
     map.setView([lat, lng], 15);
 }
 
-// Cambiar a vista satélite
+function enfocarLoteEnMapa(lat, lng, loteId) {
+    enfocarLote(lat, lng);
+    var lote = lotesData.find(function (item) { return String(item.id) === String(loteId); });
+    if (lote) {
+        mostrarPanelLote(lote);
+    }
+}
+
 function toggleCapaSatelite() {
     if (currentLayer === 'osm') {
         map.removeLayer(osmLayer);
@@ -720,41 +1360,576 @@ function toggleCapaSatelite() {
     }
 }
 
-// Pantalla completa
 function toggleFullscreen() {
     var container = document.getElementById('mapContainer');
     if (!document.fullscreenElement) {
-        container.requestFullscreen().catch(err => {
-            alert('Error al activar pantalla completa');
+        container.requestFullscreen().catch(function () {
+            mostrarToastMapa('No se pudo activar pantalla completa.', 'warning');
         });
     } else {
         document.exitFullscreen();
     }
 }
 
-// Exportar mapa (captura simple)
-function exportarMapa() {
-    alert('Funcionalidad de exportar mapa.\n\nPuedes usar Ctrl+P para imprimir o guardar como PDF.');
-}
-
-// Compartir mapa
-function compartirMapa() {
-    var url = window.location.href;
-    if (navigator.clipboard) {
-        navigator.clipboard.writeText(url).then(function() {
-            alert('Enlace copiado al portapapeles:\n' + url);
-        });
-    } else {
-        prompt('Copia este enlace:', url);
+function mostrarCargaMapaExport(mostrar, texto) {
+    var container = document.getElementById('mapContainer');
+    if (!container) return;
+    var el = document.getElementById('mapaExportLoading');
+    if (mostrar) {
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'mapaExportLoading';
+            el.className = 'mapa-export-loading';
+            el.innerHTML = '<div class="mapa-export-loading__box"><i class="fas fa-spinner fa-spin mr-2"></i><span></span></div>';
+            container.appendChild(el);
+        }
+        el.querySelector('span').textContent = texto || 'Generando documento…';
+        el.style.display = 'flex';
+    } else if (el) {
+        el.style.display = 'none';
     }
 }
 
-// Cargar lotes al iniciar
-$(document).ready(function() {
+function mostrarToastMapa(mensaje, tipo) {
+    var existente = document.getElementById('mapaToastMsg');
+    if (existente) existente.remove();
+    var toast = document.createElement('div');
+    toast.id = 'mapaToastMsg';
+    toast.className = 'alert alert-' + (tipo || 'success') + ' mapa-toast-msg';
+    toast.textContent = mensaje;
+    document.body.appendChild(toast);
+    setTimeout(function () {
+        if (toast.parentNode) toast.remove();
+    }, 4500);
+}
+
+function mostrarFeedbackCompartir(mensaje, tipo) {
+    var feedback = document.getElementById('shareMapaFeedback');
+    if (!feedback) return;
+    feedback.className = 'alert alert-' + (tipo || 'success') + ' mapa-share-feedback mt-3';
+    feedback.textContent = mensaje;
+    feedback.classList.remove('d-none');
+}
+
+function htmlEtiquetaExportGrupo(grupo) {
+    if (grupo.length === 1) {
+        var lote = grupo[0];
+        return '<div class="mapa-export-label"><strong>' + escapeHtml(lote.nombre) + '</strong>'
+            + '<span>' + escapeHtml(lote.cultivo || 'Sin cultivo') + ' · ' + escapeHtml(lote.estado || '') + '</span></div>';
+    }
+
+    var html = '<div class="mapa-export-label"><strong>' + grupo.length + ' lotes en zona</strong>';
+    grupo.slice(0, 4).forEach(function (lote) {
+        html += '<span>' + escapeHtml(lote.nombre) + '</span>';
+    });
+    if (grupo.length > 4) {
+        html += '<span>+' + (grupo.length - 4) + ' más</span>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function activarVistaExportacionMapa() {
+    var container = document.getElementById('mapContainer');
+    if (container) {
+        container.classList.add('mapa-export-mode');
+    }
+
+    exportacionMapaEstado = { marcadores: [], circlesOcultos: [] };
+
+    circles.forEach(function (circle) {
+        if (map.hasLayer(circle)) {
+            map.removeLayer(circle);
+            exportacionMapaEstado.circlesOcultos.push(circle);
+        }
+    });
+
+    markers.forEach(function (marker) {
+        var grupo = marker._grupoLotes;
+        if (!grupo) {
+            return;
+        }
+        marker.closeTooltip();
+        marker.unbindTooltip();
+        marker.bindTooltip(htmlEtiquetaExportGrupo(grupo), {
+            permanent: true,
+            direction: 'top',
+            offset: [0, -14],
+            opacity: 1,
+            className: 'mapa-export-label-pane',
+            interactive: false
+        });
+        marker.openTooltip();
+        exportacionMapaEstado.marcadores.push(marker);
+    });
+}
+
+function restaurarVistaExportacionMapa() {
+    if (!exportacionMapaEstado) {
+        return;
+    }
+
+    exportacionMapaEstado.marcadores.forEach(function (marker) {
+        marker.closeTooltip();
+        marker.unbindTooltip();
+        if (marker._grupoLotes) {
+            bindInteraccionesCapa(marker, marker._grupoLotes);
+        }
+    });
+
+    exportacionMapaEstado.circlesOcultos.forEach(function (circle) {
+        circle.addTo(map);
+    });
+
+    var container = document.getElementById('mapContainer');
+    if (container) {
+        container.classList.remove('mapa-export-mode');
+    }
+
+    exportacionMapaEstado = null;
+}
+
+async function capturarContenedorMapa() {
+    var container = document.getElementById('mapContainer');
+    if (!container || typeof html2canvas !== 'function') {
+        throw new Error('No se pudo preparar la captura del mapa.');
+    }
+
+    var ocultarIds = ['mapFilters', 'lotInfoPanel', 'mapaExportLoading'];
+    var estados = {};
+    ocultarIds.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) {
+            estados[id] = el.style.display;
+            el.style.display = 'none';
+        }
+    });
+
+    activarVistaExportacionMapa();
+    map.invalidateSize();
+    await new Promise(function (resolve) { setTimeout(resolve, 750); });
+
+    try {
+        return await html2canvas(container, {
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            scale: 2,
+            logging: false,
+            imageTimeout: 15000
+        });
+    } finally {
+        restaurarVistaExportacionMapa();
+        ocultarIds.forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el && Object.prototype.hasOwnProperty.call(estados, id)) {
+                el.style.display = estados[id];
+            }
+        });
+    }
+}
+
+function hexToRgb(hex) {
+    hex = String(hex || '#6c757d').replace('#', '');
+    if (hex.length === 3) {
+        hex = hex.split('').map(function (c) { return c + c; }).join('');
+    }
+    return {
+        r: parseInt(hex.substring(0, 2), 16) || 108,
+        g: parseInt(hex.substring(2, 4), 16) || 117,
+        b: parseInt(hex.substring(4, 6), 16) || 125
+    };
+}
+
+function resumenLotesPdf(lotes) {
+    var resumen = {
+        total: lotes.length,
+        enProduccion: 0,
+        cosechados: 0,
+        hectareas: 0
+    };
+    lotes.forEach(function (lote) {
+        var estado = normalizarEstado(lote.estado);
+        if (estado.indexOf('producc') >= 0 || estado.indexOf('crecim') >= 0) {
+            resumen.enProduccion++;
+        }
+        if (estado.indexOf('cosech') >= 0) {
+            resumen.cosechados++;
+        }
+        resumen.hectareas += parseFloat(lote.superficie) || 0;
+    });
+    return resumen;
+}
+
+function dibujarPiePdf(pdf, pagina, total) {
+    var pageW = pdf.internal.pageSize.getWidth();
+    var pageH = pdf.internal.pageSize.getHeight();
+    var margen = 12;
+
+    pdf.setDrawColor(226, 232, 240);
+    pdf.setLineWidth(0.3);
+    pdf.line(margen, pageH - 10, pageW - margen, pageH - 10);
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(148, 163, 184);
+    pdf.text('AgroFusion · Reporte geográfico de lotes', margen, pageH - 5);
+    pdf.text('Página ' + pagina + ' de ' + total, pageW - margen, pageH - 5, { align: 'right' });
+}
+
+function dibujarEncabezadoPdf(pdf, compacto) {
+    var pageW = pdf.internal.pageSize.getWidth();
+    var margen = 12;
+
+    pdf.setFillColor(20, 83, 45);
+    pdf.rect(0, 0, pageW, compacto ? 16 : 28, 'F');
+
+    pdf.setFillColor(34, 197, 94);
+    pdf.rect(0, compacto ? 16 : 28, pageW, 1.2, 'F');
+
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(compacto ? 11 : 16);
+    pdf.text('Mapa de lotes — AgroFusion', margen, compacto ? 10 : 14);
+
+    if (!compacto) {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9);
+        pdf.setTextColor(220, 252, 231);
+        pdf.text(
+            'Reporte geográfico · Generado ' + new Date().toLocaleString('es-BO'),
+            margen,
+            22
+        );
+    }
+
+    return compacto ? 22 : 34;
+}
+
+function dibujarTarjetasResumenPdf(pdf, lotes, y) {
+    var margen = 12;
+    var pageW = pdf.internal.pageSize.getWidth();
+    var ancho = (pageW - (margen * 2) - 9) / 4;
+    var resumen = resumenLotesPdf(lotes);
+    var tarjetas = [
+        { label: 'Lotes en mapa', valor: String(resumen.total), color: [20, 83, 45] },
+        { label: 'En producción', valor: String(resumen.enProduccion), color: [22, 163, 74] },
+        { label: 'Cosechados', valor: String(resumen.cosechados), color: [217, 119, 6] },
+        { label: 'Hectáreas', valor: resumen.hectareas.toFixed(1), color: [30, 64, 175] }
+    ];
+
+    tarjetas.forEach(function (tarjeta, index) {
+        var x = margen + (index * (ancho + 3));
+        pdf.setFillColor(248, 250, 252);
+        pdf.setDrawColor(226, 232, 240);
+        pdf.setLineWidth(0.3);
+        pdf.roundedRect(x, y, ancho, 16, 2, 2, 'FD');
+
+        pdf.setFillColor(tarjeta.color[0], tarjeta.color[1], tarjeta.color[2]);
+        pdf.circle(x + 4, y + 4, 1.2, 'F');
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.setTextColor(tarjeta.color[0], tarjeta.color[1], tarjeta.color[2]);
+        pdf.text(tarjeta.valor, x + 7, y + 7.5);
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(tarjeta.label, x + 7, y + 12.5);
+    });
+
+    return y + 20;
+}
+
+function dibujarMarcoImagenPdf(pdf, x, y, w, h) {
+    pdf.setFillColor(255, 255, 255);
+    pdf.setDrawColor(226, 232, 240);
+    pdf.setLineWidth(0.4);
+    pdf.roundedRect(x - 1.5, y - 1.5, w + 3, h + 3, 2, 2, 'S');
+}
+
+function dibujarLeyendaEstadosPdf(pdf, y) {
+    var margen = 12;
+    var items = [
+        { label: 'Disponible', color: '#6c757d' },
+        { label: 'En preparación', color: '#17a2b8' },
+        { label: 'Sembrado', color: '#007bff' },
+        { label: 'En producción', color: '#28a745' },
+        { label: 'Cosechado', color: '#ffc107' },
+        { label: 'En descanso', color: '#343a40' }
+    ];
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(51, 65, 85);
+    pdf.text('Leyenda de estados', margen, y);
+    y += 4;
+
+    var x = margen;
+    items.forEach(function (item) {
+        var rgb = hexToRgb(item.color);
+        pdf.setFillColor(rgb.r, rgb.g, rgb.b);
+        pdf.circle(x + 1.5, y + 1.2, 1.3, 'F');
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(71, 85, 105);
+        pdf.text(item.label, x + 4, y + 2.2);
+        x += 38;
+    });
+
+    return y + 7;
+}
+
+function dibujarTablaLotesPdf(pdf, lotes, startY) {
+    var margen = 12;
+    var pageW = pdf.internal.pageSize.getWidth();
+    var pageH = pdf.internal.pageSize.getHeight();
+    var anchoTabla = pageW - (margen * 2);
+    var cols = [
+        { key: 'num', titulo: '#', w: 8 },
+        { key: 'lote', titulo: 'Lote', w: 42 },
+        { key: 'cultivo', titulo: 'Cultivo', w: 28 },
+        { key: 'estado', titulo: 'Estado', w: 30 },
+        { key: 'superficie', titulo: 'Superficie', w: 24 },
+        { key: 'ubicacion', titulo: 'Ubicación', w: anchoTabla - 132 }
+    ];
+    var y = startY;
+    var rowH = 11;
+    var footerReserva = 14;
+
+    function dibujarEncabezadoTabla(doc, columnas, mx, yy, ancho) {
+        doc.setFillColor(20, 83, 45);
+        doc.roundedRect(mx, yy, ancho, 8, 1.5, 1.5, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(255, 255, 255);
+        var cx = mx + 2;
+        columnas.forEach(function (col) {
+            doc.text(col.titulo, cx, yy + 5.2);
+            cx += col.w;
+        });
+        return yy + 8;
+    }
+
+    function nuevaPaginaTabla() {
+        pdf.addPage();
+        y = dibujarEncabezadoPdf(pdf, true) + 4;
+        y = dibujarEncabezadoTabla(pdf, cols, margen, y, anchoTabla);
+    }
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.setTextColor(30, 58, 95);
+    pdf.text('Detalle de lotes (' + lotes.length + ')', margen, y);
+    y += 6;
+
+    y = dibujarEncabezadoTabla(pdf, cols, margen, y, anchoTabla);
+
+    lotes.forEach(function (lote, index) {
+        if (y + rowH > pageH - footerReserva) {
+            nuevaPaginaTabla();
+        }
+
+        if (index % 2 === 0) {
+            pdf.setFillColor(248, 250, 252);
+        } else {
+            pdf.setFillColor(255, 255, 255);
+        }
+        pdf.rect(margen, y, anchoTabla, rowH, 'F');
+
+        pdf.setDrawColor(226, 232, 240);
+        pdf.setLineWidth(0.15);
+        pdf.line(margen, y + rowH, margen + anchoTabla, y + rowH);
+
+        var cx = margen + 2;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(51, 65, 85);
+        pdf.text(String(index + 1), cx, y + 4.5);
+        cx += cols[0].w;
+
+        pdf.text(String(lote.nombre || 'Sin nombre').substring(0, 28), cx, y + 4.2);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(String((lote.propietario || 'Sin propietario')).trim().substring(0, 32), cx, y + 8.2);
+        cx += cols[1].w;
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.2);
+        pdf.setTextColor(71, 85, 105);
+        pdf.text(String(lote.cultivo || '—').substring(0, 18), cx, y + 6);
+        cx += cols[2].w;
+
+        var estadoRgb = hexToRgb(coloresEstado[normalizarEstado(lote.estado)] || '#6c757d');
+        pdf.setFillColor(estadoRgb.r, estadoRgb.g, estadoRgb.b);
+        pdf.circle(cx + 1.5, y + 4.8, 1.1, 'F');
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(6.8);
+        pdf.setTextColor(estadoRgb.r, estadoRgb.g, estadoRgb.b);
+        pdf.text(String(lote.estado || '—').substring(0, 16), cx + 4, y + 6);
+        cx += cols[3].w;
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.2);
+        pdf.setTextColor(51, 65, 85);
+        pdf.text(String(lote.superficie_etiqueta || '—').substring(0, 14), cx, y + 6);
+        cx += cols[4].w;
+
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(
+            pdf.splitTextToSize(String(lote.ubicacion_visible || lote.ubicacion || 'Sin ubicación'), cols[5].w - 2),
+            cx,
+            y + 4.5
+        );
+
+        y += rowH;
+    });
+
+    return y + 4;
+}
+
+function agregarListadoLotesPdf(pdf, lotes, inicioY) {
+    return dibujarTablaLotesPdf(pdf, lotes, inicioY);
+}
+
+async function generarPdfMapa(opciones) {
+    opciones = opciones || {};
+    var lotes = lotesMapaActivos || [];
+    var JsPDF = obtenerConstructorPdf();
+    if (!JsPDF) {
+        throw new Error('No se cargó la librería PDF.');
+    }
+
+    mostrarCargaMapaExport(true, opciones.imprimir ? 'Preparando impresión…' : 'Generando PDF…');
+
+    try {
+        var canvas = await capturarContenedorMapa();
+        var imgData = canvas.toDataURL('image/jpeg', 0.92);
+        var pdf = new JsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        var pageW = pdf.internal.pageSize.getWidth();
+        var pageH = pdf.internal.pageSize.getHeight();
+        var margen = 12;
+
+        var y = dibujarEncabezadoPdf(pdf, false);
+        y = dibujarTarjetasResumenPdf(pdf, lotes, y);
+
+        var maxW = pageW - (margen * 2);
+        var maxH = 92;
+        var ratio = canvas.width / canvas.height;
+        var imgW = maxW;
+        var imgH = imgW / ratio;
+        if (imgH > maxH) {
+            imgH = maxH;
+            imgW = imgH * ratio;
+        }
+
+        dibujarMarcoImagenPdf(pdf, margen, y, imgW, imgH);
+        pdf.addImage(imgData, 'JPEG', margen, y, imgW, imgH, undefined, 'FAST');
+        y += imgH + 5;
+
+        y = dibujarLeyendaEstadosPdf(pdf, y);
+        dibujarTablaLotesPdf(pdf, lotes, y + 2);
+
+        var totalPaginas = pdf.internal.getNumberOfPages();
+        for (var p = 1; p <= totalPaginas; p++) {
+            pdf.setPage(p);
+            dibujarPiePdf(pdf, p, totalPaginas);
+        }
+
+        var nombre = 'mapa-lotes-agrofusion-' + new Date().toISOString().slice(0, 10) + '.pdf';
+        if (opciones.descargar) {
+            pdf.save(nombre);
+        }
+        if (opciones.imprimir) {
+            pdf.autoPrint();
+            window.open(pdf.output('bloburl'), '_blank');
+        }
+
+        return pdf;
+    } finally {
+        mostrarCargaMapaExport(false);
+    }
+}
+
+async function exportarMapa() {
+    try {
+        await generarPdfMapa({ descargar: true, imprimir: false });
+        mostrarToastMapa('PDF del mapa descargado correctamente.');
+    } catch (error) {
+        mostrarCargaMapaExport(false);
+        mostrarToastMapa(error.message || 'No se pudo exportar el mapa.', 'danger');
+    }
+}
+
+async function imprimirMapa() {
+    try {
+        await generarPdfMapa({ descargar: false, imprimir: true });
+    } catch (error) {
+        mostrarCargaMapaExport(false);
+        mostrarToastMapa(error.message || 'No se pudo preparar la impresión.', 'danger');
+    }
+}
+
+function obtenerUrlMapaCompartir() {
+    return window.location.href.split('#')[0];
+}
+
+function compartirMapa() {
+    var url = obtenerUrlMapaCompartir();
+    var input = document.getElementById('shareMapaUrl');
+    var whatsapp = document.getElementById('shareMapaWhatsapp');
+    var email = document.getElementById('shareMapaEmail');
+    var feedback = document.getElementById('shareMapaFeedback');
+
+    if (input) input.value = url;
+    if (whatsapp) {
+        whatsapp.href = 'https://wa.me/?text=' + encodeURIComponent('Mapa de lotes AgroFusion: ' + url);
+    }
+    if (email) {
+        email.href = 'mailto:?subject=' + encodeURIComponent('Mapa de lotes AgroFusion')
+            + '&body=' + encodeURIComponent('Consulta el mapa de lotes en este enlace:\n' + url);
+    }
+    if (feedback) feedback.classList.add('d-none');
+
+    $('#modalCompartirMapa').modal('show');
+}
+
+function copiarEnlaceMapa() {
+    var url = obtenerUrlMapaCompartir();
+    var input = document.getElementById('shareMapaUrl');
+    if (input) {
+        input.value = url;
+        input.focus();
+        input.select();
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function () {
+            mostrarFeedbackCompartir('Enlace copiado al portapapeles.');
+        }).catch(function () {
+            mostrarFeedbackCompartir('Seleccione el enlace y cópielo manualmente (Ctrl+C).', 'warning');
+        });
+        return;
+    }
+
+    try {
+        document.execCommand('copy');
+        mostrarFeedbackCompartir('Enlace copiado al portapapeles.');
+    } catch (e) {
+        mostrarFeedbackCompartir('Seleccione el enlace y cópielo manualmente (Ctrl+C).', 'warning');
+    }
+}
+
+$(document).ready(function () {
     cargarLotes(lotesData);
-    
-    // Animación de cards
-    $('.card').css('opacity', '0').animate({'opacity': '1'}, 800);
+    $('.mapa-panel-inferior__card, .mapa-kpi-panel, .card-modulo-main').css('opacity', '0').animate({ opacity: 1 }, 800);
+
+    var btnCopiar = document.getElementById('btnCopiarEnlaceMapa');
+    if (btnCopiar) {
+        btnCopiar.addEventListener('click', copiarEnlaceMapa);
+    }
 });
 </script>
 @endpush

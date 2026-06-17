@@ -85,22 +85,30 @@
                            value="{{ request('q') }}" placeholder="Código, cultivo, planta, chofer…">
                 </div>
                 @unless($esTransportista ?? false)
-                <div class="col-md-2 mb-2 mb-md-0">
-                    <label class="small text-muted mb-1">Chofer</label>
-                    <input type="text" name="transportista_nombre" class="form-control form-control-sm"
-                           value="{{ request('transportista_nombre') }}" placeholder="Nombre chofer">
-                </div>
                 @if(($transportistas ?? collect())->isNotEmpty())
                 <div class="col-md-2 mb-2 mb-md-0">
-                    <label class="small text-muted mb-1">Lista choferes</label>
-                    <select name="transportista" class="custom-select custom-select-sm">
-                        <option value="">Todos</option>
-                        @foreach($transportistas as $t)
-                            <option value="{{ $t->usuarioid }}" @selected((string) request('transportista') === (string) $t->usuarioid)>
-                                {{ trim($t->nombre.' '.$t->apellido) }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <label class="small text-muted mb-1">Chofer</label>
+                    @include('partials.selector-catalogo', [
+                        'id' => 'envios_filtro_transportista',
+                        'name' => 'transportista',
+                        'value' => request('transportista'),
+                        'labelSelected' => $transportistaFiltroNombre ?? '',
+                        'endpoint' => route('catalogo-selector.usuarios'),
+                        'params' => ['roles' => 'transportista'],
+                        'title' => 'Filtrar por chofer',
+                        'searchPlaceholder' => 'Nombre, usuario o correo…',
+                        'searchLabel' => 'Buscar chofer',
+                        'allowEmpty' => true,
+                        'emptyLabel' => 'Todos los choferes',
+                        'placeholderEmpty' => 'Todos',
+                        'inputGroup' => true,
+                        'showLabel' => false,
+                        'modalIcon' => 'fa-user-tie',
+                        'rowIcon' => 'fa-id-badge',
+                        'colNombre' => 'Transportista',
+                        'colDetalle' => 'Usuario / contacto',
+                        'variant' => 'filtros',
+                    ])
                 </div>
                 @endif
                 <div class="col-md-2 mb-2 mb-md-0">
@@ -137,16 +145,6 @@
                     <label class="small text-muted mb-1">Hasta</label>
                     <input type="date" name="hasta" class="form-control form-control-sm" value="{{ request('hasta') }}">
                 </div>
-                @unless($esTransportista ?? false)
-                <div class="col-auto mb-2 mb-md-0">
-                    <label class="small text-muted mb-1 d-block">&nbsp;</label>
-                    <div class="form-check mb-0">
-                        <input type="checkbox" class="form-check-input" id="sin_asignar" name="sin_asignar" value="1"
-                               @checked(request()->boolean('sin_asignar'))>
-                        <label class="form-check-label small" for="sin_asignar">Sin chofer</label>
-                    </div>
-                </div>
-                @endunless
                 <div class="col-auto mb-2 mb-md-0">
                     <label class="small text-muted mb-1 d-block">&nbsp;</label>
                     <button type="submit" class="btn btn-success btn-sm px-3">

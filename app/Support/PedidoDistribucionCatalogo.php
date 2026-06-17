@@ -56,19 +56,49 @@ final class PedidoDistribucionCatalogo
         return $pedido->estado === self::ESTADO_CONFIRMADO;
     }
 
+    public static function puedeDespacharDirecto(PedidoDistribucion $pedido): bool
+    {
+        return self::puedeMarcarEnviado($pedido) && $pedido->rutadistribucionid === null;
+    }
+
     public static function puedeConfirmarRecepcion(PedidoDistribucion $pedido): bool
     {
         return $pedido->estado === self::ESTADO_EN_TRANSITO;
+    }
+
+    /** @return array<string, string> Etiquetas legibles para filtros (menos opciones técnicas). */
+    public static function etiquetasFiltroEstado(): array
+    {
+        return [
+            'revision' => 'En revisión',
+            'preparacion' => 'Preparando envío',
+            'camino' => 'En camino',
+            'recibido' => 'Recibido',
+            'cerrado' => 'Cerrado',
+        ];
+    }
+
+    /** @return list<string> */
+    public static function estadosDeGrupoFiltro(string $grupo): array
+    {
+        return match ($grupo) {
+            'revision' => [self::ESTADO_PENDIENTE],
+            'preparacion' => [self::ESTADO_CONFIRMADO],
+            'camino' => [self::ESTADO_EN_TRANSITO],
+            'recibido' => [self::ESTADO_RECIBIDO],
+            'cerrado' => [self::ESTADO_RECHAZADO, self::ESTADO_CANCELADO],
+            default => [],
+        };
     }
 
     /** @return array<string, string> */
     public static function etiquetasEstado(): array
     {
         return [
-            self::ESTADO_PENDIENTE => 'Pendiente planta',
-            self::ESTADO_CONFIRMADO => 'Aceptado — listo para envío',
-            self::ESTADO_EN_TRANSITO => 'En tránsito',
-            self::ESTADO_RECIBIDO => 'Recibido en PDV',
+            self::ESTADO_PENDIENTE => 'En revisión',
+            self::ESTADO_CONFIRMADO => 'Preparando envío',
+            self::ESTADO_EN_TRANSITO => 'En camino',
+            self::ESTADO_RECIBIDO => 'Recibido',
             self::ESTADO_RECHAZADO => 'Rechazado',
             self::ESTADO_CANCELADO => 'Cancelado',
         ];
@@ -83,9 +113,9 @@ final class PedidoDistribucionCatalogo
     public static function badgeEstado(PedidoDistribucion $pedido): array
     {
         return match ($pedido->estado) {
-            self::ESTADO_PENDIENTE => ['clase' => 'warning', 'etiqueta' => 'Pendiente planta'],
-            self::ESTADO_CONFIRMADO => ['clase' => 'info', 'etiqueta' => 'Listo para envío'],
-            self::ESTADO_EN_TRANSITO => ['clase' => 'primary', 'etiqueta' => 'En tránsito'],
+            self::ESTADO_PENDIENTE => ['clase' => 'warning', 'etiqueta' => 'En revisión'],
+            self::ESTADO_CONFIRMADO => ['clase' => 'info', 'etiqueta' => 'Preparando envío'],
+            self::ESTADO_EN_TRANSITO => ['clase' => 'primary', 'etiqueta' => 'En camino'],
             self::ESTADO_RECIBIDO => ['clase' => 'success', 'etiqueta' => 'Recibido'],
             self::ESTADO_RECHAZADO => ['clase' => 'danger', 'etiqueta' => 'Rechazado'],
             self::ESTADO_CANCELADO => ['clase' => 'secondary', 'etiqueta' => 'Cancelado'],

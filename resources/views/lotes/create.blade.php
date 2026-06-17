@@ -84,6 +84,9 @@
                             'selectorId' => 'lote_semilla',
                             'insumoSemillaId' => $insumoSemillaId ?? '',
                             'insumoSemillaLabel' => $insumoSemillaLabel ?? '',
+                            'cantidadSemillaPlanificada' => old('cantidad_semilla_planificada', ''),
+                            'cantidadSemillaUnidad' => $dosisInicial['unidad'] ?? 'kg',
+                            'semillaStockInicial' => $semillaStockInicial ?? null,
                         ])
 
                         <div class="form-group">
@@ -195,7 +198,15 @@
                 if (label) label.textContent = this.files[0]?.name || 'Elegir imagen…';
             });
 
-            window.AgroFusionLoteMapa.vincularDosisSiembra({ selectorId: 'lote_semilla' });
+            window.AgroFusionLoteMapa.vincularDosisSiembra({
+                selectorId: 'lote_semilla',
+                initialDosis: @json(($dosisInicial['tiene_dosis'] ?? false) ? [
+                    'dosis_por_ha' => $dosisInicial['por_ha'] ?? 0,
+                    'dosis_unidad' => $dosisInicial['unidad'] ?? 'kg',
+                ] : null),
+                initialCantidad: @json(old('cantidad_semilla_planificada')),
+                initialStock: @json($semillaStockInicial ?? null),
+            });
         })();
     </script>
 @endpush

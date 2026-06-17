@@ -22,6 +22,8 @@
     $urlTrazabilidadActividad = fn ($act) => $act->lote
         ? route('lotes.trazabilidad', $act->lote).'#historial-eventos'
         : null;
+    $loteFiltroId = $filtros['loteid'] ?? '';
+    $loteFiltroNombre = $loteFiltroNombre ?? '';
 @endphp
 
 @push('styles')
@@ -75,20 +77,6 @@
     font-weight: 500;
     color: #343a40;
 }
-.page-actividades .act-evidencia-thumb {
-    display: block;
-    width: 52px;
-    height: 52px;
-    object-fit: cover;
-    border-radius: 6px;
-    border: 1px solid #dee2e6;
-    margin-top: .35rem;
-    cursor: pointer;
-    transition: box-shadow .15s ease;
-}
-.page-actividades .act-evidencia-thumb:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,.12);
-}
 .page-actividades .act-row-card {
     display: flex;
     align-items: flex-start;
@@ -112,14 +100,6 @@
 .page-actividades .btn-actions .btn {
     padding: 0.25rem 0.5rem;
     line-height: 1.2;
-}
-.page-actividades .act-card-evidencia {
-    width: 64px;
-    height: 64px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-    flex-shrink: 0;
 }
 </style>
 @endpush
@@ -198,12 +178,26 @@
                     </div>
                     <div class="col-lg-3 col-md-3 col-6 mb-2">
                         <label class="small text-muted mb-1">Lote</label>
-                        <select name="loteid" class="form-control form-control-sm">
-                            <option value="">Todos</option>
-                            @foreach($lotes as $lote)
-                                <option value="{{ $lote->loteid }}" @selected(($filtros['loteid'] ?? '') == $lote->loteid)>{{ $lote->nombre }}</option>
-                            @endforeach
-                        </select>
+                        @include('partials.selector-catalogo', [
+                            'id' => 'actividades_filtro_lote',
+                            'name' => 'loteid',
+                            'value' => $loteFiltroId,
+                            'labelSelected' => $loteFiltroNombre,
+                            'endpoint' => route('catalogo-selector.lotes'),
+                            'title' => 'Filtrar por lote',
+                            'searchPlaceholder' => 'Nombre, código o ubicación…',
+                            'searchLabel' => 'Buscar lote',
+                            'allowEmpty' => true,
+                            'emptyLabel' => 'Todos los lotes',
+                            'placeholderEmpty' => 'Todos los lotes',
+                            'inputGroup' => true,
+                            'showLabel' => false,
+                            'modalIcon' => 'fa-map-marked-alt',
+                            'rowIcon' => 'fa-seedling',
+                            'colNombre' => 'Lote',
+                            'colDetalle' => 'Cultivo / ubicación',
+                            'variant' => 'filtros',
+                        ])
                     </div>
                     <div class="col-lg-3 col-md-3 col-6 mb-2">
                         <label class="small text-muted mb-1">Tipo</label>
@@ -240,9 +234,6 @@
                         @php
                             $esCompletada = $act->fechafin !== null;
                             $trzUrl = $urlTrazabilidadActividad($act);
-                            $evidenciaUrl = $esCompletada && $act->evidencia_foto_path
-                                ? asset('storage/'.$act->evidencia_foto_path)
-                                : null;
                         @endphp
                         <tr>
                             <td>
@@ -272,14 +263,7 @@
                             <td>{{ $act->fechainicio ? \Carbon\Carbon::parse($act->fechainicio)->format('d/m/Y') : '—' }}</td>
                             <td>
                                 @if($esCompletada)
-                                    <span class="d-block">{{ \Carbon\Carbon::parse($act->fechafin)->format('d/m/Y') }}</span>
-                                    @if($evidenciaUrl)
-                                        <img src="{{ $evidenciaUrl }}" alt="Evidencia"
-                                             class="act-evidencia-thumb btn-ver-evidencia"
-                                             data-url="{{ $evidenciaUrl }}"
-                                             data-titulo="{{ $act->tipoActividad->nombre ?? 'Actividad' }}"
-                                             title="Ver evidencia fotográfica">
-                                    @endif
+                                    {{ \Carbon\Carbon::parse($act->fechafin)->format('d/m/Y') }}
                                 @else
                                     <span class="badge badge-light border text-muted font-weight-normal">Pendiente</span>
                                 @endif
@@ -316,9 +300,6 @@
                 @php
                     $esCompletada = $act->fechafin !== null;
                     $trzUrl = $urlTrazabilidadActividad($act);
-                    $evidenciaUrl = $esCompletada && $act->evidencia_foto_path
-                        ? asset('storage/'.$act->evidencia_foto_path)
-                        : null;
                 @endphp
                 <div class="act-row-card">
                     <div class="act-avatar {{ $esCompletada ? 'completada' : 'pendiente' }}">
@@ -361,12 +342,6 @@
                         <p class="act-desc mb-0 mt-2">{{ Str::limit($act->descripcion, 100) }}</p>
                         @endif
                     </div>
-                    @if($evidenciaUrl)
-                        <img src="{{ $evidenciaUrl }}" alt="Evidencia"
-                             class="act-card-evidencia btn-ver-evidencia"
-                             data-url="{{ $evidenciaUrl }}"
-                             data-titulo="{{ $act->tipoActividad->nombre ?? 'Actividad' }}">
-                    @endif
                     @if($trzUrl)
                     <a href="{{ $trzUrl }}" class="btn btn-default btn-sm btn-actions flex-shrink-0 align-self-center" title="Ver en trazabilidad">
                         <i class="fas fa-eye text-info"></i>
@@ -386,8 +361,6 @@
     </div>
 
 </div>
-
-@include('partials.modal-ver-evidencia')
 @endsection
 
 @push('scripts')

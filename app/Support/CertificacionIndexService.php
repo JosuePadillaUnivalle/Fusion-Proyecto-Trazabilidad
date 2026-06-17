@@ -14,24 +14,96 @@ class CertificacionIndexService
         private LoteProduccionTransformacionService $transformacion
     ) {}
 
-    /** @return array{pendientes: Collection, certificados: Collection, stats: array<string, int>, ambito: string} */
-    public function datosPlanta(): array
+    /** @return array{pendientes: Collection, evaluaciones: Collection, stats: array<string, int>, ambito: string, filtros: array<string, string>} */
+    public function datosPlanta(array $filtros = []): array
     {
+        $q = mb_strtolower(trim($filtros['q'] ?? ''));
+        $producto = mb_strtolower(trim($filtros['producto'] ?? ''));
+        $resultado = trim($filtros['resultado'] ?? '');
+        $desde = trim($filtros['desde'] ?? '');
+        $hasta = trim($filtros['hasta'] ?? '');
+
+        $coincideLote = function (LoteProduccionPedido $lote) use ($q, $producto): bool {
+            if ($q !== '') {
+                $texto = mb_strtolower(implode(' ', array_filter([
+                    $lote->nombre,
+                    $lote->codigo_lote,
+                    $lote->producto,
+                    $lote->plantillaTransformacion?->nombre,
+                ])));
+                if (! str_contains($texto, $q)) {
+                    return false;
+                }
+            }
+            if ($producto !== '') {
+                $prod = mb_strtolower((string) ($lote->producto ?? ''));
+                $nombre = mb_strtolower((string) ($lote->nombre ?? ''));
+                if (! str_contains($prod, $producto) && ! str_contains($nombre, $producto)) {
+                    return false;
+                }
+            }
+
+            return true;
+        };
+
         $lotes = LoteProduccionPedido::query()
-            ->with(['evaluacionesFinales', 'plantillaTransformacion'])
+            ->with([
+                'evaluacionesFinales',
+                'plantillaTransformacion',
+                'pedido',
+                'unidadMedida',
+            ])
             ->orderByDesc('loteproduccionpedidoid')
             ->get();
 
-        $pendientes = $lotes->filter(function (LoteProduccionPedido $lote) {
+        $pendientes = $lotes->filter(function (LoteProduccionPedido $lote) use ($coincideLote) {
             return $this->transformacion->transformacionCompleta($lote)
-                && $lote->evaluacionesFinales->isEmpty();
+                && $lote->evaluacionesFinales->isEmpty()
+                && $coincideLote($lote);
         })->values();
 
-        $evaluaciones = EvaluacionFinalLoteProduccion::query()
-            ->with(['loteProduccionPedido', 'inspector'])
-            ->orderByDesc('fecha_evaluacion')
-            ->limit(20)
-            ->get();
+        $evaluacionesQuery = EvaluacionFinalLoteProduccion::query()
+            ->with([
+                'loteProduccionPedido.pedido',
+                'loteProduccionPedido.plantillaTransformacion',
+                'inspector',
+            ])
+            ->orderByDesc('fecha_evaluacion');
+
+        if ($resultado === 'certificado') {
+            $evaluacionesQuery->where('razon', EvaluacionFinalLoteProduccion::RAZON_CERTIFICADO);
+        } elseif ($resultado === 'no_conforme') {
+            $evaluacionesQuery->where('razon', EvaluacionFinalLoteProduccion::RAZON_NO_CONFORME);
+        }
+
+        if ($desde !== '') {
+            $evaluacionesQuery->whereDate('fecha_evaluacion', '>=', $desde);
+        }
+        if ($hasta !== '') {
+            $evaluacionesQuery->whereDate('fecha_evaluacion', '<=', $hasta);
+        }
+
+        if ($q !== '' || $producto !== '') {
+            $evaluacionesQuery->whereHas('loteProduccionPedido', function ($lq) use ($q, $producto) {
+                if ($q !== '') {
+                    $term = '%'.$q.'%';
+                    $lq->where(function ($w) use ($term) {
+                        $w->whereRaw('LOWER(nombre) LIKE ?', [$term])
+                            ->orWhereRaw('LOWER(codigo_lote) LIKE ?', [$term])
+                            ->orWhereRaw('LOWER(producto) LIKE ?', [$term]);
+                    });
+                }
+                if ($producto !== '') {
+                    $termProd = '%'.$producto.'%';
+                    $lq->where(function ($w) use ($termProd) {
+                        $w->whereRaw('LOWER(producto) LIKE ?', [$termProd])
+                            ->orWhereRaw('LOWER(nombre) LIKE ?', [$termProd]);
+                    });
+                }
+            });
+        }
+
+        $evaluaciones = $evaluacionesQuery->limit(50)->get();
 
         $certificadosOk = $lotes->filter(function (LoteProduccionPedido $lote) {
             $ultima = $lote->evaluacionesFinales->sortByDesc('fecha_evaluacion')->first();
@@ -39,14 +111,28 @@ class CertificacionIndexService
             return $ultima && $ultima->esCertificado();
         });
 
+        $noConformes = $lotes->filter(function (LoteProduccionPedido $lote) {
+            $ultima = $lote->evaluacionesFinales->sortByDesc('fecha_evaluacion')->first();
+
+            return $ultima && $ultima->esNoConforme();
+        });
+
         return [
             'ambito' => 'planta',
             'pendientes' => $pendientes,
-            'certificados' => $evaluaciones,
+            'evaluaciones' => $evaluaciones,
             'stats' => [
                 'pendientes' => $pendientes->count(),
                 'certificados' => $certificadosOk->count(),
+                'no_conformes' => $noConformes->count(),
                 'total_lotes' => $lotes->count(),
+            ],
+            'filtros' => [
+                'q' => $filtros['q'] ?? '',
+                'producto' => $filtros['producto'] ?? '',
+                'resultado' => $resultado,
+                'desde' => $desde,
+                'hasta' => $hasta,
             ],
         ];
     }

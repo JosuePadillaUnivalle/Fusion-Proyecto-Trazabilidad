@@ -67,6 +67,102 @@
 .progress-group:last-child { margin-bottom: 0; }
 .pg-label { font-size: .85rem; font-weight: 600; color: #334155; }
 .pg-value { font-size: .78rem; color: #64748b; }
+.admin-dash-card--interactive .role-acc-card__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+}
+.admin-dash-card__link {
+    font-size: .78rem;
+    font-weight: 700;
+    color: #059669;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.admin-dash-card__link:hover { color: #047857; text-decoration: underline; }
+.admin-interactive-row {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .85rem 1.15rem;
+    border-bottom: 1px solid #f1f5f9;
+    text-decoration: none;
+    color: inherit;
+    transition: background .15s ease;
+}
+.admin-interactive-row:last-child { border-bottom: 0; }
+.admin-interactive-row:hover {
+    background: #f8fafc;
+    color: inherit;
+    text-decoration: none;
+}
+.admin-interactive-row:focus-visible {
+    outline: 2px solid #34d399;
+    outline-offset: -2px;
+    background: #f0fdf4;
+}
+.admin-interactive-row__chevron {
+    margin-left: auto;
+    color: #cbd5e1;
+    font-size: .72rem;
+    transition: transform .15s ease, color .15s ease;
+}
+.admin-interactive-row:hover .admin-interactive-row__chevron {
+    color: #059669;
+    transform: translateX(2px);
+}
+.admin-interactive-empty {
+    display: block;
+    padding: 1.5rem 1.15rem;
+    text-align: center;
+    text-decoration: none;
+    color: inherit;
+    transition: background .15s ease;
+}
+.admin-interactive-empty:hover {
+    background: #f8fafc;
+    text-decoration: none;
+    color: inherit;
+}
+.admin-interactive-empty--center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 auto;
+    min-height: 12rem;
+}
+.admin-dash-card--fill {
+    display: flex;
+    flex-direction: column;
+}
+.admin-dash-card--fill > .card-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+}
+.progress-group--link {
+    display: block;
+    padding: .55rem .65rem;
+    margin: 0 -.65rem .85rem;
+    border-radius: 10px;
+    text-decoration: none;
+    color: inherit;
+    transition: background .15s ease, box-shadow .15s ease;
+}
+.progress-group--link:last-child { margin-bottom: 0; }
+.progress-group--link:hover {
+    background: #f8fafc;
+    box-shadow: inset 0 0 0 1px #e2e8f0;
+    text-decoration: none;
+    color: inherit;
+}
+.progress-group--link:focus-visible {
+    outline: 2px solid #34d399;
+    outline-offset: 2px;
+}
 </style>
 @endpush
 
@@ -182,51 +278,103 @@
 
         <div class="row">
             <div class="col-md-6 mb-4">
-                <div class="card role-acc-card h-100 mb-0">
+                <div class="card role-acc-card h-100 mb-0 admin-dash-card--interactive">
                     <div class="role-acc-card__head">
-                        <h3><i class="fas fa-history text-secondary mr-2"></i>Actividades recientes</h3>
+                        <h3 class="mb-0"><i class="fas fa-history text-secondary mr-2"></i>Actividades recientes</h3>
+                        @can('lotes.view')
+                        <a href="{{ route('actividades.index') }}" class="admin-dash-card__link">
+                            Ver todas <i class="fas fa-arrow-right ml-1"></i>
+                        </a>
+                        @endcan
                     </div>
                     <div class="card-body p-0">
                         @forelse($actividadesRecientes as $act)
                         @php
                             $uiActividad = \App\Support\DashboardPresentacion::actividadIcono($act->tipoActividad->nombre ?? null);
                             $fechaActividad = \App\Support\DashboardPresentacion::actividadFechaTexto($act->fechainicio);
+                            $urlActividad = $act->lote
+                                ? route('lotes.trazabilidad', $act->lote).'#historial-eventos'
+                                : route('actividades.show', $act);
                         @endphp
-                        <div class="recent-activity-item">
+                        @can('lotes.view')
+                        <a href="{{ $urlActividad }}" class="admin-interactive-row recent-activity-item" title="Ver actividad en trazabilidad">
+                        @else
+                        <div class="admin-interactive-row recent-activity-item">
+                        @endcan
                             <div class="activity-icon {{ $uiActividad['class'] }}">
                                 <i class="fas {{ $uiActividad['icon'] }}"></i>
                             </div>
-                            <div>
-                                <div class="font-weight-bold" style="font-size:.88rem">{{ $act->tipoActividad->nombre ?? 'Actividad' }} — {{ $act->lote->nombre ?? 'Sin lote' }}</div>
+                            <div class="flex-grow-1 min-width-0">
+                                <div class="font-weight-bold text-truncate" style="font-size:.88rem">{{ $act->tipoActividad->nombre ?? 'Actividad' }} — {{ $act->lote->nombre ?? 'Sin lote' }}</div>
                                 <small class="text-muted">{{ $fechaActividad }} · {{ trim(($act->usuario->nombre ?? '').' '.($act->usuario->apellido ?? '')) }}</small>
                             </div>
+                            @can('lotes.view')
+                            <i class="fas fa-chevron-right admin-interactive-row__chevron" aria-hidden="true"></i>
+                            @endcan
+                        @can('lotes.view')
+                        </a>
+                        @else
                         </div>
+                        @endcan
                         @empty
+                        @can('lotes.update')
+                        <a href="{{ route('actividades.create') }}" class="admin-interactive-empty text-muted">
+                            <i class="fas fa-plus-circle d-block mb-2"></i>
+                            No hay actividades recientes. Registrar una actividad
+                        </a>
+                        @else
                         <div class="text-center text-muted py-4"><i class="fas fa-inbox d-block mb-2"></i>No hay actividades recientes</div>
+                        @endcan
                         @endforelse
                     </div>
                 </div>
             </div>
             <div class="col-md-6 mb-4">
-                <div class="card role-acc-card h-100 mb-0">
+                <div class="card role-acc-card h-100 mb-0 admin-dash-card--interactive admin-dash-card--fill">
                     <div class="role-acc-card__head">
-                        <h3><i class="fas fa-bell text-warning mr-2"></i>Alertas del sistema</h3>
+                        <h3 class="mb-0"><i class="fas fa-bell text-warning mr-2"></i>Alertas del sistema</h3>
+                        @can('inventario.view')
+                        <a href="{{ route('insumos.index', ['stock' => 'bajo']) }}" class="admin-dash-card__link">
+                            Ver inventario <i class="fas fa-arrow-right ml-1"></i>
+                        </a>
+                        @endcan
                     </div>
                     <div class="card-body p-0">
                         @forelse($insumosStockBajo as $insumo)
                         @php $stockAgotado = (float) $insumo->stock <= 0; @endphp
-                        <div class="alert-item {{ $stockAgotado ? 'alert-item-agotado' : '' }}">
+                        @can('inventario.view')
+                        <a href="{{ route('insumos.show', $insumo) }}" class="admin-interactive-row alert-item {{ $stockAgotado ? 'alert-item-agotado' : '' }}" title="Ver insumo">
+                        @else
+                        <div class="admin-interactive-row alert-item {{ $stockAgotado ? 'alert-item-agotado' : '' }}">
+                        @endcan
                             <div class="alert-icon"><i class="fas {{ $stockAgotado ? 'fa-times' : 'fa-exclamation' }}"></i></div>
-                            <div>
-                                <div class="font-weight-bold" style="font-size:.88rem">{{ $stockAgotado ? 'Stock agotado' : 'Stock bajo' }}: {{ $insumo->nombre }}</div>
+                            <div class="flex-grow-1 min-width-0">
+                                <div class="font-weight-bold text-truncate" style="font-size:.88rem">{{ $stockAgotado ? 'Stock agotado' : 'Stock bajo' }}: {{ $insumo->nombre }}</div>
                                 <small class="text-muted">
                                     {{ number_format($insumo->stock, 2) }} {{ $insumo->unidadMedida->abreviatura ?? '' }}
                                     @unless($stockAgotado)(menor a {{ \App\Support\InsumoCatalogo::UMBRAL_ALERTA_STOCK }})@endunless
                                 </small>
                             </div>
+                            @can('inventario.view')
+                            <i class="fas fa-chevron-right admin-interactive-row__chevron" aria-hidden="true"></i>
+                            @endcan
+                        @can('inventario.view')
+                        </a>
+                        @else
                         </div>
+                        @endcan
                         @empty
-                        <div class="text-center text-success py-4"><i class="fas fa-check-circle d-block mb-2"></i>Sin alertas pendientes</div>
+                        @can('inventario.view')
+                        <a href="{{ route('insumos.index') }}" class="admin-interactive-empty admin-interactive-empty--center text-success">
+                            <i class="fas fa-check-circle mb-2" style="font-size:1.35rem"></i>
+                            <span>Sin alertas pendientes. Revisar inventario</span>
+                        </a>
+                        @else
+                        <div class="admin-interactive-empty admin-interactive-empty--center text-success">
+                            <i class="fas fa-check-circle mb-2" style="font-size:1.35rem"></i>
+                            <span>Sin alertas pendientes</span>
+                        </div>
+                        @endcan
                         @endforelse
                     </div>
                 </div>
@@ -234,19 +382,37 @@
         </div>
 
         @if($topCultivos->isNotEmpty())
-        <div class="card role-acc-card mb-0">
+        <div class="card role-acc-card mb-0 admin-dash-card--interactive">
             <div class="role-acc-card__head">
-                <h3><i class="fas fa-trophy text-warning mr-2"></i>Top cultivos por producción</h3>
+                <h3 class="mb-0"><i class="fas fa-trophy text-warning mr-2"></i>Top cultivos por producción</h3>
+                @can('lote_produccion.view')
+                <a href="{{ route('producciones.index') }}" class="admin-dash-card__link">
+                    Ver producciones <i class="fas fa-arrow-right ml-1"></i>
+                </a>
+                @endcan
             </div>
             <div class="card-body">
                 @php $colores = ['success','warning','info','danger','primary']; $maxProduccion = $topCultivos->max('total') ?: 1; @endphp
                 @foreach($topCultivos as $index => $cultivo)
+                @can('lote_produccion.view')
+                <a href="{{ route('producciones.index', ['buscar' => $cultivo->nombre, 'filtros_abiertos' => 1]) }}"
+                   class="progress-group progress-group--link"
+                   title="Ver cosechas de {{ $cultivo->nombre }}">
+                @else
                 <div class="progress-group">
-                    <div class="d-flex justify-content-between"><span class="pg-label">{{ $cultivo->nombre }}</span><span class="pg-value">{{ number_format($cultivo->total, 0) }} kg</span></div>
+                @endcan
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="pg-label">{{ $cultivo->nombre }}</span>
+                        <span class="pg-value">{{ number_format($cultivo->total, 0) }} kg</span>
+                    </div>
                     <div class="progress" style="height:8px;border-radius:4px">
                         <div class="progress-bar bg-{{ $colores[$index % 5] }}" style="width:{{ ($cultivo->total / $maxProduccion) * 100 }}%"></div>
                     </div>
+                @can('lote_produccion.view')
+                </a>
+                @else
                 </div>
+                @endcan
                 @endforeach
             </div>
         </div>
@@ -288,16 +454,36 @@ $(function () {
     var chartData = @json($chartData);
     if (chartData.labels && chartData.labels.length > 0) {
         var ctx = document.getElementById('productionChart').getContext('2d');
+        var esDiario = chartData.modo === 'diario';
         new Chart(ctx, {
             type: 'line',
             data: { labels: chartData.labels, datasets: chartData.datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'top' } },
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: esDiario ? {
+                        callbacks: {
+                            title: function (items) {
+                                return items.length ? 'Día ' + items[0].label : '';
+                            }
+                        }
+                    } : {}
+                },
                 scales: {
                     y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
-                    x: { grid: { color: '#f1f5f9' } }
+                    x: {
+                        grid: { color: '#f1f5f9' },
+                        title: {
+                            display: esDiario,
+                            text: 'Día del mes',
+                            color: '#64748b',
+                            font: { size: 11 }
+                        },
+                        ticks: { maxTicksLimit: esDiario ? 16 : undefined }
+                    }
                 }
             }
         });

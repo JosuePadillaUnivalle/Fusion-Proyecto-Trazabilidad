@@ -88,7 +88,6 @@
 .dash-filtros-field--selector { grid-column: span 2; min-width: 200px; }
 .dash-filtros-field--selector .selector-catalogo-wrapper { margin-bottom: 0; }
 .dash-filtros-field--selector .selector-catalogo-label { cursor: pointer; font-size: .86rem; }
-.dash-filtros-field--selector .input-group .btn { font-size: .78rem; font-weight: 700; white-space: nowrap; }
 </style>
 
 <div class="dash-filtros-card" id="dash-filtros-panel">
@@ -154,6 +153,7 @@
                     'modalIcon' => 'fa-seedling',
                     'rowIcon' => 'fa-seedling',
                     'inputGroup' => true,
+                    'variant' => 'filtros',
                 ])
             </div>
             @endif
@@ -178,6 +178,7 @@
                     'rowIcon' => 'fa-map-marked-alt',
                     'colDetalle' => 'Cultivo · código',
                     'inputGroup' => true,
+                    'variant' => 'filtros',
                 ])
             </div>
             @endif
@@ -272,7 +273,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.querySelectorAll('#dash-filtros-form .selector-catalogo-label').forEach(function (el) {
         el.addEventListener('click', function () {
-            var btn = el.closest('.input-group')?.querySelector('[data-selector-open]');
+            var wrap = el.closest('.selector-catalogo-wrapper');
+            var btn = wrap?.querySelector('[data-selector-open]');
             if (btn) btn.click();
         });
     });

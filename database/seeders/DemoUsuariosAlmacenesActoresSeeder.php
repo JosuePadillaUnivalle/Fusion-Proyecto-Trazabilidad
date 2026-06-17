@@ -7,6 +7,7 @@ use App\Models\Almacen;
 use App\Models\TipoAlmacen;
 use App\Models\UnidadMedida;
 use App\Models\Usuario;
+use App\Support\AlmacenAmbito;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -60,6 +61,11 @@ class DemoUsuariosAlmacenesActoresSeeder extends Seeder
 
         $central = null;
         foreach ($items as $item) {
+            $tipoKey = $item['tipo'];
+            $ambito = ($tipoKey === 'Planta' || str_contains(mb_strtolower($item['nombre']), 'planta'))
+                ? AlmacenAmbito::PLANTA
+                : AlmacenAmbito::AGRICOLA;
+
             $almacen = Almacen::updateOrCreate(
                 ['nombre' => $item['nombre']],
                 [
@@ -67,8 +73,9 @@ class DemoUsuariosAlmacenesActoresSeeder extends Seeder
                     'ubicacion' => $item['ubicacion'],
                     'capacidad' => 50000,
                     'unidadmedidaid' => $unidadBase->unidadmedidaid,
-                    'tipoalmacenid' => $tipos[$item['tipo']]->tipoalmacenid,
+                    'tipoalmacenid' => $tipos[$tipoKey]->tipoalmacenid,
                     'activo' => true,
+                    'ambito' => $ambito,
                 ]
             );
 

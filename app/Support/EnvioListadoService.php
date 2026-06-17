@@ -60,13 +60,6 @@ final class EnvioListadoService
                 });
             }
 
-            if ($request->boolean('sin_asignar')) {
-                $query->where(function ($q) {
-                    $q->whereDoesntHave('envioAsignacion')
-                        ->orWhereHas('envioAsignacion', fn ($a) => $a->whereNull('transportista_usuarioid'));
-                });
-            }
-
             if ($request->filled('vehiculo')) {
                 $placa = $request->string('vehiculo')->trim()->toString();
                 $query->whereHas('envioAsignacion', fn ($q) => $q->where('vehiculo_ref', 'like', "%{$placa}%"));

@@ -1,7 +1,9 @@
 @php
+    use App\Support\EstadoLoteCatalogo;
     $propietario = trim(($lote->usuario->nombre ?? '').' '.($lote->usuario->apellido ?? '')) ?: '—';
     $tieneCoords = $lote->latitud && $lote->longitud;
     $ubicacionVisible = $lote->ubicacion_visible;
+    $estadoSlug = EstadoLoteCatalogo::slugFromNombre($lote->estadoTipo->nombre ?? '') ?: 'default';
 @endphp
 
 <div class="lote-datos-panel">
@@ -15,17 +17,19 @@
         </div>
     </div>
 
-    <div class="lote-datos-panel__badges">
+    <div class="lote-chip-row">
         @if($lote->cultivo_etiqueta)
-            <span class="lote-datos-panel__badge lote-datos-panel__badge--cultivo">
-                <i class="fas fa-seedling mr-1"></i>{{ $lote->cultivo_etiqueta }}
+            <span class="lote-chip lote-chip--cultivo">
+                <span class="lote-chip__icon"><i class="fas fa-seedling"></i></span>
+                {{ $lote->cultivo_etiqueta }}
             </span>
         @else
-            <span class="lote-datos-panel__badge lote-datos-panel__badge--muted">
-                <i class="fas fa-seedling mr-1"></i>Sin semilla
+            <span class="lote-chip lote-chip--muted">
+                <span class="lote-chip__icon"><i class="fas fa-seedling"></i></span>
+                Sin semilla
             </span>
         @endif
-        <span class="estado-badge {{ $estadoClass ?? 'bg-secondary' }}">
+        <span class="lote-chip lote-chip--estado lote-chip--estado-{{ $estadoSlug }}">
             {{ ucfirst($lote->estadoTipo->nombre ?? 'Sin estado') }}
         </span>
     </div>

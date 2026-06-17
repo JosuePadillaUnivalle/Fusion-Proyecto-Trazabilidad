@@ -66,6 +66,23 @@
         color: #166534;
         margin-bottom: 1.25rem;
     }
+    .cert-list-filter {
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+    .cert-list-filter .input-group-text {
+        background: #fff;
+        border-color: #e2e8f0;
+        color: #64748b;
+    }
+    .cert-list-filter .form-control {
+        border-color: #e2e8f0;
+        font-size: .88rem;
+    }
+    .cert-list-filter .form-control:focus {
+        border-color: #86efac;
+        box-shadow: 0 0 0 .12rem rgba(34, 197, 94, .12);
+    }
 </style>
 
 <div class="container-fluid">
@@ -160,6 +177,22 @@
                         </div>
                     </x-slot:tools>
                 </x-modulo-index-header>
+                @if($lotesPendientes->isNotEmpty())
+                    <div class="cert-list-filter px-3 py-3">
+                        <label class="small text-muted mb-1 d-block" for="filtroLotesCertificar">Buscar lote</label>
+                        <div class="input-group input-group-sm">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            </div>
+                            <input type="search"
+                                   class="form-control"
+                                   id="filtroLotesCertificar"
+                                   placeholder="Nombre, #lote, cultivo o estado…"
+                                   autocomplete="off">
+                        </div>
+                        <small class="text-muted d-block mt-1 cert-filter-meta" id="filtroLotesCertificarMeta" hidden></small>
+                    </div>
+                @endif
                 <div class="card-body">
                     @can('certificaciones.create')
                         @if($lotesPendientes->isNotEmpty())
@@ -186,7 +219,9 @@
                     @endcan
 
                     @forelse($lotesPendientes as $lote)
-                        <div class="lote-card p-3 mb-3" data-lote-id="{{ $lote->loteid }}">
+                        <div class="lote-card p-3 mb-3"
+                             data-lote-id="{{ $lote->loteid }}"
+                             data-search="{{ strtolower(trim($lote->nombre.' #'.$lote->loteid.' '.($lote->cultivo_etiqueta ?? '').' '.($lote->estadoTipo->nombre ?? ''))) }}">
                             <div class="d-flex align-items-start">
                                 @can('certificaciones.create')
                                     <div class="custom-control custom-checkbox mr-3 pt-1">
@@ -220,17 +255,22 @@
                                                 </div>
                                             </div>
                                         </form>
-                                        <form action="{{ route('certificaciones.store') }}" method="POST" class="form-row align-items-center" onsubmit="return confirm('¿Marcar este lote como No conforme? No podrá enviarse al almacén.');">
+                                        <form action="{{ route('certificaciones.store') }}" method="POST" class="mb-0" onsubmit="return confirm('¿Marcar este lote como No conforme? No podrá enviarse al almacén.');">
                                             @csrf
                                             <input type="hidden" name="loteid" value="{{ $lote->loteid }}">
                                             <input type="hidden" name="resultado" value="No conforme">
-                                            <div class="col-sm-8 mb-2 mb-sm-0">
-                                                <input type="text" name="observaciones" class="form-control form-control-sm" placeholder="Motivo obligatorio: daños, plagas, calidad…" required>
-                                            </div>
-                                            <div class="col-sm-4">
-                                                <button class="btn btn-sm btn-outline-danger btn-block px-3 py-2" type="submit">
-                                                    <i class="fas fa-times-circle mr-1"></i>No conforme
-                                                </button>
+                                            <div class="form-row">
+                                                <div class="col-sm-6 mb-2">
+                                                    <input type="text" name="observaciones" class="form-control form-control-sm" placeholder="Motivo obligatorio: daños, plagas, calidad…" required>
+                                                </div>
+                                                <div class="col-sm-6 mb-2">
+                                                    <input type="text" name="recomendaciones" class="form-control form-control-sm" placeholder="Recomendaciones para mejorar (opcional)">
+                                                </div>
+                                                <div class="col-sm-12">
+                                                    <button class="btn btn-sm btn-outline-danger px-3 py-2" type="submit">
+                                                        <i class="fas fa-times-circle mr-1"></i>No conforme
+                                                    </button>
+                                                </div>
                                             </div>
                                         </form>
                                     @endcan
@@ -243,6 +283,10 @@
                             <p class="mb-0">Todos los lotes de campo elegibles ya están certificados.</p>
                         </div>
                     @endforelse
+                    <div id="filtroLotesCertificarVacio" class="text-center text-muted py-5 d-none">
+                        <i class="fas fa-search fa-2x mb-2"></i>
+                        <p class="mb-0">Ningún lote coincide con la búsqueda.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -255,6 +299,22 @@
                     icon-class="text-primary"
                     :registros="$certificados->count()"
                 />
+                @if($certificados->isNotEmpty())
+                    <div class="cert-list-filter px-3 py-3">
+                        <label class="small text-muted mb-1 d-block" for="filtroEvaluacionesRegistradas">Buscar evaluación</label>
+                        <div class="input-group input-group-sm">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            </div>
+                            <input type="search"
+                                   class="form-control"
+                                   id="filtroEvaluacionesRegistradas"
+                                   placeholder="Código, lote, cultivo u observación…"
+                                   autocomplete="off">
+                        </div>
+                        <small class="text-muted d-block mt-1 cert-filter-meta" id="filtroEvaluacionesRegistradasMeta" hidden></small>
+                    </div>
+                @endif
                 <div class="card-body cert-timeline p-0">
                     @forelse($certificados as $cert)
                         <div class="border-bottom px-3 py-3 cert-item"
@@ -262,7 +322,8 @@
                              tabindex="0"
                              title="Ver detalle de la evaluación"
                              data-cert-id="{{ $cert->certificacionid }}"
-                             data-cert-url="{{ route('certificaciones.show', $cert) }}">
+                             data-cert-url="{{ route('certificaciones.show', $cert) }}"
+                             data-search="{{ strtolower(trim(($cert->codigo_certificado ?? '').' '.$cert->loteid.' '.($cert->lote->nombre ?? '').' '.($cert->lote->cultivo->nombre ?? '').' '.($cert->observaciones ?? '').' '.($cert->esNoConforme() ? 'no conforme' : 'certificado'))) }}">
                             <div class="d-flex justify-content-between align-items-start mb-1">
                                 @if($cert->esNoConforme())
                                     <span class="badge badge-warning">No conforme</span>
@@ -275,6 +336,9 @@
                             <div class="small text-muted">Lote #{{ $cert->loteid }} · {{ $cert->lote->cultivo->nombre ?? '—' }}</div>
                             @if($cert->observaciones)
                                 <p class="small mb-1 mt-2 text-secondary text-truncate">{{ Str::limit($cert->observaciones, 80) }}</p>
+                            @endif
+                            @if($cert->recomendaciones)
+                                <p class="small mb-0 text-muted"><strong>Recomendaciones:</strong> {{ Str::limit($cert->recomendaciones, 100) }}</p>
                             @endif
                             <div class="small text-primary mt-1">
                                 <i class="fas fa-eye mr-1"></i>Ver detalle
@@ -289,6 +353,10 @@
                             <p class="mb-0">Aún no hay evaluaciones registradas.</p>
                         </div>
                     @endforelse
+                    <div id="filtroEvaluacionesRegistradasVacio" class="text-center text-muted py-5 px-3 d-none">
+                        <i class="fas fa-search fa-2x mb-2"></i>
+                        <p class="mb-0">Ninguna evaluación coincide con la búsqueda.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -323,6 +391,71 @@
 @push('scripts')
 <script>
 (function () {
+    function normalizarTexto(texto) {
+        return (texto || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function filtrarLista(config) {
+        const input = document.getElementById(config.inputId);
+        if (!input) return;
+
+        const items = document.querySelectorAll(config.itemSelector);
+        const emptyEl = config.emptyId ? document.getElementById(config.emptyId) : null;
+        const metaEl = config.metaId ? document.getElementById(config.metaId) : null;
+
+        function aplicar() {
+            const q = normalizarTexto(input.value.trim());
+            let visibles = 0;
+
+            items.forEach(function (item) {
+                const coincide = !q || normalizarTexto(item.getAttribute('data-search')).includes(q);
+                item.classList.toggle('d-none', !coincide);
+                if (coincide) visibles++;
+            });
+
+            if (emptyEl) {
+                emptyEl.classList.toggle('d-none', visibles > 0 || items.length === 0);
+            }
+
+            if (metaEl) {
+                if (q && items.length) {
+                    metaEl.hidden = false;
+                    metaEl.textContent = visibles + ' de ' + items.length + ' coinciden';
+                } else {
+                    metaEl.hidden = true;
+                }
+            }
+
+            if (typeof config.onChange === 'function') {
+                config.onChange(visibles);
+            }
+        }
+
+        input.addEventListener('input', aplicar);
+    }
+
+    filtrarLista({
+        inputId: 'filtroLotesCertificar',
+        itemSelector: '.lote-card[data-search]',
+        emptyId: 'filtroLotesCertificarVacio',
+        metaId: 'filtroLotesCertificarMeta',
+        onChange: function () {
+            if (typeof actualizarSeleccion === 'function') {
+                actualizarSeleccion();
+            }
+        }
+    });
+
+    filtrarLista({
+        inputId: 'filtroEvaluacionesRegistradas',
+        itemSelector: '.cert-item[data-search]',
+        emptyId: 'filtroEvaluacionesRegistradasVacio',
+        metaId: 'filtroEvaluacionesRegistradasMeta'
+    });
+
     const modal = $('#modalCertDetalle');
     const modalBody = document.getElementById('modalCertDetalleBody');
     const modalLink = document.getElementById('modalCertDetalleLink');
@@ -358,6 +491,10 @@
     const btnTodos = document.getElementById('btnSeleccionarTodos');
     const formSel = document.getElementById('formCertSeleccion');
 
+    function checksVisibles() {
+        return document.querySelectorAll('.lote-card:not(.d-none) .lote-check');
+    }
+
     if (!checks.length || !formSel) return;
 
     function actualizarSeleccion() {
@@ -376,7 +513,7 @@
         let todosMarcados = false;
         btnTodos.addEventListener('click', () => {
             todosMarcados = !todosMarcados;
-            checks.forEach(c => { c.checked = todosMarcados; });
+            checksVisibles().forEach(c => { c.checked = todosMarcados; });
             btnTodos.innerHTML = todosMarcados
                 ? '<i class="far fa-square mr-1"></i>Desmarcar todos'
                 : '<i class="far fa-check-square mr-1"></i>Seleccionar todos';

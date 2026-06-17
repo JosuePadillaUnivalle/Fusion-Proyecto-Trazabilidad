@@ -37,7 +37,7 @@
                     </div>
                     <div class="col-md-4 mb-3">
                         <small class="text-muted text-uppercase d-block mb-1">Cargado por</small>
-                        <strong>{{ $documento->usuario?->nombreusuario ?? 'N/D' }}</strong>
+                        <strong>{{ \App\Support\DocumentoEntregaCatalogo::etiquetaUsuario($documento->usuario) }}</strong>
                     </div>
                     <div class="col-md-4 mb-3">
                         <small class="text-muted text-uppercase d-block mb-1">Fecha</small>

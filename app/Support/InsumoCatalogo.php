@@ -15,8 +15,7 @@ class InsumoCatalogo
     public const TIPOS = [
         'material_siembra' => 'Material de Siembra',
         'fertilizantes' => 'Fertilizantes',
-        'pesticidas' => 'Pesticidas',
-        'material_riego' => 'Material de Riego',
+        'pesticidas' => 'Control de plagas',
     ];
 
     /** Nombres de unidad (clave para buscar en BD) por tipo */
@@ -24,7 +23,6 @@ class InsumoCatalogo
         'material_siembra' => ['Kilogramo', 'Gramo', 'Quintal', 'Unidad'],
         'fertilizantes' => ['Kilogramo', 'Gramo', 'Quintal', 'Litro'],
         'pesticidas' => ['Kilogramo', 'Gramo', 'Mililitro', 'Litro'],
-        'material_riego' => ['Metro', 'Unidad'],
     ];
 
     /** @var array<string, string> */
@@ -33,11 +31,10 @@ class InsumoCatalogo
         'material de siembra' => 'material_siembra',
         'fertilizante' => 'fertilizantes',
         'pesticida' => 'pesticidas',
+        'pesticidas' => 'pesticidas',
         'plaguicida' => 'pesticidas',
-        'material de riego' => 'material_riego',
-        'riego' => 'material_riego',
-        'herramienta' => 'material_riego',
-        'equipo' => 'material_riego',
+        'control de plagas' => 'pesticidas',
+        'bioinsumo' => 'pesticidas',
     ];
 
     public static function slugFromNombreTipo(?string $nombre): ?string
@@ -63,9 +60,11 @@ class InsumoCatalogo
 
     public static function asegurarCatalogosBase(): void
     {
-        foreach (self::TIPOS as $nombre) {
-            TipoInsumo::updateOrCreate(['nombre' => $nombre], ['nombre' => $nombre]);
+        foreach (self::TIPOS as $label) {
+            TipoInsumo::updateOrCreate(['nombre' => $label], ['nombre' => $label]);
         }
+
+        self::normalizarTiposObsoletos();
 
         $unidades = [
             ['nombre' => 'Kilogramo', 'abreviatura' => 'kg', 'categoria' => 'peso'],
@@ -131,6 +130,43 @@ class InsumoCatalogo
         }
 
         return $out;
+    }
+
+    /** Abreviaturas válidas para el campo dosis_unidad según tipo de insumo. */
+    public static function abreviaturasDosisValidasPorTipo(string $slug): array
+    {
+        return collect(self::unidadesPorTipoParaJs()[$slug] ?? [])
+            ->pluck('abreviatura')
+            ->filter(fn ($a) => $a !== null && trim((string) $a) !== '')
+            ->map(fn ($a) => mb_strtolower(trim((string) $a)))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public static function normalizarDosisUnidad(?string $unidad, ?string $slug = null): ?string
+    {
+        if ($unidad === null || trim($unidad) === '') {
+            return null;
+        }
+
+        $u = mb_strtolower(trim($unidad));
+
+        if ($slug === 'material_siembra' && in_array($u, ['unidad', 'planta', 'plantas', 'semilla', 'semillas', 'und'], true)) {
+            return 'und';
+        }
+
+        return $u;
+    }
+
+    public static function dosisUnidadEsValida(?string $unidad, string $slug): bool
+    {
+        $normalizada = self::normalizarDosisUnidad($unidad, $slug);
+        if ($normalizada === null) {
+            return true;
+        }
+
+        return in_array($normalizada, self::abreviaturasDosisValidasPorTipo($slug), true);
     }
 
     public static function stockCritico(float $stock): bool
@@ -218,5 +254,184 @@ class InsumoCatalogo
         }
 
         return \App\Models\Insumo::query()->whereIn('insumoid', $invalidIds)->delete();
+    }
+
+    /**
+     * Reasigna insumos con tipos legacy al catálogo oficial y asegura fertilizantes / pesticidas de campo.
+     */
+    public static function asegurarInsumosCampo(): void
+    {
+        self::asegurarCatalogosBase();
+        self::purgarInsumosConTipoInvalido();
+        self::reasignarTiposLegacyEnInsumos();
+
+        $tiposPorSlug = self::tiposOrdenados()
+            ->mapWithKeys(fn (\App\Models\TipoInsumo $t) => [
+                (string) self::slugFromNombreTipo($t->nombre) => (int) $t->tipoinsumoid,
+            ]);
+
+        $almacenId = \App\Support\AlmacenAmbito::scope(
+            \App\Models\Almacen::query()->where('activo', true),
+            \App\Support\AlmacenAmbito::AGRICOLA
+        )->orderBy('almacenid')->value('almacenid');
+
+        $kgId = \App\Models\UnidadMedida::query()->whereRaw('LOWER(nombre) LIKE ?', ['%kilogramo%'])->value('unidadmedidaid')
+            ?? \App\Models\UnidadMedida::query()->value('unidadmedidaid');
+        $gId = \App\Models\UnidadMedida::query()->whereRaw('LOWER(nombre) LIKE ?', ['%gramo%'])->value('unidadmedidaid')
+            ?? $kgId;
+        $lId = \App\Models\UnidadMedida::query()->whereRaw('LOWER(nombre) LIKE ?', ['%litro%'])->value('unidadmedidaid')
+            ?? $kgId;
+
+        $catalogo = [
+            ['nombre' => 'Fertilizante NPK 15-15-15', 'slug' => 'fertilizantes', 'um' => $kgId, 'stock' => 280.0],
+            ['nombre' => 'Urea granulada 46%', 'slug' => 'fertilizantes', 'um' => $kgId, 'stock' => 195.0],
+            ['nombre' => 'Abono orgánico compost', 'slug' => 'fertilizantes', 'um' => $kgId, 'stock' => 150.0],
+            ['nombre' => 'Fungicida cobre hidróxido', 'slug' => 'pesticidas', 'um' => $gId, 'stock' => 126.0],
+            ['nombre' => 'Insecticida piretroides', 'slug' => 'pesticidas', 'um' => $lId, 'stock' => 48.0],
+            ['nombre' => 'Herbicida glifosato', 'slug' => 'pesticidas', 'um' => $lId, 'stock' => 72.0],
+        ];
+
+        foreach ($catalogo as $def) {
+            $tipoId = $tiposPorSlug->get($def['slug']);
+            if (! $tipoId || ! $def['um']) {
+                continue;
+            }
+
+            $match = ['nombre' => $def['nombre']];
+            if ($almacenId) {
+                $match['almacenid'] = $almacenId;
+            }
+
+            $insumo = \App\Models\Insumo::query()->firstOrNew($match);
+            if (! $insumo->exists) {
+                $insumo->stock = $def['stock'];
+                $insumo->stockminimo = self::UMBRAL_ALERTA_STOCK;
+            } elseif ((float) $insumo->stock <= 0) {
+                $insumo->stock = $def['stock'];
+            }
+
+            $insumo->tipoinsumoid = $tipoId;
+            $insumo->unidadmedidaid = (int) $def['um'];
+            if ($almacenId) {
+                $insumo->almacenid = (int) $almacenId;
+            }
+            if (! InsumoImagenCatalogo::esImagenPersonalizada((string) ($insumo->imagenurl ?? ''))) {
+                $insumo->imagenurl = InsumoImagenCatalogo::urlPorNombreYTipo($def['nombre'], $def['slug']);
+            }
+            $insumo->save();
+        }
+
+        self::rellenarImagenesInsumosOperativos();
+    }
+
+    /** Fusiona tipos legacy y elimina categorías retiradas del catálogo. */
+    private static function normalizarTiposObsoletos(): void
+    {
+        $oficialPlagas = TipoInsumo::query()->where('nombre', 'Control de plagas')->first();
+        if ($oficialPlagas === null) {
+            $oficialPlagas = TipoInsumo::query()->whereIn('nombre', ['Pesticidas', 'Pesticida'])->first();
+            if ($oficialPlagas) {
+                $oficialPlagas->update(['nombre' => 'Control de plagas']);
+            }
+        }
+
+        if ($oficialPlagas) {
+            $legacyPlagas = TipoInsumo::query()
+                ->whereIn('nombre', ['Pesticidas', 'Pesticida'])
+                ->where('tipoinsumoid', '!=', $oficialPlagas->tipoinsumoid)
+                ->get();
+
+            foreach ($legacyPlagas as $legacy) {
+                \App\Models\Insumo::query()
+                    ->where('tipoinsumoid', $legacy->tipoinsumoid)
+                    ->update(['tipoinsumoid' => $oficialPlagas->tipoinsumoid]);
+                $legacy->delete();
+            }
+        }
+
+        $tiposRiego = TipoInsumo::query()
+            ->whereIn('nombre', ['Material de Riego', 'Material de riego', 'Riego'])
+            ->get();
+
+        foreach ($tiposRiego as $tipoRiego) {
+            $insumoIds = \App\Models\Insumo::query()
+                ->where('tipoinsumoid', $tipoRiego->tipoinsumoid)
+                ->pluck('insumoid');
+
+            if ($insumoIds->isNotEmpty()) {
+                if (\Illuminate\Support\Facades\Schema::hasTable('loteinsumo')) {
+                    \App\Models\LoteInsumo::query()->whereIn('insumoid', $insumoIds)->delete();
+                }
+                if (\Illuminate\Support\Facades\Schema::hasTable('almacen_movimiento')) {
+                    \Illuminate\Support\Facades\DB::table('almacen_movimiento')
+                        ->whereIn('insumoid', $insumoIds)
+                        ->delete();
+                }
+                \App\Models\Insumo::query()->whereIn('insumoid', $insumoIds)->delete();
+            }
+
+            $tipoRiego->delete();
+        }
+    }
+
+    /** Reasigna tipoinsumoid según el nombre del tipo legacy. */
+    public static function reasignarTiposLegacyEnInsumos(): void
+    {
+        $oficial = self::tiposOrdenados()->keyBy(fn (\App\Models\TipoInsumo $t) => (string) self::slugFromNombreTipo($t->nombre));
+
+        \App\Models\Insumo::query()->with('tipo')->chunkById(100, function ($insumos) use ($oficial) {
+            foreach ($insumos as $insumo) {
+                $slug = self::slugFromNombreTipo($insumo->tipo?->nombre);
+                if ($slug === null) {
+                    $slug = self::inferirSlugDesdeNombreInsumo($insumo->nombre);
+                }
+                if ($slug === null) {
+                    continue;
+                }
+
+                $tipoOficial = $oficial->get($slug);
+                if ($tipoOficial && (int) $insumo->tipoinsumoid !== (int) $tipoOficial->tipoinsumoid) {
+                    $insumo->tipoinsumoid = (int) $tipoOficial->tipoinsumoid;
+                    $insumo->save();
+                }
+            }
+        });
+    }
+
+    private static function inferirSlugDesdeNombreInsumo(string $nombre): ?string
+    {
+        $n = mb_strtolower($nombre);
+        if (str_contains($n, 'fertiliz') || str_contains($n, 'npk') || str_contains($n, 'urea') || str_contains($n, 'abono') || str_contains($n, 'compost')) {
+            return 'fertilizantes';
+        }
+        if (str_contains($n, 'fungicida') || str_contains($n, 'insecticida') || str_contains($n, 'herbicida')
+            || str_contains($n, 'plaguicida') || str_contains($n, 'fitosanit')) {
+            return 'pesticidas';
+        }
+
+        return null;
+    }
+
+    public static function rellenarImagenesInsumosOperativos(): void
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('insumo', 'imagenurl')) {
+            return;
+        }
+
+        $query = self::aplicarFiltroOperativo(\App\Models\Insumo::query()->with('tipo'));
+        $query->chunkById(100, function ($insumos) {
+            foreach ($insumos as $insumo) {
+                $slug = self::slugFromNombreTipo($insumo->tipo?->nombre);
+                $actual = (string) ($insumo->imagenurl ?? '');
+                if (InsumoImagenCatalogo::esImagenPersonalizada($actual)) {
+                    continue;
+                }
+                $canonica = InsumoImagenCatalogo::urlPorNombreYTipo((string) $insumo->nombre, $slug);
+                if ($actual !== $canonica || InsumoImagenCatalogo::esUrlPlaceholder($actual)) {
+                    $insumo->imagenurl = $canonica;
+                    $insumo->save();
+                }
+            }
+        });
     }
 }

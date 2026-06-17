@@ -242,6 +242,63 @@ class DistribucionRutaService
         return $texto !== '' ? $texto : 'Parada';
     }
 
+    /** Corrige rutas «en ruta» cuyos pedidos ya terminaron (recibidos, rechazados o cancelados). */
+    public function sincronizarEstadosRutasActivas(): int
+    {
+        $actualizadas = 0;
+
+        RutaDistribucion::query()
+            ->where('estado', RutaDistribucionCatalogo::ESTADO_EN_RUTA)
+            ->with('pedidos')
+            ->orderBy('rutadistribucionid')
+            ->each(function (RutaDistribucion $ruta) use (&$actualizadas) {
+                if ($this->sincronizarEstadoRuta($ruta)) {
+                    $actualizadas++;
+                }
+            });
+
+        return $actualizadas;
+    }
+
+    public function sincronizarEstadoRuta(RutaDistribucion $ruta): bool
+    {
+        if ($ruta->estado !== RutaDistribucionCatalogo::ESTADO_EN_RUTA) {
+            return false;
+        }
+
+        $ruta->loadMissing('pedidos');
+        $pedidos = $ruta->pedidos;
+
+        if ($pedidos->isEmpty()) {
+            $ruta->update(['estado' => RutaDistribucionCatalogo::ESTADO_COMPLETADA]);
+
+            return true;
+        }
+
+        $terminales = [
+            PedidoDistribucionCatalogo::ESTADO_RECIBIDO,
+            PedidoDistribucionCatalogo::ESTADO_RECHAZADO,
+            PedidoDistribucionCatalogo::ESTADO_CANCELADO,
+        ];
+
+        $todosTerminales = $pedidos->every(
+            fn (PedidoDistribucion $pedido) => in_array($pedido->estado, $terminales, true)
+        );
+
+        if (! $todosTerminales) {
+            return false;
+        }
+
+        DB::transaction(function () use ($ruta) {
+            $ruta->update(['estado' => RutaDistribucionCatalogo::ESTADO_COMPLETADA]);
+            $ruta->paradas()
+                ->where('tipo', RutaDistribucionCatalogo::PARADA_ENTREGA_PDV)
+                ->update(['estado' => 'completada']);
+        });
+
+        return true;
+    }
+
     public function asegurarTransportistaPlanta(int $transportistaId): void
     {
         $usuario = \App\Models\Usuario::query()

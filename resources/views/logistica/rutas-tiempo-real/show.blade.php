@@ -6,23 +6,28 @@
 @push('styles')
 @include('logistica.partials.mapa-ruta-styles')
 <style>
-#mapaSimulacionVivo{height:480px;width:100%;min-height:420px;border-radius:12px;border:1px solid #dee2e6}
+#mapaSimulacionVivo{height:480px;width:100%;min-height:420px;border-radius:12px;border:1px solid #dee2e6;z-index:1}
 .sim-live-panel{border:0;border-radius:14px;box-shadow:0 4px 18px rgba(18,38,63,.08)}
-.leaflet-div-icon.sim-camion-marker,
 .leaflet-div-icon.ruta-parada-marker{
     width:auto!important;height:auto!important;margin:0!important;padding:0!important;
     background:transparent!important;border:none!important;
 }
-.sim-camion-icono{
-    width:34px;height:34px;border-radius:50%;
-    background:linear-gradient(135deg,#f59e0b,#d97706);
-    border:3px solid #fff;
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-size:15px;
-    box-shadow:0 2px 8px rgba(0,0,0,.4);
-    pointer-events:none;
+.leaflet-marker-icon.sim-camion-marker{
+    width:36px!important;height:36px!important;
+    margin-left:-18px!important;margin-top:-18px!important;
+    background:transparent!important;border:none!important;
 }
-.leaflet-marker-icon.sim-camion-marker{z-index:2000!important}
+.sim-camion-pin{
+    width:36px;height:36px;border-radius:50%;
+    background:#ea580c;border:2px solid #fff;color:#fff;
+    display:flex!important;align-items:center;justify-content:center;
+    line-height:1;
+    box-shadow:0 3px 12px rgba(0,0,0,.45);
+    pointer-events:auto;
+}
+.leaflet-marker-icon.sim-camion-marker{z-index:20000!important}
+.sim-ruta-pendiente{stroke:#1e40af!important;stroke-opacity:1!important}
+.sim-ruta-recorrida{stroke:#ea580c!important;stroke-opacity:1!important}
 </style>
 @endpush
 
@@ -50,6 +55,8 @@
                      data-sim-tipo="{{ $tipo }}"
                      data-sim-id="{{ $id }}"
                      data-sim-estado-id="sim-estado-inicial-{{ $tipo }}-{{ $id }}"
+                     data-sim-inicio-unix="{{ $estado['inicio_at_unix'] ?? '' }}"
+                     data-sim-duracion="{{ $estado['duracion_seg'] ?? 60 }}"
                      data-sim-volver-url="{{ route('logistica.rutas-tiempo-real.index') }}">
                     <div class="row">
                         <div class="col-lg-8 mb-3 mb-lg-0">
@@ -80,7 +87,11 @@
                                         @elseif(($estado['progreso'] ?? 0) >= 100 || ($estado['segundos_restantes'] ?? 1) <= 0)
                                             Finalizando recepción en planta…
                                         @elseif(($estado['segundos_restantes'] ?? 0) > 0)
-                                            Llegada estimada en ~{{ (int) ceil($estado['segundos_restantes'] / 60) }} min
+                                            @if(($estado['segundos_restantes'] ?? 0) < 60)
+                                                Llegada estimada en ~{{ (int) ceil($estado['segundos_restantes']) }} s
+                                            @else
+                                                Llegada estimada en ~{{ (int) ceil($estado['segundos_restantes'] / 60) }} min
+                                            @endif
                                         @else
                                             Calculando…
                                         @endif
@@ -129,5 +140,5 @@
 
 @push('scripts')
 @include('logistica.partials.mapa-ruta-libs')
-<script src="{{ asset('js/simulacion-ruta.js') }}"></script>
+<script src="{{ asset('js/simulacion-ruta.js') }}?v=7"></script>
 @endpush

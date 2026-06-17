@@ -39,6 +39,7 @@ class Usuario extends Authenticatable
         'telefono',
         'ci_nit',
         'tipo_licencia',
+        'licencias_json',
         'passwordhash',
         'role',
         'supervisor_usuarioid',
@@ -76,6 +77,7 @@ class Usuario extends Authenticatable
         'ultimologin' => 'datetime',
         'fecha_revision' => 'datetime',
         'revisado_por' => 'integer',
+        'licencias_json' => 'array',
     ];
 
     public function notificaciones()

@@ -132,6 +132,40 @@
     }
     .fase-step.fase-step--scroll { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
     .fase-step.fase-step--scroll:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(44,85,48,.2); }
+    .lp-ruta-paso { transition: opacity .2s ease, filter .2s ease; }
+    .lp-ruta-paso.is-bloqueado {
+        opacity: .42;
+        filter: grayscale(.25);
+    }
+    .lp-ruta-paso.is-actual { box-shadow: 0 0 0 2px rgba(245,158,11,.35); }
+    .lp-ruta-paso.is-en-curso { box-shadow: 0 0 0 2px rgba(59,130,246,.35); }
+    .lp-ruta-paso__lock { font-size: .68rem; display: block; margin-top: 2px; }
+    .lp-asignaciones-pendientes { margin-top: 1rem; }
+    .lp-asignaciones-pendientes__titulo {
+        font-size: .78rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .04em; color: #92400e; margin-bottom: .65rem;
+    }
+    .lp-paso--pendiente {
+        border-color: #fbbf24;
+        background: linear-gradient(135deg, #fffbeb 0%, #fff 100%);
+        align-items: center;
+        gap: .75rem;
+    }
+    .lp-paso--pendiente .lp-timeline-num {
+        background: #f59e0b;
+        flex-shrink: 0;
+    }
+    .lp-paso--pendiente__accion { flex-shrink: 0; }
+    .lp-paso--pendiente .lp-paso-meta {
+        font-size: .8rem; color: #64748b; line-height: 1.45;
+    }
+    .lp-paso--pendiente .lp-paso-meta strong { color: #1e293b; }
+    .lp-paso--entrada { animation: lpPasoEntrada .4s ease; }
+    @keyframes lpPasoEntrada {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .lp-ajax-loading { opacity: .65; pointer-events: none; }
     </style>
 @endpush
 
@@ -156,7 +190,10 @@
 
     restaurarScroll();
     document.addEventListener('DOMContentLoaded', restaurarScroll);
-    window.addEventListener('load', restaurarScroll);
+    window.addEventListener('load', function () {
+        restaurarScroll();
+        setTimeout(restaurarScroll, 120);
+    });
 })();
 </script>
 <div class="trz-dash">
@@ -307,6 +344,7 @@
             </div>
         </div>
         <div class="card-body">
+            <div id="lp-ajax-flash" class="d-none"></div>
             @if($panelActivo === 'transformacion')
             <p class="small text-muted mb-3">
                 @if(!empty($rutaPlantilla))
@@ -327,17 +365,33 @@
                         <a href="{{ route('plantillas-transformacion.show', $lote->plantillaTransformacion) }}" class="ml-2 font-weight-normal">Ver detalle</a>
                     @endif
                 </div>
-                <div class="d-flex flex-wrap" style="gap:6px;">
+                <div class="d-flex flex-wrap" id="lp-ruta-plantilla-pasos" style="gap:6px;">
                     @foreach($rutaPlantilla as $paso)
-                    <span class="badge px-2 py-1 {{ $paso['estado'] === 'hecho' ? 'badge-success' : ($paso['estado'] === 'actual' ? 'badge-warning' : 'badge-light border text-muted') }}">
+                    @php
+                        $clasePaso = match ($paso['estado']) {
+                            'hecho' => 'badge-success',
+                            'actual' => 'badge-warning text-dark',
+                            'en_curso' => 'badge-info',
+                            default => 'badge-light border text-muted lp-ruta-paso is-bloqueado',
+                        };
+                        if (in_array($paso['estado'], ['actual', 'en_curso'], true)) {
+                            $clasePaso .= ' lp-ruta-paso is-'.str_replace('_', '-', $paso['estado'] === 'en_curso' ? 'en-curso' : 'actual');
+                        }
+                    @endphp
+                    <span class="badge px-2 py-1 {{ $clasePaso }}" title="{{ $paso['estado'] === 'bloqueado' ? 'Complete la etapa anterior para habilitar este paso' : '' }}">
                         {{ $paso['orden'] }}. {{ $paso['proceso'] }}
                         @if($paso['estado'] === 'hecho')<i class="fas fa-check ml-1"></i>@endif
+                        @if($paso['estado'] === 'en_curso')<i class="fas fa-hourglass-half ml-1"></i>@endif
+                        @if($paso['estado'] === 'bloqueado')
+                            <span class="lp-ruta-paso__lock"><i class="fas fa-lock mr-1"></i>Complete etapa {{ max(1, $paso['orden'] - 1) }}</span>
+                        @endif
                     </span>
                     @endforeach
                 </div>
             </div>
             @endif
 
+            <div id="lp-lista-etapas-completadas">
             @forelse($etapas_transformacion ?? [] as $etapa)
                 <div class="lp-paso done {{ !empty($etapa['es_cierre']) ? 'cierre' : '' }} d-flex align-items-start">
                     <span class="lp-timeline-num">{{ $etapa['numero'] }}</span>
@@ -362,23 +416,34 @@
                 </div>
             @empty
                 @if($panelActivo === 'transformacion')
-                <p class="text-muted small mb-3">Aún no hay etapas registradas. Ejemplo para papas fritas: Preparación de materias primas (pelar/cortar) → Tratamiento térmico (freír) → Empaquetado.</p>
+                <p class="text-muted small mb-3" id="lp-etapas-vacio">Aún no hay etapas registradas. Ejemplo para papas fritas: Preparación de materias primas (pelar/cortar) → Tratamiento térmico (freír) → Empaquetado.</p>
                 @endif
             @endforelse
+            </div>
 
             @if(!empty($asignacionesPendientesLote) && $asignacionesPendientesLote->count())
-            <div class="alert alert-warning py-2 px-3 mb-3">
-                <strong class="small d-block mb-1"><i class="fas fa-user-clock mr-1"></i>Asignaciones pendientes</strong>
-                <ul class="mb-0 pl-0 list-unstyled small">
-                    @foreach($asignacionesPendientesLote as $asig)
-                    <li class="d-flex flex-wrap justify-content-between align-items-center border-bottom py-2" style="gap:.5rem;">
-                        <span>
-                            {{ $asig->proceso?->nombre }} · {{ $asig->maquina?->nombre }}
-                            → <strong>{{ $asig->operador?->nombreCompleto() }}</strong>
-                            @if($asig->observaciones) <span class="text-muted">({{ Str::limit($asig->observaciones, 60) }})</span> @endif
-                        </span>
-                        @if(!empty($puedeAsignarEtapa))
-                        <form method="POST" action="{{ route('procesamiento.completar-etapa-asignada', [$lote, $asig]) }}" class="mb-0">
+            <div class="lp-asignaciones-pendientes" id="lp-asignaciones-pendientes">
+                <div class="lp-asignaciones-pendientes__titulo">
+                    <i class="fas fa-user-clock mr-1"></i>Asignaciones pendientes ({{ $asignacionesPendientesLote->count() }})
+                </div>
+                @foreach($asignacionesPendientesLote as $asig)
+                <div class="lp-paso lp-paso--pendiente d-flex flex-wrap" data-asignacion-id="{{ $asig->asignacionetapaplantaid }}">
+                    <span class="lp-timeline-num" aria-hidden="true"><i class="fas fa-hourglass-half" style="font-size:.7rem"></i></span>
+                    <div class="flex-grow-1 min-width-0">
+                        <strong class="d-block">{{ $asig->proceso?->nombre }}</strong>
+                        <div class="lp-paso-meta">
+                            <i class="fas fa-industry mr-1"></i>{{ $asig->maquina?->nombre }}
+                            <span class="mx-1">·</span>
+                            <i class="fas fa-user-cog mr-1"></i><strong>{{ $asig->operador?->nombreCompleto() }}</strong>
+                            @if($asig->observaciones)
+                                <br><span class="text-secondary">{{ $asig->observaciones }}</span>
+                            @endif
+                        </div>
+                    </div>
+                    @if(!empty($puedeAsignarEtapa))
+                    <div class="lp-paso--pendiente__accion">
+                        <form method="POST" action="{{ route('procesamiento.completar-etapa-asignada', [$lote, $asig]) }}" class="mb-0"
+                              data-ajax-lp-action="completar-etapa">
                             @csrf
                             <button type="button" class="btn btn-success btn-sm font-weight-bold"
                                     data-confirm-modal
@@ -388,10 +453,10 @@
                                 <i class="fas fa-check mr-1"></i>Marcar completada
                             </button>
                         </form>
-                        @endif
-                    </li>
-                    @endforeach
-                </ul>
+                    </div>
+                    @endif
+                </div>
+                @endforeach
             </div>
             @endif
 
@@ -400,9 +465,9 @@
             <div class="lp-form-etapa mt-3" id="lp-form-registrar-etapa">
                 <h6 class="font-weight-bold text-success mb-3">
                     <i class="fas fa-user-plus mr-1"></i>
-                    Asignar etapa {{ count($etapas_transformacion ?? []) + count($asignacionesPendientesLote ?? []) + 1 }} a operario
+                    Asignar etapa {{ $ordenEtapaActual ?? 1 }} a operario
                 </h6>
-                <form method="POST" action="{{ route('procesamiento.asignar-etapa', $lote) }}" id="formAsignarEtapa">
+                <form method="POST" action="{{ route('procesamiento.asignar-etapa', $lote) }}" id="formAsignarEtapa" class="js-lp-guardar-scroll">
                     @csrf
                     <div class="form-row lp-etapa-asignar-row">
                         <div class="col-md-3 lp-etapa-field">
@@ -417,9 +482,11 @@
                             </div>
                             <small class="lp-etapa-hint">
                                 @if(!empty($siguientePasoPlantilla))
-                                    <span class="text-success"><i class="fas fa-magic mr-1"></i>Sugerido: {{ $siguientePasoPlantilla->proceso?->nombre }}</span>
+                                    <span class="text-success"><i class="fas fa-magic mr-1"></i>Etapa {{ $ordenEtapaActual ?? 1 }}: {{ $siguientePasoPlantilla->proceso?->nombre }}</span>
+                                @elseif(!empty($rutaPlantilla))
+                                    <span class="text-muted">Solo puede asignar la etapa actual del proceso.</span>
                                 @else
-                                    Puede repetir el mismo proceso las veces que necesite.
+                                    Registre las etapas en orden secuencial.
                                 @endif
                             </small>
                         </div>
@@ -490,6 +557,10 @@
                     </div>
                 </form>
             </div>
+            @elseif(!empty($puedeAsignarEtapa) && empty($puedeAsignarNuevaEtapa) && !empty($mensajeBloqueoAsignacion))
+            <div class="alert alert-light border mt-3 mb-0 small text-muted" id="lp-bloqueo-asignacion">
+                <i class="fas fa-lock mr-1"></i>{{ $mensajeBloqueoAsignacion }}
+            </div>
             @elseif(\App\Support\UsuarioRol::esOperarioPlanta(auth()->user()))
             <div class="alert alert-info py-2 px-3 mt-3 mb-0 small">
                 <i class="fas fa-info-circle mr-1"></i>
@@ -535,9 +606,13 @@
                         </select>
                         <small class="text-muted d-block mt-1">No conforme cierra el lote sin almacenar.</small>
                     </div>
-                    <div class="col-md-8 form-group mb-md-0">
-                        <label class="small font-weight-bold">Observaciones</label>
-                        <input type="text" name="observaciones" class="form-control form-control-sm" maxlength="500" placeholder="Opcional">
+                    <div class="col-md-4 form-group">
+                        <label class="small font-weight-bold">Motivo / observaciones</label>
+                        <input type="text" name="observaciones" class="form-control form-control-sm" maxlength="500" placeholder="Obligatorio si es no conforme">
+                    </div>
+                    <div class="col-md-4 form-group mb-md-0">
+                        <label class="small font-weight-bold">Recomendaciones</label>
+                        <input type="text" name="recomendaciones" class="form-control form-control-sm" maxlength="2000" placeholder="Sugerencias para mejorar (no conforme)">
                     </div>
                 </div>
                 <button type="submit" class="btn btn-sm mt-2 font-weight-bold" style="background:#7c3aed;color:#fff">
@@ -609,6 +684,7 @@
                 @endpush
                 @include('partials.almacen-envio-selector', [
                     'almacenes' => $almacenesPlanta ?? collect(),
+                    'resumenesCapacidad' => $resumenesCapacidadPlanta ?? [],
                     'sectionId' => 'almacenSectionLote',
                     'hiddenInputId' => 'almacenidLote',
                     'guiaTexto' => 'Toda la producción terminada del lote debe ingresar al inventario del almacén elegido. El sistema valida la capacidad disponible y puede sugerir un almacén según el producto.',
@@ -985,14 +1061,162 @@
         irASeccionFase('transformacion');
     }
 
-    const formAsignarEtapa = document.getElementById('formAsignarEtapa');
-    if (formAsignarEtapa) {
-        formAsignarEtapa.addEventListener('submit', function () {
-            try {
-                sessionStorage.setItem('lp_procesamiento_scroll', String(window.scrollY));
-            } catch (err) {}
+    const scrollKey = 'lp_procesamiento_scroll';
+
+    function guardarScrollProcesamiento() {
+        try {
+            sessionStorage.setItem(scrollKey, String(window.scrollY));
+        } catch (err) {}
+    }
+
+    document.querySelectorAll('.js-lp-guardar-scroll').forEach(function (form) {
+        form.addEventListener('submit', guardarScrollProcesamiento);
+    });
+
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-confirm-modal]');
+        if (!btn || !btn.closest('.js-lp-guardar-scroll')) return;
+        guardarScrollProcesamiento();
+    }, true);
+})();
+</script>
+<script>
+(function () {
+    function escHtml(text) {
+        const d = document.createElement('div');
+        d.textContent = text == null ? '' : String(text);
+        return d.innerHTML;
+    }
+
+    function mostrarFlashAjax(mensaje, tipo) {
+        const cont = document.getElementById('lp-ajax-flash');
+        if (!cont) return;
+        const icon = tipo === 'error' ? 'fa-ban' : 'fa-check';
+        const clase = tipo === 'error' ? 'ag-flash--error' : 'ag-flash--success';
+        cont.className = '';
+        cont.innerHTML =
+            '<div class="ag-flash ' + clase + ' mb-3" role="status">' +
+                '<span class="ag-flash__icon"><i class="fas ' + icon + '"></i></span>' +
+                '<span class="ag-flash__text">' + escHtml(mensaje) + '</span>' +
+                '<button type="button" class="ag-flash__close" aria-label="Cerrar"><i class="fas fa-times"></i></button>' +
+            '</div>';
+        cont.classList.remove('d-none');
+        cont.querySelector('.ag-flash__close')?.addEventListener('click', function () {
+            cont.classList.add('d-none');
+            cont.innerHTML = '';
         });
     }
+
+    function htmlEtapaCompletada(etapa) {
+        if (!etapa) return '';
+        const cierre = etapa.es_cierre ? '<span class="badge badge-info ml-1">Cierre</span>' : '';
+        const obs = etapa.observaciones
+            ? '<br><small class="text-secondary">' + escHtml(etapa.observaciones) + '</small>' : '';
+        const operador = etapa.operador ? ' · ' + escHtml(etapa.operador) : '';
+
+        return '<div class="lp-paso done lp-paso--entrada d-flex align-items-start">' +
+            '<span class="lp-timeline-num">' + escHtml(etapa.numero) + '</span>' +
+            '<div class="flex-grow-1"><strong>' + escHtml(etapa.proceso) + '</strong>' + cierre + '<br>' +
+            '<small class="text-muted"><i class="fas fa-industry mr-1"></i>' + escHtml(etapa.maquina) +
+            ' · <i class="far fa-clock mr-1"></i>' + escHtml(etapa.inicio_fmt) + ' → ' + escHtml(etapa.fin_fmt) +
+            operador + '</small>' + obs + '</div>' +
+            '<span class="badge badge-success"><i class="fas fa-check"></i></span></div>';
+    }
+
+    function claseRutaPaso(estado) {
+        if (estado === 'hecho') return 'badge px-2 py-1 badge-success';
+        if (estado === 'actual') return 'badge px-2 py-1 badge-warning text-dark lp-ruta-paso is-actual';
+        if (estado === 'en_curso') return 'badge px-2 py-1 badge-info lp-ruta-paso is-en-curso';
+        return 'badge px-2 py-1 badge-light border text-muted lp-ruta-paso is-bloqueado';
+    }
+
+    function htmlRutaPaso(paso) {
+        let extra = '';
+        if (paso.estado === 'hecho') extra = '<i class="fas fa-check ml-1"></i>';
+        else if (paso.estado === 'en_curso') extra = '<i class="fas fa-hourglass-half ml-1"></i>';
+        else if (paso.estado === 'bloqueado') {
+            extra = '<span class="lp-ruta-paso__lock"><i class="fas fa-lock mr-1"></i>Complete etapa ' + Math.max(1, paso.orden - 1) + '</span>';
+        }
+        const title = paso.estado === 'bloqueado' ? ' title="Complete la etapa anterior para habilitar este paso"' : '';
+        return '<span class="' + claseRutaPaso(paso.estado) + '"' + title + '>' +
+            escHtml(paso.orden) + '. ' + escHtml(paso.proceso) + extra + '</span>';
+    }
+
+    window.LpProcesamientoAjax = {
+        completarEtapa: function (form) {
+            const card = form.closest('[data-asignacion-id]');
+            const btn = form.querySelector('button');
+            if (btn) btn.classList.add('lp-ajax-loading');
+
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            })
+                .then(function (r) {
+                    return r.text().then(function (text) {
+                        let data = null;
+                        try {
+                            data = text ? JSON.parse(text) : null;
+                        } catch (parseErr) {
+                            throw {
+                                message: r.ok
+                                    ? 'Respuesta inválida del servidor.'
+                                    : 'Error del servidor (' + r.status + '). Recargue la página e intente de nuevo.',
+                            };
+                        }
+                        if (!r.ok || !data || data.ok === false) {
+                            throw { message: (data && data.message) || 'No se pudo completar la etapa.' };
+                        }
+                        return data;
+                    });
+                })
+                .then(function (data) {
+                    if (btn) btn.classList.remove('lp-ajax-loading');
+                    if (card) {
+                        card.style.transition = 'opacity .3s ease';
+                        card.style.opacity = '0';
+                        setTimeout(function () { card.remove(); }, 300);
+                    }
+                    const lista = document.getElementById('lp-lista-etapas-completadas');
+                    const vacio = document.getElementById('lp-etapas-vacio');
+                    if (vacio) vacio.remove();
+                    if (lista && data.etapa) lista.insertAdjacentHTML('beforeend', htmlEtapaCompletada(data.etapa));
+
+                    const ruta = document.getElementById('lp-ruta-plantilla-pasos');
+                    if (ruta && Array.isArray(data.ruta_plantilla)) {
+                        ruta.innerHTML = data.ruta_plantilla.map(htmlRutaPaso).join('');
+                    }
+
+                    const bloqueo = document.getElementById('lp-bloqueo-asignacion');
+                    if (bloqueo) {
+                        if (data.mensaje_bloqueo) {
+                            bloqueo.classList.remove('d-none');
+                            bloqueo.innerHTML = '<i class="fas fa-lock mr-1"></i>' + escHtml(data.mensaje_bloqueo);
+                        } else {
+                            bloqueo.classList.add('d-none');
+                        }
+                    }
+
+                    const seccion = document.getElementById('lp-asignaciones-pendientes');
+                    if (seccion && (data.asignaciones_pendientes_count || 0) <= 0) {
+                        seccion.style.transition = 'opacity .35s ease';
+                        seccion.style.opacity = '0';
+                        setTimeout(function () { seccion.remove(); }, 350);
+                    }
+
+                    mostrarFlashAjax(data.message, 'success');
+                })
+                .catch(function (err) {
+                    if (btn) btn.classList.remove('lp-ajax-loading');
+                    mostrarFlashAjax((err && err.message) || 'No se pudo completar la etapa.', 'error');
+                });
+        },
+    };
 })();
 </script>
 @endpush

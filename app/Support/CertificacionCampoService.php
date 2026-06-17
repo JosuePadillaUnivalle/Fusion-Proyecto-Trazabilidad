@@ -51,7 +51,7 @@ final class CertificacionCampoService
         }
 
         if (! $this->estaCertificado($lote)) {
-            return 'Debe certificar el lote en Certificaciones antes de enviar la cosecha al almacén.';
+            return 'El lote aún no está certificado. Certifíquelo en Certificaciones antes de enviar la cosecha al almacén.';
         }
 
         return null;

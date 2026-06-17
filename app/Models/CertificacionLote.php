@@ -28,6 +28,7 @@ class CertificacionLote extends Model
         'resultado',
         'observaciones',
         'fecha_certificacion',
+        'recomendaciones',
     ];
 
     protected $casts = [

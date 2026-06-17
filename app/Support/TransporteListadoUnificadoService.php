@@ -69,6 +69,13 @@ final class TransporteListadoUnificadoService
                 ->orderBy('apellido')
                 ->get();
 
+        $transportistaFiltroNombre = '';
+        if ($filtroTransportista > 0) {
+            $tSel = $transportistas->firstWhere('usuarioid', $filtroTransportista)
+                ?? Usuario::query()->find($filtroTransportista);
+            $transportistaFiltroNombre = trim(($tSel?->nombre ?? '').' '.($tSel?->apellido ?? ''));
+        }
+
         $resumenEnvios = (! $esTransportista && $user?->can('asignaciones.create'))
             ? self::resumenUnificado()
             : null;
@@ -77,6 +84,7 @@ final class TransporteListadoUnificadoService
             'items' => $paginator,
             'transportistas' => $transportistas,
             'filtroTransportista' => $filtroTransportista,
+            'transportistaFiltroNombre' => $transportistaFiltroNombre,
             'esTransportista' => $esTransportista,
             'estadosPedido' => PedidoCatalogo::opcionesEstadoEnSelector(),
             'estadosLogistica' => EnvioAsignacionEstadoCatalogo::opcionesFiltro(),
@@ -138,10 +146,6 @@ final class TransporteListadoUnificadoService
             } elseif ($filtro !== '') {
                 $query->whereRaw('1 = 0');
             }
-        }
-
-        if ($request->boolean('sin_asignar')) {
-            $query->whereRaw('1 = 0');
         }
 
         if ($request->filled('estado')) {

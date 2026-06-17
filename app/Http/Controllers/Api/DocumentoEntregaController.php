@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DocumentoEntrega;
+use App\Support\DocumentoEntregaCatalogo;
 use App\Support\DocumentoEntregaTransportista;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class DocumentoEntregaController extends Controller
     {
         $q = DocumentoEntrega::query()
             ->with(['usuario', 'pedido'])
+            ->tap(fn ($query) => DocumentoEntregaCatalogo::aplicarFiltroOperativo($query))
             ->orderByDesc('created_at');
 
         $user = auth()->user();

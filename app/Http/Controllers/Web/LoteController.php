@@ -9,9 +9,16 @@ use App\Models\Cultivo;
 use App\Models\Insumo;
 use App\Models\EstadoLoteTipo;
 use App\Models\Produccion;
+use App\Models\Almacen;
+use App\Models\HistorialEstadoLote;
+use App\Models\ProduccionAlmacenamiento;
+use App\Support\AlmacenAmbito;
+use App\Support\CertificacionCampoService;
+use App\Services\AlmacenCapacidadService;
 use App\Support\CultivoSiembraCatalogo;
 use App\Support\EstadoLoteCatalogo;
 use App\Support\InsumoCatalogo;
+use App\Support\LoteCultivoResolver;
 use App\Support\LoteDefaults;
 use App\Support\SuperficieFormato;
 use App\Support\UbicacionGpsParser;
@@ -34,6 +41,8 @@ class LoteController extends Controller
         private LoteTrazabilidadService $trazabilidadService,
         private LoteEstadoPorActividad $loteEstadoPorActividad,
         private NotificacionUsuarioService $notificaciones,
+        private AlmacenCapacidadService $capacidadService,
+        private CertificacionCampoService $certificacionCampo,
     ) {}
 
     public function index(Request $request)
@@ -109,9 +118,6 @@ class LoteController extends Controller
             'cosechados' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['cosechado']))->count(),
             'hectareas' => (float) (Lote::sum('superficie') ?? 0),
             'en_mapa' => Lote::whereNotNull('latitud')->whereNotNull('longitud')->count(),
-            'sin_coordenadas' => Lote::where(function ($q) {
-                $q->whereNull('latitud')->orWhereNull('longitud');
-            })->count(),
         ];
 
         // Lotes con coordenadas para el mapa
@@ -136,16 +142,9 @@ class LoteController extends Controller
                     'cultivoid' => $lote->cultivoid,
                     'insumosemillaid' => $lote->insumosemillaid,
                     'estadoid' => $lote->estadolotetipoid,
+                    'codigo_trazabilidad' => $lote->codigo_trazabilidad,
                 ];
             });
-
-        // Lotes sin coordenadas (para alertas)
-        $lotesSinCoordenadas = Lote::with(['usuario'])
-            ->where(function ($q) {
-                $q->whereNull('latitud')->orWhereNull('longitud');
-            })
-            ->limit(5)
-            ->get();
 
         // Top lotes por producción
         $topLotes = Lote::with(['usuario', 'cultivo'])
@@ -159,31 +158,12 @@ class LoteController extends Controller
             ->limit(5)
             ->get();
 
-        // Alertas climáticas (placeholder - se puede conectar con la tabla Clima)
-        $alertasClimaticas = collect([]);
-
-        // Lotes que podrían necesitar insumos (en producción sin actividad reciente)
-        $lotesStockBajo = Lote::with(['usuario'])
-            ->whereHas('estadoTipo', fn($q) => $q->whereIn('nombre', ['sembrado', 'en producción']))
-            ->whereNotNull('latitud')
-            ->whereNotNull('longitud')
-            ->limit(3)
-            ->get();
-
-        // Datos para filtros
-        $usuarios = Usuario::orderBy('nombre')->get();
-        $cultivos = Cultivo::orderBy('nombre')->get();
         $estados = EstadoLoteCatalogo::paraSelect();
 
         return view('lotes.mapa', compact(
             'stats',
             'lotesConCoordenadas',
-            'lotesSinCoordenadas',
             'topLotes',
-            'alertasClimaticas',
-            'lotesStockBajo',
-            'usuarios',
-            'cultivos',
             'estados'
         ));
     }
@@ -207,8 +187,21 @@ class LoteController extends Controller
 
         $insumoSemillaId = old('insumosemillaid', request()->query('insumosemillaid'));
         $insumoSemillaLabel = null;
+        $dosisInicial = null;
+        $semillaStockInicial = null;
         if ($insumoSemillaId) {
-            $insumoSemillaLabel = Insumo::find($insumoSemillaId)?->nombre;
+            $insumoSemilla = Insumo::query()->with(['unidadMedida', 'tipo'])->find($insumoSemillaId);
+            $insumoSemillaLabel = $insumoSemilla?->nombre;
+            $semillaStockInicial = $this->metaStockSemilla($insumoSemilla);
+            if ($insumoSemilla && (float) old('superficie', 0) > 0) {
+                $dosisInicial = CultivoSiembraCatalogo::sugerenciaParaInsumo(
+                    $insumoSemilla,
+                    (float) old('superficie')
+                );
+            } elseif ($insumoSemilla) {
+                $dosisInicial = CultivoSiembraCatalogo::sugerenciaParaInsumo($insumoSemilla, 1.0);
+                $dosisInicial['superficie_ha'] = 0;
+            }
         }
 
         return view('lotes.create', compact(
@@ -218,6 +211,8 @@ class LoteController extends Controller
             'responsableLabel',
             'insumoSemillaId',
             'insumoSemillaLabel',
+            'dosisInicial',
+            'semillaStockInicial',
             'responsableSelectorParams',
             'esJefeAgricultorDesignando'
         ));
@@ -231,6 +226,7 @@ class LoteController extends Controller
             'ubicacion' => 'nullable|string|max:200',
             'superficie' => 'required|numeric|min:0.01',
             'insumosemillaid' => 'nullable|exists:insumo,insumoid',
+            'cantidad_semilla_planificada' => 'nullable|numeric|min:0',
             'latitud' => 'nullable|numeric|between:-90,90',
             'longitud' => 'nullable|numeric|between:-180,180',
             'imagen' => 'nullable|image|max:2048',
@@ -238,7 +234,12 @@ class LoteController extends Controller
 
         $data['usuarioid'] = $this->resolverUsuarioidLote($request, $data['usuarioid'] ?? null);
         $data['insumosemillaid'] = $this->resolverInsumoSemilla($data['insumosemillaid'] ?? null);
-        $data['cultivoid'] = null;
+        $data['cultivoid'] = LoteCultivoResolver::resolver($data['insumosemillaid']);
+        $data['cantidad_semilla_planificada'] = $this->resolverCantidadSemillaPlanificada(
+            $data['insumosemillaid'],
+            (float) $data['superficie'],
+            $data['cantidad_semilla_planificada'] ?? null
+        );
 
         $data['ubicacion'] = UbicacionGpsParser::normalizarUbicacionLote(
             $data['ubicacion'] ?? null,
@@ -354,7 +355,120 @@ class LoteController extends Controller
 
     public function trazabilidad(Lote $lote, Request $request)
     {
-        return view('lotes.trazabilidad', $this->trazabilidadService->dashboardLote($lote, $request));
+        $user = $request->user();
+        $lote->loadMissing('usuario');
+        $data = $this->trazabilidadService->dashboardLote($lote, $request);
+
+        if ($data['puede_enviar_almacen'] ?? false) {
+            $data = array_merge($data, $this->trazabilidadService->datosFormularioEnvioAlmacen($lote));
+        }
+
+        $puedeDesignar = $this->puedeDesignarResponsableLote($user);
+        $responsableInicial = old('usuarioid');
+        $responsableLabel = '';
+
+        if ($responsableInicial) {
+            $u = Usuario::find($responsableInicial);
+            $responsableLabel = $u ? trim($u->nombre.' '.($u->apellido ?? '')) : '';
+        } elseif ($lote->usuarioid && $this->puedeAsignarUsuarioALote($user, (int) $lote->usuarioid)) {
+            $responsableInicial = $lote->usuarioid;
+            $responsableLabel = trim($lote->usuario->nombre.' '.($lote->usuario->apellido ?? ''));
+        } elseif (! $puedeDesignar && $user) {
+            $responsableInicial = $user->usuarioid;
+            $responsableLabel = trim($user->nombre.' '.($user->apellido ?? ''));
+        }
+
+        return view('lotes.trazabilidad', array_merge($data, [
+            'puede_designar_responsable_siembra' => $puedeDesignar,
+            'responsable_siembra_params' => $this->paramsSelectorResponsable($user),
+            'responsable_siembra_inicial' => $responsableInicial,
+            'responsable_siembra_label' => $responsableLabel,
+        ]));
+    }
+
+    public function enviarAlmacen(Request $request, Lote $lote)
+    {
+        $this->autorizarLoteAsignado($request, $lote);
+
+        if (! $this->trazabilidadService->puedeEnviarAlmacenCampo($lote)) {
+            $bloqueo = $this->certificacionCampo->mensajeBloqueoAlmacen($lote);
+
+            return redirect()
+                ->route('lotes.trazabilidad', $lote)
+                ->with('error', $bloqueo ?? 'No puede enviar este lote al almacén en este momento.');
+        }
+
+        $data = $request->validate([
+            'produccionid' => 'required|exists:produccion,produccionid',
+            'almacenid' => 'required|exists:almacen,almacenid',
+        ], [
+            'almacenid.required' => 'Seleccione un almacén agrícola de destino.',
+        ]);
+
+        $produccion = Produccion::query()
+            ->with(['almacenamientos', 'unidadMedida', 'lote.cultivo'])
+            ->where('loteid', $lote->loteid)
+            ->findOrFail((int) $data['produccionid']);
+
+        if ($produccion->almacenamientos->isNotEmpty()) {
+            return redirect()
+                ->route('lotes.trazabilidad', $lote)
+                ->with('warning', 'Esta cosecha ya fue enviada al almacén.');
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $almacen = AlmacenAmbito::scope(Almacen::query(), AlmacenAmbito::AGRICOLA)
+                ->where('almacenid', $data['almacenid'])
+                ->firstOrFail();
+
+            $cantidadBaseKg = (float) ($produccion->cantidad_base ?? $this->capacidadService->convertirAKg(
+                (float) $produccion->cantidad,
+                $produccion->unidadMedida
+            ));
+
+            $resumenAlmacen = $this->capacidadService->resumen($almacen);
+            $disponibleKg = $resumenAlmacen['disponible_kg'];
+
+            if ($cantidadBaseKg > $disponibleKg) {
+                throw ValidationException::withMessages([
+                    'almacenid' => 'La cantidad a almacenar excede la capacidad disponible. Disponible: '.
+                        round($disponibleKg, 2).' kg',
+                ]);
+            }
+
+            ProduccionAlmacenamiento::create([
+                'produccionid' => $produccion->produccionid,
+                'almacenid' => $almacen->almacenid,
+                'cantidad' => $produccion->cantidad,
+                'unidadmedidaid' => $produccion->unidadmedidaid,
+                'fechaentrada' => now(),
+                'observaciones' => "Cosecha del lote {$lote->nombre}",
+            ]);
+
+            $produccion->update(['almacendestinoid' => null]);
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return redirect()
+                ->route('lotes.trazabilidad', $lote)
+                ->with('error', $e->getMessage())
+                ->withInput();
+        }
+
+        $unidad = $produccion->unidadMedida?->abreviatura ?? 'kg';
+        $mensaje = "Cosecha almacenada en {$almacen->nombre}: {$produccion->cantidad} {$unidad}.";
+
+        return redirect()
+            ->route('lotes.trazabilidad', $lote)
+            ->with('success', $mensaje)
+            ->withFragment('historial-eventos');
     }
 
     public function ubicacion(Lote $lote)
@@ -383,6 +497,7 @@ class LoteController extends Controller
             ? trim($lote->usuario->nombre.' '.($lote->usuario->apellido ?? ''))
             : null;
         $insumoSemillaLabel = $lote->insumoSemilla?->nombre;
+        $semillaStockInicial = $this->metaStockSemilla($lote->insumoSemilla);
         $dosisInicial = null;
         if ($lote->insumoSemilla && (float) $lote->superficie > 0) {
             $dosisInicial = CultivoSiembraCatalogo::sugerenciaParaInsumo(
@@ -397,6 +512,7 @@ class LoteController extends Controller
             'responsableLabel',
             'insumoSemillaLabel',
             'dosisInicial',
+            'semillaStockInicial',
             'mostrarFechaSiembra',
             'puedeDesignarResponsable',
             'responsableSelectorParams',
@@ -421,13 +537,19 @@ class LoteController extends Controller
             'ubicacion' => 'nullable|string|max:200',
             'superficie' => 'required|numeric|min:0',
             'insumosemillaid' => 'nullable|exists:insumo,insumoid',
+            'cantidad_semilla_planificada' => 'nullable|numeric|min:0',
             'latitud' => 'nullable|numeric|between:-90,90',
             'longitud' => 'nullable|numeric|between:-180,180',
         ]);
 
         $anteriorUsuarioid = (int) $lote->usuarioid;
         $data['insumosemillaid'] = $this->resolverInsumoSemilla($data['insumosemillaid'] ?? null);
-        $data['cultivoid'] = null;
+        $data['cultivoid'] = LoteCultivoResolver::resolver($data['insumosemillaid']);
+        $data['cantidad_semilla_planificada'] = $this->resolverCantidadSemillaPlanificada(
+            $data['insumosemillaid'],
+            (float) $data['superficie'],
+            $data['cantidad_semilla_planificada'] ?? null
+        );
         $data['ubicacion'] = UbicacionGpsParser::normalizarUbicacionLote(
             $data['ubicacion'] ?? null,
             isset($data['latitud']) ? (float) $data['latitud'] : null,
@@ -609,5 +731,44 @@ class LoteController extends Controller
         }
 
         return (int) $insumo->insumoid;
+    }
+
+    private function resolverCantidadSemillaPlanificada(?int $insumoSemillaId, float $superficieHa, mixed $cantidad): ?float
+    {
+        if (! $insumoSemillaId) {
+            return null;
+        }
+
+        if ($cantidad !== null && $cantidad !== '') {
+            return round((float) $cantidad, 3);
+        }
+
+        $insumo = Insumo::query()->find($insumoSemillaId);
+        if ($insumo === null) {
+            return null;
+        }
+
+        $sugerencia = CultivoSiembraCatalogo::sugerenciaParaInsumo($insumo, $superficieHa);
+
+        return $sugerencia['tiene_dosis'] ? (float) $sugerencia['sugerido'] : null;
+    }
+
+    /**
+     * @return array{stock: float, unidad: string, sin_stock: bool}|null
+     */
+    private function metaStockSemilla(?Insumo $insumo): ?array
+    {
+        if ($insumo === null) {
+            return null;
+        }
+
+        $insumo->loadMissing('unidadMedida', 'tipo');
+        $stock = (float) ($insumo->stock ?? 0);
+
+        return [
+            'stock' => $stock,
+            'unidad' => $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? 'ud',
+            'sin_stock' => $stock <= 0,
+        ];
     }
 }

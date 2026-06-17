@@ -1,17 +1,31 @@
 @php
-    $usado = $almacen->almacenamientos->whereNull('fechasalida')->sum('cantidad');
-    $disponible = $almacen->capacidad - $usado;
-    $porcentaje = $almacen->capacidad > 0 ? ($usado / $almacen->capacidad) * 100 : 0;
+    $resumen = $resumenCapacidad ?? null;
+    if ($resumen) {
+        $disponible = $resumen['disponible_kg'];
+        $capacidad = $resumen['capacidad_kg'];
+        $usado = $resumen['ocupado_kg'];
+        $porcentaje = $resumen['porcentaje'];
+        $umEtiqueta = 'kg';
+    } else {
+        $usado = $almacen->almacenamientos->whereNull('fechasalida')->sum('cantidad');
+        $disponible = max(0, (float) $almacen->capacidad - $usado);
+        $capacidad = (float) $almacen->capacidad;
+        $porcentaje = $capacidad > 0 ? ($usado / $capacidad) * 100 : 0;
+        $umEtiqueta = $almacen->unidadMedida->abreviatura ?? 'kg';
+    }
     $fillClass = $porcentaje < 50 ? 'low' : ($porcentaje < 80 ? 'medium' : 'high');
     $isSelected = isset($isSelected) ? (bool) $isSelected : false;
     $colClass = $colClass ?? 'col-md-6 mb-2';
 @endphp
-<div class="{{ $colClass }}">
+    <div class="{{ $colClass }}">
     <div class="almacen-card {{ $isSelected ? 'selected' : '' }}"
+         role="button"
+         tabindex="0"
+         aria-pressed="{{ $isSelected ? 'true' : 'false' }}"
          data-id="{{ $almacen->almacenid }}"
          data-disponible="{{ $disponible }}"
          data-nombre="{{ $almacen->nombre }}"
-         data-um-almacen="{{ $almacen->unidadMedida->abreviatura ?? 'kg' }}"
+         data-um-almacen="{{ $umEtiqueta }}"
          data-tipo="{{ strtolower($almacen->tipoAlmacen->nombre ?? 'general') }}"
          data-tags="{{ strtolower($almacen->nombre . ' ' . ($almacen->tipoAlmacen->nombre ?? '') . ' ' . ($almacen->ubicacion ?? '')) }}">
         <div class="d-flex align-items-start">
@@ -36,7 +50,12 @@
                 </div>
                 <div class="small mt-1">
                     <span class="text-success font-weight-bold">{{ number_format($disponible, 0) }}</span>
-                    <span class="text-muted">/ {{ number_format($almacen->capacidad, 0) }} {{ $almacen->unidadMedida->abreviatura ?? 'kg' }}</span>
+                    <span class="text-muted">/ {{ number_format($capacidad, 0) }} {{ $umEtiqueta }}</span>
+                    @if($resumen)
+                        <span class="text-muted d-block" style="font-size:.72rem;">
+                            Ocupado: {{ number_format($usado, 0) }} kg ({{ number_format($porcentaje, 1) }}&nbsp;%)
+                        </span>
+                    @endif
                 </div>
                 <div class="capacidad-bar">
                     <div class="fill {{ $fillClass }}" style="width: {{ min($porcentaje, 100) }}%"></div>

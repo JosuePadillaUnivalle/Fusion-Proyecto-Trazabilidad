@@ -241,11 +241,11 @@
                                 <label class="small font-weight-bold">Costo del servicio (Bs) <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-sm">
                                     <div class="input-group-prepend"><span class="input-group-text">Bs</span></div>
-                                    <input type="number" name="costo_bs" class="form-control" min="0.01" step="0.01"
-                                           value="{{ old('costo_bs') }}" placeholder="Monto acordado por la ruta completa" required>
+                                    <input type="number" name="costo_bs" id="costo_bs" class="form-control" min="0" step="1"
+                                           value="{{ old('costo_bs', '0') }}" placeholder="0 — se calcula al trazar la ruta" required>
                                 </div>
                                 @error('costo_bs')<small class="text-danger">{{ $message }}</small>@enderror
-                                <small class="text-muted">Lo define logística; un solo monto por todo el envío.</small>
+                                <small class="text-muted d-block" id="costoEnvioDetalle">Se estima por distancia, paradas y clima (recargo si lluvia). Puede editarlo manualmente.</small>
                             </div>
                         </div>
                     </div>
@@ -276,8 +276,12 @@
     const hub = { lat: {{ $hubLat }}, lng: {{ $hubLng }} };
     const MAX_RECOGIDAS_EXTRA = 5;
     const PRODUCTO_ENDPOINT = @json(route('catalogo-selector.productos-pedido'));
+    const COSTO_ENVIO_URL = @json(route('pedidos.calcular-costo-envio'));
+    const CSRF_TOKEN = @json(csrf_token());
     let pickerRecogidaActivo = null;
     let redrawToken = 0;
+    let costoEditadoManual = false;
+    let costoEnvioToken = 0;
 
     function aviso(mensaje, titulo, tono) {
         if (window.ModalConfirmar && typeof ModalConfirmar.aviso === 'function') {
@@ -646,11 +650,13 @@
                 ? 'Agregue más recogidas o el destino para trazar la ruta.'
                 : '';
             syncEstadoRuta();
+            actualizarCostoEnvio(null);
             return;
         }
 
         const paraRuta = waypointsParaTrazado(puntos);
-        const routeResult = await RutaPorCalles.fetchRoute(paraRuta);
+        let routeResult = null;
+        routeResult = await RutaPorCalles.fetchRoute(paraRuta);
         if (token !== redrawToken) return;
 
         if (routeResult?.geojson) {
@@ -668,7 +674,7 @@
                 try { state.map.fitBounds(bounds.pad(0.15)); } catch (e) {}
             }
 
-            const km = routeResult.distance_m ? (routeResult.distance_m / 1000).toFixed(1) : null;
+            const km = routeResult.distance_m ? Math.round(routeResult.distance_m / 1000) : null;
             const min = routeResult.duration_s ? Math.round(routeResult.duration_s / 60) : null;
             let resumen = (puntos.length > 2 ? puntos.length + ' paradas · ' : '') +
                 (routeResult.straight ? 'Ruta estimada (línea recta)' : 'Ruta por calles');
@@ -676,6 +682,73 @@
             document.getElementById('rutaResumen').textContent = resumen;
         }
         syncEstadoRuta();
+        actualizarCostoEnvio(routeResult?.distance_m ?? null);
+    }
+
+    function resetCostoEnvio() {
+        costoEditadoManual = false;
+        const input = document.getElementById('costo_bs');
+        if (input) {
+            input.value = '0';
+        }
+        const detalle = document.getElementById('costoEnvioDetalle');
+        if (detalle) {
+            detalle.textContent = 'Se estima por distancia, paradas y clima (recargo si lluvia). Puede editarlo manualmente.';
+        }
+    }
+
+    async function actualizarCostoEnvio(distanciaMetros) {
+        if (costoEditadoManual) {
+            return;
+        }
+
+        const puntos = waypointsActuales();
+        const token = ++costoEnvioToken;
+
+        if (puntos.length < 2) {
+            resetCostoEnvio();
+            return;
+        }
+
+        const detalle = document.getElementById('costoEnvioDetalle');
+        if (detalle) {
+            detalle.textContent = 'Calculando costo de envío…';
+        }
+
+        try {
+            const resp = await fetch(COSTO_ENVIO_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': CSRF_TOKEN,
+                },
+                body: JSON.stringify({
+                    paradas: puntos.map(function (p) { return { lat: p.lat, lng: p.lng }; }),
+                    distancia_m: distanciaMetros,
+                }),
+            });
+            if (token !== costoEnvioToken) return;
+            if (!resp.ok) {
+                throw new Error('No se pudo calcular el costo');
+            }
+            const data = await resp.json();
+            const input = document.getElementById('costo_bs');
+            if (input && !costoEditadoManual) {
+                input.value = String(Math.round(Number(data.costo_bs || 0)));
+            }
+            if (detalle) {
+                let texto = data.detalle || 'Costo estimado según la ruta.';
+                if (data.lluvia && data.descripcion_clima) {
+                    texto += ' Clima: ' + data.descripcion_clima + '.';
+                }
+                detalle.textContent = texto;
+            }
+        } catch (e) {
+            if (detalle) {
+                detalle.textContent = 'No se pudo calcular automáticamente. Ingrese el costo manualmente.';
+            }
+        }
     }
 
     function selectorIdForRecogida(key) {
@@ -834,13 +907,13 @@
             '<label class="small font-weight-bold lbl-producto-recogida d-block mb-2"></label>' +
             '<div class="form-row align-items-end">' +
                 '<div class="col-md-5">' +
-                    '<div class="selector-catalogo-wrapper flex-grow-1 w-100 mb-0" id="selector_wrap_' + selId + '">' +
-                        '<div class="input-group input-group-sm">' +
-                            '<input type="text" class="form-control selector-catalogo-label text-muted" readonly placeholder="Clic en Buscar o use Ver en el almacén…">' +
+                    '<div class="selector-catalogo-wrapper flex-grow-1 w-100 mb-0 selector-catalogo--filtros" id="selector_wrap_' + selId + '">' +
+                        '<div class="selector-filtros-field">' +
+                            '<input type="text" class="selector-filtros-field__input selector-catalogo-label is-empty" readonly placeholder="Elegir producto…">' +
                             '<input type="hidden" name="detalles[' + detalleIdx + '][producto_ref]" class="selector-catalogo-value" required>' +
-                            '<div class="input-group-append">' +
-                                '<button type="button" class="btn btn-outline-primary btn-sm" data-selector-open="' + selId + '">' +
-                                    '<i class="fas fa-search mr-1"></i> Buscar' +
+                            '<div class="selector-filtros-field__actions">' +
+                                '<button type="button" class="selector-filtros-field__open" data-selector-open="' + selId + '" title="Abrir catálogo">' +
+                                    '<i class="fas fa-chevron-down"></i>' +
                                 '</button>' +
                             '</div>' +
                         '</div>' +
@@ -1088,6 +1161,7 @@
         document.getElementById('rutaResumen').textContent = '';
         document.getElementById('productos-recogida-container').innerHTML = '';
         syncFilasProducto();
+        resetCostoEnvio();
         redrawRoute();
     }
 
@@ -1122,6 +1196,12 @@
 
         document.getElementById('btnVerAlmacenesMapa').addEventListener('click', toggleAlmacenesEnMapa);
         document.getElementById('btnReiniciarRuta').addEventListener('click', reiniciarRuta);
+        const costoInput = document.getElementById('costo_bs');
+        if (costoInput) {
+            costoInput.addEventListener('input', function () {
+                costoEditadoManual = true;
+            });
+        }
         document.getElementById('btnLimpiarOrigen').addEventListener('click', function () {
             if (bloquearRecogidaSiDestino()) return;
             limpiarOrigen();

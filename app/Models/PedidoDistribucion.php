@@ -19,6 +19,8 @@ class PedidoDistribucion extends Model
         'puntoventaid',
         'almacen_planta_origenid',
         'rutadistribucionid',
+        'transportista_usuarioid',
+        'vehiculoid',
         'estado',
         'fechapedido',
         'fecha_entrega_deseada',
@@ -35,6 +37,8 @@ class PedidoDistribucion extends Model
         'puntoventaid' => 'integer',
         'almacen_planta_origenid' => 'integer',
         'rutadistribucionid' => 'integer',
+        'transportista_usuarioid' => 'integer',
+        'vehiculoid' => 'integer',
         'fechapedido' => 'datetime',
         'fecha_entrega_deseada' => 'date',
         'fecha_aceptacion' => 'datetime',
@@ -72,6 +76,16 @@ class PedidoDistribucion extends Model
     public function rutaDistribucion(): BelongsTo
     {
         return $this->belongsTo(RutaDistribucion::class, 'rutadistribucionid', 'rutadistribucionid');
+    }
+
+    public function transportista(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'transportista_usuarioid', 'usuarioid');
+    }
+
+    public function vehiculo(): BelongsTo
+    {
+        return $this->belongsTo(Vehiculo::class, 'vehiculoid', 'vehiculoid');
     }
 
     public function getRouteKeyName(): string

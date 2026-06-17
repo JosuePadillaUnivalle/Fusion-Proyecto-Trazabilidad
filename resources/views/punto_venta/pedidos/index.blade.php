@@ -29,7 +29,7 @@
         </div>
         <div class="col-md-4">
             <div class="small-box bg-primary">
-                <div class="inner"><h3>{{ $pedidos->where('estado', 'en_transito')->count() }}</h3><p>En tránsito</p></div>
+                <div class="inner"><h3>{{ $pedidos->where('estado', 'en_transito')->count() }}</h3><p>En camino</p></div>
                 <div class="icon"><i class="fas fa-shipping-fast"></i></div>
             </div>
         </div>
@@ -52,18 +52,58 @@
             nuevo-icon="fa-paper-plane"
         />
 
-        <div id="filtrosPedidosDistPanel" class="collapse {{ request()->hasAny(['q','estado','puntoventaid']) ? 'show' : '' }}">
-            @include('partials.modulo-filtros-form', [
-                'action' => route('punto-venta.pedidos.index'),
-                'campos' => [
-                    ['name' => 'q', 'label' => 'Buscar', 'placeholder' => 'Solicitud, producto o PDV…', 'col' => 'col-lg-4 col-md-6'],
-                    ['name' => 'puntoventaid', 'label' => 'Punto de venta', 'type' => 'select', 'col' => 'col-lg-3 col-md-6',
-                        'options' => $puntosVenta->pluck('nombre', 'puntoventaid')->all()],
-                    ['name' => 'estado', 'label' => 'Estado', 'type' => 'select', 'col' => 'col-lg-3 col-md-6',
-                        'options' => \App\Support\PedidoDistribucionCatalogo::etiquetasEstado()],
-                ],
-                'botonesAlineacion' => 'end',
-            ])
+        <div id="filtrosPedidosDistPanel" class="collapse {{ request()->hasAny(['q','estado_grupo','puntoventaid']) ? 'show' : '' }}">
+            <div class="modulo-filtros-panel">
+                <form method="GET" action="{{ route('punto-venta.pedidos.index') }}">
+                    <div class="form-row align-items-end">
+                        <div class="col-lg-4 col-md-6 form-group mb-3 mb-lg-0">
+                            <label>Buscar</label>
+                            <input type="text" name="q" class="form-control" value="{{ request('q') }}" placeholder="Solicitud, producto o PDV…">
+                        </div>
+                        <div class="col-lg-3 col-md-6 form-group mb-3 mb-lg-0">
+                            @include('partials.selector-catalogo', [
+                                'id' => 'ped_filtro_pdv',
+                                'name' => 'puntoventaid',
+                                'value' => $filtroPdvId ?? '',
+                                'labelSelected' => $filtroPdvNombre ?? '',
+                                'endpoint' => route('catalogo-selector.puntos-venta'),
+                                'title' => 'Filtrar por punto de venta',
+                                'label' => 'Punto de venta',
+                                'icon' => 'fa-store',
+                                'searchPlaceholder' => 'Nombre, dirección o minorista…',
+                                'searchLabel' => 'Buscar punto de venta',
+                                'allowEmpty' => true,
+                                'emptyLabel' => 'Todos los puntos',
+                                'placeholderEmpty' => 'Todos los puntos',
+                                'modalIcon' => 'fa-store',
+                                'rowIcon' => 'fa-store',
+                                'colNombre' => 'Punto de venta',
+                                'colDetalle' => 'Minorista / ubicación',
+                                'variant' => 'filtros',
+                            ])
+                        </div>
+                        <div class="col-lg-3 col-md-6 form-group mb-3 mb-lg-0">
+                            <label>Estado</label>
+                            <select name="estado_grupo" class="form-control">
+                                <option value="">Todos</option>
+                                @foreach(\App\Support\PedidoDistribucionCatalogo::etiquetasFiltroEstado() as $valor => $etiqueta)
+                                    <option value="{{ $valor }}" @selected(request('estado_grupo') === $valor)>{{ $etiqueta }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap justify-content-end modulo-filtros-acciones mt-2 pt-1">
+                        <button type="submit" class="btn btn-success btn-filtro-modulo">
+                            <i class="fas fa-filter mr-1"></i> Filtrar
+                        </button>
+                        @if(request()->except('page'))
+                        <a href="{{ route('punto-venta.pedidos.index') }}" class="btn btn-outline-secondary btn-filtro-modulo">
+                            <i class="fas fa-times mr-1"></i> Limpiar
+                        </a>
+                        @endif
+                    </div>
+                </form>
+            </div>
         </div>
 
         <div class="card-body p-0">

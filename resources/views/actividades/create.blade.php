@@ -14,6 +14,9 @@
         @if(!empty($returnUrl))
             <input type="hidden" name="return" value="{{ $returnUrl }}">
         @endif
+        @if(!empty($desdeTrazabilidad))
+            <input type="hidden" name="desde_trazabilidad" value="1">
+        @endif
         <div class="card-body">
             <div class="row">
                 <div class="col-md-8">

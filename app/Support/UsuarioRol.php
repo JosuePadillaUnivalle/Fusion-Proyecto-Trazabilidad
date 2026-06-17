@@ -163,6 +163,21 @@ final class UsuarioRol
         return null;
     }
 
+    /** Etiqueta legible para mostrar en pantalla (sin guiones bajos ni jerga técnica). */
+    public static function etiquetaRol(?string $nombre): string
+    {
+        return match (strtolower((string) $nombre)) {
+            'admin' => 'Administrador',
+            'agricultor' => 'Campo — operario',
+            'jefe_agricultor' => 'Jefe de campo',
+            'jefe_planta' => 'Jefe de planta',
+            'minorista' => 'Punto de venta',
+            'planta' => 'Planta — operario',
+            'transportista' => 'Transporte',
+            default => ucfirst(str_replace('_', ' ', (string) $nombre)),
+        };
+    }
+
     public static function puedeAprobarSolicitud(?Usuario $user, ?string $rolSolicitado): bool
     {
         if (! $user) {

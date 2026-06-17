@@ -49,17 +49,6 @@ class PedidoAgricolaController extends Controller
             };
         }
 
-        if ($request->filled('transporte')) {
-            if ($request->string('transporte')->toString() === 'con') {
-                $query->whereHas('envioAsignacion', fn ($e) => $e->whereNotNull('transportista_usuarioid'));
-            } elseif ($request->string('transporte')->toString() === 'sin') {
-                $query->where(function ($q) {
-                    $q->whereDoesntHave('envioAsignacion')
-                        ->orWhereHas('envioAsignacion', fn ($e) => $e->whereNull('transportista_usuarioid'));
-                });
-            }
-        }
-
         if ($request->filled('fase_envio')) {
             match ($request->string('fase_envio')->toString()) {
                 'pendiente_salida' => $query->whereHas('envioAsignacion', fn ($e) => $e

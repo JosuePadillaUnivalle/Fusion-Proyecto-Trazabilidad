@@ -245,9 +245,179 @@
     color: #fff;
     border-color: #2c5530;
 }
-.page-calendario #lista-dia-actividades .list-group-item {
-    padding: 0.6rem 0.85rem;
-    font-size: 0.9rem;
+.page-calendario .cal-filtros-principales {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 0.75rem;
+}
+@media (max-width: 991.98px) {
+    .page-calendario .cal-filtros-principales {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 575.98px) {
+    .page-calendario .cal-filtros-principales {
+        grid-template-columns: 1fr;
+    }
+}
+.page-calendario .cal-filtro-campo {
+    min-width: 0;
+}
+.page-calendario .cal-filtro-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6c757d;
+    margin-bottom: 0.35rem;
+    line-height: 1.25;
+    min-height: 1.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.page-calendario .cal-filtro-label--spacer {
+    visibility: hidden;
+    user-select: none;
+}
+.page-calendario .cal-filtros-principales .form-control-sm,
+.page-calendario .cal-filtros-principales .input-group-sm > .form-control,
+.page-calendario .cal-filtros-principales .input-group-sm > .input-group-append > .btn {
+    height: calc(1.8125rem + 2px);
+}
+.page-calendario .cal-filtros-principales .selector-catalogo-wrapper {
+    margin-bottom: 0;
+}
+.page-calendario .cal-filtros-principales .input-group-sm {
+    width: 100%;
+}
+.page-calendario .cal-filtros-principales .selector-catalogo-label {
+    font-size: 0.875rem;
+}
+.page-calendario .cal-filtro-campo--accion .btn {
+    width: 100%;
+}
+#dayActivitiesModal .modal-dialog {
+    max-width: 580px;
+}
+.cal-dia-timeline {
+    padding: 1rem 1.1rem 0.35rem;
+}
+.cal-dia-timeline__item {
+    display: flex;
+    gap: 0.85rem;
+}
+.cal-dia-timeline__track {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 28px;
+    flex-shrink: 0;
+    padding-top: 0.35rem;
+}
+.cal-dia-timeline__num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--tipo-color, #28a745);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.95), 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+.cal-dia-timeline__line {
+    flex: 1;
+    width: 2px;
+    background: linear-gradient(180deg, #dee2e6, #eef1f4);
+    min-height: 28px;
+    margin-top: 6px;
+}
+.cal-dia-timeline__item:last-child .cal-dia-timeline__line {
+    opacity: 0;
+}
+.cal-dia-timeline__card {
+    flex: 1;
+    width: 100%;
+    border: 1px solid #e7ece8;
+    border-radius: 12px;
+    background: #fff;
+    padding: 0.8rem 0.95rem;
+    margin-bottom: 0.95rem;
+    text-align: left;
+    cursor: pointer;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    border-left: 4px solid var(--tipo-color, #28a745);
+}
+.cal-dia-timeline__card:hover {
+    box-shadow: 0 6px 18px rgba(44, 85, 48, 0.1);
+    transform: translateY(-1px);
+}
+.cal-dia-timeline__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.55rem;
+    margin-bottom: 0.35rem;
+}
+.cal-dia-timeline__hora {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #6c757d;
+    background: #f1f5f2;
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+}
+.cal-dia-timeline__tipo {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #1f2933;
+}
+.cal-dia-timeline__lote {
+    display: block;
+    font-size: 0.86rem;
+    color: #5c6b73;
+    margin-bottom: 0.15rem;
+}
+.cal-dia-timeline__resp {
+    display: block;
+    font-size: 0.78rem;
+    color: #868e96;
+}
+.cal-dia-timeline__empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: #6c757d;
+}
+.cal-dia-timeline-filtros {
+    border-bottom: 1px solid #e5efe7;
+    background: linear-gradient(180deg, #f8faf9 0%, #fff 100%);
+    padding: 0.85rem 1rem 0.65rem;
+}
+.cal-dia-timeline-filtros .selector-catalogo-wrapper .small.font-weight-bold {
+    font-size: 0.72rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.cal-dia-timeline-filtros__buscar label {
+    font-size: 0.72rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.25rem;
+}
+.cal-dia-timeline-filtros__resumen {
+    font-size: 0.78rem;
+    color: #6c757d;
+    margin-top: 0.15rem;
 }
 .page-calendario .fc-daygrid-day.fc-day-today .fc-daygrid-day-frame {
     background: rgba(23, 162, 184, 0.08) !important;
@@ -491,35 +661,57 @@
         </x-modulo-index-header>
 
         <div id="filtrosCalendarioPanel" class="filtros-panel collapse show">
-            <div class="row align-items-end">
-                <div class="col-lg-3 col-md-4 col-6 mb-2">
-                    <label class="small text-muted mb-1">Estado</label>
+            <div class="cal-filtros-principales">
+                <div class="cal-filtro-campo">
+                    <label class="cal-filtro-label" for="filter-estado">Estado</label>
                     <select id="filter-estado" class="form-control form-control-sm">
                         <option value="">Todas</option>
                         <option value="pendiente">Pendientes</option>
                         <option value="completada">Completadas</option>
                     </select>
                 </div>
-                <div class="col-lg-3 col-md-4 col-6 mb-2">
-                    <label class="small text-muted mb-1">Lote</label>
-                    <select id="filter-lote" class="form-control form-control-sm">
-                        <option value="">Todos los lotes</option>
-                        @foreach($lotes as $lote)
-                            <option value="{{ $lote->loteid }}">{{ $lote->nombre }}</option>
-                        @endforeach
-                    </select>
+                <div class="cal-filtro-campo">
+                    <label class="cal-filtro-label"><i class="fas fa-map-marked-alt mr-1"></i> Lote</label>
+                    @include('partials.selector-catalogo', [
+                        'id' => 'cal_filtro_lote',
+                        'name' => 'filtro_loteid',
+                        'value' => '',
+                        'labelSelected' => '',
+                        'endpoint' => route('catalogo-selector.lotes'),
+                        'title' => 'Filtrar por lote',
+                        'searchPlaceholder' => 'Nombre, código o ubicación…',
+                        'searchLabel' => 'Buscar lote',
+                        'allowEmpty' => true,
+                        'emptyLabel' => 'Todos los lotes',
+                        'placeholderEmpty' => 'Todos los lotes',
+                        'size' => 'sm',
+                        'inputGroup' => true,
+                        'variant' => 'filtros',
+                    ])
                 </div>
-                <div class="col-lg-3 col-md-4 col-6 mb-2">
-                    <label class="small text-muted mb-1">Responsable</label>
-                    <select id="filter-usuario" class="form-control form-control-sm">
-                        <option value="">Todos</option>
-                        @foreach($usuarios as $u)
-                            <option value="{{ $u->usuarioid }}">{{ $u->nombre }} {{ $u->apellido }}</option>
-                        @endforeach
-                    </select>
+                <div class="cal-filtro-campo">
+                    <label class="cal-filtro-label"><i class="fas fa-user mr-1"></i> Responsable</label>
+                    @include('partials.selector-catalogo', [
+                        'id' => 'cal_filtro_responsable',
+                        'name' => 'filtro_usuarioid',
+                        'value' => '',
+                        'labelSelected' => '',
+                        'endpoint' => route('catalogo-selector.usuarios'),
+                        'params' => $responsableSelectorParams ?? ['roles' => 'agricultor'],
+                        'title' => 'Filtrar por responsable',
+                        'searchPlaceholder' => 'Nombre, correo o usuario…',
+                        'searchLabel' => 'Buscar responsable',
+                        'allowEmpty' => true,
+                        'emptyLabel' => 'Todos',
+                        'placeholderEmpty' => 'Todos los responsables',
+                        'size' => 'sm',
+                        'inputGroup' => true,
+                        'variant' => 'filtros',
+                    ])
                 </div>
-                <div class="col-lg-3 col-md-4 col-6 mb-2">
-                    <button type="button" class="btn btn-outline-secondary btn-sm btn-block" id="btn-limpiar-filtros-cal">
+                <div class="cal-filtro-campo cal-filtro-campo--accion">
+                    <label class="cal-filtro-label cal-filtro-label--spacer" aria-hidden="true">&nbsp;</label>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-limpiar-filtros-cal">
                         <i class="fas fa-eraser mr-1"></i> Limpiar
                     </button>
                 </div>
@@ -572,7 +764,7 @@
         <div class="card-footer py-2 d-flex flex-wrap align-items-center" style="gap: 12px;">
             <small class="text-muted">
                 <i class="fas fa-mouse-pointer mr-1"></i>
-                <strong>Mes:</strong> clic en un d&iacute;a (n&uacute;mero = cantidad de actividades).
+                <strong>Mes:</strong> clic en un d&iacute;a (n&uacute;mero = cantidad; se abre la l&iacute;nea de tiempo).
             </small>
             <small class="text-muted">
                 <span class="dia-badge-calendario d-inline-block" style="position:static;transform:none;min-width:22px;height:22px;line-height:22px;font-size:0.7rem;"></span>
@@ -598,14 +790,52 @@
 @endcan
 
 <div class="modal fade" id="dayActivitiesModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-success text-white py-2">
-                <h5 class="modal-title mb-0"><i class="fas fa-calendar-day mr-2"></i> <span id="dia-modal-titulo">Actividades del d&iacute;a</span></h5>
+                <h5 class="modal-title mb-0"><i class="fas fa-stream mr-2"></i> <span id="dia-modal-titulo">Actividades del d&iacute;a</span></h5>
                 <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <div class="modal-body p-0">
-                <div id="lista-dia-actividades" class="list-group list-group-flush"></div>
+                <div class="cal-dia-timeline-filtros">
+                    <div class="row align-items-end">
+                        <div class="col-md-7 mb-2">
+                            @include('partials.selector-catalogo', [
+                                'id' => 'cal_dia_timeline_lote',
+                                'name' => 'dia_timeline_loteid',
+                                'label' => 'Lote',
+                                'icon' => 'fa-map-marked-alt',
+                                'value' => '',
+                                'labelSelected' => '',
+                                'endpoint' => route('catalogo-selector.lotes'),
+                                'title' => 'Filtrar actividades del día por lote',
+                                'searchPlaceholder' => 'Nombre, código o ubicación…',
+                                'searchLabel' => 'Buscar lote',
+                                'allowEmpty' => true,
+                                'emptyLabel' => 'Todos los lotes del día',
+                                'placeholderEmpty' => 'Todos los lotes',
+                                'size' => 'sm',
+                            ])
+                        </div>
+                        <div class="col-md-5 mb-2 cal-dia-timeline-filtros__buscar">
+                            <label class="d-block font-weight-bold mb-1" for="dia-timeline-buscar">
+                                <i class="fas fa-search mr-1"></i> Buscar
+                            </label>
+                            <input type="search"
+                                   id="dia-timeline-buscar"
+                                   class="form-control form-control-sm"
+                                   placeholder="Actividad, lote o responsable…"
+                                   autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center justify-content-between">
+                        <div id="dia-timeline-resumen" class="cal-dia-timeline-filtros__resumen"></div>
+                        <button type="button" class="btn btn-link btn-sm p-0 text-muted" id="dia-timeline-limpiar">
+                            <i class="fas fa-eraser mr-1"></i> Limpiar filtros
+                        </button>
+                    </div>
+                </div>
+                <div id="lista-dia-actividades" class="cal-dia-timeline"></div>
             </div>
             <div class="modal-footer py-2">
                 <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cerrar</button>
@@ -783,6 +1013,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var iconosTipoMap = @json($iconosTipo);
     var contadorEl = document.getElementById('filtro-contador');
     var conteosPorDia = {};
+    var diaActividadesCache = [];
 
     function tiposActivos() {
         var slugs = [];
@@ -792,10 +1023,15 @@ document.addEventListener('DOMContentLoaded', function () {
         return slugs;
     }
 
+    function valorFiltroSelector(selectorId) {
+        var input = document.querySelector('#selector_wrap_' + selectorId + ' .selector-catalogo-value');
+        return input ? input.value : '';
+    }
+
     function filtrarEventos() {
         var slugs = tiposActivos();
-        var loteId = document.getElementById('filter-lote').value;
-        var usuarioId = document.getElementById('filter-usuario').value;
+        var loteId = valorFiltroSelector('cal_filtro_lote');
+        var usuarioId = valorFiltroSelector('cal_filtro_responsable');
         var estado = document.getElementById('filter-estado').value;
 
         return allEvents.filter(function (e) {
@@ -821,25 +1057,6 @@ document.addEventListener('DOMContentLoaded', function () {
             conteosPorDia[fecha].total++;
             if (e.extendedProps && e.extendedProps.pendiente) conteosPorDia[fecha].pendientes++;
         });
-    }
-
-    function agruparDuplicados(items) {
-        var mapa = {};
-        items.forEach(function (e) {
-            var p = e.extendedProps || {};
-            var key = (p.tipoSlug || '') + '|' + (p.loteid || '') + '|' + (p.pendiente ? 'p' : 'c');
-            if (!mapa[key]) {
-                mapa[key] = {
-                    representante: p,
-                    tipo: p.tipo,
-                    lote: p.lote,
-                    pendiente: p.pendiente,
-                    cantidad: 0,
-                };
-            }
-            mapa[key].cantidad++;
-        });
-        return Object.values(mapa);
     }
 
     function claseTipoEvento(slug) {
@@ -976,41 +1193,165 @@ document.addEventListener('DOMContentLoaded', function () {
         $('#activityModal').modal('show');
     }
 
-    function abrirListaDia(fecha) {
-        var lista = document.getElementById('lista-dia-actividades');
-        var titulo = document.getElementById('dia-modal-titulo');
-        if (!lista) return;
-        var partes = fecha.split('-');
-        var items = filtrarEventos().filter(function (e) {
-            return (e.start || '').substring(0, 10) === fecha;
-        });
-        var grupos = agruparDuplicados(items);
-
-        titulo.textContent = 'Actividades del ' + partes[2] + '/' + partes[1] + '/' + partes[0];
-        lista.innerHTML = '';
-
-        if (!grupos.length) {
-            lista.innerHTML = '<div class="p-3 text-muted text-center">Sin actividades este d&iacute;a</div>';
-        } else {
-            grupos.forEach(function (g) {
-                var li = document.createElement('button');
-                li.type = 'button';
-                li.className = 'list-group-item list-group-item-action text-left d-flex justify-content-between align-items-center';
-                var texto = '<span><strong>' + g.tipo + '</strong> <span class="text-muted">- ' + g.lote + '</span></span>';
-                var badges = g.pendiente
-                    ? '<span class="badge badge-warning">Pendiente</span>'
-                    : '<span class="badge badge-success">Hecha</span>';
-                if (g.cantidad > 1) {
-                    badges = '<span class="badge badge-secondary mr-1">x' + g.cantidad + '</span>' + badges;
-                }
-                li.innerHTML = texto + badges;
-                li.addEventListener('click', function () {
-                    $('#dayActivitiesModal').modal('hide');
-                    abrirDetalleActividad(g.representante);
-                });
-                lista.appendChild(li);
-            });
+    function etiquetaHora(props) {
+        var hora = props && props.hora ? String(props.hora) : '';
+        if (!hora || hora === '00:00') {
+            return 'Todo el día';
         }
+        return hora;
+    }
+
+    function filtrarItemsTimelineDia(items) {
+        var loteId = valorFiltroSelector('cal_dia_timeline_lote');
+        var q = (document.getElementById('dia-timeline-buscar')?.value || '').trim().toLowerCase();
+
+        return items.filter(function (props) {
+            if (loteId && String(props.loteid) !== String(loteId)) {
+                return false;
+            }
+            if (!q) {
+                return true;
+            }
+            var texto = [
+                props.tipo,
+                props.lote,
+                props.responsable,
+            ].join(' ').toLowerCase();
+
+            return texto.indexOf(q) !== -1;
+        });
+    }
+
+    function actualizarResumenTimelineDia(mostradas, total) {
+        var resumen = document.getElementById('dia-timeline-resumen');
+        if (!resumen) {
+            return;
+        }
+        var lotesDelDia = {};
+        diaActividadesCache.forEach(function (p) {
+            if (p.loteid) {
+                lotesDelDia[p.loteid] = p.lote || 'Lote';
+            }
+        });
+        var numLotes = Object.keys(lotesDelDia).length;
+        var txt = 'Mostrando ' + mostradas + ' de ' + total + ' actividad' + (total !== 1 ? 'es' : '');
+        if (numLotes > 1) {
+            txt += ' · ' + numLotes + ' lotes este día';
+        }
+        if (mostradas !== total) {
+            txt += ' (filtrado)';
+        }
+        resumen.textContent = txt;
+    }
+
+    function limpiarFiltrosTimelineDia() {
+        if (window.CatalogoSelector) {
+            CatalogoSelector.clear('cal_dia_timeline_lote');
+        }
+        var buscar = document.getElementById('dia-timeline-buscar');
+        if (buscar) {
+            buscar.value = '';
+        }
+        pintarTimelineDia(filtrarItemsTimelineDia(diaActividadesCache));
+    }
+
+    function pintarTimelineDia(items) {
+        var lista = document.getElementById('lista-dia-actividades');
+        if (!lista) {
+            return;
+        }
+
+        lista.innerHTML = '';
+        actualizarResumenTimelineDia(items.length, diaActividadesCache.length);
+
+        if (!items.length) {
+            lista.innerHTML = '<div class="cal-dia-timeline__empty">'
+                + '<i class="fas fa-filter fa-2x mb-2 d-block"></i>'
+                + (diaActividadesCache.length
+                    ? 'Ninguna actividad coincide con el lote o la búsqueda.'
+                    : 'Sin actividades este d&iacute;a')
+                + '</div>';
+            return;
+        }
+
+        items.forEach(function (props, index) {
+            var slug = props.tipoSlug || '';
+            var color = coloresTipoMap[slug] || '#28a745';
+            var icono = iconosTipoMap[slug] || 'fa-tasks';
+            var numero = index + 1;
+            var item = document.createElement('div');
+            item.className = 'cal-dia-timeline__item';
+            item.style.setProperty('--tipo-color', color);
+
+            var estadoBadge = props.pendiente
+                ? '<span class="badge badge-warning">Pendiente</span>'
+                : '<span class="badge badge-success">Hecha</span>';
+
+            item.innerHTML =
+                '<div class="cal-dia-timeline__track">' +
+                    '<span class="cal-dia-timeline__num" title="Orden ' + numero + '">' + numero + '</span>' +
+                    (index < items.length - 1 ? '<span class="cal-dia-timeline__line"></span>' : '') +
+                '</div>' +
+                '<button type="button" class="cal-dia-timeline__card">' +
+                    '<div class="cal-dia-timeline__meta">' +
+                        '<span class="cal-dia-timeline__hora">' + etiquetaHora(props) + '</span>' +
+                        estadoBadge +
+                    '</div>' +
+                    '<span class="cal-dia-timeline__tipo"><i class="fas ' + icono + ' mr-1" style="color:' + color + '"></i>' + (props.tipo || 'Actividad') + '</span>' +
+                    '<span class="cal-dia-timeline__lote">' + (props.lote || 'Sin lote') + '</span>' +
+                    '<span class="cal-dia-timeline__resp"><i class="fas fa-user mr-1"></i>' + (props.responsable || 'Sin responsable') + '</span>' +
+                '</button>';
+
+            item.querySelector('.cal-dia-timeline__card').addEventListener('click', function () {
+                $('#dayActivitiesModal').modal('hide');
+                abrirDetalleActividad(props);
+            });
+            lista.appendChild(item);
+        });
+    }
+
+    function sincronizarLotesFiltroDia() {
+        var ids = [];
+        var vistos = {};
+        diaActividadesCache.forEach(function (p) {
+            var id = p.loteid;
+            if (id && !vistos[id]) {
+                vistos[id] = true;
+                ids.push(id);
+            }
+        });
+
+        if (window.CatalogoSelector && CatalogoSelector.instances.cal_dia_timeline_lote) {
+            if (!CatalogoSelector.instances.cal_dia_timeline_lote.params) {
+                CatalogoSelector.instances.cal_dia_timeline_lote.params = {};
+            }
+            CatalogoSelector.instances.cal_dia_timeline_lote.params.loteids = ids.join(',');
+        }
+    }
+
+    function abrirListaDia(fecha) {
+        var titulo = document.getElementById('dia-modal-titulo');
+        var partes = fecha.split('-');
+        diaActividadesCache = filtrarEventos()
+            .filter(function (e) {
+                return (e.start || '').substring(0, 10) === fecha;
+            })
+            .map(function (e) {
+                return Object.assign({}, e.extendedProps || {});
+            })
+            .sort(function (a, b) {
+                var ta = Number(a.horaTimestamp || 0);
+                var tb = Number(b.horaTimestamp || 0);
+                if (ta !== tb) return ta - tb;
+                return Number(a.id || 0) - Number(b.id || 0);
+            });
+
+        if (titulo) {
+            titulo.textContent = 'Línea de tiempo · ' + partes[2] + '/' + partes[1] + '/' + partes[0];
+        }
+
+        sincronizarLotesFiltroDia();
+        limpiarFiltrosTimelineDia();
         $('#dayActivitiesModal').modal('show');
     }
 
@@ -1116,13 +1457,34 @@ document.addEventListener('DOMContentLoaded', function () {
         aplicarFiltros();
     });
 
-    document.getElementById('filter-lote').addEventListener('change', aplicarFiltros);
-    document.getElementById('filter-usuario').addEventListener('change', aplicarFiltros);
     document.getElementById('filter-estado').addEventListener('change', aplicarFiltros);
 
+    ['cal_filtro_lote', 'cal_filtro_responsable'].forEach(function (selectorId) {
+        var wrap = document.getElementById('selector_wrap_' + selectorId);
+        if (wrap) {
+            wrap.addEventListener('selector-catalogo:change', aplicarFiltros);
+        }
+    });
+
+    var buscarTimelineDia = document.getElementById('dia-timeline-buscar');
+    if (buscarTimelineDia) {
+        buscarTimelineDia.addEventListener('input', function () {
+            pintarTimelineDia(filtrarItemsTimelineDia(diaActividadesCache));
+        });
+    }
+    var wrapTimelineLote = document.getElementById('selector_wrap_cal_dia_timeline_lote');
+    if (wrapTimelineLote) {
+        wrapTimelineLote.addEventListener('selector-catalogo:change', function () {
+            pintarTimelineDia(filtrarItemsTimelineDia(diaActividadesCache));
+        });
+    }
+    document.getElementById('dia-timeline-limpiar')?.addEventListener('click', limpiarFiltrosTimelineDia);
+
     document.getElementById('btn-limpiar-filtros-cal').addEventListener('click', function () {
-        document.getElementById('filter-lote').value = '';
-        document.getElementById('filter-usuario').value = '';
+        if (window.CatalogoSelector) {
+            CatalogoSelector.clear('cal_filtro_lote');
+            CatalogoSelector.clear('cal_filtro_responsable');
+        }
         document.getElementById('filter-estado').value = '';
         var principales = ['siembra', 'riego', 'cosecha', 'fumigacion', 'fertilizacion', 'labranza', 'control-de-plagas', 'poda'];
         document.querySelectorAll('.btn-tipo-filtro').forEach(function (btn) {

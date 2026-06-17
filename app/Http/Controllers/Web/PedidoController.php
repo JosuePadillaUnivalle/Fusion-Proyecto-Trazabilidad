@@ -7,6 +7,7 @@ use App\Models\EnvioAsignacionMultiple;
 use App\Models\Pedido;
 use App\Models\Usuario;
 use App\Models\Almacen;
+use App\Services\CostoEnvioRutaService;
 use App\Services\NotificacionUsuarioService;
 use App\Services\RecepcionPlantaEnvioService;
 use App\Support\AlmacenAmbito;
@@ -18,6 +19,7 @@ use App\Support\RutaPorCallesService;
 use App\Support\UbicacionGpsParser;
 use App\Support\UsuarioRol;
 use Illuminate\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -113,7 +115,7 @@ class PedidoController extends Controller
             'observaciones' => 'nullable|string',
             'transportista_usuarioid' => 'required|integer|exists:usuario,usuarioid',
             'vehiculoid' => 'required|integer|exists:vehiculo,vehiculoid',
-            'costo_bs' => 'required|numeric|min:0.01|max:99999999.99',
+            'costo_bs' => 'required|integer|min:1|max:99999999',
             'recogidas' => 'nullable|array|max:5',
             'recogidas.*.latitud' => 'required|numeric|between:-90,90',
             'recogidas.*.longitud' => 'required|numeric|between:-180,180',
@@ -316,7 +318,7 @@ class PedidoController extends Controller
         $data = $request->validate([
             'transportista_usuarioid' => ['required', 'integer', 'exists:usuario,usuarioid'],
             'vehiculoid' => ['required', 'integer', 'exists:vehiculo,vehiculoid'],
-            'costo_bs' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
+            'costo_bs' => ['required', 'integer', 'min:1', 'max:99999999'],
         ]);
 
         $envio = null;
@@ -377,5 +379,20 @@ class PedidoController extends Controller
         }
 
         return back()->with('success', "Pedido {$pedido->numero_solicitud} recibido en planta. La carga se registró en el almacén de destino.");
+    }
+
+    public function calcularCostoEnvio(Request $request, CostoEnvioRutaService $costoEnvio): JsonResponse
+    {
+        $data = $request->validate([
+            'paradas' => ['required', 'array', 'min:2'],
+            'paradas.*.lat' => ['required', 'numeric', 'between:-90,90'],
+            'paradas.*.lng' => ['required', 'numeric', 'between:-180,180'],
+            'distancia_m' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        return response()->json($costoEnvio->calcular(
+            $data['paradas'],
+            isset($data['distancia_m']) ? (float) $data['distancia_m'] : null
+        ));
     }
 }

@@ -7,6 +7,7 @@ use App\Models\AlmacenMovimiento;
 use App\Models\DetallePedidoDistribucion;
 use App\Models\Insumo;
 use App\Models\PedidoDistribucion;
+use App\Models\RutaDistribucion;
 use App\Models\TipoInsumo;
 use App\Models\TipoMovimientoAlmacen;
 use App\Models\Usuario;
@@ -17,6 +18,10 @@ use Illuminate\Support\Str;
 
 class RecepcionPuntoVentaService
 {
+    public function __construct(
+        private readonly DistribucionRutaService $rutas
+    ) {}
+
     public function confirmar(PedidoDistribucion $pedido, Usuario $usuario): void
     {
         if (! PedidoDistribucionCatalogo::puedeConfirmarRecepcion($pedido)) {
@@ -51,6 +56,14 @@ class RecepcionPuntoVentaService
                 'fecha_recepcion' => now(),
             ]);
         });
+
+        $pedido->refresh();
+        if ($pedido->rutadistribucionid) {
+            $ruta = RutaDistribucion::query()->find($pedido->rutadistribucionid);
+            if ($ruta) {
+                $this->rutas->sincronizarEstadoRuta($ruta);
+            }
+        }
     }
 
     private function transferirDetalle(

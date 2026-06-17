@@ -59,7 +59,7 @@
             nuevo-text="Nueva máquina"
         />
 
-        <div id="filtrosMaquinasPanel" class="filtros-panel collapse {{ request()->hasAny(['buscar','estado','con_codigo']) ? 'show' : '' }}">
+        <div id="filtrosMaquinasPanel" class="filtros-panel collapse {{ request()->hasAny(['buscar','estado']) ? 'show' : '' }}">
             <form method="GET" action="{{ route('maquinas-planta.index') }}">
                 <div class="row align-items-end">
                     <div class="col-md-4 mb-2 mb-md-0">
@@ -73,12 +73,6 @@
                             <option value="activa" @selected(request('estado') === 'activa')>Activas</option>
                             <option value="mantenimiento" @selected(in_array(request('estado'), ['mantenimiento', 'inactiva'], true))>En mantenimiento</option>
                         </select>
-                    </div>
-                    <div class="col-md-2 mb-2 mb-md-0">
-                        <div class="custom-control custom-checkbox mb-1">
-                            <input type="checkbox" class="custom-control-input" id="filtroConCodigo" name="con_codigo" value="1" @checked(request()->boolean('con_codigo'))>
-                            <label class="custom-control-label small" for="filtroConCodigo">Solo con código</label>
-                        </div>
                     </div>
                 </div>
                 <x-filtros-form-actions :limpiar-url="route('maquinas-planta.index', ['filtros_abiertos' => 1])" />

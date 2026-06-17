@@ -1,6 +1,6 @@
 @php
-    $esMiRuta = (int) auth()->id() === (int) ($ruta->transportista_usuarioid ?? 0);
-    $puedeEmpezar = $esMiRuta && \App\Support\SimulacionRutaCatalogo::puedeEmpezarDistribucion($ruta);
+    $usuario = auth()->user();
+    $puedeEmpezar = \App\Support\SimulacionRutaCatalogo::usuarioPuedeEmpezarDistribucion($usuario, $ruta);
     $simulacionActiva = \App\Support\SimulacionRutaCatalogo::simulacionActivaDistribucion($ruta);
 @endphp
 

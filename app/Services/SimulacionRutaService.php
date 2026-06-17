@@ -187,6 +187,7 @@ class SimulacionRutaService
 
         return $agricolas
             ->merge($distribucion)
+            ->filter()
             ->sortByDesc('progreso')
             ->values();
     }
@@ -241,7 +242,7 @@ class SimulacionRutaService
 
     public function debeCompletarAgricola(EnvioAsignacionMultiple $envio): bool
     {
-        $duracion = (int) ($envio->simulacion_duracion_seg ?? 0);
+        $duracion = SimulacionRutaCatalogo::duracionEfectiva((int) ($envio->simulacion_duracion_seg ?? 0));
 
         return $envio->simulacion_inicio_at !== null
             && ! EnvioAsignacionEstadoCatalogo::llegoADestino($envio)
@@ -251,7 +252,7 @@ class SimulacionRutaService
 
     public function debeCompletarDistribucion(RutaDistribucion $ruta): bool
     {
-        $duracion = (int) ($ruta->simulacion_duracion_seg ?? 0);
+        $duracion = SimulacionRutaCatalogo::duracionEfectiva((int) ($ruta->simulacion_duracion_seg ?? 0));
 
         return $ruta->simulacion_inicio_at !== null
             && $ruta->estado === RutaDistribucionCatalogo::ESTADO_EN_RUTA
@@ -318,18 +319,7 @@ class SimulacionRutaService
      */
     private function calcularDuracionSegundos(array $geo, array $paradas): int
     {
-        $distanceM = (float) ($geo['features'][0]['properties']['distance_m'] ?? 0);
-        if ($distanceM <= 0) {
-            $distanceM = $this->distanciaTotalParadas($paradas);
-        }
-
-        $km = $distanceM / 1000;
-        $duracion = (int) round($km * SimulacionRutaCatalogo::SEGUNDOS_POR_KM);
-
-        return max(
-            SimulacionRutaCatalogo::DURACION_MIN_SEG,
-            min(SimulacionRutaCatalogo::DURACION_MAX_SEG, $duracion)
-        );
+        return SimulacionRutaCatalogo::duracionEfectiva();
     }
 
     /**
@@ -363,11 +353,12 @@ class SimulacionRutaService
 
     public function progreso(?Carbon $inicio, int $duracionSeg): float
     {
-        if ($inicio === null || $duracionSeg <= 0) {
+        $duracionEfectiva = SimulacionRutaCatalogo::duracionEfectiva($duracionSeg);
+        if ($inicio === null || $duracionEfectiva <= 0) {
             return 0.0;
         }
 
-        return min(1.0, $this->segundosTranscurridos($inicio) / $duracionSeg);
+        return min(1.0, $this->segundosTranscurridos($inicio) / $duracionEfectiva);
     }
 
     /**
@@ -448,12 +439,21 @@ class SimulacionRutaService
         bool $completada,
         array $paradas,
     ): array {
+        $duracionEfectiva = SimulacionRutaCatalogo::duracionEfectiva($duracionSeg);
         $progreso = $completada ? 1.0 : $this->progreso($inicio, $duracionSeg);
-        $posicion = $this->posicionEnRuta($geo, $progreso);
+        $geoEfectivo = $geo;
+        if ($this->extraerCoordenadas($geoEfectivo) === [] && count($paradas) >= 2) {
+            $geoEfectivo = $this->construirGeoJson(array_map(
+                fn (array $p) => ['lat' => $p['lat'], 'lng' => $p['lng']],
+                $paradas
+            ));
+        }
+        $posicion = $this->posicionEnRuta($geoEfectivo, $progreso)
+            ?? $this->posicionEntreParadas($paradas, $progreso);
         $transcurrido = $this->segundosTranscurridos($inicio);
-        $restante = $completada || $inicio === null || $duracionSeg <= 0
+        $restante = $completada || $inicio === null || $duracionEfectiva <= 0
             ? 0
-            : max(0, $duracionSeg - $transcurrido);
+            : max(0, $duracionEfectiva - $transcurrido);
 
         return [
             'tipo' => $tipo,
@@ -467,18 +467,43 @@ class SimulacionRutaService
                 ? null
                 : now()->addSeconds($restante)->toIso8601String(),
             'posicion' => $posicion,
-            'geojson' => $geo,
+            'geojson' => $geoEfectivo,
             'paradas' => $paradas,
             'inicio_at' => $inicio?->toIso8601String(),
-            'duracion_seg' => $duracionSeg,
+            'inicio_at_unix' => $inicio?->timestamp,
+            'duracion_seg' => $duracionEfectiva,
         ];
     }
 
-    /** @return array<string, mixed> */
-    private function mapearItemLista(EnvioAsignacionMultiple|RutaDistribucion $item): array
+    /**
+     * @param  array<int, array{lat: float, lng: float, orden?: int, label?: string}>  $paradas
+     * @return array{lat: float, lng: float}|null
+     */
+    private function posicionEntreParadas(array $paradas, float $progreso): ?array
+    {
+        if (count($paradas) < 2) {
+            return null;
+        }
+
+        $origen = $paradas[0];
+        $destino = $paradas[array_key_last($paradas)];
+        $ratio = min(1.0, max(0.0, $progreso));
+
+        return [
+            'lat' => $origen['lat'] + ($destino['lat'] - $origen['lat']) * $ratio,
+            'lng' => $origen['lng'] + ($destino['lng'] - $origen['lng']) * $ratio,
+        ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private function mapearItemLista(EnvioAsignacionMultiple|RutaDistribucion $item): ?array
     {
         if ($item instanceof EnvioAsignacionMultiple) {
-            $estado = $this->estadoAgricola($item, false);
+            $estado = $this->estadoAgricola($item, true);
+            $item->refresh();
+            if ($estado['completada'] || ! SimulacionRutaCatalogo::simulacionActivaAgricola($item)) {
+                return null;
+            }
             $chofer = trim(($item->transportista?->nombre ?? '').' '.($item->transportista?->apellido ?? ''));
             $destino = $item->pedido
                 ? (EnvioPedidoService::etiquetaPlantaDestinoLista($item->pedido) ?? 'Planta')
@@ -500,7 +525,12 @@ class SimulacionRutaService
             ];
         }
 
-        $estado = $this->estadoDistribucion($item, false);
+        $estado = $this->estadoDistribucion($item, true);
+        $item->refresh();
+        if ($estado['completada'] || ! SimulacionRutaCatalogo::simulacionActivaDistribucion($item)) {
+            return null;
+        }
+
         $chofer = trim(($item->transportista?->nombre ?? '').' '.($item->transportista?->apellido ?? ''));
         $paradas = $item->paradas?->where('tipo', RutaDistribucionCatalogo::PARADA_ENTREGA_PDV)->count() ?? 0;
 

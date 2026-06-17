@@ -23,7 +23,7 @@ class AsignacionEtapaPlantaService
     public function puedeAsignar(LoteProduccionPedido $lote): bool
     {
         return ! $this->trazabilidad->transformacionCompleta($lote)
-            && ! $this->transformacion->plantillaAgotada($lote);
+            && $this->transformacion->puedeAsignarNuevaEtapa($lote);
     }
 
     /**
@@ -32,10 +32,18 @@ class AsignacionEtapaPlantaService
     public function asignar(LoteProduccionPedido $lote, array $data, Usuario $asignador): AsignacionEtapaPlanta
     {
         if (! $this->puedeAsignar($lote)) {
-            throw new \InvalidArgumentException('La transformación de este lote ya no admite nuevas asignaciones.');
+            throw new \InvalidArgumentException(
+                $this->transformacion->mensajeBloqueoAsignacion($lote)
+                ?? 'La transformación de este lote ya no admite nuevas asignaciones.'
+            );
         }
 
         $proceso = ProcesoPlanta::query()->findOrFail($data['procesoplantaid']);
+        $errorProceso = $this->transformacion->validarProcesoParaAsignar($lote, (int) $proceso->procesoplantaid);
+        if ($errorProceso !== null) {
+            throw new \InvalidArgumentException($errorProceso);
+        }
+
         if (in_array($proceso->nombre, ['Control de Calidad'], true)) {
             throw new \InvalidArgumentException('«Control de Calidad» corresponde a la fase de certificación, no a transformación.');
         }

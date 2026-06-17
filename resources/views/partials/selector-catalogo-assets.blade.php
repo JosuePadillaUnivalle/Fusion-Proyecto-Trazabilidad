@@ -374,6 +374,277 @@
             border-color: #dc2626;
             color: #b91c1c;
         }
+
+        /* Combobox filtros (variante natural, sin LED) */
+        .selector-filtros-field {
+            position: relative;
+            display: flex;
+            align-items: stretch;
+            min-height: 38px;
+            border: 1px solid #dbeafe;
+            border-radius: 10px;
+            background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+            transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+        .selector-filtros-field:hover {
+            border-color: #93c5fd;
+            background: #fff;
+        }
+        .selector-filtros-field:focus-within {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+            background: #fff;
+        }
+        .selector-filtros-field__input {
+            flex: 1 1 auto;
+            min-width: 0;
+            border: 0;
+            background: transparent;
+            padding: .45rem .5rem .45rem .75rem;
+            font-size: .86rem;
+            color: #1e293b;
+            outline: none;
+            cursor: pointer;
+        }
+        .selector-filtros-field__input.is-empty::placeholder { color: #94a3b8; }
+        .selector-filtros-field__actions {
+            display: flex;
+            align-items: center;
+            gap: .15rem;
+            padding: 0 .35rem 0 0;
+            flex-shrink: 0;
+        }
+        .selector-filtros-field__clear {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border: 0;
+            border-radius: 999px;
+            background: #f1f5f9;
+            color: #64748b;
+            font-size: .68rem;
+            cursor: pointer;
+            transition: background .15s ease, color .15s ease, opacity .15s ease;
+        }
+        .selector-filtros-field__clear:hover {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .selector-filtros-field__clear.is-hidden {
+            opacity: 0;
+            pointer-events: none;
+            width: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        .selector-filtros-field__open {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border: 0;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            color: #fff;
+            font-size: .72rem;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, .28);
+            transition: transform .12s ease, box-shadow .15s ease;
+        }
+        .selector-filtros-field__open:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, .35);
+        }
+        .selector-filtros-field__open:active { transform: translateY(0); }
+        .filtros-panel .selector-filtros-field,
+        .modulo-filtros-panel .selector-filtros-field,
+        .map-filters .selector-filtros-field {
+            min-height: calc(1.8125rem + 2px);
+        }
+        .filtros-panel .selector-filtros-field__input,
+        .modulo-filtros-panel .selector-filtros-field__input,
+        .map-filters .selector-filtros-field__input {
+            font-size: .875rem;
+            padding-top: .3125rem;
+            padding-bottom: .3125rem;
+        }
+        .filtros-panel .selector-filtros-field__open,
+        .modulo-filtros-panel .selector-filtros-field__open,
+        .map-filters .selector-filtros-field__open {
+            width: 28px;
+            height: 28px;
+        }
+
+        /* Formularios: misma altura que .form-control */
+        .selector-catalogo-wrapper .selector-filtros-field {
+            min-height: calc(1.5em + .75rem + 2px);
+        }
+        .selector-catalogo-wrapper .selector-filtros-field__input {
+            font-size: .9rem;
+            padding: .375rem .5rem .375rem .75rem;
+        }
+
+        /* Pickers legacy (modales / formularios) → mismo estilo combobox filtros */
+        .picker-field,
+        .pedido-picker-field,
+        .asig-picker-field,
+        .pdv-picker-field {
+            position: relative;
+            display: flex;
+            align-items: stretch;
+            min-height: calc(1.5em + .75rem + 2px);
+            border: 1px solid #dbeafe;
+            border-radius: 10px;
+            background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+            overflow: hidden;
+            transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+        .picker-field:hover,
+        .pedido-picker-field:hover,
+        .asig-picker-field:hover,
+        .pdv-picker-field:hover {
+            border-color: #93c5fd;
+            background: #fff;
+        }
+        .picker-field:focus-within,
+        .pedido-picker-field:focus-within,
+        .asig-picker-field:focus-within,
+        .pdv-picker-field:focus-within {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+            background: #fff;
+        }
+        .picker-field .picker-display,
+        .pedido-picker-field .picker-display,
+        .asig-picker-field .picker-display,
+        .pdv-picker-field .picker-display {
+            flex: 1 1 auto;
+            min-width: 0;
+            border: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            padding: .375rem .5rem .375rem .75rem !important;
+            font-size: .9rem;
+            color: #1e293b;
+            outline: none;
+            min-height: auto !important;
+        }
+        .picker-field .picker-display.text-muted,
+        .pedido-picker-field .picker-display.text-muted,
+        .asig-picker-field .picker-display.text-muted,
+        .pdv-picker-field .picker-display.text-muted {
+            color: #94a3b8 !important;
+        }
+        .picker-field .picker-actions,
+        .pedido-picker-field .picker-actions,
+        .asig-picker-field .picker-actions,
+        .pdv-picker-field .picker-actions {
+            display: flex;
+            align-items: center;
+            gap: .15rem;
+            padding: 0 .35rem 0 0;
+            border-left: 0 !important;
+            flex-shrink: 0;
+        }
+        .picker-field .picker-actions .btn,
+        .pedido-picker-field .picker-actions .btn,
+        .asig-picker-field .picker-actions .btn,
+        .pdv-picker-field .picker-actions .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 0 !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            min-width: 0;
+            line-height: 1;
+        }
+        .picker-field .picker-actions .btn[id*="Limpiar"],
+        .picker-field .picker-actions .btn[title="Quitar"],
+        .picker-field .picker-actions .btn[title="Quitar selección"],
+        .pedido-picker-field .picker-actions .btn[id*="Limpiar"],
+        .pedido-picker-field .picker-actions .btn[title="Quitar"],
+        .asig-picker-field .picker-actions .btn[id*="Limpiar"],
+        .asig-picker-field .picker-actions .btn[title="Quitar"],
+        .pdv-picker-field .picker-actions .btn[id*="Limpiar"],
+        .pdv-picker-field .picker-actions .btn[title="Quitar"] {
+            width: 26px;
+            height: 26px;
+            border-radius: 999px !important;
+            background: #f1f5f9 !important;
+            color: #64748b !important;
+            font-size: .68rem !important;
+        }
+        .picker-field .picker-actions .btn[id*="Limpiar"]:hover,
+        .picker-field .picker-actions .btn[title="Quitar"]:hover,
+        .pedido-picker-field .picker-actions .btn[id*="Limpiar"]:hover,
+        .pedido-picker-field .picker-actions .btn[title="Quitar"]:hover,
+        .asig-picker-field .picker-actions .btn[id*="Limpiar"]:hover,
+        .asig-picker-field .picker-actions .btn[title="Quitar"]:hover,
+        .pdv-picker-field .picker-actions .btn[id*="Limpiar"]:hover,
+        .pdv-picker-field .picker-actions .btn[title="Quitar"]:hover {
+            background: #fee2e2 !important;
+            color: #dc2626 !important;
+        }
+        .picker-field .picker-actions .btn[id*="Buscar"],
+        .picker-field .picker-actions .btn[id*="buscar"],
+        .picker-field .picker-actions .btn-buscar-recogida,
+        .picker-field .picker-actions .btn-buscar-recogida-extra,
+        .pedido-picker-field .picker-actions .btn[id*="Buscar"],
+        .pedido-picker-field .picker-actions .btn[id*="buscar"],
+        .pedido-picker-field .picker-actions .btn-buscar-recogida-extra,
+        .asig-picker-field .picker-actions .btn[id*="Buscar"],
+        .asig-picker-field .picker-actions .btn-buscar-recogida,
+        .pdv-picker-field .picker-actions .btn[id*="Buscar"] {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px !important;
+            background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
+            color: #fff !important;
+            font-size: .72rem !important;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, .28) !important;
+        }
+        .picker-field .picker-actions .btn[id*="Buscar"]:hover,
+        .pedido-picker-field .picker-actions .btn[id*="Buscar"]:hover,
+        .asig-picker-field .picker-actions .btn[id*="Buscar"]:hover,
+        .pdv-picker-field .picker-actions .btn[id*="Buscar"]:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, .35) !important;
+        }
+        .picker-field .picker-actions .btn[id*="Buscar"] .fa-search::before,
+        .pedido-picker-field .picker-actions .btn[id*="Buscar"] .fa-search::before,
+        .pedido-picker-field .picker-actions .btn-buscar-recogida-extra .fa-search::before,
+        .asig-picker-field .picker-actions .btn[id*="Buscar"] .fa-search::before,
+        .pdv-picker-field .picker-actions .btn[id*="Buscar"] .fa-search::before,
+        .picker-field .picker-actions .btn-buscar-recogida .fa-search::before,
+        .picker-field .picker-actions .btn-buscar-recogida-extra .fa-search::before,
+        .asig-picker-field .picker-actions .btn-buscar-recogida .fa-search::before {
+            content: "\f078";
+        }
+        .picker-field .picker-actions .btn[id*="Buscar"] .mr-1,
+        .pedido-picker-field .picker-actions .btn[id*="Buscar"] .mr-1,
+        .asig-picker-field .picker-actions .btn[id*="Buscar"] .mr-1,
+        .pdv-picker-field .picker-actions .btn[id*="Buscar"] .mr-1 {
+            margin-right: 0 !important;
+        }
+        .picker-actions .btn[id*="VerProductos"],
+        .picker-actions .btn[id*="VerProductos"] + .btn,
+        .picker-actions .btn-outline-info.btn-sm {
+            width: auto !important;
+            min-width: 30px !important;
+            height: 30px !important;
+            padding: 0 .45rem !important;
+            border-radius: 8px !important;
+            font-size: .72rem !important;
+            background: #eff6ff !important;
+            color: #1d4ed8 !important;
+            border: 1px solid #bfdbfe !important;
+        }
     </style>
     @endpush
 

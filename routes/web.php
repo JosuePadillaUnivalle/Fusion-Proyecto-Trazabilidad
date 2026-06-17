@@ -50,6 +50,7 @@ use App\Http\Controllers\Web\Envios\EnvioTransportistaController;
 use App\Http\Controllers\Web\Envios\EnvioVehiculoController;
 use App\Http\Controllers\Web\ExternalApiProxyController;
 use App\Http\Controllers\Web\CertificacionController;
+use App\Http\Controllers\Web\CertificacionPlantaController;
 use App\Http\Controllers\Web\ActorAbastecimientoController;
 use App\Http\Controllers\Web\ProcesoPlantaController;
 use App\Http\Controllers\Web\MaquinaPlantaController;
@@ -166,6 +167,8 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::get('lotes/{lote}/trazabilidad', [LoteController::class, 'trazabilidad'])->name('lotes.trazabilidad')->middleware('action.permission:lotes,read');
     Route::get('lotes/{lote}/siembra', [ActividadController::class, 'createSiembra'])->name('lotes.siembra.create')->middleware('action.permission:lotes,update');
     Route::post('lotes/{lote}/siembra', [ActividadController::class, 'storeSiembra'])->name('lotes.siembra.store')->middleware('action.permission:lotes,update');
+    Route::post('lotes/{lote}/asignar-siembra', [ActividadController::class, 'asignarSiembra'])->name('lotes.siembra.asignar')->middleware('action.permission:lotes,update');
+    Route::post('lotes/{lote}/enviar-almacen', [LoteController::class, 'enviarAlmacen'])->name('lotes.enviar-almacen')->middleware('action.permission:lotes,update');
     Route::get('lotes/{lote}/cambiar-estado', [LoteController::class, 'cambiarEstadoForm'])->name('lotes.cambiar-estado')->middleware('action.permission:lotes,update');
     Route::post('lotes/{lote}/cambiar-estado', [LoteController::class, 'cambiarEstadoStore'])->name('lotes.cambiar-estado.store')->middleware('action.permission:lotes,update');
     Route::get('lotes/{lote}/ubicacion', [LoteController::class, 'ubicacion'])->name('lotes.ubicacion')->middleware('action.permission:lotes,read');
@@ -314,11 +317,15 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::post('/certificaciones/masivo', [CertificacionController::class, 'storeBatch'])->name('certificaciones.store-bulk')->middleware('action.permission:certificaciones,create');
     Route::post('/certificaciones', [CertificacionController::class, 'store'])->name('certificaciones.store')->middleware('action.permission:certificaciones,create');
     Route::get('/certificaciones/{certificacion}', [CertificacionController::class, 'show'])->name('certificaciones.show')->middleware('action.permission:certificaciones,read');
+
+    Route::get('/certificaciones-planta', [CertificacionPlantaController::class, 'index'])->name('certificaciones-planta.index')->middleware('action.permission:lote_produccion,read');
+    Route::get('/certificaciones-planta/{evaluacionFinalLoteProduccion}', [CertificacionPlantaController::class, 'show'])->name('certificaciones-planta.show')->middleware('action.permission:lote_produccion,read');
     // ==============================
     // PEDIDOS (CLIENTES EXTERNOS)
     // ==============================
     Route::get('pedidos', [PedidoController::class, 'index'])->name('pedidos.index')->middleware('action.permission:pedidos,read');
     Route::get('pedidos/create', [PedidoController::class, 'create'])->name('pedidos.create')->middleware('action.permission:pedidos,create');
+    Route::post('pedidos/calcular-costo-envio', [PedidoController::class, 'calcularCostoEnvio'])->name('pedidos.calcular-costo-envio')->middleware('action.permission:pedidos,create');
     Route::post('pedidos', [PedidoController::class, 'store'])->name('pedidos.store')->middleware('action.permission:pedidos,create');
     Route::get('pedidos/{pedido}', [PedidoController::class, 'show'])->name('pedidos.show')->middleware('action.permission:pedidos,read');
     Route::get('pedidos/{pedido}/edit', [PedidoController::class, 'edit'])->name('pedidos.edit')->middleware('action.permission:pedidos,update');

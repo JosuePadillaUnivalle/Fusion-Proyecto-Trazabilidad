@@ -45,10 +45,32 @@ class TransporteCapacidadService
 
     public function licenciaTransportista(Usuario $transportista): ?string
     {
+        $licencias = $this->licenciasTransportista($transportista);
+
+        return $licencias !== [] ? TiposLicenciaBolivia::licenciaPrincipal($licencias) : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function licenciasTransportista(Usuario $transportista): array
+    {
         $transportista->loadMissing('perfilTransportista');
 
-        return $transportista->tipo_licencia
+        $json = $transportista->licencias_json ?? $transportista->perfilTransportista?->licencias_json;
+        if (is_string($json)) {
+            $decoded = json_decode($json, true);
+            $json = is_array($decoded) ? $decoded : null;
+        }
+
+        if (is_array($json) && $json !== []) {
+            return TiposLicenciaBolivia::normalizarLista($json);
+        }
+
+        $unica = $transportista->tipo_licencia
             ?? $transportista->perfilTransportista?->tipo_licencia;
+
+        return TiposLicenciaBolivia::normalizarLista($unica !== null ? [$unica] : []);
     }
 
     public function validarAsignacion(Usuario $transportista, Vehiculo $vehiculo): void
@@ -76,11 +98,11 @@ class TransporteCapacidadService
         }
 
         $cap = $this->capacidadEfectiva($vehiculo);
-        $licenciaConductor = $this->licenciaTransportista($transportista);
+        $licencias = $this->licenciasTransportista($transportista);
 
-        if (! LicenciaConduccionCatalogo::puedeConducir($licenciaConductor, $cap['licencia_requerida'])) {
+        if (! LicenciaConduccionCatalogo::puedeConducirConLicencias($licencias, $cap['licencia_requerida'])) {
             throw new InvalidArgumentException(
-                LicenciaConduccionCatalogo::mensajeBloqueo($licenciaConductor, $cap['licencia_requerida'])
+                LicenciaConduccionCatalogo::mensajeBloqueoMultiples($licencias, $cap['licencia_requerida'])
             );
         }
     }

@@ -117,6 +117,7 @@ class AlmacenMovimientoController extends Controller
                 'orden_id' => $mov->almacen_movimientoid,
                 'naturaleza' => $mov->tipo?->naturaleza ?? '',
                 'tipo_nombre' => $mov->tipo?->nombre ?? '—',
+                'almacen_id' => (int) ($mov->almacenid ?? 0),
                 'almacen_nombre' => $mov->almacen?->nombre ?? '',
                 'producto' => $mov->insumo?->nombre ?? '—',
                 'cantidad' => (float) $mov->cantidad,
@@ -155,6 +156,7 @@ class AlmacenMovimientoController extends Controller
                     'orden_id' => $c->produccionalmacenamientoid,
                     'naturaleza' => 'ingreso',
                     'tipo_nombre' => 'Ingreso por cosecha',
+                    'almacen_id' => (int) ($c->almacenid ?? 0),
                     'almacen_nombre' => $c->almacen?->nombre ?? '',
                     'producto' => $producto,
                     'cantidad' => (float) $c->cantidad,
@@ -337,6 +339,20 @@ class AlmacenMovimientoController extends Controller
             ]);
         }
 
+        $almacen = Almacen::query()->with('unidadMedida')->findOrFail($data['almacenid']);
+        $insumo->loadMissing('unidadMedida');
+
+        if ($tipo->naturaleza === 'ingreso') {
+            try {
+                $this->capacidadService->validarIngresoKg(
+                    $almacen,
+                    $this->capacidadService->convertirAKg((float) $data['cantidad'], $insumo->unidadMedida)
+                );
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                return back()->withInput()->withErrors($e->errors());
+            }
+        }
+
         if ($tipo->naturaleza === 'salida' && ! $insumo->tieneStockSuficiente((float) $data['cantidad'])) {
             return back()->withInput()->withErrors([
                 'cantidad' => 'Stock insuficiente. Disponible: '.number_format((float) $insumo->stock, 3),
@@ -455,6 +471,16 @@ class AlmacenMovimientoController extends Controller
 
         $user = $request->user();
 
+        $cantidadKgIngreso = $data['categoria_entrada'] === 'cosecha'
+            ? (float) $data['cantidad']
+            : $this->capacidadService->convertirAKg($cantidadStock, $insumo->unidadMedida);
+
+        try {
+            $this->capacidadService->validarIngresoKg($almacen, $cantidadKgIngreso);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()->withInput()->withErrors($e->errors());
+        }
+
         try {
             DB::transaction(function () use ($data, $almacen, $insumo, $tipo, $user, $cantidadStock, $prefijoObs) {
                 if ((int) $insumo->almacenid !== (int) $almacen->almacenid) {
@@ -564,12 +590,17 @@ class AlmacenMovimientoController extends Controller
             ->orderBy('nombre')
             ->get();
 
+        $almacenNombreFiltro = $almacenId
+            ? (string) ($almacenes->firstWhere('almacenid', $almacenId)?->nombre ?? '')
+            : '';
+
         return view('almacen_movimientos.reportes', array_merge(compact(
             'movimientos',
             'resumenProducto',
             'stockPorAlmacen',
             'almacenes',
             'almacenId',
+            'almacenNombreFiltro',
             'fechaDesde',
             'fechaHasta',
             'periodoActivo',

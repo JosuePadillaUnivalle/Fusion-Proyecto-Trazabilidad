@@ -42,15 +42,8 @@ class TrazabilidadProductoPdvService
     {
         $codigo = $this->asegurarCodigo($insumo);
         $path = route('trazabilidad.publica', ['codigo' => $codigo], false);
-        $request = request();
 
-        if ($request && ! app()->runningInConsole()) {
-            $host = $request->getSchemeAndHttpHost();
-
-            return $host.$path;
-        }
-
-        return route('trazabilidad.publica', ['codigo' => $codigo]);
+        return PublicUrlHelper::absolute($path);
     }
 
     /**
@@ -282,6 +275,8 @@ class TrazabilidadProductoPdvService
             'detalles.insumo.unidadMedida',
             'creadoPor',
             'aceptadoPor',
+            'transportista',
+            'vehiculo',
             'rutaDistribucion.transportista',
             'rutaDistribucion.vehiculo',
             'rutaDistribucion.paradas',
@@ -699,6 +694,16 @@ class TrazabilidadProductoPdvService
             }
             if ($pedido->almacenPlantaOrigen?->nombre) {
                 $lineasTransito[] = 'Origen: '.$pedido->almacenPlantaOrigen->nombre;
+            }
+            $transportistaDirecto = $this->nombreUsuario($pedido->transportista);
+            if ($transportistaDirecto && ! $ruta) {
+                $lineasTransito[] = 'Transportista: '.$transportistaDirecto;
+            }
+            if ($pedido->vehiculo && ! $ruta) {
+                $vehiculoTxt = trim($pedido->vehiculo->placa.' '.($pedido->vehiculo->marca ?? '').' '.($pedido->vehiculo->modelo ?? ''));
+                if ($vehiculoTxt !== '') {
+                    $lineasTransito[] = 'Vehículo: '.$vehiculoTxt;
+                }
             }
 
             $eventos->push($this->normalizarEvento(

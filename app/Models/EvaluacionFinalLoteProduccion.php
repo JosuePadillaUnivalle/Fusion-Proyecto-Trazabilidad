@@ -25,6 +25,7 @@ class EvaluacionFinalLoteProduccion extends Model
         'inspector_usuarioid',
         'razon',
         'observaciones',
+        'recomendaciones',
         'fecha_evaluacion',
     ];
 

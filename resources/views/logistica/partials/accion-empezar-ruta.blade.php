@@ -1,6 +1,6 @@
 @php
-    $esMiAsignacion = (int) auth()->id() === (int) ($asignacion->transportista_usuarioid ?? 0);
-    $puedeEmpezar = $esMiAsignacion && \App\Support\SimulacionRutaCatalogo::puedeEmpezarAgricola($asignacion);
+    $usuario = auth()->user();
+    $puedeEmpezar = \App\Support\SimulacionRutaCatalogo::usuarioPuedeEmpezarAgricola($usuario, $asignacion);
     $simulacionActiva = \App\Support\SimulacionRutaCatalogo::simulacionActivaAgricola($asignacion);
     $compacto = !empty($compacto);
 @endphp

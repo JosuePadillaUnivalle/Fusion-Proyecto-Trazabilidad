@@ -1,6 +1,7 @@
 @php
     $modalId = $modalId ?? ('modalAlmacenes-' . ($sectionId ?? 'almacenSection'));
     $mapaId = $mapaId ?? ('mapaAlmacenes-' . ($sectionId ?? 'almacenSection'));
+    $etiquetaAmbito = $etiquetaAmbito ?? 'agrícola';
 @endphp
 
 <div class="modal fade" id="{{ $modalId }}" tabindex="-1" role="dialog" aria-labelledby="{{ $modalId }}Label" aria-hidden="true">
@@ -8,7 +9,7 @@
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title" id="{{ $modalId }}Label">
-                    <i class="fas fa-warehouse mr-2"></i>Buscar almacén
+                    <i class="fas fa-warehouse mr-2"></i>Buscar almacén {{ $etiquetaAmbito }}
                 </h5>
                 <button type="button" class="close text-white" data-dismiss="modal" aria-label="Cerrar">
                     <span aria-hidden="true">&times;</span>
@@ -63,7 +64,8 @@
 
                     <div class="tab-pane fade p-3" id="{{ $modalId }}-mapa" role="tabpanel">
                         <p class="small text-muted mb-2">
-                            <i class="fas fa-hand-pointer mr-1"></i> Haga clic en un almacén del mapa para seleccionarlo.
+                            <i class="fas fa-hand-pointer mr-1"></i>
+                            Mapa con todos los almacenes {{ $etiquetaAmbito }}s. Haga clic en un pin para seleccionarlo.
                         </p>
                         <div class="almacen-mapa-wrap position-relative">
                             <div id="{{ $mapaId }}" class="almacen-mapa-modal"></div>

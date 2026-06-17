@@ -9,6 +9,7 @@ use App\Models\Lote;
 use App\Models\LoteInsumo;
 use App\Support\ActividadDetalleCatalogo;
 use App\Support\InsumoCatalogo;
+use App\Support\InsumoImagenCatalogo;
 use App\Support\PedidoCatalogo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -102,11 +103,20 @@ class ActividadInsumoService
                 ]);
             }
 
+            $unidad = $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? 'ud';
+            if ((float) $insumo->stock < $cantidad) {
+                throw ValidationException::withMessages([
+                    'detalle_actividad_json' => 'Stock insuficiente de «'.$insumo->nombre.'». Disponible: '
+                        .number_format((float) $insumo->stock, 2).' '.$unidad
+                        .'; intentó aplicar: '.number_format($cantidad, 2).' '.$unidad.'.',
+                ]);
+            }
+
             $normalizados[] = [
                 'insumoid' => (int) $insumo->insumoid,
                 'nombre' => $insumo->nombre,
                 'cantidad' => $cantidad,
-                'unidad' => $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? 'ud',
+                'unidad' => $unidad,
             ];
         }
 
@@ -168,6 +178,8 @@ class ActividadInsumoService
      */
     public function listarInsumosParaModal(string $tipoSlug, ?Lote $lote = null): array
     {
+        InsumoCatalogo::asegurarInsumosCampo();
+
         InsumoCatalogo::asegurarCatalogosBase();
 
         $tipoIds = InsumoCatalogo::tiposOrdenados()
@@ -203,15 +215,7 @@ class ActividadInsumoService
 
             $coleccion = collect($planificado ? [$planificado] : [])->merge($resto);
 
-            return $coleccion->map(function (Insumo $i) {
-                return [
-                    'id' => (int) $i->insumoid,
-                    'nombre' => $i->nombre,
-                    'stock' => (float) $i->stock,
-                    'unidad' => $i->unidadMedida?->abreviatura ?? $i->unidadMedida?->nombre ?? 'ud',
-                    'unidad_nombre' => $i->unidadMedida?->nombre ?? 'Unidad',
-                ];
-            })->values()->all();
+            return $coleccion->map(fn (Insumo $i) => self::mapearInsumoModal($i))->values()->all();
         }
 
         if ($tipoSlug === 'material_siembra' && $referenciaNombre) {
@@ -228,27 +232,24 @@ class ActividadInsumoService
                 return false;
             });
             if ($filtrados->isNotEmpty()) {
-                return $filtrados->map(function (Insumo $i) {
-                    return [
-                        'id' => (int) $i->insumoid,
-                        'nombre' => $i->nombre,
-                        'stock' => (float) $i->stock,
-                        'unidad' => $i->unidadMedida?->abreviatura ?? $i->unidadMedida?->nombre ?? 'ud',
-                        'unidad_nombre' => $i->unidadMedida?->nombre ?? 'Unidad',
-                    ];
-                })->values()->all();
+                return $filtrados->map(fn (Insumo $i) => self::mapearInsumoModal($i))->values()->all();
             }
         }
 
-        return $query->get()->map(function (Insumo $i) {
-            return [
-                'id' => (int) $i->insumoid,
-                'nombre' => $i->nombre,
-                'stock' => (float) $i->stock,
-                'unidad' => $i->unidadMedida?->abreviatura ?? $i->unidadMedida?->nombre ?? 'ud',
-                'unidad_nombre' => $i->unidadMedida?->nombre ?? 'Unidad',
-            ];
-        })->values()->all();
+        return $query->get()->map(fn (Insumo $i) => self::mapearInsumoModal($i))->values()->all();
+    }
+
+    /** @return array<string, mixed> */
+    private static function mapearInsumoModal(Insumo $i): array
+    {
+        return [
+            'id' => (int) $i->insumoid,
+            'nombre' => $i->nombre,
+            'stock' => (float) $i->stock,
+            'unidad' => $i->unidadMedida?->abreviatura ?? $i->unidadMedida?->nombre ?? 'ud',
+            'unidad_nombre' => $i->unidadMedida?->nombre ?? 'Unidad',
+            'imagen' => InsumoImagenCatalogo::urlPara($i),
+        ];
     }
 
     private function idEstadoAplicado(): int

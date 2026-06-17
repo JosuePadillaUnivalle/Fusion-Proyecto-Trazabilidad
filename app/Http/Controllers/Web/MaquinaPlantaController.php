@@ -190,10 +190,6 @@ class MaquinaPlantaController extends Controller
             }
         }
 
-        if ($request->boolean('con_codigo')) {
-            $query->whereNotNull('codigo')->where('codigo', '!=', '');
-        }
-
         if ($request->filled('buscar')) {
             $buscar = '%'.trim((string) $request->buscar).'%';
             $query->where(function ($q) use ($buscar) {

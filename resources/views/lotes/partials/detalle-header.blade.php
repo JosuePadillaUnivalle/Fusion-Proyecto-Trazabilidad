@@ -1,21 +1,39 @@
-<div class="lote-header">
-    <div class="row align-items-center">
-        <div class="col-md-8">
-            <h2><i class="fas fa-map-marked-alt mr-2"></i>{{ $lote->nombre }}</h2>
-            <p class="mb-0 mt-2">
-                <i class="fas fa-user mr-1"></i> {{ $lote->usuario->nombre ?? 'Sin asignar' }}
-                {{ $lote->usuario->apellido ?? '' }}
-                <span class="mx-2">|</span>
-                <i class="fas fa-map-marker-alt mr-1"></i> {{ $lote->ubicacion_visible }}
-            </p>
-        </div>
-        <div class="col-md-4 text-md-right">
-            <span class="estado-badge {{ $estadoClass }}">{{ ucfirst($lote->estadoTipo->nombre ?? 'Sin estado') }}</span>
-            @if($lote->cultivo_etiqueta)
-                <br><span class="badge badge-light mt-2" style="font-size: 0.9rem;">
-                    <i class="fas fa-seedling mr-1"></i> {{ $lote->cultivo_etiqueta }}
+@php
+    use App\Support\EstadoLoteCatalogo;
+    $estadoNombre = $lote->estadoTipo->nombre ?? 'Sin estado';
+    $estadoSlug = EstadoLoteCatalogo::slugFromNombre($estadoNombre) ?: 'default';
+@endphp
+
+<div class="lote-hero">
+    <div class="lote-hero__glow" aria-hidden="true"></div>
+    <div class="row align-items-start align-items-md-center">
+        <div class="col-lg-8">
+            <div class="lote-hero__eyebrow">
+                <i class="fas fa-map-marked-alt"></i> Lote agrícola
+            </div>
+            <h1 class="lote-hero__title">{{ $lote->nombre }}</h1>
+            <div class="lote-hero__meta">
+                <span class="lote-hero__meta-item">
+                    <i class="fas fa-user"></i>
+                    {{ trim(($lote->usuario->nombre ?? '').' '.($lote->usuario->apellido ?? '')) ?: 'Sin asignar' }}
                 </span>
-            @endif
+                <span class="lote-hero__meta-item">
+                    <i class="fas fa-map-marker-alt"></i>
+                    {{ $lote->ubicacion_visible }}
+                </span>
+            </div>
+        </div>
+        <div class="col-lg-4 mt-3 mt-lg-0">
+            <div class="lote-hero__chips">
+                <span class="lote-hero-chip lote-hero-chip--estado lote-hero-chip--estado-{{ $estadoSlug }}">
+                    {{ ucfirst($estadoNombre) }}
+                </span>
+                @if($lote->cultivo_etiqueta)
+                <span class="lote-hero-chip lote-hero-chip--cultivo">
+                    <i class="fas fa-seedling"></i>{{ $lote->cultivo_etiqueta }}
+                </span>
+                @endif
+            </div>
         </div>
     </div>
 </div>

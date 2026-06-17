@@ -87,6 +87,9 @@
                             'selectorId' => 'lote_edit_semilla',
                             'insumoSemillaId' => old('insumosemillaid', $lote->insumosemillaid ?? ''),
                             'insumoSemillaLabel' => $insumoSemillaLabel ?? '',
+                            'cantidadSemillaPlanificada' => old('cantidad_semilla_planificada', $lote->cantidad_semilla_planificada ?? ''),
+                            'cantidadSemillaUnidad' => $dosisInicial['unidad'] ?? 'kg',
+                            'semillaStockInicial' => $semillaStockInicial ?? null,
                         ])
 
                         <div class="form-group">
@@ -196,6 +199,8 @@
                 'dosis_por_ha' => $dosisInicial['por_ha'] ?? 0,
                 'dosis_unidad' => $dosisInicial['unidad'] ?? 'kg',
             ] : null),
+            initialCantidad: @json(old('cantidad_semilla_planificada', $lote->cantidad_semilla_planificada)),
+            initialStock: @json($semillaStockInicial ?? null),
         });
     </script>
 @endpush

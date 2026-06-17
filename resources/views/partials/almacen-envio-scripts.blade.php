@@ -7,6 +7,8 @@
     $unidadSelectId = $unidadSelectId ?? 'unidadmedidaid';
     $productoHint = $productoHint ?? '';
     $almacenesCatalogo = $almacenesCatalogo ?? [];
+    $requiereAlmacen = $requiereAlmacen ?? true;
+    $resumenDestinoId = $resumenDestinoId ?? null;
     $modalId = 'modalAlmacenes-' . $sectionId;
     $mapaId = 'mapaAlmacenes-' . $sectionId;
 @endphp
@@ -24,6 +26,8 @@
     const unidadSelectId = @json($unidadSelectId);
     const productoHint = @json($productoHint);
     const almacenesCatalogo = @json($almacenesCatalogo);
+    const requiereAlmacen = @json($requiereAlmacen);
+    const resumenDestinoId = @json($resumenDestinoId);
     const modalId = @json($modalId);
     const mapaId = @json($mapaId);
     const almacenOptionsId = '#almacenOptions-' + sectionId;
@@ -93,6 +97,57 @@
         }
     }
 
+    function iconoTipoResumen(tipo) {
+        const t = String(tipo || '').toLowerCase();
+        if (t.includes('silo')) return 'fa-database';
+        if (t.includes('bodega')) return 'fa-warehouse';
+        if (t.includes('fría') || t.includes('frio')) return 'fa-snowflake';
+        return 'fa-box';
+    }
+
+    function barraClaseResumen(porcentaje) {
+        if (porcentaje < 50) return 'low';
+        if (porcentaje < 80) return 'medium';
+        return 'high';
+    }
+
+    function actualizarResumenDestino(id) {
+        if (!resumenDestinoId) return;
+        const el = document.getElementById(resumenDestinoId);
+        if (!el) return;
+
+        const item = almacenPorId(id);
+        if (!item) {
+            el.innerHTML = '<div class="alert alert-info mb-0 py-3"><i class="fas fa-warehouse mr-1"></i> Use <strong>Cambiar almacén</strong> para elegir el destino.</div>';
+            return;
+        }
+
+        const ocupado = Math.max(0, (item.capacidad || 0) - (item.disponible || 0));
+        const porcentaje = item.capacidad > 0 ? (ocupado / item.capacidad) * 100 : 0;
+        const fillClass = barraClaseResumen(porcentaje);
+        const ubicacion = item.direccion || item.ubicacion || '';
+        const cantidadTxt = cantidadFija ? (cantidadFija + ' kg') : '';
+
+        el.innerHTML =
+            '<div class="border rounded p-3 bg-light">' +
+                '<div class="d-flex flex-wrap justify-content-between align-items-start mb-2" style="gap:.5rem;">' +
+                    '<div>' +
+                        '<span class="badge badge-success mb-2"><i class="fas fa-map-marker-alt mr-1"></i> Destino de envío</span>' +
+                        '<h6 class="font-weight-bold mb-1"><i class="fas fa-warehouse text-warning mr-1"></i>' + (item.nombre || '') + '</h6>' +
+                        '<p class="small text-muted mb-0">' + (item.tipo || 'General') + (ubicacion ? ' · ' + ubicacion : '') + '</p>' +
+                    '</div>' +
+                    (cantidadTxt ? '<div class="text-right"><span class="text-muted small d-block">Cantidad a ingresar</span><strong class="text-dark">' + cantidadTxt + '</strong></div>' : '') +
+                '</div>' +
+                '<div class="small">' +
+                    '<span class="text-success font-weight-bold">' + Math.round(item.disponible || 0).toLocaleString() + '</span>' +
+                    '<span class="text-muted">/ ' + Math.round(item.capacidad || 0).toLocaleString() + ' kg disponibles</span>' +
+                    '<span class="text-muted">(' + porcentaje.toFixed(1) + ' % ocupado)</span>' +
+                '</div>' +
+                '<div class="capacidad-bar mt-1"><div class="fill ' + fillClass + '" style="width:' + Math.min(porcentaje, 100) + '%"></div></div>' +
+                '<p class="small text-muted mb-0 mt-2"><i class="fas fa-info-circle mr-1"></i> Destino actualizado. Confirme o vuelva a cambiar.</p>' +
+            '</div>';
+    }
+
     function aplicarSeleccion(id, nombre, disponible, card) {
         cardsEnSeccion().removeClass('selected').css({ background: 'white', borderColor: '#dee2e6' });
         cardsEnSeccion().find('.fa-check-circle').hide();
@@ -115,14 +170,27 @@
         } else {
             $('#alertaCapacidad-' + sectionId).remove();
         }
+
+        actualizarResumenDestino(id);
     }
 
     function seleccionarAlmacenPorId(id, cerrarModal) {
-        const item = almacenPorId(id);
-        if (!item) return;
-
         const card = cardPorId(id);
-        aplicarSeleccion(id, item.nombre, item.disponible, card.length ? card : null);
+        const item = almacenPorId(id);
+        let nombre;
+        let disponible;
+
+        if (item) {
+            nombre = item.nombre;
+            disponible = item.disponible;
+        } else if (card.length) {
+            nombre = card.data('nombre');
+            disponible = card.data('disponible');
+        } else {
+            return;
+        }
+
+        aplicarSeleccion(id, nombre, disponible, card.length ? card : null);
 
         if (cerrarModal && $('#' + modalId).length) {
             $('#' + modalId).modal('hide');
@@ -201,7 +269,7 @@
             }
         });
 
-        if (mejor && !$('#' + hiddenInputId).val()) {
+        if (mejor && requiereAlmacen && !$('#' + hiddenInputId).val()) {
             seleccionarAlmacenPorId(mejor.id, false);
             $(almacenOptionsId + ' .alert-suggestion').remove();
             $(almacenOptionsId).prepend(
@@ -434,7 +502,7 @@
     };
 
     $(function () {
-        if (cardsEnSeccion().length === 1 && !$('#' + hiddenInputId).val()) {
+        if (requiereAlmacen && cardsEnSeccion().length === 1 && !$('#' + hiddenInputId).val()) {
             cardsEnSeccion().first().trigger('click');
         }
 
@@ -442,13 +510,14 @@
         if (seleccionInicial) {
             const item = almacenPorId(seleccionInicial);
             if (item) actualizarSeleccionExterna(seleccionInicial, item.nombre);
+            actualizarResumenDestino(seleccionInicial);
         }
 
         if (productoHint) {
             recomendarAlmacen(productoHint);
         }
 
-        if (formSelector) {
+        if (formSelector && requiereAlmacen) {
             $(formSelector).on('submit', function (e) {
                 if (!$('#' + hiddenInputId).val()) {
                     e.preventDefault();
@@ -459,7 +528,20 @@
         }
 
         cardsEnSeccion().on('click', function () {
-            seleccionarAlmacenPorId($(this).data('id'), false);
+            const $card = $(this);
+            aplicarSeleccion(
+                $card.data('id'),
+                $card.data('nombre'),
+                $card.data('disponible'),
+                $card
+            );
+        });
+
+        cardsEnSeccion().on('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                $(this).trigger('click');
+            }
         });
 
         if (cantidadFija === null) {
@@ -495,6 +577,12 @@
             });
 
             $('a[href="#' + modalId + '-mapa"]').on('shown.bs.tab', function () {
+                if (mapaState.map) {
+                    mapaState.map.remove();
+                    mapaState.map = null;
+                    mapaState.capa = null;
+                    mapaState.inicializado = false;
+                }
                 window.setTimeout(initMapaModal, 120);
             });
 

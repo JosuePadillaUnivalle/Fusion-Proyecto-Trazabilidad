@@ -5,7 +5,7 @@
 
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
-    <li class="breadcrumb-item"><a href="{{ route('envios.seguimiento') }}">Envíos</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('logistica.asignaciones.listado') }}">Envíos</a></li>
     <li class="breadcrumb-item active">Reportes de distribución</li>
 @endsection
 
@@ -34,7 +34,7 @@
                     <select id="filtroGlobalEstado" class="form-control form-control-sm">
                         <option value="">Todos los estados</option>
                         @foreach($estadosLista ?? [] as $est)
-                        <option value="{{ $est }}">{{ ucfirst(str_replace('_', ' ', $est)) }}</option>
+                        <option value="{{ strtolower($est) }}">{{ $est }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -48,12 +48,12 @@
                     </select>
                 </div>
                 <div class="col-md-2 mb-2">
-                    <label class="text-muted small font-weight-bold">Mín. cantidad</label>
+                    <label class="text-muted small font-weight-bold">Cantidad mínima</label>
                     <select id="filtroGlobalMinCant" class="form-control form-control-sm">
-                        <option value="">Sin mínimo</option>
-                        <option value="2">≥ 2</option>
-                        <option value="3">≥ 3</option>
-                        <option value="5">≥ 5</option>
+                        <option value="">Mostrar todos</option>
+                        <option value="2">Al menos 2 envíos</option>
+                        <option value="3">Al menos 3 envíos</option>
+                        <option value="5">Al menos 5 envíos</option>
                     </select>
                 </div>
                 <div class="col-md-3 mb-2">
@@ -90,32 +90,17 @@
         </div>
         <div class="col-6 col-lg-3">
             <div class="small-box small-box-blue">
-                <div class="inner"><h3>{{ $c['en_ruta'] ?? 0 }}</h3><p>En ruta</p></div>
+                <div class="inner"><h3>{{ $c['en_ruta'] ?? 0 }}</h3><p>En transporte</p></div>
                 <div class="icon"><i class="fas fa-route"></i></div>
             </div>
         </div>
     </div>
 
     <div class="row mb-3">
-        <div class="col-md-6">
+        <div class="col-md-12">
             <div class="small-box small-box-purple">
-                <div class="inner"><h3>{{ $c['entregados'] ?? 0 }}</h3><p>Entregados</p></div>
+                <div class="inner"><h3>{{ $c['entregados'] ?? 0 }}</h3><p>Entregados / completados</p></div>
                 <div class="icon"><i class="fas fa-check-double"></i></div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="small-box small-box-orange">
-                <div class="inner">
-                    <h3>{{ number_format($c['stock_productos_todas_bodegas'] ?? 0, 0) }}</h3>
-                    <p>Stock en bodegas</p>
-                </div>
-                <div class="icon"><i class="fas fa-warehouse"></i></div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="small-box small-box-indigo">
-                <div class="inner"><h3>{{ $c['lineas_inventario_envio'] ?? 0 }}</h3><p>Líneas inventario</p></div>
-                <div class="icon"><i class="fas fa-boxes"></i></div>
             </div>
         </div>
     </div>
@@ -135,12 +120,12 @@
                     <input type="text" id="searchTopTransportista" class="form-control form-control-sm" placeholder="Nombre del transportista...">
                 </div>
                 <div class="col-md-3 mb-2 mb-md-0">
-                    <label class="text-muted small font-weight-bold">Mín. asignaciones</label>
+                    <label class="text-muted small font-weight-bold">Mostrar choferes con</label>
                     <select id="filtroTopMinAsig" class="form-control form-control-sm">
-                        <option value="">Todas</option>
-                        <option value="2">≥ 2</option>
-                        <option value="5">≥ 5</option>
-                        <option value="10">≥ 10</option>
+                        <option value="">Cualquier cantidad</option>
+                        <option value="2">Al menos 2 envíos</option>
+                        <option value="5">Al menos 5 envíos</option>
+                        <option value="10">Al menos 10 envíos</option>
                     </select>
                 </div>
                 <div class="col-md-3 mb-2 mb-md-0">
@@ -188,7 +173,7 @@
                         <td class="font-weight-bold">{{ $nombre }}</td>
                         <td class="text-right font-weight-bold">{{ $t->c }}</td>
                         <td class="text-right" onclick="event.stopPropagation()">
-                            <a href="{{ route('envios.transportistas') }}" class="btn btn-xs btn-outline-secondary btn-sm">Ver todos</a>
+                            <a href="{{ route('logistica.asignaciones.listado', ['transportista' => $t->transportista_usuarioid]) }}" class="btn btn-xs btn-outline-secondary btn-sm">Ver envíos</a>
                         </td>
                     </tr>
                     <tr>
@@ -228,7 +213,7 @@
                             <select id="selectPorEstado" class="form-control form-control-sm">
                                 <option value="">Todos</option>
                                 @foreach($estadosLista ?? [] as $est)
-                                <option value="{{ $est }}">{{ ucfirst(str_replace('_', ' ', $est)) }}</option>
+                                <option value="{{ strtolower($est) }}">{{ $est }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -237,11 +222,11 @@
                             <input type="text" id="searchPorEstado" class="form-control form-control-sm" placeholder="Ej: entregado, pendiente...">
                         </div>
                         <div class="col-md-2 mb-2">
-                            <label class="text-muted small font-weight-bold">Mín. cant.</label>
+                            <label class="text-muted small font-weight-bold">Cantidad mínima</label>
                             <select id="minCantPorEstado" class="form-control form-control-sm">
-                                <option value="">—</option>
-                                <option value="2">≥ 2</option>
-                                <option value="5">≥ 5</option>
+                                <option value="">Mostrar todos</option>
+                                <option value="2">Al menos 2 envíos</option>
+                                <option value="5">Al menos 5 envíos</option>
                             </select>
                         </div>
                         <div class="col-md-2 mb-2">
@@ -265,7 +250,7 @@
                                 $uid = 'rep-est-'.preg_replace('/[^a-z0-9]+/', '-', $estado);
                             @endphp
                             <tr class="fila-estado-toggle fila-filtro-rep-est"
-                                data-texto="{{ $estado }}"
+                                data-texto="{{ strtolower($estado) }}"
                                 data-cant="{{ $cant }}"
                                 data-target="#{{ $uid }}"
                                 role="button"
@@ -273,7 +258,7 @@
                                 aria-expanded="false"
                                 aria-controls="{{ $uid }}">
                                 <td><i class="fas fa-chevron-right chevron-estado"></i></td>
-                                <td class="text-capitalize">{{ $estado }}</td>
+                                <td>{{ $estado }}</td>
                                 <td class="text-right font-weight-bold">{{ $cant }}</td>
                             </tr>
                             <tr>
@@ -281,8 +266,8 @@
                                     <div class="collapse detalle-estado-envios" id="{{ $uid }}">
                                         @include('partials.envios-lista-detalle-collapse', ['lista' => $lista, 'filtroId' => $uid])
                                         <div class="p-2 border-top bg-white text-right">
-                                            <a href="{{ route('envios.seguimiento') }}?estado={{ urlencode($estado) }}" class="btn btn-sm btn-success">
-                                                <i class="fas fa-route mr-1"></i> Ver todos en seguimiento
+                                            <a href="{{ route('logistica.asignaciones.listado', ['q' => $estado]) }}" class="btn btn-sm btn-success">
+                                                <i class="fas fa-truck mr-1"></i> Ver en listado de envíos
                                             </a>
                                         </div>
                                     </div>
@@ -323,11 +308,11 @@
                             <input type="text" id="searchPorDestino" class="form-control form-control-sm" placeholder="Planta, ciudad, almacén...">
                         </div>
                         <div class="col-md-2 mb-2">
-                            <label class="text-muted small font-weight-bold">Mín. cant.</label>
+                            <label class="text-muted small font-weight-bold">Cantidad mínima</label>
                             <select id="minCantPorDestino" class="form-control form-control-sm">
-                                <option value="">—</option>
-                                <option value="2">≥ 2</option>
-                                <option value="3">≥ 3</option>
+                                <option value="">Mostrar todos</option>
+                                <option value="2">Al menos 2 envíos</option>
+                                <option value="3">Al menos 3 envíos</option>
                             </select>
                         </div>
                         <div class="col-md-2 mb-2">
@@ -367,8 +352,8 @@
                                     <div class="collapse detalle-estado-envios" id="{{ $uid }}">
                                         @include('partials.envios-lista-detalle-collapse', ['lista' => $lista, 'filtroId' => $uid])
                                         <div class="p-2 border-top bg-white text-right">
-                                            <a href="{{ route('envios.seguimiento') }}?destino={{ urlencode($destino) }}" class="btn btn-sm btn-success">
-                                                <i class="fas fa-route mr-1"></i> Ver todos en seguimiento
+                                            <a href="{{ route('logistica.asignaciones.listado', ['q' => $destino]) }}" class="btn btn-sm btn-success">
+                                                <i class="fas fa-truck mr-1"></i> Ver en listado de envíos
                                             </a>
                                         </div>
                                     </div>

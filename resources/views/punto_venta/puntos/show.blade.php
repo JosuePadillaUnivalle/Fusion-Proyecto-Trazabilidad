@@ -9,6 +9,24 @@
 <style>
 .pdv-map-readonly { height: 260px; }
 .pdv-inv-acciones .btn { min-width: 34px; }
+.pdv-inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .85rem; padding: 1rem 1.15rem; }
+.pdv-inv-card {
+    border: 1px solid #e8edf2;
+    border-radius: 14px;
+    background: #fff;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .65rem;
+}
+.pdv-inv-card__name { font-weight: 700; color: #1e293b; font-size: .95rem; margin: 0; }
+.pdv-inv-card__code { font-size: .72rem; color: #94a3b8; font-family: ui-monospace, monospace; }
+.pdv-inv-card__stock-row { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+.pdv-inv-card__stock-val { font-size: 1.35rem; font-weight: 800; color: #047857; line-height: 1; }
+.pdv-inv-bar { height: 6px; border-radius: 999px; background: #ecfdf5; overflow: hidden; }
+.pdv-inv-bar__fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #059669, #34d399); }
+.pdv-inv-bar__fill--bajo { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.pdv-inv-card__actions { display: flex; flex-wrap: wrap; gap: .35rem; padding-top: .5rem; border-top: 1px solid #f1f5f9; }
 #modalQrInventario .qr-box {
     display: flex; align-items: center; justify-content: center;
     min-height: 220px; background: #f8faf9; border-radius: 12px; border: 2px dashed #a7f3d0;
@@ -83,69 +101,74 @@
                     <h3 class="card-title mb-0"><i class="fas fa-boxes mr-1"></i> Inventario</h3>
                     <span class="badge badge-light">{{ $insumos->count() }} productos</span>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped m-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>Producto</th>
-                                    <th>Stock</th>
-                                    <th>Unidad</th>
-                                    <th class="text-center" style="min-width:130px;">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($insumos as $insumo)
-                                    <tr>
-                                        <td>
-                                            <strong>{{ $insumo->nombre }}</strong>
-                                            @if($insumo->codigo_trazabilidad)
-                                                <br><small class="text-muted">{{ $insumo->codigo_trazabilidad }}</small>
-                                            @endif
-                                        </td>
-                                        <td>{{ number_format($insumo->stock, 2) }}</td>
-                                        <td>{{ $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? '—' }}</td>
-                                        <td class="text-center text-nowrap pdv-inv-acciones">
-                                            @can('punto_venta.update')
-                                            <a href="{{ route('punto-venta.puntos.inventario.edit', [$punto, $insumo]) }}"
-                                               class="btn btn-xs btn-outline-secondary" title="Editar">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            @endcan
-                                            @can('punto_venta.view')
-                                            <button type="button"
-                                                    class="btn btn-xs btn-outline-success btn-qr-inventario"
-                                                    title="Código QR trazabilidad"
-                                                    data-url="{{ route('punto-venta.puntos.inventario.qr', [$punto, $insumo]) }}"
-                                                    data-producto="{{ $insumo->nombre }}">
-                                                <i class="fas fa-qrcode"></i>
-                                            </button>
-                                            @endcan
-                                            @can('punto_venta.delete')
-                                            <form method="POST"
-                                                  action="{{ route('punto-venta.puntos.inventario.destroy', [$punto, $insumo]) }}"
-                                                  class="d-inline form-eliminar-insumo">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="button"
-                                                        class="btn btn-xs btn-outline-danger"
-                                                        title="Eliminar"
-                                                        data-confirm-modal
-                                                        data-confirm-title="Eliminar producto"
-                                                        data-confirm-message="¿Eliminar «{{ $insumo->nombre }}» del inventario de este punto de venta?">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </form>
-                                            @endcan
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="4" class="text-center text-muted py-3">Sin productos. Reciba un pedido de distribución desde planta.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
+                @if($insumos->isEmpty())
+                <div class="card-body text-center text-muted py-4">
+                    Sin productos. Reciba un pedido de distribución desde planta.
                 </div>
+                @else
+                <div class="pdv-inv-grid">
+                    @foreach($insumos as $insumo)
+                        @php
+                            $unidad = $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? '';
+                            $minimo = (float) ($insumo->stockminimo ?? 0);
+                            $stock = (float) $insumo->stock;
+                            $pct = $minimo > 0 ? min(100, round(($stock / max($minimo * 2, 1)) * 100)) : min(100, $stock > 0 ? 100 : 0);
+                            $bajo = $minimo > 0 && $stock <= $minimo;
+                        @endphp
+                        <article class="pdv-inv-card">
+                            <div>
+                                <h4 class="pdv-inv-card__name">{{ $insumo->nombre }}</h4>
+                                @if($insumo->codigo_trazabilidad)
+                                <div class="pdv-inv-card__code">{{ $insumo->codigo_trazabilidad }}</div>
+                                @endif
+                            </div>
+                            <div class="pdv-inv-card__stock-row">
+                                <span class="pdv-inv-card__stock-val">{{ number_format($stock, 2) }}</span>
+                                @if($unidad)<span class="pdv-unidad-badge pdv-unidad-badge--inline">{{ $unidad }}</span>@endif
+                            </div>
+                            <div class="pdv-inv-bar" title="{{ $bajo ? 'Stock bajo' : 'Nivel de stock' }}">
+                                <div class="pdv-inv-bar__fill{{ $bajo ? ' pdv-inv-bar__fill--bajo' : '' }}" style="width: {{ $pct }}%"></div>
+                            </div>
+                            @if($bajo)
+                            <span class="badge badge-warning align-self-start"><i class="fas fa-exclamation-triangle mr-1"></i>Stock bajo</span>
+                            @endif
+                            <div class="pdv-inv-card__actions pdv-inv-acciones">
+                                @can('punto_venta.update')
+                                <a href="{{ route('punto-venta.puntos.inventario.edit', [$punto, $insumo]) }}"
+                                   class="btn btn-xs btn-outline-secondary" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                @endcan
+                                @can('punto_venta.view')
+                                <button type="button"
+                                        class="btn btn-xs btn-outline-success btn-qr-inventario"
+                                        title="Código QR trazabilidad"
+                                        data-url="{{ route('punto-venta.puntos.inventario.qr', [$punto, $insumo]) }}"
+                                        data-producto="{{ $insumo->nombre }}">
+                                    <i class="fas fa-qrcode"></i>
+                                </button>
+                                @endcan
+                                @can('punto_venta.delete')
+                                <form method="POST"
+                                      action="{{ route('punto-venta.puntos.inventario.destroy', [$punto, $insumo]) }}"
+                                      class="d-inline form-eliminar-insumo">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="button"
+                                            class="btn btn-xs btn-outline-danger"
+                                            title="Eliminar"
+                                            data-confirm-modal
+                                            data-confirm-title="Eliminar producto"
+                                            data-confirm-message="¿Eliminar «{{ $insumo->nombre }}» del inventario de este punto de venta?">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                @endcan
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+                @endif
             </div>
 
             <div class="card pdv-card card-outline card-info">
@@ -186,7 +209,7 @@
                     </button>
                 </div>
                 <div class="modal-body px-4 py-4 text-center">
-                    <p class="text-muted small mb-3">Escanee el código para ver el recorrido del producto desde el lote agrícola hasta este punto de venta.</p>
+                    <p class="text-muted small mb-3">Escanea el código QR para ver la trazabilidad completa.</p>
                     <div id="qrInventarioCanvas" class="qr-box mb-3"></div>
                     <p class="qr-url mb-2" id="modalQrUrl"></p>
                     <a href="#" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success" id="modalQrAbrir">

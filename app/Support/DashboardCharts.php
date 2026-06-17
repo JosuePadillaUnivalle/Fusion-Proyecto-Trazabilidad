@@ -11,10 +11,126 @@ use App\Models\PedidoDistribucion;
 use App\Models\Produccion;
 use App\Models\PuntoVenta;
 use App\Models\Usuario;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 final class DashboardCharts
 {
+    /**
+     * Gráfico de producción por cultivo (dashboard admin).
+     *
+     * @return array{labels: array<int, string>, datasets: array<int, array<string, mixed>>, modo: string}
+     */
+    public static function produccionAdmin(DashboardFiltros $filtros): array
+    {
+        $coloresChart = ['#28a745', '#ffc107', '#17a2b8', '#dc3545', '#6f42c1', '#fd7e14'];
+        $meses = $filtros->mesesParaGrafico();
+        $chartDesde = $meses[0] ?? null;
+
+        $cultivosChart = Produccion::select('cultivo.cultivoid', 'cultivo.nombre')
+            ->join('lote', 'produccion.loteid', '=', 'lote.loteid')
+            ->join('cultivo', 'lote.cultivoid', '=', 'cultivo.cultivoid')
+            ->when($chartDesde, fn ($q) => $q->where('produccion.fechacosecha', '>=', Carbon::create($chartDesde['año'], $chartDesde['mes'], 1)))
+            ->when($filtros->cultivoId, fn ($q) => $q->where('lote.cultivoid', $filtros->cultivoId))
+            ->when($filtros->loteId, fn ($q) => $q->where('lote.loteid', $filtros->loteId))
+            ->when($filtros->estadoLoteId, fn ($q) => $q->where('lote.estadolotetipoid', $filtros->estadoLoteId))
+            ->groupBy('cultivo.cultivoid', 'cultivo.nombre')
+            ->get();
+
+        if (count($meses) === 1) {
+            $dias = $filtros->diasParaGrafico();
+            if ($dias !== []) {
+                return [
+                    'labels' => array_column($dias, 'label'),
+                    'datasets' => self::datasetsProduccionPorDias($cultivosChart, $dias, $filtros, $coloresChart),
+                    'modo' => 'diario',
+                ];
+            }
+        }
+
+        $datasets = [];
+        foreach ($cultivosChart as $index => $cultivo) {
+            $data = [];
+            foreach ($meses as $mes) {
+                $data[] = self::sumProduccionCultivoEnMes($cultivo->cultivoid, $mes, $filtros);
+            }
+            $color = $coloresChart[$index % count($coloresChart)];
+            $datasets[] = self::datasetLineaProduccion($cultivo->nombre, $data, $color);
+        }
+
+        return [
+            'labels' => array_column($meses, 'nombre'),
+            'datasets' => $datasets,
+            'modo' => 'mensual',
+        ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, object{cultivoid: int, nombre: string}>  $cultivosChart
+     * @param  array<int, array{fecha: string, label: string}>  $dias
+     * @param  array<int, string>  $coloresChart
+     * @return array<int, array<string, mixed>>
+     */
+    private static function datasetsProduccionPorDias($cultivosChart, array $dias, DashboardFiltros $filtros, array $coloresChart): array
+    {
+        $datasets = [];
+        foreach ($cultivosChart as $index => $cultivo) {
+            $data = [];
+            foreach ($dias as $dia) {
+                $qProd = Produccion::join('lote', 'produccion.loteid', '=', 'lote.loteid')
+                    ->where('lote.cultivoid', $cultivo->cultivoid)
+                    ->whereDate('produccion.fechacosecha', $dia['fecha']);
+                if ($filtros->loteId) {
+                    $qProd->where('lote.loteid', $filtros->loteId);
+                }
+                if ($filtros->estadoLoteId) {
+                    $qProd->where('lote.estadolotetipoid', $filtros->estadoLoteId);
+                }
+                $data[] = (float) $qProd->sum('produccion.cantidad');
+            }
+            $color = $coloresChart[$index % count($coloresChart)];
+            $datasets[] = self::datasetLineaProduccion($cultivo->nombre, $data, $color);
+        }
+
+        return $datasets;
+    }
+
+    /**
+     * @param  array{mes: int, año: int, nombre: string}  $mes
+     */
+    private static function sumProduccionCultivoEnMes(int $cultivoId, array $mes, DashboardFiltros $filtros): float
+    {
+        $qProd = Produccion::join('lote', 'produccion.loteid', '=', 'lote.loteid')
+            ->where('lote.cultivoid', $cultivoId)
+            ->whereMonth('produccion.fechacosecha', $mes['mes'])
+            ->whereYear('produccion.fechacosecha', $mes['año']);
+        if ($filtros->loteId) {
+            $qProd->where('lote.loteid', $filtros->loteId);
+        }
+        if ($filtros->estadoLoteId) {
+            $qProd->where('lote.estadolotetipoid', $filtros->estadoLoteId);
+        }
+
+        return (float) $qProd->sum('produccion.cantidad');
+    }
+
+    /**
+     * @param  array<int, float>  $data
+     * @return array<string, mixed>
+     */
+    private static function datasetLineaProduccion(string $nombreCultivo, array $data, string $color): array
+    {
+        return [
+            'label' => $nombreCultivo.' (kg)',
+            'data' => $data,
+            'borderColor' => $color,
+            'backgroundColor' => $color.'20',
+            'borderWidth' => 3,
+            'fill' => true,
+            'tension' => 0.4,
+        ];
+    }
+
     /**
      * @return array<string, mixed>
      */

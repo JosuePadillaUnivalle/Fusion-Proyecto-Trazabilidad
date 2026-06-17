@@ -481,10 +481,10 @@ final class EnvioPedidoService
     {
         $envio->loadMissing(['ruta.paradas', 'pedido']);
 
+        $puntos = [];
         if ($envio->ruta?->paradas?->isNotEmpty()) {
             $puntos = app(RutaPorCallesService::class)->paradasConCoordenadas($envio->ruta->paradas);
-
-            return array_values(array_map(fn (array $p) => [
+            $puntos = array_values(array_map(fn (array $p) => [
                 'lat' => $p['lat'],
                 'lng' => $p['lng'],
                 'orden' => (int) ($p['orden'] ?? 0),
@@ -492,30 +492,86 @@ final class EnvioPedidoService
             ], $puntos));
         }
 
-        $pedido = $envio->pedido;
-        if ($pedido === null) {
-            return [];
+        if (count($puntos) < 2 && $envio->pedido !== null) {
+            $puntos = self::paradasDesdePedido($envio->pedido);
         }
 
+        return $puntos;
+    }
+
+    /**
+     * @return array<int, array{lat: float, lng: float, orden: int, label: string}>
+     */
+    private static function paradasDesdePedido(Pedido $pedido): array
+    {
         $puntos = [];
-        if ($pedido->origen_latitud !== null && $pedido->origen_longitud !== null) {
+
+        $origen = self::coordenadasDesdeCampoPedido(
+            $pedido->origen_latitud,
+            $pedido->origen_longitud,
+            $pedido->origen_direccion
+        );
+        if ($origen !== null) {
             $puntos[] = [
-                'lat' => (float) $pedido->origen_latitud,
-                'lng' => (float) $pedido->origen_longitud,
+                'lat' => $origen['lat'],
+                'lng' => $origen['lng'],
                 'orden' => 1,
                 'label' => self::etiquetaOrigenPedido($pedido) ?? 'Origen',
             ];
         }
-        if ($pedido->latitud !== null && $pedido->longitud !== null) {
+
+        $destino = self::coordenadasDesdeCampoPedido(
+            $pedido->latitud,
+            $pedido->longitud,
+            $pedido->direccion_texto ?? $pedido->nombre_planta
+        );
+        if ($destino === null) {
+            $aprox = app(RutaPorCallesService::class)->coordsDesdePedido($pedido);
+            if ($aprox !== null) {
+                $destino = ['lat' => $aprox['lat'], 'lng' => $aprox['lng']];
+            }
+        }
+        if ($destino !== null) {
             $puntos[] = [
-                'lat' => (float) $pedido->latitud,
-                'lng' => (float) $pedido->longitud,
+                'lat' => $destino['lat'],
+                'lng' => $destino['lng'],
                 'orden' => count($puntos) + 1,
                 'label' => self::etiquetaDestinoPedido($pedido) ?? 'Destino',
             ];
         }
 
         return $puntos;
+    }
+
+    /**
+     * @return array{lat: float, lng: float}|null
+     */
+    private static function coordenadasDesdeCampoPedido($lat, $lng, ?string $texto): ?array
+    {
+        if ($lat !== null && $lng !== null) {
+            return ['lat' => (float) $lat, 'lng' => (float) $lng];
+        }
+
+        return self::coordenadasDesdeTextoGps($texto);
+    }
+
+    /**
+     * @return array{lat: float, lng: float}|null
+     */
+    private static function coordenadasDesdeTextoGps(?string $texto): ?array
+    {
+        if ($texto === null || trim($texto) === '') {
+            return null;
+        }
+
+        if (preg_match('/GPS\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/i', $texto, $coincidencias)) {
+            return [
+                'lat' => (float) $coincidencias[1],
+                'lng' => (float) $coincidencias[2],
+            ];
+        }
+
+        return null;
     }
 
     private static function etiquetaMapaParada(string $label): string

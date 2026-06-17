@@ -21,12 +21,6 @@ class CertificacionController extends Controller
 
     public function index(Request $request): View|RedirectResponse
     {
-        if ($request->input('ambito') === 'planta') {
-            return redirect()
-                ->route('certificaciones.index')
-                ->with('info', 'Las certificaciones aplican solo a lotes de campo. La evaluación de calidad en planta se registra en Procesamiento de lote.');
-        }
-
         $datos = $this->indexService->datosCampo();
 
         return view('certificaciones.index', [
@@ -42,6 +36,7 @@ class CertificacionController extends Controller
             'loteid'        => ['required', 'integer', 'exists:lote,loteid'],
             'resultado'     => ['nullable', 'string', Rule::in(CertificacionLote::RAZONES)],
             'observaciones' => ['nullable', 'string', 'max:1000'],
+            'recomendaciones' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $resultado = $validated['resultado'] ?? CertificacionLote::RAZON_CERTIFICADO;
@@ -52,15 +47,56 @@ class CertificacionController extends Controller
                 ->withInput();
         }
 
-        $this->evaluarLote((int) $validated['loteid'], $resultado, $validated['observaciones'] ?? null);
+        $this->evaluarLote(
+            (int) $validated['loteid'],
+            $resultado,
+            $validated['observaciones'] ?? null,
+            $validated['recomendaciones'] ?? null
+        );
 
         $mensaje = $resultado === CertificacionLote::RAZON_CERTIFICADO
             ? 'Lote de campo certificado correctamente.'
             : 'Lote marcado como No conforme. No podrá enviarse al almacén.';
 
+        $lote = Lote::findOrFail((int) $validated['loteid']);
+
+        $returnUrl = $this->validReturnUrl($request->input('return'));
+        if ($returnUrl) {
+            return redirect($returnUrl)->with('success', $mensaje);
+        }
+
+        if ($request->boolean('from_trazabilidad')) {
+            return redirect()
+                ->route('lotes.trazabilidad', $lote)
+                ->with('success', $mensaje);
+        }
+
         return redirect()
             ->route('certificaciones.index')
             ->with('success', $mensaje);
+    }
+
+    private function validReturnUrl(mixed $return): ?string
+    {
+        if (! is_string($return) || trim($return) === '') {
+            return null;
+        }
+
+        $return = trim($return);
+        if (str_starts_with($return, '/')) {
+            return $return;
+        }
+
+        $appUrl = rtrim((string) config('app.url'), '/');
+        if (str_starts_with($return, $appUrl)) {
+            return $return;
+        }
+
+        if (preg_match('#^https?://[^/]+(/lotes/\d+/trazabilidad(?:\?.*)?)$#', $return, $m)) {
+            return $m[1];
+        }
+
+        return null;
     }
 
     public function storeBatch(Request $request): RedirectResponse
@@ -95,7 +131,7 @@ class CertificacionController extends Controller
         return view('certificaciones.show', ['cert' => $certificacion]);
     }
 
-    private function evaluarLote(int $loteid, string $resultado, ?string $observaciones): void
+    private function evaluarLote(int $loteid, string $resultado, ?string $observaciones, ?string $recomendaciones = null): void
     {
         $lote = Lote::findOrFail($loteid);
 
@@ -121,18 +157,24 @@ class CertificacionController extends Controller
                 'codigo_certificado'  => $codigo,
                 'resultado'           => $resultado,
                 'observaciones'       => $observaciones,
+                'recomendaciones'     => $recomendaciones,
                 'fecha_certificacion' => now(),
             ]
         );
 
         $lote->update(['estadolotetipoid' => $estado->estadolotetipoid]);
 
+        $histObs = $resultado.': '.$certificacion->codigo_certificado
+            .($observaciones ? ' — '.$observaciones : '');
+        if ($recomendaciones && $resultado === CertificacionLote::RAZON_NO_CONFORME) {
+            $histObs .= ' | Recomendaciones: '.$recomendaciones;
+        }
+
         HistorialEstadoLote::create([
             'loteid'           => $lote->loteid,
             'estadolotetipoid' => $estado->estadolotetipoid,
             'fecha_cambio'     => now(),
-            'observaciones'    => $resultado.': '.$certificacion->codigo_certificado
-                .($observaciones ? ' — '.$observaciones : ''),
+            'observaciones'    => $histObs,
             'usuarioid'        => auth()->id(),
         ]);
     }

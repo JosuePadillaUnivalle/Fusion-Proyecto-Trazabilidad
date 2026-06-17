@@ -149,9 +149,13 @@ class ProductoPlantaCatalogo
             ];
         }
 
-        $cantidad = (float) ($lote->cantidad_objetivo ?? 0);
-        if ($cantidad <= 0 && $salidaKg > 0) {
+        $cantidadObjetivo = (float) ($lote->cantidad_objetivo ?? 0);
+        if ($salidaKg > 0) {
             $cantidad = $salidaKg;
+        } elseif ($cantidadObjetivo > 0) {
+            $cantidad = $cantidadObjetivo;
+        } else {
+            $cantidad = 0.0;
         }
 
         return [

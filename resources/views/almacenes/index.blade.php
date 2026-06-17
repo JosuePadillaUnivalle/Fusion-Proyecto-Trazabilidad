@@ -79,9 +79,9 @@
             <div class="small-box small-box-blue">
                 <div class="inner">
                     <h3>{{ number_format($stats['ocupado_total'] ?? 0, 0) }}</h3>
-                    <p>kg ocupados (cosecha)</p>
+                    <p>kg ocupados{{ ($ambito ?? '') === 'planta' ? ' (planta)' : ' (cosecha)' }}</p>
                 </div>
-                <div class="icon"><i class="fas fa-seedling"></i></div>
+                <div class="icon"><i class="fas {{ ($ambito ?? '') === 'planta' ? 'fa-industry' : 'fa-seedling' }}"></i></div>
                 <span class="small-box-footer">En esta página</span>
             </div>
         </div>
@@ -89,7 +89,7 @@
             <div class="small-box small-box-purple">
                 <div class="inner">
                     <h3>{{ $stats['ocupacion_promedio'] ?? 0 }}%</h3>
-                    <p>Ocupación promedio</p>
+                    <p>Uso promedio de almacenaje</p>
                 </div>
                 <div class="icon"><i class="fas fa-chart-pie"></i></div>
                 <span class="small-box-footer">Capacidad utilizada</span>
@@ -120,14 +120,15 @@
                         <input type="text" id="searchInput" class="form-control" placeholder="Buscar almacén...">
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-3 mb-2">
-                    <label class="small text-muted mb-1">Ocupación</label>
+                <div class="col-lg-4 col-md-6 mb-2">
+                    <label class="small text-muted mb-1">Nivel de almacenaje</label>
                     <select id="filterOcupacion" class="form-control form-control-sm">
-                        <option value="">Todas</option>
-                        <option value="baja">Baja (&lt; 50%)</option>
-                        <option value="media">Media (50–85%)</option>
-                        <option value="alta">Alta (&gt; 85%)</option>
+                        <option value="">Todos los niveles</option>
+                        <option value="baja">Espacio disponible (menos del 50% usado)</option>
+                        <option value="media">Medio lleno (50% – 85% usado)</option>
+                        <option value="alta">Casi lleno (más del 85% usado)</option>
                     </select>
+                    <small class="text-muted d-block mt-1">Filtra por cuánto espacio físico está en uso, no por actividad operativa.</small>
                 </div>
             </div>
             <x-filtros-client-actions />
@@ -140,7 +141,7 @@
                         <th>Nombre</th>
                         <th>Ubicación</th>
                         <th>Capacidad (kg)</th>
-                        <th>Ocupación</th>
+                        <th>Almacenaje</th>
                         <th class="text-center" style="width: 110px;">Acciones</th>
                     </tr>
                 </thead>
@@ -220,7 +221,7 @@
                                     <i class="fas fa-warehouse mr-1"></i>{{ $a->nombre }}
                                 </p>
                                 <span class="badge badge-{{ $pct > 85 ? 'danger' : ($pct >= 50 ? 'warning' : 'success') }}">
-                                    {{ $pct }}% ocupado
+                                    {{ $pct }}% usado
                                 </span>
                             </div>
                             @if($direccionAlmacen)

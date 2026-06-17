@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\EnvioAsignacionMultiple;
 use App\Models\RutaDistribucion;
+use App\Models\Usuario;
 
 final class SimulacionRutaCatalogo
 {
@@ -11,12 +12,13 @@ final class SimulacionRutaCatalogo
 
     public const TIPO_DISTRIBUCION = 'distribucion';
 
-    /** Segundos por kilómetro para la simulación (≈ 2 min/km). */
-    public const SEGUNDOS_POR_KM = 120;
+    /** Duración fija de la simulación (demo de trazabilidad en vivo). */
+    public const DURACION_DEMO_SEG = 60;
 
-    public const DURACION_MIN_SEG = 90;
-
-    public const DURACION_MAX_SEG = 600;
+    public static function duracionEfectiva(?int $duracionAlmacenada = null): int
+    {
+        return self::DURACION_DEMO_SEG;
+    }
 
     public static function simulacionActivaAgricola(EnvioAsignacionMultiple $envio): bool
     {
@@ -67,5 +69,28 @@ final class SimulacionRutaCatalogo
         }
 
         return $ruta->transportista_usuarioid !== null;
+    }
+
+    /** Transportista asignado o supervisor con permiso de actualizar asignaciones. */
+    public static function usuarioPuedeEmpezarAgricola(?Usuario $user, EnvioAsignacionMultiple $envio): bool
+    {
+        if (! self::puedeEmpezarAgricola($envio) || $user === null) {
+            return false;
+        }
+
+        return (int) $envio->transportista_usuarioid === (int) $user->usuarioid
+            || $user->can('asignaciones.update');
+    }
+
+    /** Transportista asignado, jefe de planta/admin o quien gestione asignaciones. */
+    public static function usuarioPuedeEmpezarDistribucion(?Usuario $user, RutaDistribucion $ruta): bool
+    {
+        if (! self::puedeEmpezarDistribucion($ruta) || $user === null) {
+            return false;
+        }
+
+        return (int) $ruta->transportista_usuarioid === (int) $user->usuarioid
+            || UsuarioRol::puedeGestionarDistribucionPlanta($user)
+            || $user->can('asignaciones.update');
     }
 }

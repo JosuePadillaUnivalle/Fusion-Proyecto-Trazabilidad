@@ -20,6 +20,7 @@ class Produccion extends Model
         'cantidad_base',
         'fechacosecha',
         'destinoproduccionid',
+        'almacendestinoid',
         'procesoplantaid',
         'maquinaplantaid',
         'imagenurl',
@@ -33,6 +34,7 @@ class Produccion extends Model
         'unidadmedidaid'      => 'integer',
         'cantidad_base'       => 'float',
         'destinoproduccionid' => 'integer',
+        'almacendestinoid'    => 'integer',
         'procesoplantaid'     => 'integer',
         'maquinaplantaid'     => 'integer',
         'fechacosecha'        => 'date',
@@ -69,6 +71,11 @@ class Produccion extends Model
     public function almacenamientos()
     {
         return $this->hasMany(ProduccionAlmacenamiento::class, 'produccionid', 'produccionid');
+    }
+
+    public function almacenDestino()
+    {
+        return $this->belongsTo(Almacen::class, 'almacendestinoid', 'almacenid');
     }
 
     public function procesoPlanta()

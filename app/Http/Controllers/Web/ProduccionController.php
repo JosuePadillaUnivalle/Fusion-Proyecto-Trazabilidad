@@ -95,27 +95,31 @@ class ProduccionController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $lotesFiltro = Lote::query()
-            ->whereIn('estadolotetipoid', EstadoLoteCatalogo::idsLoteSoloCosechado() ?: [-1])
+        $estadoIdsPostCosecha = EstadoLoteCatalogo::idsLotePostCosecha() ?: [-1];
+        $loteIdsCosechadosFilter = Lote::query()
+            ->whereIn('estadolotetipoid', $estadoIdsPostCosecha)
             ->orderBy('nombre')
-            ->get(['loteid', 'nombre']);
+            ->pluck('loteid');
 
-        $destinosFiltro = DestinoProduccion::query()->orderBy('nombre')->get(['destinoproduccionid', 'nombre']);
+        $loteFiltroSeleccionado = $request->filled('loteid')
+            ? Lote::find((int) $request->loteid)
+            : null;
 
         return view('producciones.index', compact(
             'producciones',
             'stats',
-            'lotesFiltro',
-            'destinosFiltro',
+            'loteIdsCosechadosFilter',
+            'loteFiltroSeleccionado',
         ));
     }
 
     /**
-     * Una cosecha por lote: solo el registro más reciente de lotes en estado Cosechado.
+     * Una cosecha por lote: el registro más reciente de lotes ya cosechados
+     * (incluye certificado, no conforme y finalizado, no solo «Cosechado»).
      */
     private function cosechasCompletadasQuery(Request $request)
     {
-        $estadoIds = EstadoLoteCatalogo::idsLoteSoloCosechado();
+        $estadoIds = EstadoLoteCatalogo::idsLotePostCosecha();
 
         $ultimasPorLote = Produccion::query()
             ->selectRaw('MAX(produccionid) as produccionid')
@@ -126,10 +130,6 @@ class ProduccionController extends Controller
 
         if ($request->filled('loteid')) {
             $query->where('loteid', (int) $request->loteid);
-        }
-
-        if ($request->filled('destinoid')) {
-            $query->where('destinoproduccionid', (int) $request->destinoid);
         }
 
         if ($request->filled('fecha_desde')) {
@@ -175,6 +175,7 @@ class ProduccionController extends Controller
         }
 
         $unidades = UnidadMedida::where('categoria', 'peso')->get();
+        AlmacenAmbito::asegurarAmbitosEnRegistros();
         $almacenesTodos = AlmacenAmbito::scope(
             Almacen::with(['tipoAlmacen', 'unidadMedida', 'almacenamientos'])
                 ->where('activo', true)
@@ -182,6 +183,11 @@ class ProduccionController extends Controller
             AlmacenAmbito::AGRICOLA
         )->get();
         $almacenes = $this->almacenesDestacadosParaCosecha($almacenesTodos);
+        $resumenesCapacidad = $almacenesTodos
+            ->mapWithKeys(fn (Almacen $almacen) => [
+                $almacen->almacenid => $this->capacidadService->resumen($almacen),
+            ])
+            ->all();
         $almacenesCatalogo = $this->catalogoAlmacenesCosecha($almacenesTodos);
         $lotePreseleccionado = $loteidParam
             ?? (old('loteid') ?: ($lotes->count() === 1 ? $lotes->first()->loteid : null));
@@ -199,6 +205,7 @@ class ProduccionController extends Controller
             'almacenes',
             'almacenesTodos',
             'almacenesCatalogo',
+            'resumenesCapacidad',
             'lotePreseleccionado',
             'lotePreseleccionadoLabel',
             'returnUrl'
@@ -252,15 +259,18 @@ class ProduccionController extends Controller
             ]);
 
             $mensajeAlmacen = '';
+            $avisoAlmacenPendiente = null;
             if (! empty($data['almacenid'])) {
                 $bloqueo = $this->certificacionCampo->mensajeBloqueoAlmacen($lote);
-                if ($bloqueo !== null) {
-                    return back()->withErrors(['almacenid' => $bloqueo])->withInput();
-                }
-
-                $almacen = AlmacenAmbito::scope(Almacen::query(), AlmacenAmbito::AGRICOLA)
+                $almacenDestino = AlmacenAmbito::scope(Almacen::query(), AlmacenAmbito::AGRICOLA)
                     ->where('almacenid', $data['almacenid'])
                     ->firstOrFail();
+
+                if ($bloqueo !== null) {
+                    $produccion->update(['almacendestinoid' => $almacenDestino->almacenid]);
+                    $avisoAlmacenPendiente = $bloqueo;
+                } else {
+                $almacen = $almacenDestino;
 
                 // ================================
                 // 1) Capacidad del almacén en KG
@@ -297,6 +307,7 @@ class ProduccionController extends Controller
                 ]);
 
                 $mensajeAlmacen = " y almacenado en {$almacen->nombre}";
+                }
             }
 
             // Cambiar estado del lote a "Cosechado"
@@ -329,19 +340,21 @@ class ProduccionController extends Controller
             $mensaje = "¡Cosecha registrada! {$data['cantidad']} {$unidad->abreviatura} de {$lote->cultivo->nombre}"
                 .$mensajeAlmacen.'.';
             if ($mensajeAlmacen === '') {
-                $mensaje .= ' Certifique el lote en Certificaciones antes de enviarlo al almacén.';
+                $mensaje .= ' Certifique el lote en Certificaciones y luego envíelo al almacén desde la trazabilidad del lote.';
             } else {
                 $mensaje .= ' El ingreso aparece en Movimientos de almacén agrícola.';
             }
 
             $returnUrl = $this->validReturnUrl($request->input('return'));
-            if ($returnUrl) {
-                return redirect($returnUrl)->with('success', $mensaje);
+            $redirect = $returnUrl
+                ? redirect($returnUrl)->with('success', $mensaje)
+                : redirect()->route('producciones.index')->with('success', $mensaje);
+
+            if ($avisoAlmacenPendiente !== null) {
+                $redirect = $redirect->with('warning', 'La cosecha quedó registrada, pero no se envió al almacén: '.$avisoAlmacenPendiente);
             }
 
-            return redirect()
-                ->route('producciones.index')
-                ->with('success', $mensaje);
+            return $redirect;
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -401,8 +414,7 @@ class ProduccionController extends Controller
     private function catalogoAlmacenesCosecha(Collection $almacenes): array
     {
         return $almacenes->map(function (Almacen $almacen) {
-            $usado = $almacen->almacenamientos->whereNull('fechasalida')->sum('cantidad');
-            $disponible = $almacen->capacidad - $usado;
+            $resumen = $this->capacidadService->resumen($almacen);
             $resuelto = UbicacionGpsParser::resolverAlmacen(
                 (int) $almacen->almacenid,
                 $almacen->nombre,
@@ -414,9 +426,9 @@ class ProduccionController extends Controller
                 'nombre' => $almacen->nombre,
                 'tipo' => $almacen->tipoAlmacen->nombre ?? 'General',
                 'ubicacion' => $almacen->ubicacion,
-                'disponible' => $disponible,
-                'capacidad' => (float) $almacen->capacidad,
-                'um' => $almacen->unidadMedida->abreviatura ?? 'kg',
+                'disponible' => $resumen['disponible_kg'],
+                'capacidad' => $resumen['capacidad_kg'],
+                'um' => 'kg',
                 'tags' => strtolower($almacen->nombre.' '.($almacen->tipoAlmacen->nombre ?? '').' '.($almacen->ubicacion ?? '')),
                 'lat' => $resuelto['lat'],
                 'lng' => $resuelto['lng'],

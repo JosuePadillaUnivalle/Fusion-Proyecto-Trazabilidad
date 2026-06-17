@@ -123,7 +123,26 @@
             cb(true);
             return;
         }
-        if (formPendiente) formPendiente.submit();
+        if (formPendiente) {
+            if (formPendiente.classList.contains('js-lp-guardar-scroll')) {
+                try {
+                    sessionStorage.setItem('lp_procesamiento_scroll', String(window.scrollY));
+                } catch (e) {}
+            }
+            if (formPendiente.dataset.ajaxLpAction === 'completar-etapa' && window.LpProcesamientoAjax) {
+                window.LpProcesamientoAjax.completarEtapa(formPendiente);
+                formPendiente = null;
+                if (window.jQuery) window.jQuery('#modalConfirmarAccion').modal('hide');
+                return;
+            }
+            if (formPendiente.dataset.ajaxLpAction === 'completar-etapa') {
+                formPendiente.submit();
+                formPendiente = null;
+                if (window.jQuery) window.jQuery('#modalConfirmarAccion').modal('hide');
+                return;
+            }
+            formPendiente.submit();
+        }
         formPendiente = null;
         if (window.jQuery) window.jQuery('#modalConfirmarAccion').modal('hide');
     });

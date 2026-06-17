@@ -10,7 +10,7 @@
                 </button>
             </div>
             <div class="modal-body px-4 py-4 text-center">
-                <p class="text-muted small mb-3">Escanee con su teléfono (misma red Wi‑Fi) para ver el recorrido del producto.</p>
+                <p class="text-muted small mb-3">Escanea el código QR para ver la trazabilidad completa.</p>
                 <div id="qrInventarioCanvas" class="qr-box mb-3" style="display:flex;align-items:center;justify-content:center;min-height:220px;background:#f8faf9;border-radius:12px;border:2px dashed #a7f3d0;"></div>
                 <p class="small text-muted mb-2" id="modalQrUrl" style="word-break:break-all;"></p>
                 <a href="#" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success" id="modalQrAbrir">

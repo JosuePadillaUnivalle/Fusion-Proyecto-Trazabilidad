@@ -204,6 +204,49 @@ final class DashboardFiltros
     }
 
     /**
+     * Días del periodo cuando el gráfico abarca un solo mes (p. ej. «Este mes»).
+     *
+     * @return array<int, array{fecha: string, label: string}>
+     */
+    public function diasParaGrafico(): array
+    {
+        $meses = $this->mesesParaGrafico();
+        if (count($meses) !== 1) {
+            return [];
+        }
+
+        $mes = $meses[0];
+        $inicio = Carbon::create($mes['año'], $mes['mes'], 1)->startOfDay();
+        $finMes = $inicio->copy()->endOfMonth()->endOfDay();
+
+        [$desde, $hasta] = $this->rangoFechas();
+        if ($desde && $desde->gt($inicio)) {
+            $inicio = $desde->copy()->startOfDay();
+        }
+
+        $fin = $hasta ? min($hasta->copy()->endOfDay(), $finMes) : $finMes;
+        if ($this->periodo === 'mes_actual') {
+            $fin = min($fin, now()->endOfDay());
+        }
+
+        if ($inicio->gt($fin)) {
+            return [];
+        }
+
+        $dias = [];
+        $cursor = $inicio->copy();
+        while ($cursor <= $fin) {
+            $dias[] = [
+                'fecha' => $cursor->toDateString(),
+                'label' => (string) $cursor->day,
+            ];
+            $cursor->addDay();
+        }
+
+        return $dias;
+    }
+
+    /**
      * @return array<int, array{mes: int, año: int, nombre: string}>
      */
     public function mesesParaGrafico(): array

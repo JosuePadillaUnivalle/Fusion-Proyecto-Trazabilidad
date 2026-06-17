@@ -21,7 +21,9 @@ use App\Models\Usuario;
 use App\Models\Vehiculo;
 use App\Support\AlmacenAmbito;
 use App\Services\ActividadInsumoService;
+use App\Services\ProductoPlantaInventarioService;
 use App\Support\ActividadDetalleCatalogo;
+use App\Support\BusquedaTexto;
 use App\Support\CultivoSiembraCatalogo;
 use App\Support\InsumoCatalogo;
 use App\Support\PedidoCatalogo;
@@ -180,8 +182,8 @@ class CatalogoSelectorController extends Controller
 
             $transportista = Usuario::query()->find($transportistaId);
             if ($transportista) {
-                $licencia = app(TransporteCapacidadService::class)->licenciaTransportista($transportista);
-                $codigos = LicenciaConduccionCatalogo::codigosAutorizados($licencia);
+                $licencias = app(TransporteCapacidadService::class)->licenciasTransportista($transportista);
+                $codigos = LicenciaConduccionCatalogo::codigosAutorizadosMultiples($licencias);
                 if ($codigos === []) {
                     $query->whereRaw('1 = 0');
                 } else {
@@ -307,6 +309,21 @@ class CatalogoSelectorController extends Controller
             $query->where('cultivoid', (int) $request->cultivoid);
         }
 
+        if ($request->filled('loteids')) {
+            $ids = collect(explode(',', (string) $request->loteids))
+                ->map(fn ($id) => (int) trim($id))
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($ids === []) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('loteid', $ids);
+            }
+        }
+
         if ($request->boolean('solo_cosecha')) {
             $query->with(['estadoTipo', 'actividades.tipoActividad']);
             $ids = \App\Support\EstadoLoteCatalogo::idsPorSlugs(['listo_para_cosecha', 'en_crecimiento']);
@@ -409,9 +426,22 @@ class CatalogoSelectorController extends Controller
     {
         AlmacenAmbito::asegurarAmbitosEnRegistros();
 
-        $query = InsumoCatalogo::aplicarFiltroOperativo(
-            Insumo::query()->with(['tipo', 'unidadMedida', 'almacen'])
-        );
+        $esPlanta = $request->boolean('ambito_planta');
+
+        if ($esPlanta) {
+            try {
+                app(ProductoPlantaInventarioService::class)->sincronizarDesdeAlmacenajes(
+                    $request->filled('almacenid') ? (int) $request->almacenid : null
+                );
+            } catch (\Throwable $e) {
+                report($e);
+            }
+            $query = Insumo::query()->with(['tipo', 'unidadMedida', 'almacen']);
+        } else {
+            $query = InsumoCatalogo::aplicarFiltroOperativo(
+                Insumo::query()->with(['tipo', 'unidadMedida', 'almacen'])
+            );
+        }
 
         if ($request->filled('tipo_slug')) {
             $slug = trim((string) $request->tipo_slug);
@@ -449,13 +479,27 @@ class CatalogoSelectorController extends Controller
             $alm = $i->almacen?->nombre;
             $stock = (float) ($i->stock ?? 0);
             $esSemilla = InsumoCatalogo::slugFromNombreTipo($i->tipo?->nombre) === 'material_siembra';
+            $esProductoTerminado = mb_strtolower(trim($i->tipo?->nombre ?? '')) === 'producto terminado';
+            $tipoEtiqueta = $esProductoTerminado ? 'Producto terminado' : ($i->tipo?->nombre ?? 'Insumo');
+            $stockEtiqueta = $esSemilla
+                ? CultivoSiembraCatalogo::etiquetaStockSemilla($i)
+                : 'Stock: '.number_format($stock, 2).' '.$unidad;
+            $dosisUnidad = $esSemilla ? ($i->dosis_unidad ?? $unidad) : null;
+            $dosisPorHa = $esSemilla ? (float) ($i->dosis_por_ha ?? 0) : null;
+            if ($esSemilla && ($dosisPorHa === null || $dosisPorHa <= 0)) {
+                $fallback = CultivoSiembraCatalogo::dosisPorNombreCultivo(PedidoCatalogo::cultivoDesdeInsumo($i));
+                if ($fallback) {
+                    $dosisPorHa = (float) $fallback['por_ha'];
+                    $dosisUnidad = $fallback['unidad'];
+                }
+            }
 
             return [
                 'id' => $i->insumoid,
                 'label' => $i->nombre,
                 'meta' => trim(
                     ($alm ? $alm.' · ' : '')
-                    .'Stock: '.number_format($stock, 2).' '.$unidad
+                    .$tipoEtiqueta.' · '.$stockEtiqueta
                 ),
                 'extra' => [
                     'stock' => $stock,
@@ -463,8 +507,10 @@ class CatalogoSelectorController extends Controller
                     'almacen' => $alm,
                     'precio' => $i->preciounitario ?? 0,
                     'sin_stock' => $stock <= 0,
-                    'dosis_por_ha' => $esSemilla ? (float) ($i->dosis_por_ha ?? 0) : null,
-                    'dosis_unidad' => $esSemilla ? ($i->dosis_unidad ?? $unidad) : null,
+                    'dosis_por_ha' => $esSemilla ? (float) ($dosisPorHa ?? 0) : null,
+                    'dosis_unidad' => $dosisUnidad,
+                    'dosis_unidad_legible' => $esSemilla ? CultivoSiembraCatalogo::unidadLegible($dosisUnidad) : null,
+                    'semillas_por_kg' => $esSemilla ? CultivoSiembraCatalogo::semillasPorKgDesdeInsumo($i) : null,
                     'cultivo' => $esSemilla ? PedidoCatalogo::cultivoDesdeInsumo($i) : null,
                 ],
             ];
@@ -979,10 +1025,10 @@ class CatalogoSelectorController extends Controller
             return;
         }
 
-        $like = '%'.$q.'%';
+        $like = '%'.BusquedaTexto::normalizar($q).'%';
         $query->where(function (Builder $w) use ($columnas, $like) {
             foreach ($columnas as $col) {
-                $w->orWhere($col, 'like', $like);
+                $w->orWhereRaw(BusquedaTexto::sqlSinAcentos($col).' LIKE ?', [$like]);
             }
         });
     }
@@ -1026,12 +1072,8 @@ class CatalogoSelectorController extends Controller
         $items = $actividadInsumos->listarInsumosParaModal($tipoSlug, $lote);
         $sugerencia = null;
         if ($tipoSlug === 'material_siembra' && $lote) {
-            if ($lote->insumoSemilla) {
-                $sugerencia = CultivoSiembraCatalogo::sugerenciaParaInsumo(
-                    $lote->insumoSemilla,
-                    (float) $lote->superficie
-                );
-            } elseif ($lote->cultivo) {
+            $sugerencia = CultivoSiembraCatalogo::sugerenciaDesdeLote($lote);
+            if ($sugerencia === null && $lote->cultivo) {
                 $sugerencia = CultivoSiembraCatalogo::sugerenciaParaLote($lote->cultivo, (float) $lote->superficie);
             }
         }

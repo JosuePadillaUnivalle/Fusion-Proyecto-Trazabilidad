@@ -237,7 +237,7 @@
 
         <div id="filtrosMovimientosPanel" class="filtros-panel collapse {{ $filtroNaturaleza ? 'show' : '' }}">
             <div class="row">
-                <div class="col-lg-4 col-md-6 mb-2">
+                <div class="col-lg-3 col-md-6 mb-2">
                     <label class="small text-muted mb-1">Buscar</label>
                     <div class="input-group input-group-sm">
                         <div class="input-group-prepend">
@@ -247,23 +247,29 @@
                             placeholder="Producto, lote, responsable o referencia...">
                     </div>
                 </div>
-                <div class="col-lg-2 col-md-6 mb-2">
+                <div class="col-lg-3 col-md-6 mb-2">
                     <label class="small text-muted mb-1">Almacén</label>
-                    <select id="movFiltroAlmacen" class="form-control form-control-sm">
-                        <option value="">Todos los almacenes</option>
-                        @foreach($almacenesFiltro as $nombreAlmacen)
-                            <option value="{{ strtolower($nombreAlmacen) }}">{{ $nombreAlmacen }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-lg-2 col-md-6 mb-2">
-                    <label class="small text-muted mb-1">Tipo</label>
-                    <select id="movFiltroTipo" class="form-control form-control-sm">
-                        <option value="">Todos los tipos</option>
-                        @foreach($tiposFiltro as $nombreTipo)
-                            <option value="{{ strtolower($nombreTipo) }}">{{ $nombreTipo }}</option>
-                        @endforeach
-                    </select>
+                    @include('partials.selector-catalogo', [
+                        'id' => 'mov_filtro_almacen',
+                        'name' => 'mov_almacenid',
+                        'value' => '',
+                        'labelSelected' => '',
+                        'endpoint' => route('catalogo-selector.almacenes'),
+                        'params' => ['ambito' => $ambito ?? 'agricola'],
+                        'title' => 'Filtrar por almacén',
+                        'searchPlaceholder' => 'Nombre o ubicación…',
+                        'searchLabel' => 'Buscar almacén',
+                        'allowEmpty' => true,
+                        'emptyLabel' => 'Todos los almacenes',
+                        'placeholderEmpty' => 'Todos los almacenes',
+                        'inputGroup' => true,
+                        'showLabel' => false,
+                        'modalIcon' => 'fa-warehouse',
+                        'rowIcon' => 'fa-warehouse',
+                        'colNombre' => 'Almacén',
+                        'colDetalle' => 'Ubicación',
+                        'variant' => 'filtros',
+                    ])
                 </div>
                 <div class="col-lg-2 col-md-6 mb-2">
                     <label class="small text-muted mb-1">Naturaleza</label>
@@ -296,6 +302,7 @@
                         <tr class="mov-row"
                             data-search="{{ $linea->search_text }}"
                             data-almacen="{{ strtolower($linea->almacen_nombre) }}"
+                            data-almacen-id="{{ $linea->almacen_id ?? 0 }}"
                             data-tipo="{{ strtolower($linea->tipo_nombre) }}"
                             data-naturaleza="{{ strtolower($linea->naturaleza) }}">
                             <td class="text-nowrap">{{ $linea->fecha ? \Carbon\Carbon::parse($linea->fecha)->format('d/m/Y') : '—' }}</td>
@@ -348,36 +355,36 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const q = document.getElementById('movSearch');
-    const fAlmacen = document.getElementById('movFiltroAlmacen');
-    const fTipo = document.getElementById('movFiltroTipo');
+    const fAlmacenWrap = document.getElementById('selector_wrap_mov_filtro_almacen');
+    const fAlmacen = fAlmacenWrap?.querySelector('.selector-catalogo-value');
     const fNaturaleza = document.getElementById('movFiltroNaturaleza');
     const rows = Array.from(document.querySelectorAll('.mov-row'));
 
     function aplicarFiltroMovimientos() {
         const val = (q?.value || '').toLowerCase().trim();
-        const alm = (fAlmacen?.value || '').toLowerCase();
-        const tipo = (fTipo?.value || '').toLowerCase();
+        const almId = (fAlmacen?.value || '').trim();
         const nat = (fNaturaleza?.value || '').toLowerCase();
 
         rows.forEach((tr) => {
             const okSearch = !val || (tr.dataset.search || '').includes(val);
-            const okAlm = !alm || (tr.dataset.almacen || '') === alm;
-            const okTipo = !tipo || (tr.dataset.tipo || '') === tipo;
+            const okAlm = !almId || (tr.dataset.almacenId || '') === almId;
             const okNat = !nat || (tr.dataset.naturaleza || '') === nat;
-            tr.style.display = (okSearch && okAlm && okTipo && okNat) ? '' : 'none';
+            tr.style.display = (okSearch && okAlm && okNat) ? '' : 'none';
         });
     }
 
     q?.addEventListener('keyup', aplicarFiltroMovimientos);
-    fAlmacen?.addEventListener('change', aplicarFiltroMovimientos);
-    fTipo?.addEventListener('change', aplicarFiltroMovimientos);
+    fAlmacenWrap?.addEventListener('selector-catalogo:change', aplicarFiltroMovimientos);
     fNaturaleza?.addEventListener('change', aplicarFiltroMovimientos);
     document.getElementById('btnAplicarFiltros')?.addEventListener('click', aplicarFiltroMovimientos);
 
     document.getElementById('btnLimpiarFiltros')?.addEventListener('click', function () {
         if (q) q.value = '';
-        if (fAlmacen) fAlmacen.value = '';
-        if (fTipo) fTipo.value = '';
+        if (window.CatalogoSelector) {
+            CatalogoSelector.clear('mov_filtro_almacen');
+        } else if (fAlmacen) {
+            fAlmacen.value = '';
+        }
         if (fNaturaleza) fNaturaleza.value = '';
         aplicarFiltroMovimientos();
     });

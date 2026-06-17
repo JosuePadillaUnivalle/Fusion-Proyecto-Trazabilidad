@@ -32,10 +32,25 @@
     cursor: pointer; text-decoration: none;
 }
 .trz-dash .fase-step.next:hover { background: #17a2b8; color: #fff; border-color: #138496; }
-.trz-dash a.fase-step-link { display: block; color: inherit; text-decoration: none; }
-.trz-dash a.fase-step-link.fase-step.next { color: #0c5460; }
-.trz-dash a.fase-step-link.fase-step.next:hover { color: #fff; }
-.trz-dash a.fase-step-link.fase-step.active:hover { color: #fff; opacity: .95; }
+.trz-dash .fase-step-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    flex: 1;
+    min-width: 100px;
+}
+.trz-dash .fase-step-link.fase-step.next { color: #0c5460; }
+.trz-dash .fase-step-link.fase-step.next:hover,
+.trz-dash .fase-step-link.fase-step.next:focus { color: #fff; text-decoration: none; }
+.trz-dash .fase-step-link.fase-step.active:hover,
+.trz-dash .fase-step-link.fase-step.active:focus { color: #fff; opacity: .95; text-decoration: none; }
+.trz-dash button.fase-step-link {
+    appearance: none;
+    -webkit-appearance: none;
+    font: inherit;
+    text-align: center;
+    cursor: pointer;
+}
 .trz-dash .fase-step.pending { opacity: .65; }
 .trz-dash .fase-step.skipped {
     border-color: #dee2e6; background: #f8f9fa; color: #6c757d; opacity: .85;

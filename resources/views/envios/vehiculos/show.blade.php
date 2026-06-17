@@ -32,6 +32,11 @@
             <i class="fas fa-arrow-left mr-1"></i> Volver al listado
         </a>
         <div class="veh-det-toolbar__acciones d-flex flex-wrap align-items-center">
+            @if($enRuta && ($rutaTiempoReal['url'] ?? null))
+            <a href="{{ $rutaTiempoReal['url'] }}" class="btn btn-primary btn-sm mr-1 mb-1">
+                <i class="fas fa-satellite-dish mr-1"></i> Ver ruta en tiempo real
+            </a>
+            @endif
             @can('vehiculos.update')
             @include('envios.vehiculos.partials.btn-toggle-mantenimiento', ['vehiculo' => $vehiculo])
             <a href="{{ route('envios.vehiculos.edit', $vehiculo) }}" class="btn btn-success btn-sm">
@@ -63,7 +68,10 @@
                 </div>
                 @if($enRuta)
                 <p class="mb-0 mt-2 small text-white-50">
-                    <i class="fas fa-route mr-1"></i> En uso en un encargo activo. El estado se actualiza automáticamente.
+                    <i class="fas fa-route mr-1"></i> Simulación activa en ruta en tiempo real.
+                    @if($rutaTiempoReal['codigo'] ?? null)
+                        Seguimiento: <strong>{{ $rutaTiempoReal['codigo'] }}</strong>
+                    @endif
                 </p>
                 @elseif($enMantenimiento)
                 <p class="mb-0 mt-2 small text-warning">

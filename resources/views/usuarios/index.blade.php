@@ -269,7 +269,7 @@
                         <select name="rol" id="rol" class="form-control">
                             <option value="">Todos</option>
                             @foreach($roles as $rol)
-                                <option value="{{ $rol->id }}" @selected(request('rol') == $rol->id)>{{ ucfirst($rol->name) }}</option>
+                                <option value="{{ $rol->id }}" @selected(request('rol') == $rol->id)>{{ \App\Support\UsuarioRol::etiquetaRol($rol->name) }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -284,27 +284,49 @@
                     @endunless
                     @if($modoJefe && $lotes->isNotEmpty())
                     <div class="col-lg-3 col-md-6 mb-2 mb-lg-0">
-                        <label for="lote"><i class="fas fa-map-marked-alt mr-1"></i> Lote asignado</label>
-                        <select name="lote" id="lote" class="form-control">
-                            <option value="">Todos los lotes</option>
-                            @foreach($lotes as $lote)
-                                <option value="{{ $lote->loteid }}" @selected(request('lote') == $lote->loteid)>
-                                    {{ $lote->nombre }}
-                                </option>
-                            @endforeach
-                        </select>
+                        @include('partials.selector-catalogo', [
+                            'id' => 'usu_filtro_lote',
+                            'name' => 'lote',
+                            'value' => request('lote'),
+                            'labelSelected' => $loteSeleccionado?->nombre ?? '',
+                            'endpoint' => route('catalogo-selector.lotes'),
+                            'title' => 'Filtrar por lote asignado',
+                            'label' => '<i class="fas fa-map-marked-alt mr-1"></i> Lote asignado',
+                            'icon' => 'fa-map-marked-alt',
+                            'searchPlaceholder' => 'Nombre del lote…',
+                            'searchLabel' => 'Buscar lote',
+                            'allowEmpty' => true,
+                            'emptyLabel' => 'Todos los lotes',
+                            'placeholderEmpty' => 'Todos los lotes',
+                            'modalIcon' => 'fa-map-marked-alt',
+                            'rowIcon' => 'fa-seedling',
+                            'colNombre' => 'Lote',
+                            'colDetalle' => 'Cultivo / responsable',
+                            'variant' => 'filtros',
+                        ])
                     </div>
                     @elseif(! $modoJefe)
                     <div class="col-lg-3 col-md-6 mb-2 mb-lg-0">
-                        <label for="lote"><i class="fas fa-map-marked-alt mr-1"></i> Lote asignado</label>
-                        <select name="lote" id="lote" class="form-control">
-                            <option value="">Todos los lotes</option>
-                            @foreach($lotes as $lote)
-                                <option value="{{ $lote->loteid }}" @selected(request('lote') == $lote->loteid)>
-                                    {{ $lote->nombre }}
-                                </option>
-                            @endforeach
-                        </select>
+                        @include('partials.selector-catalogo', [
+                            'id' => 'usu_filtro_lote',
+                            'name' => 'lote',
+                            'value' => request('lote'),
+                            'labelSelected' => $loteSeleccionado?->nombre ?? '',
+                            'endpoint' => route('catalogo-selector.lotes'),
+                            'title' => 'Filtrar por lote asignado',
+                            'label' => '<i class="fas fa-map-marked-alt mr-1"></i> Lote asignado',
+                            'icon' => 'fa-map-marked-alt',
+                            'searchPlaceholder' => 'Nombre del lote…',
+                            'searchLabel' => 'Buscar lote',
+                            'allowEmpty' => true,
+                            'emptyLabel' => 'Todos los lotes',
+                            'placeholderEmpty' => 'Todos los lotes',
+                            'modalIcon' => 'fa-map-marked-alt',
+                            'rowIcon' => 'fa-seedling',
+                            'colNombre' => 'Lote',
+                            'colDetalle' => 'Cultivo / responsable',
+                            'variant' => 'filtros',
+                        ])
                     </div>
                     @endif
                     <div class="col-lg-{{ $modoJefe ? '3' : '2' }} col-md-12 mb-2 mb-lg-0 usu-index-filtro-actions d-flex" style="gap:6px;">
@@ -360,7 +382,7 @@
                         <td class="text-muted">{{ $usuario->telefono ?: '—' }}</td>
                         <td>
                             @forelse($usuario->roles as $role)
-                                <span class="usu-index-badge-rol">{{ ucfirst($role->name) }}</span>
+                                <span class="usu-index-badge-rol">{{ \App\Support\UsuarioRol::etiquetaRol($role->name) }}</span>
                             @empty
                                 <span class="text-muted small">Sin rol</span>
                             @endforelse

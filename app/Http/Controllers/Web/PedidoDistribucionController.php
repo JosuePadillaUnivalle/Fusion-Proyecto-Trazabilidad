@@ -30,7 +30,14 @@ class PedidoDistribucionController extends Controller
             $user
         );
 
-        if ($request->filled('estado')) {
+        if ($request->filled('estado_grupo')) {
+            $estados = PedidoDistribucionCatalogo::estadosDeGrupoFiltro(
+                $request->string('estado_grupo')->toString()
+            );
+            if ($estados !== []) {
+                $query->whereIn('estado', $estados);
+            }
+        } elseif ($request->filled('estado')) {
             $query->where('estado', $request->string('estado')->toString());
         }
 
@@ -58,6 +65,11 @@ class PedidoDistribucionController extends Controller
             $user
         )->get();
 
+        $filtroPdvId = $request->integer('puntoventaid') ?: null;
+        $filtroPdvNombre = $filtroPdvId
+            ? ($puntosVenta->firstWhere('puntoventaid', $filtroPdvId)?->nombre ?? '')
+            : '';
+
         $puedeCrear = UsuarioRol::esMinorista($user) || UsuarioRol::esAdminGlobal($user);
         $puedeGestionarPlanta = UsuarioRol::puedeGestionarDistribucionPlanta($user);
         $esMinorista = UsuarioRol::esMinorista($user);
@@ -67,6 +79,8 @@ class PedidoDistribucionController extends Controller
             'pendientes',
             'procesados',
             'puntosVenta',
+            'filtroPdvId',
+            'filtroPdvNombre',
             'puedeCrear',
             'puedeGestionarPlanta',
             'esMinorista'
@@ -92,18 +106,26 @@ class PedidoDistribucionController extends Controller
         if ($oldPunto === null && $esMinorista && $puntosMinorista->count() === 1) {
             $oldPunto = $puntosMinorista->first();
         }
+        $oldMinoristaId = old('minorista_usuarioid');
+        $oldMinoristaLabel = '';
+        if ($esAdmin) {
+            if ($oldMinoristaId) {
+                $minoristaUser = Usuario::find((int) $oldMinoristaId);
+                $oldMinoristaLabel = $minoristaUser
+                    ? trim($minoristaUser->nombre.' '.($minoristaUser->apellido ?? ''))
+                    : '';
+            } elseif ($oldPunto?->minorista) {
+                $oldMinoristaId = (int) $oldPunto->usuarioid;
+                $oldMinoristaLabel = trim($oldPunto->minorista->nombre.' '.($oldPunto->minorista->apellido ?? ''));
+            }
+        }
         $oldAlmacen = old('almacen_planta_origenid') ? Almacen::find(old('almacen_planta_origenid')) : null;
         $oldInsumo = old('insumoid') ? Insumo::with('unidadMedida', 'almacen')->find(old('insumoid')) : null;
-
-        $minoristasFiltro = Usuario::query()
-            ->where('role', 'minorista')
-            ->where('activo', true)
-            ->orderBy('nombre')
-            ->get(['usuarioid', 'nombre', 'apellido']);
 
         $puntosVentaMapa = $puntosMinorista->map(fn (PuntoVenta $pv) => [
             'id' => $pv->puntoventaid,
             'label' => $pv->nombre,
+            'minorista_usuarioid' => (int) $pv->usuarioid,
             'lat' => $pv->latitud,
             'lng' => $pv->longitud,
             'resumen' => $pv->resumenUbicacion(),
@@ -116,6 +138,8 @@ class PedidoDistribucionController extends Controller
             'puntosVentaMapa' => $puntosVentaMapa,
             'esMinorista' => $esMinorista,
             'esAdmin' => $esAdmin,
+            'oldMinoristaId' => $oldMinoristaId,
+            'oldMinoristaLabel' => $oldMinoristaLabel,
             'oldPuntoLabel' => $oldPunto?->nombre ?? '',
             'oldPuntoResumen' => $oldPunto?->resumenUbicacion() ?? '',
             'oldPuntoId' => $oldPunto?->puntoventaid,
@@ -125,7 +149,6 @@ class PedidoDistribucionController extends Controller
                 : '',
             'oldProductoUnidad' => $oldInsumo?->unidadMedida?->abreviatura ?? $oldInsumo?->unidadMedida?->nombre ?? '',
             'oldProductoStock' => $oldInsumo ? (float) $oldInsumo->stock : null,
-            'minoristasFiltro' => $minoristasFiltro,
         ]);
     }
 
@@ -136,6 +159,11 @@ class PedidoDistribucionController extends Controller
 
         $data = $request->validate([
             'puntoventaid' => 'required|integer|exists:punto_venta,puntoventaid',
+            'minorista_usuarioid' => [
+                UsuarioRol::esAdminGlobal($user) ? 'required' : 'nullable',
+                'integer',
+                'exists:usuario,usuarioid',
+            ],
             'almacen_planta_origenid' => 'nullable|integer|exists:almacen,almacenid',
             'fecha_entrega_deseada' => 'nullable|date',
             'observaciones' => 'nullable|string|max:2000',
@@ -146,6 +174,12 @@ class PedidoDistribucionController extends Controller
         $punto = PuntoVenta::query()->findOrFail($data['puntoventaid']);
         if (UsuarioRol::esMinorista($user) && (int) $punto->usuarioid !== (int) $user->usuarioid) {
             return back()->withInput()->with('error', 'Solo puede solicitar productos para sus propios puntos de venta.');
+        }
+
+        if (UsuarioRol::esAdminGlobal($user)) {
+            if ((int) $punto->usuarioid !== (int) $data['minorista_usuarioid']) {
+                return back()->withInput()->with('error', 'El punto de venta no pertenece al minorista seleccionado.');
+            }
         }
 
         if (! $punto->activo) {
@@ -185,7 +219,7 @@ class PedidoDistribucionController extends Controller
     {
         abort_unless(PuntoVentaAccess::puedeVerPedido(auth()->user(), $pedido), 403);
 
-        $pedido->load(['puntoVenta.minorista', 'detalles.insumo.unidadMedida', 'almacenPlantaOrigen', 'aceptadoPor', 'creadoPor']);
+        $pedido->load(['puntoVenta.minorista', 'detalles.insumo.unidadMedida', 'almacenPlantaOrigen', 'aceptadoPor', 'creadoPor', 'transportista', 'vehiculo.tipoVehiculo', 'rutaDistribucion.transportista', 'rutaDistribucion.vehiculo']);
 
         $puedeGestionarPlanta = UsuarioRol::puedeGestionarDistribucionPlanta(auth()->user())
             || UsuarioRol::esAdminGlobal(auth()->user());
@@ -251,20 +285,28 @@ class PedidoDistribucionController extends Controller
             ->with('success', 'Solicitud rechazada.');
     }
 
-    public function marcarEnviado(PedidoDistribucion $pedido): RedirectResponse
+    public function marcarEnviado(Request $request, PedidoDistribucion $pedido): RedirectResponse
     {
         abort_unless(UsuarioRol::puedeGestionarDistribucionPlanta(auth()->user()) || UsuarioRol::esAdminGlobal(auth()->user()), 403);
 
-        if (! PedidoDistribucionCatalogo::puedeMarcarEnviado($pedido)) {
-            return back()->with('warning', 'El pedido debe estar aceptado por planta antes de marcar el envío.');
-        }
-
-        $pedido->update([
-            'estado' => PedidoDistribucionCatalogo::ESTADO_EN_TRANSITO,
-            'fecha_envio' => now(),
+        $data = $request->validate([
+            'transportista_usuarioid' => 'required|integer|exists:usuario,usuarioid',
+            'vehiculoid' => 'required|integer|exists:vehiculo,vehiculoid',
         ]);
 
-        return back()->with('success', 'Pedido marcado en tránsito hacia el punto de venta.');
+        try {
+            app(PedidoDistribucionPlantaService::class)->marcarEnTransito(
+                $pedido,
+                (int) $data['transportista_usuarioid'],
+                (int) $data['vehiculoid']
+            );
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput()
+                ->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Pedido marcado en tránsito. Transportista y vehículo de planta asignados.');
     }
 
     public function confirmarRecepcion(PedidoDistribucion $pedido): RedirectResponse

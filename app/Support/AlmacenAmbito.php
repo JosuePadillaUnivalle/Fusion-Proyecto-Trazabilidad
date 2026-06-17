@@ -105,10 +105,76 @@ class AlmacenAmbito
     public static function scope(Builder $query, string $ambito): Builder
     {
         if (\Illuminate\Support\Facades\Schema::hasColumn('almacen', 'ambito')) {
-            return $query->where('ambito', $ambito);
+            $query = $query->where('ambito', $ambito);
+
+            if ($ambito === self::AGRICOLA) {
+                return self::excluirMarcadoresPuntoVenta(self::excluirMarcadoresPlanta($query));
+            }
+
+            return $query;
         }
 
         return self::scopeLegacyPorNombre($query, $ambito);
+    }
+
+    /** Excluye almacenes de planta aunque el campo ambito esté mal cargado. */
+    private static function excluirMarcadoresPlanta(Builder $query): Builder
+    {
+        return $query
+            ->whereRaw('LOWER(TRIM(nombre)) NOT LIKE ?', ['%planta%'])
+            ->whereDoesntHave('tipoAlmacen', fn ($t) => $t->whereRaw('LOWER(TRIM(nombre)) LIKE ?', ['%planta%']));
+    }
+
+    /** Excluye inventarios de puntos de venta / minoristas. */
+    private static function excluirMarcadoresPuntoVenta(Builder $query): Builder
+    {
+        if (\Illuminate\Support\Facades\Schema::hasTable('punto_venta')) {
+            $idsPdv = \Illuminate\Support\Facades\DB::table('punto_venta')
+                ->whereNotNull('almacenid')
+                ->pluck('almacenid')
+                ->filter()
+                ->all();
+
+            if ($idsPdv !== []) {
+                $query = $query->whereNotIn('almacenid', $idsPdv);
+            }
+        }
+
+        return $query
+            ->whereRaw('LOWER(TRIM(nombre)) NOT LIKE ?', ['almacén —%'])
+            ->whereRaw('LOWER(TRIM(nombre)) NOT LIKE ?', ['almacen —%']);
+    }
+
+    public static function resolverAmbito(Almacen $almacen): string
+    {
+        if (\Illuminate\Support\Facades\Schema::hasTable('punto_venta')) {
+            $vinculadoPdv = \Illuminate\Support\Facades\DB::table('punto_venta')
+                ->where('almacenid', $almacen->almacenid)
+                ->exists();
+
+            if ($vinculadoPdv) {
+                return self::PUNTO_VENTA;
+            }
+        }
+
+        $nombre = mb_strtolower(trim($almacen->nombre ?? ''));
+        $tipo = mb_strtolower(trim($almacen->tipoAlmacen?->nombre ?? ''));
+
+        if (str_contains($nombre, 'planta') || str_contains($tipo, 'planta')) {
+            return self::PLANTA;
+        }
+
+        if (
+            str_starts_with($nombre, 'almacén —')
+            || str_starts_with($nombre, 'almacen —')
+            || str_contains($nombre, 'pdv ')
+            || str_contains($nombre, 'punto de venta')
+            || (str_contains($nombre, 'mercado') && (float) ($almacen->capacidad ?? 0) <= 1000)
+        ) {
+            return self::PUNTO_VENTA;
+        }
+
+        return self::AGRICOLA;
     }
 
     /** Compatibilidad si aún no existe la columna ambito. */
@@ -133,18 +199,12 @@ class AlmacenAmbito
             return;
         }
 
-        Almacen::with('tipoAlmacen')
-            ->where(function ($q) {
-                $q->whereNull('ambito')->orWhere('ambito', '');
-            })
-            ->get()
-            ->each(function (Almacen $a) {
-                $nombre = mb_strtolower($a->nombre ?? '');
-                $tipo = mb_strtolower($a->tipoAlmacen?->nombre ?? '');
-                $ambito = (str_contains($nombre, 'planta') || str_contains($tipo, 'planta'))
-                    ? self::PLANTA
-                    : self::AGRICOLA;
+        Almacen::with('tipoAlmacen')->get()->each(function (Almacen $a) {
+            $ambito = self::resolverAmbito($a);
+
+            if ($a->ambito !== $ambito) {
                 $a->update(['ambito' => $ambito]);
-            });
+            }
+        });
     }
 }

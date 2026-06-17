@@ -7,13 +7,27 @@
     $tipoSlugInicial = $insumo
         ? (InsumoCatalogo::slugFromNombreTipo($insumo->tipo?->nombre) ?? 'material_siembra')
         : (InsumoCatalogo::slugFromNombreTipo($tipos->first()?->nombre) ?? 'material_siembra');
+    $dosisUnidadInicial = InsumoCatalogo::normalizarDosisUnidad(
+        old('dosis_unidad', $insumo->dosis_unidad ?? ''),
+        $tipoSlugInicial
+    );
+    $unidadStockIdInicial = old('unidadmedidaid', $insumo->unidadmedidaid ?? '');
+    $unidadStockInicial = collect($unidadesPorTipo[$tipoSlugInicial] ?? [])->first(
+        fn ($u) => (int) ($u['id'] ?? 0) === (int) $unidadStockIdInicial
+    );
+    if ($unidadStockInicial) {
+        $dosisUnidadInicial = InsumoCatalogo::normalizarDosisUnidad($unidadStockInicial['abreviatura'] ?? '', $tipoSlugInicial);
+        $dosisUnidadEtiquetaInicial = $unidadStockInicial['nombre']
+            . (! empty($unidadStockInicial['abreviatura']) ? ' (' . $unidadStockInicial['abreviatura'] . ')' : '');
+    } else {
+        $dosisUnidadEtiquetaInicial = '— Seleccione unidad de stock primero —';
+    }
     $umbral = InsumoCatalogo::UMBRAL_ALERTA_STOCK;
 
     $iconosTipo = [
         'material_siembra' => ['icon' => 'fa-seedling', 'color' => '#15803d', 'bg' => '#ecfdf5'],
         'fertilizantes' => ['icon' => 'fa-flask', 'color' => '#1d4ed8', 'bg' => '#eff6ff'],
         'pesticidas' => ['icon' => 'fa-bug', 'color' => '#b45309', 'bg' => '#fffbeb'],
-        'material_riego' => ['icon' => 'fa-tint', 'color' => '#0e7490', 'bg' => '#ecfeff'],
     ];
 @endphp
 
@@ -216,6 +230,78 @@
 .page-insumo-form .btn-outline-secondary {
     border-radius: 10px;
 }
+.page-insumo-form .ins-imagen-box {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-start;
+}
+.page-insumo-form .ins-imagen-preview {
+    width: 140px;
+    height: 140px;
+    border-radius: 12px;
+    border: 2px dashed #cbd5e1;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+}
+.page-insumo-form .ins-imagen-preview__fallback {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    color: #64748b;
+    font-size: .76rem;
+    font-weight: 600;
+    line-height: 1.25;
+    padding: .65rem;
+    word-break: break-word;
+}
+.page-insumo-form .ins-imagen-preview__fallback i {
+    font-size: 1.5rem;
+    color: #94a3b8;
+}
+.page-insumo-form .ins-imagen-preview__img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 10px;
+}
+.page-insumo-form .ins-imagen-preview.has-loaded-image .ins-imagen-preview__fallback {
+    opacity: 0;
+    visibility: hidden;
+}
+.page-insumo-form .ins-imagen-campos {
+    flex: 1;
+    min-width: 200px;
+}
+.page-insumo-form .ins-imagen-picker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .65rem;
+}
+.page-insumo-form .ins-imagen-picker .btn-elegir-imagen {
+    border-radius: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+    margin: 0;
+}
+.page-insumo-form .ins-imagen-nombre {
+    font-size: .82rem;
+    color: #64748b;
+    word-break: break-all;
+}
 </style>
 @endpush
 
@@ -224,10 +310,10 @@
         <div class="card ins-form-card card-modulo-main">
             <div class="ins-form-hero">
                 <h3><i class="fas fa-boxes mr-2"></i>{{ $tituloFormulario ?? ($insumo ? 'Editar insumo' : 'Registrar insumo') }}</h3>
-                <p>Insumos del campo: semillas, fertilizantes, pesticidas y material de riego. No registre aquí productos cosechados.</p>
+                <p>Insumos del campo: semillas, fertilizantes y control de plagas. No registre aquí productos cosechados.</p>
             </div>
 
-            <form action="{{ $formAction }}" method="POST">
+            <form action="{{ $formAction }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 @if($formMethod ?? false)
                     @method($formMethod)
@@ -256,6 +342,35 @@
                             value="{{ old('nombre', $insumo->nombre ?? '') }}"
                             placeholder="Ej. Semilla híbrida F1, Urea 46%, Manguera 2&quot;">
                         <div class="ins-field-hint">Nombre con el que lo verá en inventario y al aplicarlo a un lote.</div>
+
+                        <label class="ins-field-label mt-3" for="imagen">Imagen del insumo <span class="text-muted font-weight-normal">(opcional)</span></label>
+                        <div class="ins-imagen-box">
+                            <div class="ins-imagen-preview" id="insImagenPreview">
+                                <div class="ins-imagen-preview__fallback" id="insImagenFallback">
+                                    <i class="fas fa-image"></i>
+                                    <span id="insImagenFallbackText">{{ $insumo->nombre ?? 'Vista previa' }}</span>
+                                </div>
+                                <img src="{{ $insumo ? $insumo->imagenSrc(280) : '' }}"
+                                     alt=""
+                                     id="insImagenPreviewImg"
+                                     class="ins-imagen-preview__img{{ $insumo ? '' : ' d-none' }}">
+                            </div>
+                            <div class="ins-imagen-campos">
+                                <div class="ins-imagen-picker">
+                                    <input type="file" name="imagen" id="imagen" class="d-none" accept="image/jpeg,image/png,image/webp,image/gif">
+                                    <label for="imagen" class="btn btn-outline-secondary btn-sm btn-elegir-imagen mb-0">
+                                        <i class="fas fa-upload mr-1"></i> Elegir imagen
+                                    </label>
+                                    <span class="ins-imagen-nombre" id="insImagenNombre">Ningún archivo nuevo seleccionado</span>
+                                </div>
+                                @if($insumo && \App\Support\InsumoImagenCatalogo::esImagenPersonalizada($insumo->imagenurl))
+                                <div class="custom-control custom-checkbox">
+                                    <input type="checkbox" class="custom-control-input" name="quitar_imagen" id="quitar_imagen" value="1">
+                                    <label class="custom-control-label small" for="quitar_imagen">Quitar imagen personalizada y volver a la automática</label>
+                                </div>
+                                @endif
+                            </div>
+                        </div>
                     </div>
 
                     <div class="ins-form-section">
@@ -284,7 +399,7 @@
                         </div>
                         <select name="tipoinsumoid" id="tipoinsumoid" class="ins-tipo-select-hidden" required tabindex="-1" aria-hidden="true">
                             @foreach($tipos as $t)
-                                @php $slug = InsumoCatalogo::slugFromNombreTipo($t->nombre); @endphp
+                                @php $slug = InsumoCatalogo::slugFromNombreTipo($t->nombre) ?? 'material_siembra'; @endphp
                                 <option value="{{ $t->tipoinsumoid }}"
                                     data-slug="{{ $slug }}"
                                     @selected((int) old('tipoinsumoid', $insumo->tipoinsumoid ?? 0) === (int) $t->tipoinsumoid)>
@@ -294,9 +409,7 @@
                         </select>
                         <div class="ins-field-hint" id="guiaUnidad">
                             @if($tipoSlugInicial === 'pesticidas')
-                                Pesticidas: peso (kg, g) o volumen (ml, L).
-                            @elseif($tipoSlugInicial === 'material_riego')
-                                Riego: metros para mangueras; unidades para equipos.
+                                Control de plagas: peso (kg, g) o volumen (ml, L).
                             @elseif($tipoSlugInicial === 'fertilizantes')
                                 Fertilizantes: kg, g, quintales o litros.
                             @else
@@ -309,7 +422,17 @@
                                 <label class="ins-field-label" for="unidadmedidaid">Unidad de medida <span class="text-danger">*</span></label>
                                 <select name="unidadmedidaid" id="unidadmedidaid" class="form-control" required
                                     data-selected="{{ old('unidadmedidaid', $insumo->unidadmedidaid ?? '') }}">
-                                    <option value="">— Elija tipo primero —</option>
+                                    @php
+                                        $unidadSeleccionada = old('unidadmedidaid', $insumo->unidadmedidaid ?? '');
+                                        $listaUnidadesInicial = $unidadesPorTipo[$tipoSlugInicial] ?? [];
+                                    @endphp
+                                    @forelse($listaUnidadesInicial as $u)
+                                        <option value="{{ $u['id'] }}" @selected((int) $unidadSeleccionada === (int) $u['id'])>
+                                            {{ $u['nombre'] }}@if(!empty($u['abreviatura'])) ({{ $u['abreviatura'] }})@endif
+                                        </option>
+                                    @empty
+                                        <option value="">— Elija tipo primero —</option>
+                                    @endforelse
                                 </select>
                             </div>
                             <div class="col-md-6">
@@ -322,21 +445,32 @@
                         </div>
                     </div>
 
-                    <div class="ins-form-section" id="insDosisSiembraSection" style="{{ $tipoSlugInicial === 'material_siembra' ? '' : 'display:none;' }}">
-                        <div class="ins-section-label"><i class="fas fa-calculator"></i> Dosis de siembra</div>
+                    <div class="ins-form-section" id="insDosisSection">
+                        <div class="ins-section-label" id="insDosisSectionLabel"><i class="fas fa-calculator"></i> Dosis de siembra</div>
                         <div class="row">
                             <div class="col-md-6">
                                 <label class="ins-field-label" for="dosis_por_ha">Cantidad por hectárea</label>
                                 <input type="number" step="0.001" min="0" name="dosis_por_ha" id="dosis_por_ha" class="form-control"
                                     value="{{ old('dosis_por_ha', $insumo->dosis_por_ha ?? '') }}"
                                     placeholder="Ej. 8">
-                                <div class="ins-field-hint">Referencia para calcular semilla según la superficie del lote.</div>
+                                <div class="ins-field-hint" id="insDosisPorHaHint">Referencia para calcular semilla según la superficie del lote.</div>
                             </div>
                             <div class="col-md-6">
-                                <label class="ins-field-label" for="dosis_unidad">Unidad de la dosis</label>
-                                <input type="text" name="dosis_unidad" id="dosis_unidad" class="form-control" maxlength="20"
-                                    value="{{ old('dosis_unidad', $insumo->dosis_unidad ?? '') }}"
-                                    placeholder="kg, g, und…">
+                                <label class="ins-field-label" for="dosis_unidad_display">Unidad de la dosis</label>
+                                <input type="text" class="form-control bg-light" id="dosis_unidad_display" readonly tabindex="-1"
+                                    value="{{ $dosisUnidadEtiquetaInicial ?? '— Seleccione unidad de stock primero —' }}">
+                                <input type="hidden" name="dosis_unidad" id="dosis_unidad"
+                                    value="{{ $dosisUnidadInicial ?? '' }}">
+                                <div class="ins-field-hint" id="insDosisUnidadHint">Usa la misma unidad que el stock del insumo.</div>
+                            </div>
+                        </div>
+                        <div class="row mt-2" id="insSemillasPorKgRow" style="{{ $tipoSlugInicial === 'material_siembra' ? '' : 'display:none;' }}">
+                            <div class="col-md-6">
+                                <label class="ins-field-label" for="semillas_por_kg">Plantas/semillas por kg <span class="text-muted font-weight-normal">(estimado)</span></label>
+                                <input type="number" step="0.001" min="0" name="semillas_por_kg" id="semillas_por_kg" class="form-control"
+                                    value="{{ old('semillas_por_kg', $insumo->semillas_por_kg ?? '') }}"
+                                    placeholder="Ej. 50">
+                                <div class="ins-field-hint">Si el stock está en kg pero la siembra se cuenta en plantas, indique cuántas caben en 1 kg.</div>
                             </div>
                         </div>
                     </div>
@@ -382,19 +516,88 @@
     const guiasUnidad = {
         material_siembra: 'Semillas: kg, g, quintales o unidades (bolsas, sobres).',
         fertilizantes: 'Fertilizantes: kg, g, quintales o litros.',
-        pesticidas: 'Pesticidas: peso (kg, g) o volumen (ml, L).',
-        material_riego: 'Riego: <strong>metro</strong> para mangueras; <strong>unidad</strong> para equipos.',
+        pesticidas: 'Control de plagas: peso (kg, g) o volumen (ml, L).',
+    };
+    const titulosDosis = {
+        material_siembra: 'Dosis de siembra',
+        fertilizantes: 'Dosis de aplicación',
+        pesticidas: 'Dosis de aplicación',
+    };
+    const hintsDosisPorHa = {
+        material_siembra: 'Referencia para calcular semilla según la superficie del lote.',
+        fertilizantes: 'Cantidad recomendada de fertilizante por hectárea.',
+        pesticidas: 'Cantidad recomendada de producto por hectárea.',
     };
 
     const selTipo = document.getElementById('tipoinsumoid');
     const selUm = document.getElementById('unidadmedidaid');
+    const inputDosisUm = document.getElementById('dosis_unidad');
+    const displayDosisUm = document.getElementById('dosis_unidad_display');
     const guia = document.getElementById('guiaUnidad');
     const grid = document.getElementById('insTipoGrid');
-    const dosisSection = document.getElementById('insDosisSiembraSection');
+    const dosisSection = document.getElementById('insDosisSection');
+    const dosisSectionLabel = document.getElementById('insDosisSectionLabel');
+    const dosisPorHaHint = document.getElementById('insDosisPorHaHint');
+    const dosisUnidadHint = document.getElementById('insDosisUnidadHint');
+    const semillasPorKgRow = document.getElementById('insSemillasPorKgRow');
+    const inputImagen = document.getElementById('imagen');
+    const previewWrap = document.getElementById('insImagenPreview');
+    const previewImg = document.getElementById('insImagenPreviewImg');
+    const previewFallbackText = document.getElementById('insImagenFallbackText');
+    const nombreArchivo = document.getElementById('insImagenNombre');
+    const inputNombre = document.getElementById('nombre');
+
+    if (!selTipo || !selUm) return;
+
+    function syncImagenPreviewEstado() {
+        if (!previewWrap || !previewImg) return;
+        const visible = !previewImg.classList.contains('d-none')
+            && previewImg.src
+            && previewImg.complete
+            && previewImg.naturalWidth > 0;
+        previewWrap.classList.toggle('has-loaded-image', visible);
+    }
+
+    if (previewImg) {
+        previewImg.addEventListener('load', syncImagenPreviewEstado);
+        previewImg.addEventListener('error', function () {
+            previewImg.classList.add('d-none');
+            if (previewWrap) previewWrap.classList.remove('has-loaded-image');
+        });
+        syncImagenPreviewEstado();
+    }
+
+    if (inputNombre && previewFallbackText && !@json((bool) $insumo)) {
+        inputNombre.addEventListener('input', function () {
+            previewFallbackText.textContent = inputNombre.value.trim() || 'Vista previa';
+        });
+    }
+
+    if (inputImagen) {
+        inputImagen.addEventListener('change', function () {
+            const file = inputImagen.files && inputImagen.files[0];
+            if (nombreArchivo) {
+                nombreArchivo.textContent = file ? file.name : 'Ningún archivo nuevo seleccionado';
+            }
+            if (!file || !previewImg) return;
+            const reader = new FileReader();
+            reader.onload = function (ev) {
+                previewImg.src = ev.target.result;
+                previewImg.classList.remove('d-none');
+                syncImagenPreviewEstado();
+            };
+            reader.readAsDataURL(file);
+        });
+    }
 
     function slugTipo() {
         const opt = selTipo.options[selTipo.selectedIndex];
-        return opt ? (opt.getAttribute('data-slug') || '') : '';
+        let slug = opt ? (opt.getAttribute('data-slug') || '') : '';
+        if (!slug && grid) {
+            const activa = grid.querySelector('.ins-tipo-card.is-active');
+            if (activa) slug = activa.getAttribute('data-slug') || '';
+        }
+        return slug;
     }
 
     function marcarTarjetaActiva(tipoId) {
@@ -414,21 +617,74 @@
         selUm.innerHTML = '';
         if (!lista.length) {
             selUm.innerHTML = '<option value="">Sin unidades para este tipo</option>';
+            sincronizarDosisUnidadDesdeStock();
             return;
         }
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '— Seleccione unidad —';
+        placeholder.disabled = true;
+        if (!prev) placeholder.selected = true;
+        selUm.appendChild(placeholder);
+
+        let matched = false;
         lista.forEach(function (u) {
             const o = document.createElement('option');
             o.value = u.id;
+            o.setAttribute('data-abreviatura', (u.abreviatura || '').toLowerCase());
             o.textContent = u.nombre + (u.abreviatura ? ' (' + u.abreviatura + ')' : '');
             if (String(u.id) === String(prev)) {
                 o.selected = true;
+                matched = true;
             }
             selUm.appendChild(o);
         });
-        if (!selUm.value && lista.length) {
-            selUm.selectedIndex = 0;
+        if (!matched && lista.length && selUm.options.length > 1) {
+            selUm.selectedIndex = 1;
         }
         selUm.removeAttribute('data-selected');
+        sincronizarDosisUnidadDesdeStock();
+    }
+
+    function abreviaturaUnidadSeleccionada() {
+        const opt = selUm.options[selUm.selectedIndex];
+        if (!opt || !opt.value) {
+            return '';
+        }
+        return normalizarDosisUnidad(opt.getAttribute('data-abreviatura') || '');
+    }
+
+    function sincronizarDosisUnidadDesdeStock() {
+        if (!inputDosisUm || !displayDosisUm) {
+            return;
+        }
+
+        const abrev = abreviaturaUnidadSeleccionada();
+        if (!abrev) {
+            inputDosisUm.value = '';
+            displayDosisUm.value = '— Seleccione unidad de stock primero —';
+            return;
+        }
+
+        const slug = slugTipo();
+        const lista = unidadesPorTipo[slug] || [];
+        const um = lista.find(function (u) {
+            return normalizarDosisUnidad(u.abreviatura) === abrev;
+        });
+        const etiqueta = um
+            ? um.nombre + (um.abreviatura ? ' (' + um.abreviatura + ')' : '')
+            : abrev;
+
+        inputDosisUm.value = abrev;
+        displayDosisUm.value = etiqueta;
+    }
+
+    function normalizarDosisUnidad(val) {
+        var v = (val || '').toLowerCase().trim();
+        if (['und', 'unidad', 'planta', 'plantas', 'semilla', 'semillas'].indexOf(v) >= 0) {
+            return 'und';
+        }
+        return v;
     }
 
     function actualizarGuia() {
@@ -436,8 +692,17 @@
         if (guia) {
             guia.innerHTML = guiasUnidad[slug] || 'Elija la unidad con la que contará stock este insumo.';
         }
-        if (dosisSection) {
-            dosisSection.style.display = slug === 'material_siembra' ? '' : 'none';
+        if (dosisSectionLabel) {
+            dosisSectionLabel.innerHTML = '<i class="fas fa-calculator"></i> ' + (titulosDosis[slug] || 'Dosis');
+        }
+        if (dosisPorHaHint) {
+            dosisPorHaHint.textContent = hintsDosisPorHa[slug] || 'Cantidad por hectárea de referencia.';
+        }
+        if (dosisUnidadHint) {
+            dosisUnidadHint.textContent = 'La dosis por hectárea se expresa en la misma unidad que el stock.';
+        }
+        if (semillasPorKgRow) {
+            semillasPorKgRow.style.display = slug === 'material_siembra' ? '' : 'none';
         }
         pintarUnidades();
     }
@@ -467,6 +732,8 @@
         marcarTarjetaActiva(selTipo.value);
         actualizarGuia();
     });
+
+    selUm.addEventListener('change', sincronizarDosisUnidadDesdeStock);
 
     marcarTarjetaActiva(selTipo.value);
     actualizarGuia();

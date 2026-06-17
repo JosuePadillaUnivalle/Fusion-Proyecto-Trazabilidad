@@ -83,6 +83,7 @@ class EnvioVehiculoController extends Controller
             'estadoVisual' => $estadoSvc->codigoVisual($vehiculo),
             'estadoLabel' => $estadoSvc->etiquetaVisual($vehiculo),
             'badgeEstado' => $estadoSvc->badgeClaseVisual($vehiculo),
+            'rutaTiempoReal' => $estadoSvc->rutaTiempoRealParaVehiculo($vehiculo),
         ]);
     }
 

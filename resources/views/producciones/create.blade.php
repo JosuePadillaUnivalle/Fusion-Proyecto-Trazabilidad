@@ -161,14 +161,19 @@
                     @include('partials.almacen-envio-selector', [
                         'almacenes' => $almacenes,
                         'almacenesTodos' => $almacenesTodos ?? collect(),
+                        'resumenesCapacidad' => $resumenesCapacidad ?? [],
                         'sectionId' => 'almacenSection',
                         'hiddenInputId' => 'almacenid',
                         'selectedAlmacenId' => old('almacenid'),
+                        'etiquetaAmbito' => 'agrícola',
+                        'almacenRequerido' => false,
+                        'guiaTexto' => 'Puede registrar la cosecha sin almacén. Después de certificar el lote en Certificaciones, envíelo al almacén desde la trazabilidad del lote.',
+                        'instruccion' => 'Si el lote ya está certificado, puede elegir ahora el almacén agrícola de destino',
                     ])
                     <div class="alert alert-light border small mt-2 mb-0">
-                        <i class="fas fa-certificate text-success mr-1"></i>
-                        El envío al almacén requiere que el lote esté <strong>certificado</strong> en Certificaciones.
-                        Puede registrar solo la cosecha ahora y almacenar después de certificar.
+                        <i class="fas fa-route text-success mr-1"></i>
+                        El flujo es: <strong>cosecha → certificación → envío al almacén</strong>.
+                        No necesita almacén ni certificación para registrar la cosecha.
                     </div>
 
                     {{-- Evidencia fotográfica --}}
@@ -223,6 +228,7 @@
     'hiddenInputId' => 'almacenid',
     'formSelector' => 'form[action*="producciones"]',
     'almacenesCatalogo' => $almacenesCatalogo ?? [],
+    'requiereAlmacen' => false,
 ])
 <script>
     $(document).ready(function() {

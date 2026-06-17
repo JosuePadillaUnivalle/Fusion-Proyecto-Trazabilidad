@@ -184,6 +184,10 @@ class DashboardController extends Controller
 
         return view('dashboard.roles.minorista', array_merge(
             $this->buildMinoristaData($user, $filtros),
+            [
+                'charts' => DashboardCharts::paraMinorista($user, $filtros),
+                'etiquetaGrafico' => $filtros->etiquetaGrafico(),
+            ],
             compact('alertas', 'totalAlertas', 'filtros'),
         ));
     }
@@ -376,64 +380,22 @@ class DashboardController extends Controller
             $stats['lotes_activos'] = $stats['total_lotes'];
         }
 
-        $meses = $filtros->mesesParaGrafico();
-        $chartDesde = $meses[0] ?? null;
-        $cultivosChart = Produccion::select('cultivo.cultivoid', 'cultivo.nombre')
-            ->join('lote', 'produccion.loteid', '=', 'lote.loteid')
-            ->join('cultivo', 'lote.cultivoid', '=', 'cultivo.cultivoid')
-            ->when($chartDesde, fn ($q) => $q->where('produccion.fechacosecha', '>=', Carbon::create($chartDesde['año'], $chartDesde['mes'], 1)))
-            ->when($filtros->cultivoId, fn ($q) => $q->where('lote.cultivoid', $filtros->cultivoId))
-            ->when($filtros->loteId, fn ($q) => $q->where('lote.loteid', $filtros->loteId))
-            ->when($filtros->estadoLoteId, fn ($q) => $q->where('lote.estadolotetipoid', $filtros->estadoLoteId))
-            ->groupBy('cultivo.cultivoid', 'cultivo.nombre')
-            ->get();
-
-        $coloresChart = ['#28a745', '#ffc107', '#17a2b8', '#dc3545', '#6f42c1', '#fd7e14'];
-        $datasets = [];
-        foreach ($cultivosChart as $index => $cultivo) {
-            $data = [];
-            foreach ($meses as $mes) {
-                $qProd = Produccion::join('lote', 'produccion.loteid', '=', 'lote.loteid')
-                    ->where('lote.cultivoid', $cultivo->cultivoid)
-                    ->whereMonth('produccion.fechacosecha', $mes['mes'])
-                    ->whereYear('produccion.fechacosecha', $mes['año']);
-                if ($filtros->loteId) {
-                    $qProd->where('lote.loteid', $filtros->loteId);
-                }
-                if ($filtros->estadoLoteId) {
-                    $qProd->where('lote.estadolotetipoid', $filtros->estadoLoteId);
-                }
-                $cantidad = $qProd->sum('produccion.cantidad');
-                $data[] = (float) $cantidad;
-            }
-            $color = $coloresChart[$index % count($coloresChart)];
-            $datasets[] = [
-                'label' => $cultivo->nombre.' (kg)',
-                'data' => $data,
-                'borderColor' => $color,
-                'backgroundColor' => $color.'20',
-                'borderWidth' => 3,
-                'fill' => true,
-                'tension' => 0.4,
-            ];
-        }
-
         $actividadesRecientes = Actividad::with(['lote', 'usuario', 'tipoActividad']);
         $filtros->aplicarCultivoEnLote($actividadesRecientes);
         $actividadesRecientes = $actividadesRecientes->orderBy('fechainicio', 'desc')->limit(5)->get();
 
-        $topCultivos = Produccion::select('cultivo.nombre', DB::raw('SUM(produccion.cantidad) as total'))
+        $topCultivos = Produccion::select('cultivo.cultivoid', 'cultivo.nombre', DB::raw('SUM(produccion.cantidad) as total'))
             ->join('lote', 'produccion.loteid', '=', 'lote.loteid')
             ->join('cultivo', 'lote.cultivoid', '=', 'cultivo.cultivoid');
         $filtros->aplicarFecha($topCultivos, 'produccion.fechacosecha');
         if ($filtros->cultivoId) {
             $topCultivos->where('lote.cultivoid', $filtros->cultivoId);
         }
-        $topCultivos = $topCultivos->groupBy('cultivo.nombre')->orderByDesc('total')->limit(4)->get();
+        $topCultivos = $topCultivos->groupBy('cultivo.cultivoid', 'cultivo.nombre')->orderByDesc('total')->limit(4)->get();
 
         return [
             'stats' => $stats,
-            'chartData' => ['labels' => array_column($meses, 'nombre'), 'datasets' => $datasets],
+            'chartData' => DashboardCharts::produccionAdmin($filtros),
             'actividadesRecientes' => $actividadesRecientes,
             'insumosStockBajo' => InsumoCatalogo::aplicarFiltroOperativo(
                 Insumo::with(['tipo', 'unidadMedida'])
@@ -644,9 +606,16 @@ class DashboardController extends Controller
         $puntosIds = PuntoVenta::query()
             ->where('usuarioid', $uid)
             ->pluck('puntoventaid');
+        $almacenIds = PuntoVenta::query()
+            ->whereIn('puntoventaid', $puntosIds)
+            ->pluck('almacenid')
+            ->filter()
+            ->values();
 
         $pedidosQuery = PedidoDistribucion::query()->whereIn('puntoventaid', $puntosIds);
         $filtros->aplicarFecha($pedidosQuery, 'fechapedido');
+
+        $inventarioQuery = Insumo::query()->whereIn('almacenid', $almacenIds);
 
         return [
             'stats' => [
@@ -663,6 +632,13 @@ class DashboardController extends Controller
                     ->count(),
                 'en_transito' => (clone $pedidosQuery)
                     ->where('estado', PedidoDistribucionCatalogo::ESTADO_EN_TRANSITO)
+                    ->count(),
+            ],
+            'inventario' => [
+                'productos' => (clone $inventarioQuery)->count(),
+                'bajo_stock' => (clone $inventarioQuery)
+                    ->where('stockminimo', '>', 0)
+                    ->whereColumn('stock', '<=', 'stockminimo')
                     ->count(),
             ],
             'pedidosRecientes' => PedidoDistribucion::query()

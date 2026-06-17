@@ -108,12 +108,7 @@
             </div>
             <div class="col-md-2 mb-2 mb-md-0">
                 <label class="small text-muted mb-1">Producto</label>
-                <select name="producto" class="custom-select custom-select-sm">
-                    <option value="">Todos</option>
-                    @foreach($productosLote as $prod)
-                        <option value="{{ $prod }}" @selected($productoFiltro === $prod)>{{ $prod }}</option>
-                    @endforeach
-                </select>
+                <input type="search" name="producto" class="form-control form-control-sm" value="{{ $productoFiltro }}" placeholder="Ej. Tomate, Ensalada…">
             </div>
             <div class="col-md-2 mb-2 mb-md-0">
                 <label class="small text-muted mb-1">Estado</label>

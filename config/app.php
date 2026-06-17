@@ -56,6 +56,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | URL pública en red local (QR, enlaces desde el móvil)
+    |--------------------------------------------------------------------------
+    |
+    | Si accede desde 127.0.0.1 en el PC pero el QR debe abrir en el celular,
+    | defina la IP LAN y el puerto del servidor (ej. http://192.168.1.10:8001).
+    |
+    */
+
+    'public_url' => env('APP_PUBLIC_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
