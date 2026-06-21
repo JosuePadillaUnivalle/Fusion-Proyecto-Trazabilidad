@@ -1,0 +1,20 @@
+[33m7b8204d[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mapi-finalizada[m[33m, [m[1;31morigin/api-finalizada[m[33m)[m api sin deploy base
+[33me5a5dc8[m cambio 3
+[33mab615c7[m cambio 2
+[33mc15b3e6[m subida
+[33maa04c05[m Dockerfile actualizado
+[33mb2e86fa[m desplegar api con render y supabase
+[33m9446c48[m Temporal: Endpoint para ejecutar migraciones
+[33m070a0c1[m forzar migraciones desde 0
+[33mb07c65b[m arreglo database.php para render
+[33m0d641fc[m deploy con render
+[33mfa79f56[m api deploy
+[33m819ddc3[m[33m ([m[1;32mCrudsWeb+Api+DbParametrizada[m[33m)[m api mejorada
+[33meab0957[m[33m ([m[1;31morigin/CrudsWeb+Api+DbParametrizada[m[33m)[m RegistroImagenDefaultSupabaseApi
+[33m74d08be[m Implementacion de Auth+login+register
+[33m62c7828[m Area de GestionUsuariosUnificada
+[33m030d306[m Cruds Api y Web usando la DB parametrizada
+[33m2350f52[m[33m ([m[1;31morigin/Api+DbParametrizada[m[33m, [m[1;32mApi+DbParametrizada[m[33m)[m Agregada tabla HistorialEstadoLote
+[33m7e2b714[m ApiFinalizadaConAutenticacion
+[33m199d828[m Modelos de base parametrizada empezando creacion de api
+[33mcff101c[m[33m ([m[1;32mmain[m[33m)[m Primer commit

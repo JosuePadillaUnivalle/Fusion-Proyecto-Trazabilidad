@@ -1,0 +1,26 @@
+---
+description: Estilo visual ejecutivo AgroFusion — sin aspecto LED/neón en toda la UI
+alwaysApply: true
+---
+
+# Estilo ejecutivo AgroFusion (sin LED)
+
+Al diseñar o modificar vistas, CSS o componentes Blade en este proyecto:
+
+## Usar
+- Paleta corporativa plana: verde `#2c5530` / `#4a7c59`, grises `#dee2e6`, `#f8f9fa`, `#64748b`
+- Bordes sólidos 1–3px, fondos tintados muy suaves (no saturados)
+- Tipografía clara, jerarquía por peso/tamaño — no por glow
+- Badges Bootstrap sólidos solo cuando aporten lectura (estado); datos tabulares en texto plano
+- Hover sutil: sombra ligera, sin `translateY` exagerado ni `box-shadow` con color neón
+
+## Evitar
+- Verde esmeralda neón `#10b981` como acento principal en cards/panels (reservado al sidebar)
+- `box-shadow` con glow, `text-shadow`, animaciones pulsantes, gradientes brillantes tipo “AI/LED”
+- Pills/pastillas ovaladas detrás de cada dato numérico o de tabla
+- Bordes izquierdos gruesos + cabecera tintada fuerte combinados (aspecto “tarjeta LED”)
+
+## Referencia
+- Catálogos logística: `resources/views/envios/catalogos/partials/estilos.blade.php`
+- Cards envíos: `resources/views/logistica/envios/partials/envio-lista-estilos.blade.php`
+- Formulario vehículos: `resources/views/envios/vehiculos/partials/form-styles.blade.php`

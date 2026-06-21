@@ -1,0 +1,64 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Usuario;
+use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Role;
+
+class RoleSeeder extends Seeder
+{
+    public const ROLES_CANONICOS = ['admin', 'agricultor', 'planta', 'jefe_planta', 'jefe_mayorista', 'mayorista', 'transportista', 'minorista'];
+
+    public const ROLES_LEGACY = ['operador', 'almacen', 'Operador', 'Almacen', 'Admin', 'Agricultor'];
+
+    public function run(): void
+    {
+        foreach (self::ROLES_CANONICOS as $nombre) {
+            Role::firstOrCreate(['name' => $nombre, 'guard_name' => 'web']);
+        }
+
+        Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'web']);
+
+        $agricultorRole = Role::findByName('agricultor', 'web');
+
+        Usuario::query()
+            ->where(function ($q) {
+                $q->whereIn('role', ['operador', 'almacen'])
+                    ->orWhereHas('roles', fn ($r) => $r->whereIn('name', ['operador', 'almacen']));
+            })
+            ->each(function (Usuario $usuario) use ($agricultorRole) {
+                $usuario->syncRoles([$agricultorRole->name]);
+                $usuario->role = 'agricultor';
+                $usuario->fechamodificacion = now();
+                $usuario->save();
+            });
+
+        $adminRole = Role::findByName('admin', 'web');
+        $adminUser = Usuario::where('email', 'admin@agrofusion.com')->first();
+        if ($adminUser) {
+            $adminUser->syncRoles([$adminRole->name]);
+            $adminUser->role = 'admin';
+            $adminUser->fechamodificacion = now();
+            $adminUser->save();
+        }
+
+        $agricultorUser = Usuario::where('email', 'agricultor@agrofusion.com')->first();
+        if ($agricultorUser) {
+            $agricultorUser->syncRoles([$agricultorRole->name]);
+            $agricultorUser->role = 'agricultor';
+            $agricultorUser->fechamodificacion = now();
+            $agricultorUser->save();
+        }
+
+        foreach (['operador@agrofusion.com', 'almacen@agrofusion.com'] as $email) {
+            $legacy = Usuario::where('email', $email)->first();
+            if ($legacy) {
+                $legacy->syncRoles([$agricultorRole->name]);
+                $legacy->role = 'agricultor';
+                $legacy->fechamodificacion = now();
+                $legacy->save();
+            }
+        }
+    }
+}

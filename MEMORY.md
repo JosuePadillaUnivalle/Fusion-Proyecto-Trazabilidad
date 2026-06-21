@@ -1,0 +1,1 @@
+- [AgroNexus Models Architecture](AGENTS.md) — Laravel models with custom primary keys, relationships, and conventions for agricultural traceability

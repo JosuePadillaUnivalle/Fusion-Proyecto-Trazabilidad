@@ -1,0 +1,792 @@
+<?php
+
+namespace App\Http\Controllers\Web;
+
+use App\Http\Controllers\Controller;
+use App\Models\Clima;
+use App\Models\Lote;
+use App\Models\Produccion;
+use App\Models\Almacen;
+use App\Support\AlmacenAmbito;
+use App\Support\DashboardCharts;
+use App\Support\DashboardFiltros;
+use App\Support\DashboardPresentacion;
+use App\Models\Actividad;
+use App\Models\DocumentoEntrega;
+use App\Models\EnvioAsignacionMultiple;
+use App\Models\IncidenteEnvio;
+use App\Models\Insumo;
+use App\Models\Pedido;
+use App\Models\PedidoDistribucion;
+use App\Models\PuntoVenta;
+use App\Models\RutaMultiEntrega;
+use App\Models\RutaDistribucion;
+use App\Support\RutaDistribucionCatalogo;
+use App\Support\TransporteIngresoService;
+use App\Support\PedidoCatalogo;
+use App\Support\PedidoDistribucionCatalogo;
+use App\Models\Usuario;
+use App\Models\Cultivo;
+use App\Models\EstadoLoteTipo;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use App\Models\UsuarioNotificacion;
+use App\Models\AsignacionEtapaPlanta;
+use App\Services\NotificacionUsuarioService;
+use App\Support\UsuarioRol;
+use App\Support\EtiquetaDemo;
+use App\Support\InsumoCatalogo;
+use App\Support\MayoristaAccess;
+
+class DashboardController extends Controller
+{
+    private function isAdmin($user): bool
+    {
+        return (bool) ($user && ($user->hasRole('admin') || $user->hasRole('Admin')));
+    }
+
+    public function index(Request $request, NotificacionUsuarioService $notificaciones)
+    {
+        $user = auth()->user();
+        $filtros = DashboardFiltros::desdeRequest($request);
+        $alertas = $notificaciones->noLeidasPara((int) $user->usuarioid, 8, $user);
+        $totalAlertas = $notificaciones->contarNoLeidas((int) $user->usuarioid, $user);
+        $extras = compact('alertas', 'totalAlertas', 'filtros');
+
+        if (UsuarioRol::debeAcotarPorAsignacion($user)) {
+            return view('dashboard.inicio.agricultor', array_merge(
+                $this->buildAgricultorInicioData($user, $filtros),
+                $this->filtrosContextoAgricultor($user),
+                $extras,
+            ));
+        }
+
+        if (! $this->isAdmin($user) && UsuarioRol::esMayorista($user)) {
+            return view('dashboard.inicio.mayorista', array_merge(
+                $this->buildMayoristaInicioData($user, $filtros),
+                $extras,
+            ));
+        }
+
+        if (! $this->isAdmin($user) && UsuarioRol::esMinorista($user)) {
+            return view('dashboard.inicio.minorista', array_merge(
+                $this->buildMinoristaInicioData($user, $filtros),
+                $extras,
+            ));
+        }
+
+        if (! $this->isAdmin($user) && $user?->can('panel_transportista.view')) {
+            return view('dashboard.inicio.transportista', array_merge(
+                $this->buildTransportistaInicioData($user, $filtros),
+                $extras,
+            ));
+        }
+
+        if (! $this->isAdmin($user) && $user?->can('panel_planta.view')) {
+            return view('dashboard.inicio.planta', array_merge(
+                $this->buildPlantaInicioData($user, $filtros),
+                $extras,
+            ));
+        }
+
+        if (! $this->isAdmin($user) && $user?->can('panel_agricultor.view') && UsuarioRol::esJefeAgricultor($user)) {
+            return view('dashboard.inicio.agricola', array_merge(
+                $this->buildJefeAgricolaInicioData($user, $filtros),
+                $this->filtrosContextoCampo(),
+                $extras,
+            ));
+        }
+
+        return view('home', array_merge($this->buildAdminHomeData($filtros), $extras));
+    }
+
+    public function marcarNotificacionLeida(UsuarioNotificacion $notificacion, NotificacionUsuarioService $notificaciones)
+    {
+        $user = auth()->user();
+        $notificaciones->marcarLeida($notificacion, (int) $user->usuarioid);
+
+        if ($notificaciones->esNotificacionOperarioPlanta($notificacion)
+            && ! $notificaciones->puedeRecibirNotificacionOperarioPlanta($user)) {
+            return redirect()
+                ->route(UsuarioRol::esJefePlanta($user) ? 'dashboard.panel-planta' : 'dashboard')
+                ->with('error', 'Las tareas de transformación se notifican solo a operarios con rol planta.');
+        }
+
+        if ($notificacion->enlace) {
+            return redirect($notificacion->enlace);
+        }
+
+        return back();
+    }
+
+    public function descartarNotificacion(UsuarioNotificacion $notificacion, NotificacionUsuarioService $notificaciones)
+    {
+        $user = auth()->user();
+        $notificaciones->marcarLeida($notificacion, (int) $user->usuarioid);
+
+        return back();
+    }
+
+    public function descartarTodasNotificaciones(NotificacionUsuarioService $notificaciones)
+    {
+        $user = auth()->user();
+        $notificaciones->marcarTodasLeidas((int) $user->usuarioid, $user);
+
+        return back();
+    }
+
+    public function panelPlanta(Request $request, NotificacionUsuarioService $notificaciones)
+    {
+        $user = auth()->user();
+        abort_unless($user && ($user->can('panel_planta.view') || $this->isAdmin($user)), 403);
+
+        $filtros = DashboardFiltros::desdeRequest($request);
+        $alertas = $notificaciones->noLeidasPara((int) $user->usuarioid, 8, $user);
+        $totalAlertas = $notificaciones->contarNoLeidas((int) $user->usuarioid, $user);
+
+        return view('dashboard.roles.planta', array_merge(
+            $this->buildPlantaData($user, $filtros),
+            compact('alertas', 'totalAlertas', 'filtros'),
+        ));
+    }
+
+    public function panelTransportista(Request $request, NotificacionUsuarioService $notificaciones)
+    {
+        $user = auth()->user();
+        abort_unless($user && ($user->can('panel_transportista.view') || $this->isAdmin($user)), 403);
+
+        $filtros = DashboardFiltros::desdeRequest($request);
+        $alertas = $notificaciones->noLeidasPara((int) $user->usuarioid, 8, $user);
+        $totalAlertas = $notificaciones->contarNoLeidas((int) $user->usuarioid, $user);
+
+        return view('dashboard.roles.transportista', array_merge(
+            $this->buildTransportistaData($user, $filtros),
+            compact('alertas', 'totalAlertas', 'filtros'),
+        ));
+    }
+
+    public function panelAgricola(Request $request, NotificacionUsuarioService $notificaciones)
+    {
+        $user = auth()->user();
+        abort_unless($user && ($user->can('panel_agricultor.view') || $this->isAdmin($user)), 403);
+
+        $filtros = DashboardFiltros::desdeRequest($request);
+        $alertas = $notificaciones->noLeidasPara((int) $user->usuarioid, 8, $user);
+        $totalAlertas = $notificaciones->contarNoLeidas((int) $user->usuarioid, $user);
+
+        return view('dashboard.roles.agricola', array_merge(
+            $this->buildJefeAgricolaData($user, $filtros),
+            $this->filtrosContextoCampo(),
+            compact('alertas', 'totalAlertas', 'filtros'),
+        ));
+    }
+
+    public function panelMinorista(Request $request, NotificacionUsuarioService $notificaciones)
+    {
+        $user = auth()->user();
+        abort_unless($user && (UsuarioRol::esMinorista($user) || $this->isAdmin($user)), 403);
+
+        $filtros = DashboardFiltros::desdeRequest($request);
+        $alertas = $notificaciones->noLeidasPara((int) $user->usuarioid, 8, $user);
+        $totalAlertas = $notificaciones->contarNoLeidas((int) $user->usuarioid, $user);
+
+        return view('dashboard.roles.minorista', array_merge(
+            $this->buildMinoristaData($user, $filtros),
+            [
+                'charts' => DashboardCharts::paraMinorista($user, $filtros),
+                'etiquetaGrafico' => $filtros->etiquetaGrafico(),
+            ],
+            compact('alertas', 'totalAlertas', 'filtros'),
+        ));
+    }
+
+    public function panelMayorista(Request $request, NotificacionUsuarioService $notificaciones)
+    {
+        $user = auth()->user();
+        abort_unless($user && ($user->can('panel_mayorista.view') || $this->isAdmin($user)), 403);
+
+        $filtros = DashboardFiltros::desdeRequest($request);
+        $alertas = $notificaciones->noLeidasPara((int) $user->usuarioid, 8, $user);
+        $totalAlertas = $notificaciones->contarNoLeidas((int) $user->usuarioid, $user);
+
+        return view('dashboard.roles.mayorista', array_merge(
+            $this->buildMayoristaData($user, $filtros),
+            [
+                'charts' => DashboardCharts::paraMayorista($user, $filtros),
+                'etiquetaGrafico' => $filtros->etiquetaGrafico(),
+            ],
+            compact('alertas', 'totalAlertas', 'filtros'),
+        ));
+    }
+
+    // ========================================
+    // API: Obtener clima actual (OpenWeather)
+    // ========================================
+    public function getClima(Request $request)
+    {
+        $ciudad = (string) $request->get('ciudad', 'Santa Cruz de la Sierra');
+        $apiKey = config('services.weather.key', env('OPENWEATHER_API_KEY', ''));
+
+        if (is_string($apiKey) && trim($apiKey) !== '') {
+            try {
+                $response = Http::timeout(8)->get('https://api.openweathermap.org/data/2.5/weather', [
+                    'q' => "{$ciudad},BO",
+                    'appid' => $apiKey,
+                    'units' => 'metric',
+                    'lang' => 'es',
+                ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+
+                    return response()->json([
+                        'success' => true,
+                        'temperatura' => round($data['main']['temp']),
+                        'sensacion' => round($data['main']['feels_like']),
+                        'humedad' => $data['main']['humidity'],
+                        'descripcion' => ucfirst($data['weather'][0]['description']),
+                        'icono' => $data['weather'][0]['icon'],
+                        'viento' => round($data['wind']['speed'] * 3.6),
+                        'ciudad' => $data['name'],
+                        'fuente' => 'openweather',
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Continúa con fallback local
+            }
+        }
+
+        return response()->json($this->climaFallbackLocal());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function climaFallbackLocal(): array
+    {
+        if (Schema::hasTable('clima')) {
+            $row = Clima::query()->orderByDesc('fecha')->first();
+            if ($row) {
+                return [
+                    'success' => true,
+                    'temperatura' => round((float) ($row->temperatura ?? 26)),
+                    'humedad' => (int) round((float) ($row->humedad ?? 60)),
+                    'descripcion' => $row->descripcion ?: 'Condición registrada en campo',
+                    'icono' => $row->icono ?: '02d',
+                    'viento' => (int) round((float) ($row->viento ?? 10)),
+                    'ciudad' => 'Santa Cruz de la Sierra',
+                    'fuente' => 'registro_local',
+                ];
+            }
+        }
+
+        return [
+            'success' => true,
+            'temperatura' => 28,
+            'humedad' => 62,
+            'descripcion' => 'Parcialmente nublado',
+            'icono' => '02d',
+            'viento' => 14,
+            'ciudad' => 'Santa Cruz de la Sierra',
+            'fuente' => 'referencia',
+        ];
+    }
+
+    // ========================================
+    // API: Obtener pronóstico 5 días
+    // ========================================
+    public function getPronostico(Request $request)
+    {
+        $apiKey = env('OPENWEATHER_API_KEY');
+        if (! is_string($apiKey) || trim($apiKey) === '') {
+            return response()->json(['success' => false, 'error' => 'Servicio de clima no configurado'], 503);
+        }
+        $ciudad = $request->get('ciudad', 'Santa Cruz de la Sierra');
+        $pais = 'BO';
+
+        try {
+            $response = Http::timeout(10)->get("https://api.openweathermap.org/data/2.5/forecast", [
+                'q' => "{$ciudad},{$pais}",
+                'appid' => $apiKey,
+                'units' => 'metric',
+                'lang' => 'es',
+                'cnt' => 40
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $pronostico = [];
+                
+                foreach ($data['list'] as $item) {
+                    $fecha = date('Y-m-d', $item['dt']);
+                    if (!isset($pronostico[$fecha])) {
+                        $pronostico[$fecha] = [
+                            'fecha' => $fecha,
+                            'dia' => $this->getNombreDia($fecha),
+                            'temp_max' => $item['main']['temp_max'],
+                            'temp_min' => $item['main']['temp_min'],
+                            'descripcion' => ucfirst($item['weather'][0]['description']),
+                            'icono' => $item['weather'][0]['icon'],
+                            'humedad' => $item['main']['humidity'],
+                        ];
+                    } else {
+                        $pronostico[$fecha]['temp_max'] = max($pronostico[$fecha]['temp_max'], $item['main']['temp_max']);
+                        $pronostico[$fecha]['temp_min'] = min($pronostico[$fecha]['temp_min'], $item['main']['temp_min']);
+                    }
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'pronostico' => array_values(array_slice($pronostico, 0, 5))
+                ]);
+            }
+
+            return response()->json(['success' => false, 'error' => 'No se pudo obtener el pronóstico']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    private function getNombreDia($fecha)
+    {
+        $dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        return $dias[date('w', strtotime($fecha))];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildAdminHomeData(DashboardFiltros $filtros): array
+    {
+        $lotesQuery = Lote::query();
+        if (! $filtros->estadoLoteId) {
+            $lotesQuery->whereHas('estadoTipo', function ($q) {
+                $q->whereNotIn('nombre', ['cosechado', 'en descanso']);
+            });
+        }
+        $filtros->aplicarEnLote($lotesQuery);
+
+        $produccionQuery = Produccion::query();
+        $filtros->aplicarFecha($produccionQuery, 'fechacosecha');
+        $filtros->aplicarCultivoEnLote($produccionQuery);
+
+        $enviosTransporteQuery = EnvioAsignacionMultiple::query()
+            ->whereNotNull('costo_bs')
+            ->where(function ($q) {
+                $q->whereIn('estado', ['recibido_planta', 'entregado', 'entregada'])
+                    ->orWhereNotNull('fecha_recepcion_planta');
+            });
+        $filtros->aplicarFecha($enviosTransporteQuery, 'fecha_recepcion_planta');
+
+        $rutasTransporteQuery = RutaDistribucion::query()
+            ->where('estado', RutaDistribucionCatalogo::ESTADO_COMPLETADA)
+            ->whereNotNull('costo_bs');
+        $filtros->aplicarFecha($rutasTransporteQuery, 'fecha_salida');
+
+        $actividadesQuery = Actividad::query();
+        $filtros->aplicarFecha($actividadesQuery, 'fechainicio');
+        $filtros->aplicarCultivoEnLote($actividadesQuery);
+
+        $stats = [
+            'lotes_activos' => (clone $lotesQuery)->count(),
+            'total_lotes' => Lote::count(),
+            'produccion_mes_kg' => (clone $produccionQuery)->sum('cantidad'),
+            'insumos_stock_bajo' => Insumo::where('stock', '<=', InsumoCatalogo::UMBRAL_ALERTA_STOCK)->count(),
+            'transporte_costo_mes' => round(
+                (float) (clone $enviosTransporteQuery)->sum('costo_bs')
+                + (float) (clone $rutasTransporteQuery)->sum('costo_bs'),
+                2
+            ),
+            'hectareas_totales' => Lote::sum('superficie') ?? 0,
+            'total_actividades' => (clone $actividadesQuery)->count(),
+            'usuarios' => Usuario::count(),
+            'total_insumos' => Insumo::count(),
+        ];
+
+        if ($stats['lotes_activos'] == 0 && $stats['total_lotes'] > 0) {
+            $stats['lotes_activos'] = $stats['total_lotes'];
+        }
+
+        $actividadesRecientes = Actividad::with(['lote', 'usuario', 'tipoActividad']);
+        $filtros->aplicarCultivoEnLote($actividadesRecientes);
+        $actividadesRecientes = $actividadesRecientes->orderBy('fechainicio', 'desc')->limit(5)->get();
+
+        $topCultivos = Produccion::select('cultivo.cultivoid', 'cultivo.nombre', DB::raw('SUM(produccion.cantidad) as total'))
+            ->join('lote', 'produccion.loteid', '=', 'lote.loteid')
+            ->join('cultivo', 'lote.cultivoid', '=', 'cultivo.cultivoid');
+        $filtros->aplicarFecha($topCultivos, 'produccion.fechacosecha');
+        if ($filtros->cultivoId) {
+            $topCultivos->where('lote.cultivoid', $filtros->cultivoId);
+        }
+        $topCultivos = $topCultivos->groupBy('cultivo.cultivoid', 'cultivo.nombre')->orderByDesc('total')->limit(4)->get();
+
+        return [
+            'stats' => $stats,
+            'chartData' => DashboardCharts::produccionAdmin($filtros),
+            'actividadesRecientes' => $actividadesRecientes,
+            'insumosStockBajo' => InsumoCatalogo::aplicarFiltroOperativo(
+                Insumo::with(['tipo', 'unidadMedida'])
+            )
+                ->where('stock', '<=', InsumoCatalogo::UMBRAL_ALERTA_STOCK)
+                ->orderBy('stock')->limit(12)->get()
+                ->filter(fn (Insumo $insumo) => ! EtiquetaDemo::esDemo($insumo->nombre))
+                ->take(5)->values(),
+            'lotesPorEstado' => Lote::select('estadolote_tipo.nombre', DB::raw('COUNT(*) as total'))
+                ->join('estadolote_tipo', 'lote.estadolotetipoid', '=', 'estadolote_tipo.estadolotetipoid')
+                ->groupBy('estadolote_tipo.nombre')->get(),
+            'topCultivos' => $topCultivos,
+            'resumenEstadistico' => DashboardPresentacion::resumenEstadistico($stats),
+            'cultivos' => Cultivo::orderBy('nombre')->get(['cultivoid', 'nombre']),
+            'lotes' => Lote::query()->orderBy('nombre')->get(['loteid', 'nombre', 'cultivoid']),
+            'estadosLote' => EstadoLoteTipo::query()->orderBy('nombre')->get(['estadolotetipoid', 'nombre']),
+            'etiquetaGrafico' => $filtros->etiquetaGrafico(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function filtrosContextoAgricultor($user): array
+    {
+        $uid = (int) $user->usuarioid;
+
+        return [
+            'lotes' => Lote::query()->where('usuarioid', $uid)->orderBy('nombre')->get(['loteid', 'nombre', 'cultivoid']),
+            'mostrarLote' => true,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function filtrosContextoCampo(): array
+    {
+        return [
+            'cultivos' => Cultivo::orderBy('nombre')->get(['cultivoid', 'nombre']),
+            'lotes' => Lote::query()->orderBy('nombre')->get(['loteid', 'nombre', 'cultivoid']),
+            'mostrarCultivo' => true,
+            'mostrarLote' => true,
+        ];
+    }
+
+    private function buildPlantaInicioData($user, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+
+        return array_merge($this->buildPlantaData($user, $filtros), [
+            'charts' => DashboardCharts::paraPlanta($filtros),
+            'etiquetaGrafico' => $filtros->etiquetaGrafico(),
+        ]);
+    }
+
+    private function buildTransportistaInicioData($user, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+
+        return array_merge($this->buildTransportistaData($user, $filtros), [
+            'charts' => DashboardCharts::paraTransportista($user, $filtros),
+            'etiquetaGrafico' => $filtros->etiquetaGrafico(),
+        ]);
+    }
+
+    private function buildJefeAgricolaInicioData($user = null, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+
+        return array_merge($this->buildJefeAgricolaData($user, $filtros), [
+            'charts' => DashboardCharts::paraJefeAgricola($filtros),
+            'etiquetaGrafico' => $filtros->etiquetaGrafico(),
+        ]);
+    }
+
+    private function buildAgricultorInicioData($user, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+
+        return array_merge($this->buildAgricultorData($user, $filtros), [
+            'charts' => DashboardCharts::paraAgricultor($user, $filtros),
+            'etiquetaGrafico' => $filtros->etiquetaGrafico(),
+        ]);
+    }
+
+    private function buildMinoristaInicioData($user, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+
+        return array_merge($this->buildMinoristaData($user, $filtros), [
+            'charts' => DashboardCharts::paraMinorista($user, $filtros),
+            'etiquetaGrafico' => $filtros->etiquetaGrafico(),
+        ]);
+    }
+
+    private function buildMayoristaInicioData($user, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+
+        return array_merge($this->buildMayoristaData($user, $filtros), [
+            'charts' => DashboardCharts::paraMayorista($user, $filtros),
+            'etiquetaGrafico' => $filtros->etiquetaGrafico(),
+        ]);
+    }
+
+    private function buildMayoristaData($user, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+        $almacenIds = MayoristaAccess::idsAlmacenesMayorista($user);
+
+        if ($this->isAdmin($user)) {
+            $almacenIds = AlmacenAmbito::scope(Almacen::query(), AlmacenAmbito::MAYORISTA)
+                ->pluck('almacenid')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+        }
+
+        $pedidosQuery = PedidoDistribucion::query()->with('puntoVenta');
+        $filtros->aplicarFecha($pedidosQuery, 'fechapedido');
+
+        $inventarioQuery = Insumo::query();
+        if ($almacenIds !== []) {
+            $inventarioQuery->whereIn('almacenid', $almacenIds);
+        } else {
+            $inventarioQuery->whereRaw('1 = 0');
+        }
+
+        $almacenes = AlmacenAmbito::scopeParaUsuario(
+            Almacen::query()->orderBy('nombre'),
+            AlmacenAmbito::MAYORISTA,
+            $user
+        )->get();
+
+        return [
+            'stats' => [
+                'almacenes' => $almacenes->count(),
+                'pedidos_pendientes' => (clone $pedidosQuery)
+                    ->where('estado', PedidoDistribucionCatalogo::ESTADO_PENDIENTE)
+                    ->count(),
+                'pedidos_activos' => (clone $pedidosQuery)
+                    ->whereNotIn('estado', [
+                        PedidoDistribucionCatalogo::ESTADO_RECIBIDO,
+                        PedidoDistribucionCatalogo::ESTADO_RECHAZADO,
+                        PedidoDistribucionCatalogo::ESTADO_CANCELADO,
+                    ])
+                    ->count(),
+                'en_transito' => (clone $pedidosQuery)
+                    ->where('estado', PedidoDistribucionCatalogo::ESTADO_EN_TRANSITO)
+                    ->count(),
+                'productos_stock' => (clone $inventarioQuery)->count(),
+                'stock_bajo' => (clone $inventarioQuery)
+                    ->where('stockminimo', '>', 0)
+                    ->whereColumn('stock', '<=', 'stockminimo')
+                    ->count(),
+            ],
+            'almacenesResumen' => $almacenes,
+            'pedidosRecientes' => PedidoDistribucion::query()
+                ->with('puntoVenta')
+                ->when($filtros->tieneRango(), fn ($q) => $filtros->aplicarFecha($q, 'fechapedido'))
+                ->orderByDesc('pedidodistribucionid')
+                ->limit(8)
+                ->get(),
+        ];
+    }
+
+    private function buildPlantaData($user = null, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+
+        $pedidos = Pedido::query();
+        $asignaciones = EnvioAsignacionMultiple::query();
+        $filtros->aplicarFecha($pedidos, 'fechapedido');
+        $filtros->aplicarFecha($asignaciones, 'fecha_asignacion');
+
+        $rutasActivas = RutaMultiEntrega::query()->whereIn('estado', ['planificada', 'en_ruta']);
+        $incidentes = IncidenteEnvio::query()->where('estado', 'abierto');
+        $documentos = DocumentoEntrega::query();
+
+        $data = [
+            'stats' => [
+                'pedidos_totales' => $pedidos->count(),
+                'asignaciones' => $asignaciones->count(),
+                'rutas_activas' => (clone $rutasActivas)->count(),
+                'incidentes_abiertos' => $incidentes->count(),
+                'documentos' => $documentos->count(),
+            ],
+            'ultimas_asignaciones' => EnvioAsignacionMultiple::query()->latest()->take(8)->get(),
+            'rutas_recientes' => RutaMultiEntrega::query()->latest()->take(6)->get(),
+            'tareasPendientes' => collect(),
+            'tareasPendientesCount' => 0,
+        ];
+
+        if ($user && UsuarioRol::esOperarioPlanta($user)) {
+            $tareasPendientes = AsignacionEtapaPlanta::query()
+                ->with(['proceso', 'maquina', 'loteProduccion'])
+                ->where('operador_usuarioid', $user->usuarioid)
+                ->pendientes()
+                ->orderByDesc('creado_en')
+                ->limit(5)
+                ->get();
+            $data['tareasPendientes'] = $tareasPendientes;
+            $data['tareasPendientesCount'] = AsignacionEtapaPlanta::query()
+                ->where('operador_usuarioid', $user->usuarioid)
+                ->pendientes()
+                ->count();
+        }
+
+        return $data;
+    }
+
+    private function buildAgricultorData($user, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+        $uid = (int) $user->usuarioid;
+        $lotes = Lote::query()->where('usuarioid', $uid);
+        if ($filtros->loteId) {
+            $lotes->where('loteid', $filtros->loteId);
+        }
+        $actividades = Actividad::query()->where('usuarioid', $uid);
+        if ($filtros->loteId) {
+            $actividades->where('loteid', $filtros->loteId);
+        }
+
+        $completadas = (clone $actividades)->whereNotNull('fechafin');
+        $filtros->aplicarFecha($completadas, 'fechafin');
+
+        return [
+            'stats' => [
+                'lotes_asignados' => (clone $lotes)->count(),
+                'actividades_pendientes' => (clone $actividades)->whereNull('fechafin')->count(),
+                'actividades_hoy' => (clone $actividades)->whereDate('fechainicio', now()->toDateString())->count(),
+                'completadas_mes' => $completadas->count(),
+            ],
+            'lotesRecientes' => (clone $lotes)->with(['cultivo', 'estadoTipo'])->orderByDesc('loteid')->limit(5)->get(),
+            'actividadesPendientes' => (clone $actividades)->with(['lote', 'tipoActividad'])
+                ->whereNull('fechafin')->orderBy('fechainicio')->limit(8)->get(),
+        ];
+    }
+
+    private function buildJefeAgricolaData($user = null, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+
+        $lotes = Lote::query();
+        if ($filtros->cultivoId) {
+            $lotes->where('cultivoid', $filtros->cultivoId);
+        }
+
+        $actividades = Actividad::query()->whereNull('fechafin');
+        $filtros->aplicarCultivoEnLote($actividades);
+
+        $cosechas = Produccion::query();
+        $filtros->aplicarFecha($cosechas, 'fechacosecha');
+        $filtros->aplicarCultivoEnLote($cosechas);
+
+        $pedidosPendientes = PedidoCatalogo::contarPendientesAgricola();
+
+        return [
+            'stats' => [
+                'lotes' => $lotes->count(),
+                'actividades_pendientes' => $actividades->count(),
+                'cosechas_mes' => $cosechas->sum('cantidad'),
+                'pedidos_pendientes' => $pedidosPendientes,
+            ],
+            'lotesRecientes' => Lote::query()
+                ->with(['cultivo', 'estadoTipo'])
+                ->orderByDesc('loteid')
+                ->limit(5)
+                ->get(),
+        ];
+    }
+
+    private function buildMinoristaData($user, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+        $uid = (int) $user->usuarioid;
+        $puntosIds = PuntoVenta::query()
+            ->where('usuarioid', $uid)
+            ->pluck('puntoventaid');
+        $almacenIds = PuntoVenta::query()
+            ->whereIn('puntoventaid', $puntosIds)
+            ->pluck('almacenid')
+            ->filter()
+            ->values();
+
+        $pedidosQuery = PedidoDistribucion::query()->whereIn('puntoventaid', $puntosIds);
+        $filtros->aplicarFecha($pedidosQuery, 'fechapedido');
+
+        $inventarioQuery = Insumo::query()->whereIn('almacenid', $almacenIds);
+
+        return [
+            'stats' => [
+                'puntos_venta' => $puntosIds->count(),
+                'pedidos_activos' => (clone $pedidosQuery)
+                    ->whereNotIn('estado', [
+                        PedidoDistribucionCatalogo::ESTADO_RECIBIDO,
+                        PedidoDistribucionCatalogo::ESTADO_RECHAZADO,
+                        PedidoDistribucionCatalogo::ESTADO_CANCELADO,
+                    ])
+                    ->count(),
+                'pendientes_planta' => (clone $pedidosQuery)
+                    ->where('estado', PedidoDistribucionCatalogo::ESTADO_PENDIENTE)
+                    ->count(),
+                'en_transito' => (clone $pedidosQuery)
+                    ->where('estado', PedidoDistribucionCatalogo::ESTADO_EN_TRANSITO)
+                    ->count(),
+            ],
+            'inventario' => [
+                'productos' => (clone $inventarioQuery)->count(),
+                'bajo_stock' => (clone $inventarioQuery)
+                    ->where('stockminimo', '>', 0)
+                    ->whereColumn('stock', '<=', 'stockminimo')
+                    ->count(),
+            ],
+            'pedidosRecientes' => PedidoDistribucion::query()
+                ->with('puntoVenta')
+                ->whereIn('puntoventaid', $puntosIds)
+                ->when($filtros->tieneRango(), fn ($q) => $filtros->aplicarFecha($q, 'fechapedido'))
+                ->orderByDesc('pedidodistribucionid')
+                ->limit(5)
+                ->get(),
+        ];
+    }
+
+    private function buildTransportistaData($user, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+
+        $asignaciones = EnvioAsignacionMultiple::query()->where('transportista_usuarioid', $user->usuarioid);
+        $asignacionesPeriodo = (clone $asignaciones);
+        $filtros->aplicarFecha($asignacionesPeriodo, 'fecha_asignacion');
+
+        $rutas = RutaMultiEntrega::query()->where('transportista_usuarioid', $user->usuarioid);
+        $incidentes = IncidenteEnvio::query()->where('reportadopor_usuarioid', $user->usuarioid);
+        $documentos = DocumentoEntrega::query()->where('usuarioid', $user->usuarioid);
+
+        $total = $asignacionesPeriodo->count();
+        $enRuta = (clone $asignaciones)->where('estado', 'en_ruta')->count()
+            + RutaDistribucion::query()->where('transportista_usuarioid', $user->usuarioid)
+                ->where('estado', RutaDistribucionCatalogo::ESTADO_EN_RUTA)->count();
+        $entregadosPeriodo = (clone $asignacionesPeriodo)->where('estado', 'entregado')->count();
+
+        $ingresos = TransporteIngresoService::resumenPeriodo((int) $user->usuarioid, $filtros);
+
+        return [
+            'stats' => [
+                'asignados' => $total + RutaDistribucion::query()
+                    ->where('transportista_usuarioid', $user->usuarioid)->count(),
+                'por_recoger' => (clone $asignaciones)->where('estado', 'asignado')->count(),
+                'en_camino' => $enRuta,
+                'entregados_hoy' => $entregadosPeriodo,
+                'productividad' => $total > 0 ? round(($entregadosPeriodo / $total) * 100, 2) : 0,
+                'incidentes_abiertos' => (clone $incidentes)->where('estado', 'abierto')->count(),
+                'documentos' => $documentos->count(),
+                'ingresos_bs' => $ingresos['total_bs'],
+                'servicios_completados' => $ingresos['servicios'],
+            ],
+            'mis_asignaciones' => $asignaciones->with('pedido')->latest()->take(10)->get(),
+            'mis_rutas' => $rutas->latest()->take(6)->get(),
+        ];
+    }
+
+}

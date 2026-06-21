@@ -1,0 +1,12 @@
+/node_modules
+/vendor
+/storage/logs
+/storage/framework/cache
+/storage/framework/sessions
+/storage/framework/views
+/.env
+/agrofusion-mobile/node_modules
+/agrofusion-mobile/.expo
+/agrofusion-mobile/test-build
+*.log
+.env
