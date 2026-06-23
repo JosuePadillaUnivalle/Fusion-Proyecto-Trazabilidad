@@ -180,7 +180,6 @@ final class DocumentoEntregaArchivo
                 ?? $rutaOperacion?->checklistCondicionVehiculo?->estado_general
         );
         $transportista = $envio?->transportista ?? $rutaOperacion?->transportista ?? $documento->usuario;
-        $transportistaNombre = DocumentoEntregaCatalogo::etiquetaUsuario($transportista);
 
         $destinoCliente = '—';
         $direccionEntrega = '—';
@@ -293,6 +292,13 @@ final class DocumentoEntregaArchivo
         $operacionFirmaRecepcion = $envio?->firmaRecepcion ?? $rutaOperacion?->firmaRecepcion;
         $operacionLlegadaAt = $envio?->llegada_confirmada_at ?? $rutaOperacion?->llegada_confirmada_at;
 
+        $transportistaNombre = trim((string) ($operacionFirmaTransportista?->nombrefirmante ?? ''));
+        if ($transportistaNombre === '') {
+            $transportistaNombre = DocumentoEntregaCatalogo::etiquetaUsuario($transportista);
+        }
+
+        $recepcionNombre = trim((string) ($operacionFirmaRecepcion?->nombrefirmante ?? ''));
+
         $condicionesLineas = [];
         foreach ($operacionChecklistCondicion?->detalles ?? [] as $det) {
             $condicionesLineas[] = [
@@ -353,6 +359,7 @@ final class DocumentoEntregaArchivo
             'estadoVehiculo' => $estadoVehiculo,
             'tipoEtiqueta' => $tipoEtiqueta,
             'transportistaNombre' => $transportistaNombre,
+            'recepcionNombre' => $recepcionNombre !== '' ? $recepcionNombre : ($destinoCliente !== '—' ? $destinoCliente : null),
             'destinoCliente' => $destinoCliente,
             'direccionEntrega' => $direccionEntrega,
             'cargadoPor' => $cargadoPor,
@@ -366,10 +373,8 @@ final class DocumentoEntregaArchivo
             'incidentesLineas' => $incidentesLineas,
             'observacionIncidentes' => $observacionIncidentes,
             'observacionesIncidentes' => $operacionChecklistIncidente?->observaciones,
-            'observacionPersonal' => self::resolverObservacionPersonal(
-                $operacionChecklistCondicion?->observaciones,
-                $operacionChecklistIncidente?->observaciones
-            ),
+            'observacionPersonalCondiciones' => self::extraerObservacionManual($operacionChecklistCondicion?->observaciones),
+            'observacionPersonalIncidentes' => self::extraerObservacionManual($operacionChecklistIncidente?->observaciones),
             'firmaTransportistaImg' => $operacionFirmaTransportista?->imagenfirma,
             'firmaRecepcionImg' => $operacionFirmaRecepcion?->imagenfirma,
             'firmaRecepcionEtiqueta' => $firmaRecepcionEtiqueta,
@@ -459,28 +464,17 @@ final class DocumentoEntregaArchivo
         return true;
     }
 
-    private static function resolverObservacionPersonal(?string $obsCondiciones, ?string $obsIncidentes): ?string
+    private static function extraerObservacionManual(?string $texto): ?string
     {
-        $partes = [];
-
-        foreach ([$obsCondiciones, $obsIncidentes] as $texto) {
-            if (! self::esObservacionManual($texto)) {
-                continue;
-            }
-
-            $limpio = trim((string) $texto);
-            $limpio = preg_replace('/\s*\(registro\s+r[aá]pido\)\.?/iu', '', $limpio) ?? $limpio;
-            $limpio = trim($limpio);
-            if ($limpio !== '' && ! in_array($limpio, $partes, true)) {
-                $partes[] = $limpio;
-            }
-        }
-
-        if ($partes === []) {
+        if (! self::esObservacionManual($texto)) {
             return null;
         }
 
-        return implode(' ', $partes);
+        $limpio = trim((string) $texto);
+        $limpio = preg_replace('/\s*\(registro\s+r[aá]pido\)\.?/iu', '', $limpio) ?? $limpio;
+        $limpio = trim($limpio);
+
+        return $limpio !== '' ? $limpio : null;
     }
 
     private static function esArchivoPlaceholder(string $path): bool
