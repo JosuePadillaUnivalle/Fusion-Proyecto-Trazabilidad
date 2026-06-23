@@ -94,6 +94,11 @@
     --trz-mod-text: #6d28d9; --trz-mod-head-bg: #faf5ff;
     --trz-mod-line-a: #c4b5fd; --trz-mod-line-b: #ede9fe;
 }
+.trz-mod--mayorista {
+    --trz-mod-main: #0d9488; --trz-mod-light: #14b8a6; --trz-mod-bg: #ecfdf5;
+    --trz-mod-text: #0f766e; --trz-mod-head-bg: #f0fdfa;
+    --trz-mod-line-a: #5eead4; --trz-mod-line-b: #ccfbf1;
+}
 .trz-mod--pdv {
     --trz-mod-main: #d97706; --trz-mod-light: #f59e0b; --trz-mod-bg: #fffbeb;
     --trz-mod-text: #b45309; --trz-mod-head-bg: #fffbeb;
@@ -278,7 +283,7 @@
             <input type="search" id="trzBuscarEvento" placeholder="Ej: siembra, cosecha, planta, recepción…" autocomplete="off">
         </div>
         @if(($reporte['total_eventos'] ?? 0) > 0)
-        <p class="trz-buscar-hint mb-0">{{ $reporte['total_eventos'] }} eventos ordenados del más antiguo (1) al más reciente.</p>
+        <p class="trz-buscar-hint mb-0">{{ $reporte['total_eventos'] }} eventos en orden del ciclo: campo → planta → mayorista → distribución → tienda.</p>
         @endif
     </div>
 

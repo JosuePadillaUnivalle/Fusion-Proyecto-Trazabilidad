@@ -43,14 +43,5 @@ class PedidosAccessTest extends TestCase
         $this->get(route('logistica.asignaciones.listado'))->assertOk();
         $this->get(route('pedidos.create'))->assertOk();
     }
-
-    public function test_admin_ve_pedidos_agricola_sin_crear(): void
-    {
-        $admin = $this->createUser('admin');
-        $this->actingAs($admin);
-
-        $this->get(route('agricola.pedidos.index'))->assertOk();
-        $this->get(route('pedidos.create'))->assertOk();
-    }
 }
 

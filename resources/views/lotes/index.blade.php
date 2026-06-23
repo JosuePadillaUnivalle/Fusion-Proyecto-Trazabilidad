@@ -11,14 +11,15 @@
 @php
     use App\Support\EstadoLoteCatalogo;
 
-    $estadoBadge = fn ($nombre) => match (EstadoLoteCatalogo::slugFromNombre($nombre) ?? '') {
-        'planificado' => 'secondary',
-        'sembrado' => 'primary',
-        'en_crecimiento' => 'success',
-        'listo_para_cosecha' => 'info',
-        'cosechado' => 'warning',
-        'finalizado' => 'dark',
-        default => 'secondary',
+    $estadoBadge = fn ($nombre) => match (EstadoLoteCatalogo::slugFromNombre($nombre) ?? mb_strtolower(trim($nombre))) {
+        'planificado' => 'lote-estado lote-estado--planificado',
+        'sembrado' => 'lote-estado lote-estado--sembrado',
+        'en_crecimiento' => 'lote-estado lote-estado--crecimiento',
+        'listo_para_cosecha' => 'lote-estado lote-estado--listo',
+        'cosechado' => 'lote-estado lote-estado--cosechado',
+        'finalizado' => 'lote-estado lote-estado--finalizado',
+        'certificado' => 'lote-estado lote-estado--certificado',
+        default => 'lote-estado lote-estado--planificado',
     };
     $filtrosActivos = collect($filtros ?? [])->filter(fn ($v) => $v !== null && $v !== '');
     $filtrosAbiertos = EstadoLoteCatalogo::filtrosPanelAbierto(request(), $filtrosActivos->isNotEmpty());
@@ -118,6 +119,21 @@
     padding: 0.35em 0.65em;
     white-space: nowrap;
 }
+.page-lotes .lote-estado {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.38em 0.72em;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+    border: none;
+}
+.page-lotes .lote-estado--planificado { background: #6366f1; color: #fff; }
+.page-lotes .lote-estado--sembrado { background: #0ea5e9; color: #fff; }
+.page-lotes .lote-estado--crecimiento { background: #22c55e; color: #fff; }
+.page-lotes .lote-estado--listo { background: #14b8a6; color: #fff; }
+.page-lotes .lote-estado--cosechado { background: #f59e0b; color: #1f2937; }
+.page-lotes .lote-estado--finalizado { background: #475569; color: #fff; }
+.page-lotes .lote-estado--certificado { background: #7c3aed; color: #fff; }
 </style>
 @endpush
 
@@ -172,7 +188,7 @@
     <div class="alert alert-light border small mb-3">
         <i class="fas fa-info-circle text-success mr-1"></i>
         <strong>Estados del lote:</strong> al crear queda en <em>Planificado</em>.
-        Pasa a <em>Sembrado</em> al completar siembra; a <em>En crecimiento</em> con riego, fumigación o fertilización;
+        Pasa a <em>En crecimiento</em> al completar la siembra;
         y a <em>Cosechado</em> al registrar la cosecha. También puedes cambiarlo manualmente al editar el lote.
     </div>
 
@@ -297,7 +313,7 @@
                             <td class="text-muted">{{ $l->usuario->nombre ?? '—' }}</td>
                             <td>{{ $l->cultivo_etiqueta ?? '—' }}</td>
                             <td>
-                                <span class="badge badge-{{ $badge }}">{{ ucfirst($l->estadoTipo->nombre ?? '—') }}</span>
+                                <span class="badge {{ $badge }}">{{ ucfirst($l->estadoTipo->nombre ?? '—') }}</span>
                             </td>
                             <td class="text-right font-weight-bold">@superficie($l->superficie, 1)</td>
                             <td class="text-muted small">{{ Str::limit($l->ubicacion_visible, 28) }}</td>
@@ -361,7 +377,7 @@
                             @endif
                         </div>
                     </div>
-                    <span class="badge badge-{{ $badge }} mr-2 d-none d-md-inline">{{ ucfirst($estadoNombre) }}</span>
+                    <span class="badge {{ $badge }} mr-2 d-none d-md-inline">{{ ucfirst($estadoNombre) }}</span>
                     <div class="lote-acciones flex-shrink-0">
                         <a href="{{ route('lotes.show', $l) }}" class="btn btn-outline-info" title="Ver"><i class="fas fa-eye"></i></a>
                         @if($loteCerrado)
@@ -384,18 +400,7 @@
             @endforelse
         </div>
 
-        <div class="card-footer bg-white d-flex flex-wrap justify-content-between align-items-center py-2">
-            <div>
-                @can('lotes.update')
-                <form action="{{ route('lotes.sincronizar-operacion') }}" method="POST" class="d-inline mb-0">
-                    @csrf
-                    <button type="submit" class="btn btn-outline-info btn-sm">
-                        <i class="fas fa-sync-alt mr-1"></i> Sincronizar operación
-                    </button>
-                </form>
-                <span class="sync-hint ml-2 d-none d-md-inline">Clima, actividades y riegos automáticos</span>
-                @endcan
-            </div>
+        <div class="card-footer bg-white d-flex flex-wrap justify-content-end align-items-center py-2">
             @if($lotes->hasPages())
             <div class="mb-0">{{ $lotes->links() }}</div>
             @endif
@@ -403,6 +408,8 @@
     </div>
 
 </div>
+
+@include('lotes.partials.modal-lote-creado')
 @endsection
 
 @push('scripts')

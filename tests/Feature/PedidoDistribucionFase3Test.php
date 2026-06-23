@@ -8,14 +8,12 @@ use App\Models\Insumo;
 use App\Models\InsumoPresentacion;
 use App\Models\PedidoDistribucion;
 use App\Models\PuntoVenta;
-use App\Models\SolicitudProduccionPlanta;
 use App\Models\TipoInsumo;
 use App\Models\UnidadMedida;
 use App\Models\Usuario;
 use App\Support\AlmacenAmbito;
 use App\Support\InsumoCatalogo;
 use App\Support\PedidoDistribucionCatalogo;
-use App\Support\SolicitudProduccionPlantaCatalogo;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -52,7 +50,7 @@ class PedidoDistribucionFase3Test extends TestCase
         return $user;
     }
 
-    public function test_minorista_puede_solicitar_producto_custom_sin_stock(): void
+    public function test_minorista_no_puede_solicitar_producto_custom(): void
     {
         $minorista = $this->usuario('minorista', 'min.f3@test.local');
         $pdv = PuntoVenta::create([
@@ -75,85 +73,15 @@ class PedidoDistribucionFase3Test extends TestCase
         ]);
 
         $response->assertRedirect();
-        $pedido = PedidoDistribucion::query()->first();
-        $this->assertNotNull($pedido);
-        $this->assertSame(PedidoDistribucionCatalogo::TIPO_SOLICITUD_CUSTOM, $pedido->tipo_solicitud);
-        $this->assertNull($pedido->almacen_mayorista_origenid);
-        $detalle = $pedido->detalles->first();
-        $this->assertTrue($detalle->es_solicitud_custom);
-        $this->assertSame('bolsa', $detalle->tipo_envase);
+        $this->assertNull(PedidoDistribucion::query()->first());
     }
 
-    public function test_mayorista_acepta_custom_y_solicita_produccion_planta(): void
+    private function tipoProductoTerminadoId(): int
     {
-        $mayorista = $this->usuario('mayorista', 'may.f3@test.local');
-        $planta = $this->usuario('planta', 'plt.f3@test.local');
-        $minorista = $this->usuario('minorista', 'min2.f3@test.local');
-        $kg = UnidadMedida::create(['nombre' => 'Kilogramo', 'abreviatura' => 'kg']);
+        InsumoCatalogo::asegurarCatalogosBase();
 
-        Almacen::create([
-            'nombre' => 'Mayorista Custom F3',
-            'ubicacion' => 'Av. Test, Santa Cruz',
-            'capacidad' => 300,
-            'unidadmedidaid' => $kg->unidadmedidaid,
-            'ambito' => AlmacenAmbito::MAYORISTA,
-            'responsable_usuarioid' => $mayorista->usuarioid,
-            'activo' => true,
-        ]);
-
-        $pdv = PuntoVenta::create([
-            'usuarioid' => $minorista->usuarioid,
-            'nombre' => 'PDV F3 B',
-            'latitud' => -17.79,
-            'longitud' => -63.17,
-            'activo' => true,
-        ]);
-
-        $pedido = PedidoDistribucion::create([
-            'numero_solicitud' => 'PDV-F3-0001',
-            'puntoventaid' => $pdv->puntoventaid,
-            'estado' => PedidoDistribucionCatalogo::ESTADO_PENDIENTE,
-            'tipo_solicitud' => PedidoDistribucionCatalogo::TIPO_SOLICITUD_CUSTOM,
-            'fechapedido' => now(),
-            'fecha_entrega_deseada' => now()->addDays(2),
-            'hora_entrega_deseada' => '14:00',
-            'creado_por_usuarioid' => $minorista->usuarioid,
-        ]);
-
-        DetallePedidoDistribucion::create([
-            'pedidodistribucionid' => $pedido->pedidodistribucionid,
-            'producto_nombre' => 'Puré especial',
-            'tipo_envase' => 'lata',
-            'cantidad' => 120,
-            'es_solicitud_custom' => true,
-        ]);
-
-        $this->actingAs($mayorista)
-            ->post(route('punto-venta.pedidos.aceptar', $pedido))
-            ->assertRedirect();
-
-        $pedido->refresh();
-        $this->assertTrue($pedido->requiere_coordinacion_planta);
-        $this->assertFalse($pedido->coordinacion_planta_resuelta);
-
-        $this->actingAs($mayorista)
-            ->post(route('punto-venta.pedidos.solicitar-produccion-planta', $pedido))
-            ->assertRedirect();
-
-        $solicitud = SolicitudProduccionPlanta::query()->first();
-        $this->assertNotNull($solicitud);
-        $this->assertSame(SolicitudProduccionPlantaCatalogo::ESTADO_PENDIENTE, $solicitud->estado);
-
-        $this->actingAs($planta)
-            ->post(route('planta.solicitudes-produccion.aceptar', $solicitud))
-            ->assertRedirect();
-
-        $this->actingAs($planta)
-            ->post(route('planta.solicitudes-produccion.completar', $solicitud))
-            ->assertRedirect();
-
-        $pedido->refresh();
-        $this->assertTrue($pedido->coordinacion_planta_resuelta);
+        return (int) (InsumoCatalogo::tipoProductoTerminadoId()
+            ?? TipoInsumo::firstOrCreate(['nombre' => 'Producto terminado'])->tipoinsumoid);
     }
 
     public function test_aceptar_asigna_almacen_cercano_con_stock(): void
@@ -162,7 +90,7 @@ class PedidoDistribucionFase3Test extends TestCase
         $minorista = $this->usuario('minorista', 'min3.f3@test.local');
         $kg = UnidadMedida::create(['nombre' => 'Kilogramo', 'abreviatura' => 'kg']);
         InsumoCatalogo::asegurarCatalogosBase();
-        $tipoProductoId = InsumoCatalogo::tipoProductoTerminadoId();
+        $tipoProductoId = $this->tipoProductoTerminadoId();
 
         $almacenPlanta = Almacen::create([
             'nombre' => 'Planta F3',
@@ -200,7 +128,7 @@ class PedidoDistribucionFase3Test extends TestCase
             'almacenid' => $almacenPlanta->almacenid,
         ]);
 
-        $presentacionPlanta = InsumoPresentacion::create([
+        InsumoPresentacion::create([
             'insumoid' => $insumoPlanta->insumoid,
             'nombre' => 'Bolsa 150 g',
             'tipo_envase' => 'bolsa',
@@ -290,12 +218,12 @@ class PedidoDistribucionFase3Test extends TestCase
         $this->assertSame((int) $insumoCercano->insumoid, (int) $pedido->detalles->first()?->insumoid);
     }
 
-    public function test_minorista_puede_solicitar_espera_stock_cuando_excede_disponible(): void
+    public function test_minorista_no_puede_pedir_mas_stock_del_disponible(): void
     {
         $minorista = $this->usuario('minorista', 'min4.f3@test.local');
         $kg = UnidadMedida::create(['nombre' => 'Kilogramo', 'abreviatura' => 'kg']);
         InsumoCatalogo::asegurarCatalogosBase();
-        $tipoProductoId = InsumoCatalogo::tipoProductoTerminadoId();
+        $tipoProductoId = $this->tipoProductoTerminadoId();
 
         $almacenMay = Almacen::create([
             'nombre' => 'Mayorista Stock',
@@ -350,20 +278,16 @@ class PedidoDistribucionFase3Test extends TestCase
         ]);
 
         $response->assertRedirect();
-        $response->assertSessionHasNoErrors();
-
-        $pedido = PedidoDistribucion::query()->first();
-        $this->assertNotNull($pedido);
-        $this->assertTrue($pedido->espera_stock);
-        $this->assertSame(PedidoDistribucionCatalogo::ESTADO_PENDIENTE, $pedido->estado);
+        $response->assertSessionHas('error');
+        $this->assertNull(PedidoDistribucion::query()->first());
     }
 
-    public function test_minorista_puede_solicitar_presentacion_sin_stock(): void
+    public function test_minorista_no_puede_pedir_presentacion_sin_stock(): void
     {
         $minorista = $this->usuario('minorista', 'min5.f3@test.local');
         $kg = UnidadMedida::create(['nombre' => 'Kilogramo', 'abreviatura' => 'kg']);
         InsumoCatalogo::asegurarCatalogosBase();
-        $tipoProductoId = InsumoCatalogo::tipoProductoTerminadoId();
+        $tipoProductoId = $this->tipoProductoTerminadoId();
 
         $almacenMay = Almacen::create([
             'nombre' => 'Mayorista Papas',
@@ -433,8 +357,7 @@ class PedidoDistribucionFase3Test extends TestCase
         ]);
 
         $response->assertRedirect();
-        $pedido = PedidoDistribucion::query()->first();
-        $this->assertTrue($pedido->espera_stock);
-        $this->assertSame((int) $bolsa->insumo_presentacionid, (int) $pedido->detalles->first()?->insumo_presentacionid);
+        $response->assertSessionHas('error');
+        $this->assertNull(PedidoDistribucion::query()->first());
     }
 }

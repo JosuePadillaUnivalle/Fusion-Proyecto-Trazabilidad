@@ -195,14 +195,14 @@
                             </td>
                             <td class="text-center">
                                 <div class="btn-group btn-group-sm btn-actions">
-                                    <a href="{{ route('insumos.show', $i) }}" class="btn btn-default" title="Ver"><i class="fas fa-eye text-info"></i></a>
+                                    <a href="{{ route('insumos.show', $i) }}" class="btn btn-outline-info btn-sm" title="Ver"><i class="fas fa-eye"></i></a>
                                     @can('inventario.update')
-                                    <a href="{{ route('insumos.edit', $i) }}" class="btn btn-default" title="Editar"><i class="fas fa-edit text-warning"></i></a>
+                                    <a href="{{ route('insumos.edit', $i) }}" class="btn btn-outline-warning btn-sm" title="Editar"><i class="fas fa-edit"></i></a>
                                     @endcan
                                     @can('inventario.delete')
                                     <form action="{{ route('insumos.destroy', $i) }}" method="POST" class="d-inline on-submit-confirm">
                                         @csrf @method('DELETE')
-                                        <button type="submit" class="btn btn-default" title="Eliminar"><i class="fas fa-trash text-danger"></i></button>
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar"><i class="fas fa-trash"></i></button>
                                     </form>
                                     @endcan
                                 </div>

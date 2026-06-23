@@ -5,6 +5,26 @@
 
 @push('styles')
 @include('punto_venta.partials.modulo-styles')
+<style>
+.pdv-inv-tabla { table-layout: fixed; width: 100%; }
+.pdv-inv-tabla th,
+.pdv-inv-tabla td { vertical-align: middle; padding: .65rem 1rem; }
+.pdv-inv-tabla th:nth-child(1),
+.pdv-inv-tabla td:nth-child(1) { width: 34%; }
+.pdv-inv-tabla th:nth-child(2),
+.pdv-inv-tabla td:nth-child(2) { width: 26%; }
+.pdv-inv-tabla th:nth-child(3),
+.pdv-inv-tabla td:nth-child(3) { width: 12%; }
+.pdv-inv-tabla th:nth-child(4),
+.pdv-inv-tabla td:nth-child(4) { width: 10%; }
+.pdv-inv-tabla th:nth-child(5),
+.pdv-inv-tabla td:nth-child(5) { width: 18%; }
+.pdv-inv-tabla thead th { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }
+.pdv-inv-tabla td:nth-child(2) a { font-weight: 600; color: #047857; text-decoration: none; }
+.pdv-inv-tabla td:nth-child(2) a:hover { text-decoration: underline; }
+.pdv-inv-filtros-pdv .selector-catalogo-label,
+.pdv-inv-filtros-pdv label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #6c757d; margin-bottom: .35rem; }
+</style>
 @endpush
 
 @section('content')
@@ -17,7 +37,7 @@
 
 <div class="card pdv-card border-0 shadow-sm">
     <div class="modulo-filtros-panel collapse show" id="filtrosInventarioPdv">
-        <form method="GET" action="{{ route('punto-venta.inventario.index') }}" class="form-row align-items-end">
+        <form method="GET" action="{{ route('punto-venta.inventario.index') }}" class="form-row align-items-end pdv-inv-filtros-pdv">
             <div class="form-group col-md-4 mb-2 mb-md-0">
                 @include('partials.selector-catalogo', [
                     'id' => 'inv_filtro_pdv',
@@ -53,14 +73,14 @@
 
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-sm table-hover m-0">
+            <table class="table table-sm table-hover m-0 pdv-inv-tabla">
                 <thead class="bg-light">
                     <tr>
                         <th>Producto</th>
                         <th>Punto de venta</th>
                         <th>Stock</th>
                         <th>Unidad</th>
-                        <th class="text-center" style="min-width:150px;">Acciones</th>
+                        <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>

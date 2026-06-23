@@ -259,11 +259,6 @@ class RutaTiempoRealController extends Controller
 
     private function urlVolverAgricola(int $id): string
     {
-        $envio = EnvioAsignacionMultiple::query()->with('pedido')->find($id);
-        if ($envio?->pedido) {
-            return route('agricola.pedidos.show', $envio->pedido);
-        }
-
         return route('logistica.asignaciones.show', $id);
     }
 

@@ -78,6 +78,32 @@ class PuntoVenta extends Model
         return 'Sin dirección registrada';
     }
 
+    /**
+     * @return array{direccion: string, estimada: bool}
+     */
+    public function ubicacionVisible(): array
+    {
+        $dir = $this->direccionParaMostrar();
+        if ($dir) {
+            return [
+                'direccion' => $dir,
+                'estimada' => false,
+            ];
+        }
+
+        if ($this->latitud && $this->longitud) {
+            return [
+                'direccion' => 'Ubicación en mapa',
+                'estimada' => true,
+            ];
+        }
+
+        return [
+            'direccion' => 'Sin ubicación registrada',
+            'estimada' => false,
+        ];
+    }
+
     public function getRouteKeyName(): string
     {
         return 'puntoventaid';

@@ -21,21 +21,18 @@
         <div class="form-group">
             <label><i class="fas fa-user mr-1"></i> Minorista responsable</label>
             @if($minoristas->isNotEmpty())
-                <select name="usuarioid" id="usuarioid" class="form-control @error('usuarioid') is-invalid @enderror">
+                <select name="usuarioid" id="usuarioid" class="form-control @error('usuarioid') is-invalid @enderror" required>
                     @php
                         $usuarioidActual = old('usuarioid', $punto?->usuarioid);
-                        $esResponsableAdmin = ! $usuarioidActual
-                            || (int) $usuarioidActual === (int) auth()->id()
-                            || ! $minoristas->contains('usuarioid', (int) $usuarioidActual);
                     @endphp
-                    <option value="" @selected($esResponsableAdmin)>— Yo (administrador) —</option>
+                    <option value="" disabled @selected(! $usuarioidActual)>— Seleccione minorista —</option>
                     @foreach($minoristas as $m)
-                        <option value="{{ $m->usuarioid }}" @selected(old('usuarioid', $punto?->usuarioid) == $m->usuarioid)>
+                        <option value="{{ $m->usuarioid }}" @selected((int) $usuarioidActual === (int) $m->usuarioid)>
                             {{ trim($m->nombre.' '.$m->apellido) }} — {{ $m->email }}
                         </option>
                     @endforeach
                 </select>
-                <p class="pdv-campo-guia mb-0">Si no elige minorista, el punto quedará bajo su cuenta de administrador.</p>
+                <p class="pdv-campo-guia mb-0">El punto de venta siempre pertenece a un minorista.</p>
             @else
                 <input type="hidden" name="usuarioid" value="{{ auth()->id() }}">
                 <div class="alert alert-warning py-2 mb-0 small">

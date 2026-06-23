@@ -402,29 +402,9 @@ return [
 
             'lotes.view',
 
-            'lotes.update',
-
             'certificaciones.view',
 
-            'certificaciones.create',
-
             'inventario.view',
-
-            'inventario.create',
-
-            'inventario.update',
-
-            'pedidos.view',
-
-            'pedidos.update',
-
-            'almacen.movimientos.view',
-
-            'almacen.ingresos.create',
-
-            'almacen.salidas.create',
-
-            'almacen.reportes.view',
 
         ],
 

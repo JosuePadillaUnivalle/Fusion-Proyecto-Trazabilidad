@@ -18,8 +18,11 @@ use App\Services\AlmacenCapacidadService;
 use App\Support\CultivoSiembraCatalogo;
 use App\Support\EstadoLoteCatalogo;
 use App\Support\InsumoCatalogo;
+use App\Support\LoteAgricolaNombre;
 use App\Support\LoteCultivoResolver;
 use App\Support\LoteDefaults;
+use App\Services\PlanificacionCosechaService;
+use Illuminate\Http\JsonResponse;
 use App\Support\SuperficieFormato;
 use App\Support\UbicacionGpsParser;
 use App\Support\LoteEstadoPorActividad;
@@ -50,14 +53,7 @@ class LoteController extends Controller
         $query = Lote::query()
             ->with(['usuario', 'cultivo', 'insumoSemilla', 'estadoTipo']);
 
-        if (UsuarioRol::debeAcotarPorAsignacion($request->user())) {
-            $query->where('usuarioid', (int) $request->user()->usuarioid);
-        } elseif (
-            UsuarioRol::esJefeAgricultor($request->user())
-            && ! UsuarioRol::esAdminGlobal($request->user())
-        ) {
-            $query->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($request->user()));
-        }
+        $this->aplicarScopeLotesVisibles($query, $request->user());
 
         if ($request->filled('q')) {
             $term = '%'.trim((string) $request->q).'%';
@@ -107,21 +103,23 @@ class LoteController extends Controller
     }
 
     /**
-     * Mapa interactivo de todos los lotes
+     * Mapa interactivo de lotes visibles para el usuario
      */
-    public function mapa()
+    public function mapa(Request $request)
     {
-        // Estadísticas
+        $baseQuery = Lote::query();
+        $this->aplicarScopeLotesVisibles($baseQuery, $request->user());
+
         $stats = [
-            'total' => Lote::count(),
-            'en_produccion' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en crecimiento']))->count(),
-            'cosechados' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['cosechado']))->count(),
-            'hectareas' => (float) (Lote::sum('superficie') ?? 0),
-            'en_mapa' => Lote::whereNotNull('latitud')->whereNotNull('longitud')->count(),
+            'total' => (clone $baseQuery)->count(),
+            'en_produccion' => (clone $baseQuery)->whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en crecimiento']))->count(),
+            'cosechados' => (clone $baseQuery)->whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['cosechado']))->count(),
+            'hectareas' => (float) ((clone $baseQuery)->sum('superficie') ?? 0),
+            'en_mapa' => (clone $baseQuery)->whereNotNull('latitud')->whereNotNull('longitud')->count(),
         ];
 
-        // Lotes con coordenadas para el mapa
-        $lotesConCoordenadas = Lote::with(['usuario', 'cultivo', 'insumoSemilla', 'estadoTipo'])
+        $lotesConCoordenadas = (clone $baseQuery)
+            ->with(['usuario', 'cultivo', 'insumoSemilla', 'estadoTipo'])
             ->whereNotNull('latitud')
             ->whereNotNull('longitud')
             ->get()
@@ -146,8 +144,8 @@ class LoteController extends Controller
                 ];
             });
 
-        // Top lotes por producción
-        $topLotes = Lote::with(['usuario', 'cultivo'])
+        $topLotes = (clone $baseQuery)
+            ->with(['usuario', 'cultivo'])
             ->select('lote.*')
             ->selectSub(
                 Produccion::selectRaw('COALESCE(SUM(cantidad), 0)')
@@ -218,6 +216,47 @@ class LoteController extends Controller
         ));
     }
 
+    public function siguienteNombre(Request $request): JsonResponse
+    {
+        $producto = LoteAgricolaNombre::normalizarProducto((string) $request->query('producto', ''));
+        if ($producto === '') {
+            $insumoId = (int) $request->query('insumoid', 0);
+            if ($insumoId > 0) {
+                $producto = LoteAgricolaNombre::productoDesdeInsumo($insumoId) ?? '';
+            }
+        }
+
+        if ($producto === '') {
+            return response()->json(['nombre' => '', 'numero' => 1]);
+        }
+
+        return response()->json([
+            'nombre' => LoteAgricolaNombre::siguienteNombre($producto),
+            'numero' => LoteAgricolaNombre::siguienteNumero($producto),
+        ]);
+    }
+
+    public function planificarCosecha(Request $request, PlanificacionCosechaService $planificacion): JsonResponse
+    {
+        $insumoId = (int) $request->query('insumoid', 0);
+        if ($insumoId <= 0) {
+            return response()->json(['ok' => false, 'mensaje' => 'Seleccione una semilla / cultivo.']);
+        }
+
+        if ($request->boolean('solo_contexto')) {
+            return response()->json($planificacion->contexto($insumoId));
+        }
+
+        return response()->json($planificacion->calcular([
+            'modo' => (string) $request->query('modo', PlanificacionCosechaService::MODO_HECTAREAS),
+            'insumoid' => $insumoId,
+            'calibre_id' => $request->query('calibre_id') ? (int) $request->query('calibre_id') : null,
+            'hectareas' => $request->query('hectareas'),
+            'objetivo_unidades' => $request->query('objetivo_unidades'),
+            'objetivo_empaques' => $request->query('objetivo_empaques'),
+        ]));
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -225,16 +264,25 @@ class LoteController extends Controller
             'nombre' => 'required|string|max:100',
             'ubicacion' => 'nullable|string|max:200',
             'superficie' => 'required|numeric|min:0.01',
-            'insumosemillaid' => 'nullable|exists:insumo,insumoid',
+            'insumosemillaid' => 'required|exists:insumo,insumoid',
             'cantidad_semilla_planificada' => 'nullable|numeric|min:0',
+            'catalogotamanoconteoid' => 'nullable|exists:catalogo_tamano_conteo,catalogotamanoconteoid',
             'latitud' => 'nullable|numeric|between:-90,90',
             'longitud' => 'nullable|numeric|between:-180,180',
             'imagen' => 'nullable|image|max:2048',
+        ], [
+            'insumosemillaid.required' => 'Seleccione la semilla o cultivo a cosechar.',
         ]);
 
         $data['usuarioid'] = $this->resolverUsuarioidLote($request, $data['usuarioid'] ?? null);
         $data['insumosemillaid'] = $this->resolverInsumoSemilla($data['insumosemillaid'] ?? null);
         $data['cultivoid'] = LoteCultivoResolver::resolver($data['insumosemillaid']);
+        if (empty(trim($data['nombre'])) && $data['insumosemillaid']) {
+            $producto = LoteAgricolaNombre::productoDesdeInsumo($data['insumosemillaid']);
+            if ($producto) {
+                $data['nombre'] = LoteAgricolaNombre::siguienteNombre($producto);
+            }
+        }
         $data['cantidad_semilla_planificada'] = $this->resolverCantidadSemillaPlanificada(
             $data['insumosemillaid'],
             (float) $data['superficie'],
@@ -273,32 +321,14 @@ class LoteController extends Controller
         LoteDefaults::registrarHistorialInicial($lote);
         $this->notificaciones->loteAsignado($lote);
 
-        return redirect()->route('lotes.index')->with('success', 'Lote creado exitosamente.');
-    }
-
-    /**
-     * Fuerza sincronización operativa (clima, actividades desde insumos/cosechas, riegos).
-     */
-    public function sincronizarOperacion(Request $request, OperacionAgricolaAutomaticaService $service)
-    {
-        abort_unless(
-            $request->user()?->hasRole('admin') || $request->user()?->hasRole('agricultor'),
-            403
-        );
-
-        $r = $service->sincronizarTodo();
-
         return redirect()
             ->route('lotes.index')
-            ->with('success', sprintf(
-                'Operación sincronizada: %d clima, %d act. insumo, %d cosechas, %d riegos, %d alertas clima.',
-                $r['clima_lotes'],
-                $r['actividades_insumo'],
-                $r['actividades_cosecha'],
-                $r['actividades_riego'],
-                $r['actividades_clima']
-            ));
+            ->with('lote_creado_modal', [
+                'nombre' => $lote->nombre,
+                'trazabilidad_url' => route('lotes.trazabilidad', $lote, absolute: false),
+            ]);
     }
+
 
     public function show(Lote $lote, Request $request)
     {
@@ -448,6 +478,13 @@ class LoteController extends Controller
             ]);
 
             $produccion->update(['almacendestinoid' => null]);
+
+            $this->loteEstadoPorActividad->aplicarEstado(
+                $lote->fresh(),
+                'Finalizado',
+                'Cosecha ingresada al almacén agrícola.',
+                auth()->id()
+            );
 
             DB::commit();
         } catch (ValidationException $e) {
@@ -612,6 +649,19 @@ class LoteController extends Controller
     {
         return UsuarioRol::esAdminGlobal($usuario)
             || in_array(strtolower((string) ($usuario->role ?? '')), ['admin'], true);
+    }
+
+    private function aplicarScopeLotesVisibles($query, ?Usuario $user): void
+    {
+        if (! $user) {
+            return;
+        }
+
+        if (UsuarioRol::debeAcotarPorAsignacion($user)) {
+            $query->where('usuarioid', (int) $user->usuarioid);
+        } elseif (UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
+            $query->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($user));
+        }
     }
 
     private function autorizarLoteAsignado(Request $request, Lote $lote): void

@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', function () {
         rowIcon: @json($rowIcon),
         colDetalle: @json($colDetalle ?? 'Detalle'),
         colNombre: @json($colNombre ?? 'Nombre'),
-        theme: @json($theme ?? null),
+        theme: @json($theme ?? (str_contains((string) ($endpoint ?? ''), 'vehiculos') ? 'vehiculo' : null)),
     });
 });
 </script>

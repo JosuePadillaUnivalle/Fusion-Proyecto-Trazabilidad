@@ -21,7 +21,7 @@ class CertificacionController extends Controller
 
     public function index(Request $request): View|RedirectResponse
     {
-        $datos = $this->indexService->datosCampo();
+        $datos = $this->indexService->datosCampo($request->user());
 
         return view('certificaciones.index', [
             'lotesPendientes' => $datos['pendientes'],
@@ -54,26 +54,18 @@ class CertificacionController extends Controller
             $validated['recomendaciones'] ?? null
         );
 
-        $mensaje = $resultado === CertificacionLote::RAZON_CERTIFICADO
-            ? 'Lote de campo certificado correctamente.'
-            : 'Lote marcado como No conforme. No podrá enviarse al almacén.';
-
         $lote = Lote::findOrFail((int) $validated['loteid']);
 
         $returnUrl = $this->validReturnUrl($request->input('return'));
         if ($returnUrl) {
-            return redirect($returnUrl)->with('success', $mensaje);
+            return redirect($returnUrl);
         }
 
         if ($request->boolean('from_trazabilidad')) {
-            return redirect()
-                ->route('lotes.trazabilidad', $lote)
-                ->with('success', $mensaje);
+            return redirect()->route('lotes.trazabilidad', $lote);
         }
 
-        return redirect()
-            ->route('certificaciones.index')
-            ->with('success', $mensaje);
+        return redirect()->route('certificaciones.index');
     }
 
     private function validReturnUrl(mixed $return): ?string
@@ -113,9 +105,7 @@ class CertificacionController extends Controller
             $count++;
         }
 
-        return redirect()
-            ->route('certificaciones.index')
-            ->with('success', "$count lote(s) de campo certificado(s) correctamente.");
+        return redirect()->route('certificaciones.index');
     }
 
     public function show(CertificacionLote $certificacion): View

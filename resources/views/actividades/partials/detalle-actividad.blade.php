@@ -112,7 +112,7 @@
     <button type="button" class="btn btn-link btn-sm p-0 mt-1" id="btnActDetEditar">Cambiar detalle</button>
 </div>
 
-<div class="modal fade" id="modalActDetInsumos" tabindex="-1" role="dialog" aria-hidden="true">
+<div class="modal fade" id="modalActDetInsumos" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" data-keyboard="false">
     <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
@@ -137,7 +137,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalActDetRiego" tabindex="-1" role="dialog" aria-hidden="true">
+<div class="modal fade" id="modalActDetRiego" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" data-keyboard="false">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
@@ -190,6 +190,7 @@
     let sugerenciaActual = null;
     let tipoSlugActual = '';
     let tipoNombreActual = '';
+    let modalDetConfirmado = false;
 
     const mapaSlug = {
         'fertiliz': 'fertilizantes',
@@ -298,6 +299,8 @@
                 if (maxInsumos === 1) {
                     lista.querySelectorAll('.act-det-insumo-card').forEach(function (c) { c.classList.remove('is-selected'); });
                     card.classList.add('is-selected');
+                    sugerenciaActual = item.sugerencia_detalle || sugerenciaActual;
+                    renderCalcSiembra(calc, sugerenciaActual);
                     pintarCantidades([item]);
                 } else {
                     card.classList.toggle('is-selected');
@@ -321,16 +324,31 @@
         if (!wrap) return;
         wrap.innerHTML = '<label class="small font-weight-bold d-block mb-2">Cantidad a usar</label>';
         items.forEach(function (item) {
-            const sug = (maxInsumos === 1 && sugerenciaActual && sugerenciaActual.tiene_dosis) ? sugerenciaActual.sugerido : '';
             const prev = estado.insumos.find(function (i) { return Number(i.insumoid) === Number(item.id); });
-            const val = prev ? prev.cantidad : sug;
+            const sugDet = item.sugerencia_detalle;
+            const divisor = Math.max(1, items.length);
+            const baseSug = item.sugerencia ?? (sugDet && sugDet.tiene_dosis ? sugDet.sugerido : null);
+            const val = prev ? prev.cantidad : (baseSug != null ? Math.round((baseSug / divisor) * 100) / 100 : '');
+            let hint = '';
+            if (sugDet && sugDet.tiene_dosis && !prev && baseSug != null) {
+                if (divisor > 1) {
+                    hint = '<small class="text-success d-block mt-1">Repartido entre ' + divisor + ' insumos: '
+                        + fmtNum(baseSug / divisor) + ' ' + item.unidad
+                        + ' (dosis total ' + fmtNum(baseSug) + ' ' + item.unidad
+                        + ' · ' + fmtNum(sugDet.por_ha) + ' ' + item.unidad + '/ha × ' + fmtNum(sugDet.superficie_ha) + ' ha)</small>';
+                } else {
+                    hint = '<small class="text-success d-block mt-1">Sugerido: ' + fmtNum(baseSug) + ' ' + item.unidad
+                        + ' (' + fmtNum(sugDet.por_ha) + ' ' + item.unidad + '/ha × ' + fmtNum(sugDet.superficie_ha) + ' ha)</small>';
+                }
+            }
             const linea = document.createElement('div');
             linea.className = 'act-det-linea';
             linea.innerHTML =
                 '<div class="flex-grow-1"><small class="text-muted d-block">' + item.nombre + '</small>' +
                 '<div class="input-group input-group-sm" style="max-width:200px;">' +
                 '<input type="number" step="0.01" min="0.01" max="' + item.stock + '" class="form-control act-det-cant-input" data-id="' + item.id + '" data-nombre="' + item.nombre + '" data-unidad="' + item.unidad + '" data-stock="' + item.stock + '" value="' + (val || '') + '">' +
-                '<div class="input-group-append"><span class="input-group-text">' + item.unidad + '</span></div></div></div>';
+                '<div class="input-group-append"><span class="input-group-text">' + item.unidad + '</span></div></div>' +
+                hint + '</div>';
             wrap.appendChild(linea);
         });
     }
@@ -369,6 +387,7 @@
         }
         estado = { modo: 'insumos', insumos: filas, stock_aplicado: false };
         persistir();
+        modalDetConfirmado = true;
         $('#modalActDetInsumos').modal('hide');
         return true;
     }
@@ -396,6 +415,7 @@
         if (!sel) { alert('Seleccione un tipo de riego.'); return false; }
         estado = { modo: 'riego', riego: { key: sel.dataset.key, label: sel.dataset.label }, stock_aplicado: false };
         persistir();
+        modalDetConfirmado = true;
         $('#modalActDetRiego').modal('hide');
         return true;
     }
@@ -408,6 +428,7 @@
         const loteId = selLote ? selLote.value : '';
 
         if (tipoSlugActual === 'riego') {
+            modalDetConfirmado = false;
             pintarRiegoModal();
             $('#modalActDetRiego').modal('show');
             return;
@@ -417,14 +438,31 @@
         document.getElementById('modalActDetInsumosTitulo').textContent = 'Seleccionar — ' + tipoNombreActual;
         document.getElementById('actDetInsumosAyuda').textContent = (tipoSlugActual === 'material_siembra' ? 1 : 10) === 1
             ? 'Elija un insumo y la cantidad. Todo se descuenta de la bodega agrícola al completar la actividad.'
-            : 'Puede elegir varios insumos. Indique cuánto usará de cada uno.';
+            : 'Puede elegir varios insumos. La dosis sugerida por hectárea se reparte entre los que seleccione.';
 
         cargarCatalogo(tipoSlugActual, loteId).then(function (json) {
             catalogoActual = json.data || [];
+            modalDetConfirmado = false;
             pintarInsumosModal(catalogoActual, json.meta || {});
             $('#modalActDetInsumos').modal('show');
         });
     }
+
+    function revertirTipoSinDetalle() {
+        if (!selTipo || modalDetConfirmado) return;
+        const slug = slugDesdeTipoNombre(selTipo.options[selTipo.selectedIndex]?.textContent || '');
+        const requiereDetalle = slug === 'fertilizantes' || slug === 'pesticidas' || slug === 'material_siembra' || slug === 'riego';
+        if (!requiereDetalle) return;
+        const ok = (slug === 'riego' && estado.riego) || ((slug === 'fertilizantes' || slug === 'pesticidas' || slug === 'material_siembra') && estado.insumos.length);
+        if (!ok) {
+            selTipo.value = '';
+            estado = { modo: null, insumos: [], riego: null };
+            persistir();
+        }
+    }
+
+    $('#modalActDetInsumos').on('hidden.bs.modal', revertirTipoSinDetalle);
+    $('#modalActDetRiego').on('hidden.bs.modal', revertirTipoSinDetalle);
 
     if (selTipo && !modoSiembra) {
         selTipo.addEventListener('change', function () {

@@ -48,6 +48,8 @@
                             : ($step['eventos'].' evento(s)');
                         if (!empty($step['url'])) {
                             $titulo = 'Ir a '.$step['label'].' — '.$titulo;
+                        } elseif (($step['key'] ?? '') === 'siembra' && ($step['estado'] ?? '') === 'next' && ($puede_completar_siembra_directa ?? false)) {
+                            $titulo = 'Completar siembra con foto de evidencia';
                         } elseif (($step['key'] ?? '') === 'siembra' && ($step['estado'] ?? '') === 'next' && ($puede_asignar_siembra ?? false)) {
                             $titulo = 'Asignar quién va a sembrar';
                         } elseif (($step['key'] ?? '') === 'siembra' && in_array($step['estado'] ?? '', ['active', 'next'], true) && !empty($actividad_siembra_pendiente)) {
@@ -73,6 +75,12 @@
                             @elseif(!empty($step['mostrar_contador']))
                                 <span class="badge badge-fase-count">{{ $step['eventos'] }}</span>
                             @endif
+                        </a>
+                    @elseif(($step['key'] ?? '') === 'siembra' && ($step['estado'] ?? '') === 'next' && ($puede_completar_siembra_directa ?? false) && !empty($url_completar_siembra))
+                        <a href="{{ $url_completar_siembra }}" class="fase-step {{ $step['estado'] }} fase-step-link" title="{{ $titulo }}">
+                            <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
+                            {{ $step['label'] }}
+                            <span class="d-block small mt-1"><i class="fas fa-camera"></i> Completar</span>
                         </a>
                     @elseif(($step['key'] ?? '') === 'siembra' && ($step['estado'] ?? '') === 'next' && ($puede_asignar_siembra ?? false))
                         <a href="#" role="button" class="fase-step {{ $step['estado'] }} fase-step-link"
@@ -150,6 +158,12 @@
                     @endif
                 </p>
                 @endif
+            @elseif(($puede_completar_siembra_directa ?? false) && !empty($url_completar_siembra) && ($siguiente_fase ?? '') === 'siembra')
+                <div class="text-center mb-3">
+                    <a href="{{ $url_completar_siembra }}" class="btn btn-success btn-sm">
+                        <i class="fas fa-camera mr-1"></i> Completar {{ $siguiente_fase_label }}
+                    </a>
+                </div>
             @elseif(($puede_asignar_siembra ?? false) && ($siguiente_fase ?? '') === 'siembra')
                 <div class="text-center mb-3">
                     <button type="button" class="btn btn-success btn-sm" data-toggle="modal" data-target="#modalAsignarSiembra">
@@ -171,12 +185,6 @@
                     <i class="fas fa-hourglass-half mr-1"></i>
                     Siembra asignada a <strong>{{ $actividad_siembra_pendiente['responsable'] ?? '—' }}</strong> — pendiente de realizar.
                 </p>
-            @elseif($puede_certificar_campo ?? false)
-                <div class="text-center mb-3">
-                    <a href="#panel-certificacion-campo" class="btn btn-sm font-weight-bold text-white" style="background:#7c3aed">
-                        <i class="fas fa-certificate mr-1"></i> Certificar lote
-                    </a>
-                </div>
             @elseif($puede_enviar_almacen ?? false)
                 <div class="text-center mb-3">
                     <button type="button" class="btn btn-warning btn-sm font-weight-bold text-dark"

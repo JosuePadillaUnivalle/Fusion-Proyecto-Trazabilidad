@@ -215,7 +215,7 @@ class ActividadInsumoService
 
             $coleccion = collect($planificado ? [$planificado] : [])->merge($resto);
 
-            return $coleccion->map(fn (Insumo $i) => self::mapearInsumoModal($i))->values()->all();
+            return $coleccion->map(fn (Insumo $i) => self::mapearInsumoModal($i, $lote, $tipoSlug))->values()->all();
         }
 
         if ($tipoSlug === 'material_siembra' && $referenciaNombre) {
@@ -232,17 +232,17 @@ class ActividadInsumoService
                 return false;
             });
             if ($filtrados->isNotEmpty()) {
-                return $filtrados->map(fn (Insumo $i) => self::mapearInsumoModal($i))->values()->all();
+                return $filtrados->map(fn (Insumo $i) => self::mapearInsumoModal($i, $lote, $tipoSlug))->values()->all();
             }
         }
 
-        return $query->get()->map(fn (Insumo $i) => self::mapearInsumoModal($i))->values()->all();
+        return $query->get()->map(fn (Insumo $i) => self::mapearInsumoModal($i, $lote, $tipoSlug))->values()->all();
     }
 
     /** @return array<string, mixed> */
-    private static function mapearInsumoModal(Insumo $i): array
+    private static function mapearInsumoModal(Insumo $i, ?Lote $lote = null, ?string $tipoSlug = null): array
     {
-        return [
+        $data = [
             'id' => (int) $i->insumoid,
             'nombre' => $i->nombre,
             'stock' => (float) $i->stock,
@@ -250,6 +250,14 @@ class ActividadInsumoService
             'unidad_nombre' => $i->unidadMedida?->nombre ?? 'Unidad',
             'imagen' => InsumoImagenCatalogo::urlPara($i),
         ];
+
+        if ($lote && in_array($tipoSlug, ['fertilizantes', 'pesticidas'], true)) {
+            $sug = \App\Support\CultivoSiembraCatalogo::sugerenciaAplicacionInsumo($i, (float) $lote->superficie);
+            $data['sugerencia'] = $sug['tiene_dosis'] ? $sug['sugerido'] : null;
+            $data['sugerencia_detalle'] = $sug;
+        }
+
+        return $data;
     }
 
     private function idEstadoAplicado(): int

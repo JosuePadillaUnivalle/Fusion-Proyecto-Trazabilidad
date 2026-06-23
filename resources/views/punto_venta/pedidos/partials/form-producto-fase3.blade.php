@@ -1,22 +1,8 @@
-@php
-    $tipoSolicitud = old('tipo_solicitud', 'stock');
-    $tiposEnvase = \App\Support\SolicitudProduccionPlantaCatalogo::tiposEnvase();
-@endphp
+<input type="hidden" name="tipo_solicitud" id="tipo_solicitud" value="stock">
 
-<input type="hidden" name="tipo_solicitud" id="tipo_solicitud" value="{{ $tipoSolicitud }}">
-
-<div class="pdv-tipo-solicitud mb-2" role="tablist">
-    <button type="button" class="pdv-tipo-btn {{ $tipoSolicitud !== 'custom' ? 'is-active' : '' }}" data-tipo="stock">
-        <i class="fas fa-boxes"></i> Disponible ahora
-    </button>
-    <button type="button" class="pdv-tipo-btn {{ $tipoSolicitud === 'custom' ? 'is-active' : '' }}" data-tipo="custom">
-        <i class="fas fa-pen"></i> Pedir algo nuevo
-    </button>
-</div>
-
-<div id="bloqueStock" class="{{ $tipoSolicitud === 'custom' ? 'd-none' : '' }}">
+<div id="bloqueStock">
     <p class="small text-muted mb-2">
-        Productos en almacén mayorista. Elija producto y presentación; el pedido irá solo al mayorista que seleccione.
+        Productos con stock en almacén mayorista. Elija producto y presentación; el pedido irá al mayorista que seleccione.
     </p>
     <input type="hidden" name="insumoid" id="insumoid_real" value="{{ old('insumoid', '') }}">
     <input type="hidden" name="almacen_mayorista_origenid" id="almacen_mayorista_origenid" value="{{ old('almacen_mayorista_origenid', '') }}">
@@ -31,7 +17,7 @@
                 'endpoint' => route('catalogo-selector.productos-mayorista-pdv'),
                 'title' => 'Productos por mayorista',
                 'searchPlaceholder' => 'Nombre del producto…',
-                'required' => $tipoSolicitud !== 'custom',
+                'required' => true,
                 'inputGroup' => true,
                 'registerScript' => false,
             ])
@@ -53,41 +39,16 @@
         <div class="pdv-producto-col">
             <label class="pdv-field-label" for="selectPresentacionMayorista">Presentación <span class="text-danger">*</span></label>
             <div class="pdv-producto-pick {{ old('insumoid') ? '' : 'is-locked' }}" id="pdvPresentacionPick">
-                <select name="insumo_presentacionid" id="selectPresentacionMayorista" class="form-control form-control-sm" @if($tipoSolicitud !== 'custom') required @endif disabled>
+                <select name="insumo_presentacionid" id="selectPresentacionMayorista" class="form-control form-control-sm" required disabled>
                     <option value="">Elegir producto primero…</option>
                 </select>
                 <small id="txtPresentacionAyuda" class="form-text text-muted mb-0 d-none">Cargando presentaciones…</small>
-                <small id="txtPresentacionVacia" class="form-text text-muted mb-0 d-none">Este producto no tiene presentaciones registradas. Use «Pedir algo nuevo».</small>
+                <small id="txtPresentacionVacia" class="form-text text-muted mb-0 d-none">Este producto no tiene presentaciones con stock. Elija otro producto.</small>
             </div>
-            <div id="panelEsperaStock" class="pdv-espera-stock d-none" role="alert" aria-hidden="true"></div>
             <div id="panelStockDisponible" class="pdv-stock-disponible d-none">
                 <i class="fas fa-check-circle text-success"></i>
                 <span id="txtStockDisponible"></span>
             </div>
-        </div>
-    </div>
-</div>
-
-<div id="bloqueCustom" class="{{ $tipoSolicitud !== 'custom' ? 'd-none' : '' }}">
-    <p class="small text-muted mb-2">
-        Si no está en almacén, describa lo que necesita. El mayorista coordinará con planta.
-    </p>
-    <div class="form-row">
-        <div class="form-group col-md-7 mb-2">
-            <label class="pdv-field-label" for="producto_nombre">Descripción del producto <span class="text-danger">*</span></label>
-            <input type="text" name="producto_nombre" id="producto_nombre" class="form-control"
-                value="{{ old('producto_nombre') }}" placeholder="Ej. Papas artesanales premium">
-        </div>
-        <div class="form-group col-md-5 mb-0">
-            <label class="pdv-field-label" for="tipo_envase">Tipo de envase <span class="text-danger">*</span></label>
-            <select name="tipo_envase" id="tipo_envase" class="form-control">
-                <option value="">Seleccione…</option>
-                @foreach($tiposEnvase as $tipo)
-                    <option value="{{ $tipo }}" @selected(old('tipo_envase') === $tipo)>
-                        {{ \App\Support\SolicitudProduccionPlantaCatalogo::etiquetaTipoEnvase($tipo) }}
-                    </option>
-                @endforeach
-            </select>
         </div>
     </div>
 </div>
@@ -109,13 +70,34 @@
     </div>
 </div>
 
+<div id="panelCapacidadPdv" class="pdv-capacidad-preview d-none">
+    <div class="pdv-capacidad-preview__head">
+        <span class="pdv-capacidad-preview__badge"><i class="fas fa-warehouse mr-1"></i> Almacén del punto de venta</span>
+        <strong id="txtCapacidadPdvNombre" class="d-block mt-1"></strong>
+    </div>
+    <div class="pdv-capacidad-preview__ingreso d-none" id="rowCapacidadIngreso">
+        <span class="text-muted">Este pedido ocupará</span>
+        <strong id="txtCapacidadIngresoKg" class="text-dark"></strong>
+    </div>
+    <div class="pdv-capacidad-preview__stats small">
+        <span><strong id="txtCapacidadDisponible">—</strong> kg libres</span>
+        <span class="text-muted">de <span id="txtCapacidadTotal">—</span> kg</span>
+        <span class="text-muted">(<span id="txtCapacidadPorcentaje">0</span> % ocupado)</span>
+    </div>
+    <div class="pdv-capacidad-bar mt-1">
+        <div class="pdv-capacidad-bar__base" id="barCapacidadBase"></div>
+        <div class="pdv-capacidad-bar__proyeccion d-none" id="barCapacidadProyeccion"></div>
+    </div>
+    <p class="pdv-capacidad-preview__hint mb-0" id="txtCapacidadHint">
+        <i class="fas fa-info-circle mr-1"></i> Seleccione punto de venta, producto y cantidad para ver el espacio que ocupará.
+    </p>
+    <div id="alertaCapacidadPdv" class="pdv-capacidad-alerta d-none">
+        <i class="fas fa-exclamation-triangle"></i>
+        <span id="txtAlertaCapacidadPdv">Supera la capacidad disponible del almacén del punto de venta.</span>
+    </div>
+</div>
+
 <style>
-.pdv-tipo-solicitud { display: flex; gap: .45rem; flex-wrap: wrap; }
-.pdv-tipo-btn {
-    border: 2px solid #d1fae5; background: #fff; color: #047857;
-    border-radius: 999px; padding: .4rem .85rem; font-weight: 600; font-size: .8rem;
-}
-.pdv-tipo-btn.is-active { background: linear-gradient(135deg,#047857,#10b981); color: #fff; border-color: #065f46; }
 .pdv-producto-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -138,12 +120,6 @@
     color: #64748b; font-size: .66rem;
 }
 .pdv-producto-meta__value { color: #334155; font-weight: 600; word-break: break-word; }
-.pdv-stock-banner {
-    display: flex; align-items: center; gap: .4rem;
-    margin-top: .35rem; padding: .35rem .55rem;
-    background: #ecfdf5; border: 1px solid #bbf7d0; border-radius: 8px;
-    font-size: .78rem; font-weight: 600; color: #047857;
-}
 .pdv-stock-disponible {
     display: flex; align-items: flex-start; gap: .35rem;
     margin-top: .35rem; font-size: .78rem; font-weight: 600; color: #166534;
@@ -152,15 +128,60 @@
 .pdv-stock-alerta {
     margin-top: .3rem; font-size: .76rem; font-weight: 600; color: #b45309;
 }
-.pdv-espera-stock {
-    display: flex; align-items: flex-start; gap: .45rem;
-    margin-top: .4rem; padding: .5rem .65rem;
-    background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
-    font-size: .76rem; color: #92400e; line-height: 1.35;
-}
-.pdv-espera-stock i { margin-top: .1rem; color: #d97706; }
 .pdv-cantidad-wrap.is-invalid .form-control,
 .pdv-cantidad-wrap.is-invalid .input-group-text {
     border-color: #f59e0b !important;
 }
+.pdv-capacidad-preview {
+    margin-top: .75rem;
+    padding: .65rem .75rem;
+    border: 1px solid #dbeafe;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #f8fbff, #f0f7ff);
+    font-size: .8rem;
+}
+.pdv-capacidad-preview.is-excedido {
+    border-color: #fecaca;
+    background: linear-gradient(180deg, #fff5f5, #fef2f2);
+}
+.pdv-capacidad-preview__badge {
+    display: inline-block;
+    font-size: .66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #1d4ed8;
+    background: rgba(59, 130, 246, .12);
+    border-radius: 999px;
+    padding: .15rem .55rem;
+}
+.pdv-capacidad-preview__ingreso { margin: .35rem 0 .2rem; }
+.pdv-capacidad-preview__stats { color: #475569; }
+.pdv-capacidad-preview__hint { margin-top: .4rem; font-size: .74rem; color: #64748b; }
+.pdv-capacidad-bar {
+    position: relative;
+    height: 8px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+.pdv-capacidad-bar__base,
+.pdv-capacidad-bar__proyeccion {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 999px;
+    transition: width .25s ease;
+}
+.pdv-capacidad-bar__base { background: #64748b; z-index: 1; }
+.pdv-capacidad-bar__proyeccion { background: #22c55e; z-index: 2; opacity: .85; }
+.pdv-capacidad-preview.is-excedido .pdv-capacidad-bar__proyeccion { background: #ef4444; }
+.pdv-capacidad-alerta {
+    margin-top: .45rem;
+    font-size: .76rem;
+    font-weight: 600;
+    color: #b45309;
+}
+.pdv-capacidad-preview.is-excedido .pdv-capacidad-alerta { color: #b91c1c; }
 </style>

@@ -56,11 +56,13 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | URL pública en red local (QR, enlaces desde el móvil)
+    | URL pública en red local (QR desde consola, correos, jobs)
     |--------------------------------------------------------------------------
     |
-    | Si accede desde 127.0.0.1 en el PC pero el QR debe abrir en el celular,
-    | defina la IP LAN y el puerto del servidor (ej. http://192.168.1.10:8001).
+    | Solo se usa cuando no hay petición HTTP (artisan, colas). En el navegador
+    | el QR toma automáticamente el host actual (ej. http://127.0.0.1:8001).
+    | Para probar desde el celular, abra la app con la IP LAN en el PC o defina
+    | APP_PUBLIC_URL con esa IP y el puerto (ej. http://192.168.1.10:8001).
     |
     */
 

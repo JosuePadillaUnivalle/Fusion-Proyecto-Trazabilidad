@@ -28,8 +28,8 @@ class CargaCalculoServiceTest extends TestCase
 
     public function test_simulacion_dura_dos_minutos(): void
     {
-        $this->assertSame(120, SimulacionRutaCatalogo::DURACION_DEMO_SEG);
-        $this->assertSame(120, SimulacionRutaCatalogo::duracionEfectiva(3600));
+        $this->assertSame(60, SimulacionRutaCatalogo::DURACION_DEMO_SEG);
+        $this->assertSame(60, SimulacionRutaCatalogo::duracionEfectiva(3600));
     }
 
     public function test_lote_agricola_nombre_secuencial(): void

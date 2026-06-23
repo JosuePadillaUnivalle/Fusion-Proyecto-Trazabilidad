@@ -64,6 +64,32 @@ final class RutaDistribucionNavegacion
         return $ruta->simulacion_inicio_at ?? $ruta->fecha_salida;
     }
 
+    public static function etiquetaParadaCarga(string $tipo): string
+    {
+        return match ($tipo) {
+            RutaDistribucionCatalogo::PARADA_CARGA_PLANTA => 'Punto de carga — planta',
+            RutaDistribucionCatalogo::PARADA_CARGA_MAYORISTA => 'Punto de carga — mayorista',
+            default => 'Punto de carga',
+        };
+    }
+
+    public static function resumenProducto(RutaDistribucion $ruta): string
+    {
+        if ($ruta->esTrasladoPlantaMayorista()) {
+            $detalle = $ruta->detallesTraslado?->first();
+
+            return $detalle?->insumo?->nombre
+                ?? $detalle?->producto_nombre
+                ?? 'Traslado planta → mayorista';
+        }
+
+        $primer = $ruta->pedidos?->first()?->detalles?->first();
+
+        return $primer?->producto_nombre
+            ?? $primer?->cultivo_personalizado
+            ?? 'Distribución a punto de venta';
+    }
+
     public static function volverUrl(RutaDistribucion $ruta, ?Usuario $user = null, string $rutaPrefijo = 'logistica.traslados-planta'): string
     {
         $user ??= auth()->user();

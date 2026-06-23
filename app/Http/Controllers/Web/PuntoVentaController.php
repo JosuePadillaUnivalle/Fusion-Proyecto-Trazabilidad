@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Insumo;
 use App\Models\PuntoVenta;
 use App\Models\Usuario;
 use App\Services\PuntoVentaAlmacenService;
 use App\Support\CuentaEstado;
 use App\Support\PuntoVentaAccess;
+use App\Support\PuntoVentaEliminacionCatalogo;
 use App\Support\UsuarioRol;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -72,22 +74,21 @@ class PuntoVentaController extends Controller
         ];
 
         if ($esAdmin) {
-            $rules['usuarioid'] = 'nullable|integer|exists:usuario,usuarioid';
+            $rules['usuarioid'] = 'required|integer|exists:usuario,usuarioid';
         }
 
         $data = $request->validate($rules);
 
-        $usuarioidResponsable = $esAdmin
-            ? (int) ($data['usuarioid'] ?? $user->usuarioid)
-            : (int) $user->usuarioid;
-
-        if ($esAdmin && $usuarioidResponsable !== (int) $user->usuarioid) {
-            $responsable = Usuario::query()->find($usuarioidResponsable);
-            if (! $responsable || ! UsuarioRol::esMinorista($responsable)) {
+        if ($esAdmin) {
+            $responsable = Usuario::query()->findOrFail((int) $data['usuarioid']);
+            if (! UsuarioRol::esMinorista($responsable)) {
                 return back()
                     ->withInput()
-                    ->withErrors(['usuarioid' => 'Seleccione un minorista válido o deje la asignación por defecto.']);
+                    ->withErrors(['usuarioid' => 'Debe asignar un minorista válido. El administrador no puede ser dueño del punto de venta.']);
             }
+            $usuarioidResponsable = (int) $responsable->usuarioid;
+        } else {
+            $usuarioidResponsable = (int) $user->usuarioid;
         }
 
         $puntoVenta = PuntoVenta::create([
@@ -153,22 +154,21 @@ class PuntoVentaController extends Controller
         ];
 
         if ($esAdmin) {
-            $rules['usuarioid'] = 'nullable|integer|exists:usuario,usuarioid';
+            $rules['usuarioid'] = 'required|integer|exists:usuario,usuarioid';
         }
 
         $data = $request->validate($rules);
 
-        $usuarioidResponsable = $esAdmin
-            ? (int) ($data['usuarioid'] ?? $punto->usuarioid)
-            : $punto->usuarioid;
-
-        if ($esAdmin && $usuarioidResponsable !== (int) $request->user()->usuarioid) {
-            $responsable = Usuario::query()->find($usuarioidResponsable);
-            if (! $responsable || ! UsuarioRol::esMinorista($responsable)) {
+        if ($esAdmin) {
+            $responsable = Usuario::query()->findOrFail((int) $data['usuarioid']);
+            if (! UsuarioRol::esMinorista($responsable)) {
                 return back()
                     ->withInput()
-                    ->withErrors(['usuarioid' => 'Seleccione un minorista válido.']);
+                    ->withErrors(['usuarioid' => 'Debe asignar un minorista válido.']);
             }
+            $usuarioidResponsable = (int) $responsable->usuarioid;
+        } else {
+            $usuarioidResponsable = $punto->usuarioid;
         }
 
         $punto->update([
@@ -197,11 +197,32 @@ class PuntoVentaController extends Controller
     {
         abort_unless(PuntoVentaAccess::puedeEditarPunto(auth()->user(), $punto), 403);
 
-        if ($punto->pedidosDistribucion()->whereNotIn('estado', ['recibido', 'rechazado', 'cancelado'])->exists()) {
-            return back()->with('error', 'No se puede eliminar: tiene pedidos de distribución activos.');
+        $eval = PuntoVentaEliminacionCatalogo::evaluar($punto);
+        if (! $eval['ok']) {
+            return back()->with([
+                'error' => $eval['mensaje'],
+                'error_modal' => true,
+                'error_modal_titulo' => $eval['titulo'],
+            ]);
         }
 
-        $punto->delete();
+        PuntoVentaEliminacionCatalogo::cancelarPedidosPendientes($punto);
+        PuntoVentaEliminacionCatalogo::eliminarHistorialAsociado($punto);
+
+        if ($punto->almacenid) {
+            Insumo::query()->where('almacenid', $punto->almacenid)->delete();
+            $punto->almacen?->delete();
+        }
+
+        try {
+            $punto->delete();
+        } catch (\Illuminate\Database\QueryException) {
+            return back()->with([
+                'error' => 'No se pudo eliminar «'.$punto->nombre.'» porque aún hay registros vinculados en el sistema.',
+                'error_modal' => true,
+                'error_modal_titulo' => 'No se puede eliminar',
+            ]);
+        }
 
         return redirect()
             ->route('punto-venta.puntos.index')

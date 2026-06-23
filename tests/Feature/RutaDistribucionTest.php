@@ -25,30 +25,30 @@ class RutaDistribucionTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function usuarioJefePlanta(): Usuario
+    private function usuarioAdmin(): Usuario
     {
         $this->seed(RolePermissionSeeder::class);
-        Role::findOrCreate('jefe_planta', 'web');
+        Role::findOrCreate('admin', 'web');
 
         $user = Usuario::create([
-            'nombre' => 'Jefe',
-            'apellido' => 'Planta',
-            'email' => 'jefe.planta.ruta@test.local',
-            'nombreusuario' => 'jefe_planta_ruta',
+            'nombre' => 'Admin',
+            'apellido' => 'Ruta',
+            'email' => 'admin.ruta@test.local',
+            'nombreusuario' => 'admin_ruta',
             'passwordhash' => Hash::make('secret'),
-            'role' => 'jefe_planta',
+            'role' => 'admin',
             'fecharegistro' => now(),
             'fechamodificacion' => now(),
             'activo' => true,
         ]);
-        $user->assignRole('jefe_planta');
+        $user->assignRole('admin');
 
         return $user;
     }
 
-    public function test_jefe_planta_puede_ver_planificacion_distribucion(): void
+    public function test_admin_puede_ver_planificacion_distribucion(): void
     {
-        $user = $this->usuarioJefePlanta();
+        $user = $this->usuarioAdmin();
         $this->actingAs($user);
 
         $this->get(route('punto-venta.rutas.index'))->assertOk();
@@ -57,12 +57,21 @@ class RutaDistribucionTest extends TestCase
 
     public function test_crea_ruta_con_pedidos_confirmados(): void
     {
-        $user = $this->usuarioJefePlanta();
+        $user = $this->usuarioAdmin();
         $this->actingAs($user);
 
         $unidad = UnidadMedida::create(['nombre' => 'Kilogramo', 'abreviatura' => 'kg']);
 
-        $almacen = Almacen::create([
+        $almacenMayorista = Almacen::create([
+            'nombre' => 'Almacén Mayorista Test',
+            'ubicacion' => 'GPS -17.79420, -63.16150',
+            'capacidad' => 1000,
+            'unidadmedidaid' => $unidad->unidadmedidaid,
+            'activo' => true,
+            'ambito' => AlmacenAmbito::MAYORISTA,
+        ]);
+
+        $almacenPlanta = Almacen::create([
             'nombre' => 'Almacén Planta Test',
             'ubicacion' => 'GPS -17.79420, -63.16150',
             'capacidad' => 1000,
@@ -91,7 +100,7 @@ class RutaDistribucionTest extends TestCase
 
         PerfilTransportista::create([
             'usuarioid' => $chofer->usuarioid,
-            'ambito_flota' => TransportistaFlotaCatalogo::PLANTA,
+            'ambito_flota' => TransportistaFlotaCatalogo::MAYORISTA,
             'vehiculoid' => $vehiculo->vehiculoid,
             'disponible' => true,
         ]);
@@ -123,13 +132,14 @@ class RutaDistribucionTest extends TestCase
             'stock' => 100,
             'tipoinsumoid' => $tipo->tipoinsumoid,
             'unidadmedidaid' => $unidad->unidadmedidaid,
-            'almacenid' => $almacen->almacenid,
+            'almacenid' => $almacenMayorista->almacenid,
         ]);
 
         $pedido = PedidoDistribucion::create([
             'numero_solicitud' => 'PDV-TEST-0001',
             'puntoventaid' => $pdv->puntoventaid,
-            'almacen_planta_origenid' => $almacen->almacenid,
+            'almacen_planta_origenid' => $almacenPlanta->almacenid,
+            'almacen_mayorista_origenid' => $almacenMayorista->almacenid,
             'estado' => PedidoDistribucionCatalogo::ESTADO_CONFIRMADO,
             'fechapedido' => now(),
             'fecha_aceptacion' => now(),
@@ -144,7 +154,7 @@ class RutaDistribucionTest extends TestCase
         ]);
 
         $response = $this->post(route('punto-venta.rutas.store'), [
-            'almacen_planta_origenid' => $almacen->almacenid,
+            'almacen_mayorista_origenid' => $almacenMayorista->almacenid,
             'transportista_usuarioid' => $chofer->usuarioid,
             'vehiculoid' => $vehiculo->vehiculoid,
             'costo_bs' => 250.50,

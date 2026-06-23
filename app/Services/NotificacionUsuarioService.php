@@ -7,12 +7,14 @@ use App\Models\AsignacionEtapaPlanta;
 use App\Models\EnvioAsignacionMultiple;
 use App\Models\Lote;
 use App\Models\Pedido;
+use App\Models\PedidoDistribucion;
 use App\Models\Usuario;
 use App\Models\UsuarioNotificacion;
 use App\Models\RutaDistribucion;
 use App\Support\EnvioAsignacionEstadoCatalogo;
 use App\Support\EnvioPedidoService;
 use App\Support\PedidoCatalogo;
+use App\Support\PedidoDistribucionCatalogo;
 use App\Support\RutaDistribucionCatalogo;
 use App\Support\UsuarioRol;
 
@@ -56,7 +58,7 @@ class NotificacionUsuarioService
             'lote_asignado',
             'Nuevo lote asignado',
             "Se te asignó el lote «{$lote->nombre}».",
-            route('lotes.show', $lote, false),
+            route('lotes.trazabilidad', $lote, false),
             'lote',
             (int) $lote->loteid,
         );
@@ -137,6 +139,41 @@ class NotificacionUsuarioService
         );
     }
 
+    public function solicitudPedidoMinoristaMayorista(PedidoDistribucion $pedido): void
+    {
+        if (! PedidoDistribucionCatalogo::pendienteAprobacionMayorista($pedido)) {
+            return;
+        }
+
+        $pedido->loadMissing(['detalles.insumo', 'puntoVenta.minorista', 'almacenMayoristaOrigen']);
+        $almacen = $pedido->almacenMayoristaOrigen;
+
+        if ($almacen === null
+            || ! \Illuminate\Support\Facades\Schema::hasColumn('almacen', 'responsable_usuarioid')
+            || ! $almacen->responsable_usuarioid) {
+            return;
+        }
+
+        $det = $pedido->detalles->first();
+        $minorista = $pedido->puntoVenta?->minorista;
+        $nombreMinorista = $minorista
+            ? trim(($minorista->nombre ?? '').' '.($minorista->apellido ?? ''))
+            : 'Un minorista';
+        $producto = $det?->producto_nombre ?? $det?->insumo?->nombre ?? 'producto';
+        $pdv = $pedido->puntoVenta?->nombre ?? 'punto de venta';
+        $codigo = $pedido->numero_solicitud ?? '#'.$pedido->pedidodistribucionid;
+
+        $this->notificar(
+            (int) $almacen->responsable_usuarioid,
+            'pedido_distribucion_pendiente',
+            'Nueva solicitud de minorista',
+            "{$nombreMinorista} solicitó {$producto} para «{$pdv}» ({$codigo}).",
+            route('punto-venta.pedidos.show', ['pedido' => $pedido, 'ctx' => 'mayorista'], false),
+            'pedido_distribucion',
+            (int) $pedido->pedidodistribucionid,
+        );
+    }
+
     public function pedidoPendienteAgricola(Pedido $pedido): void
     {
         if (! PedidoCatalogo::pendienteAprobacionAgricola($pedido)) {
@@ -153,12 +190,17 @@ class NotificacionUsuarioService
             ->get();
 
         foreach ($jefes as $jefe) {
+            $pedido->loadMissing('envioAsignacion');
+            $enlace = $pedido->envioAsignacion
+                ? route('logistica.asignaciones.show', $pedido->envioAsignacion, false)
+                : route('logistica.asignaciones.listado', [], false);
+
             $this->notificar(
                 $jefe,
                 'pedido_pendiente_agricola',
-                'Pedido pendiente de aceptar',
+                'Envío pendiente de aceptar',
                 "La solicitud {$pedido->numero_solicitud} ({$producto}, {$totalKg} kg) espera aprobación de producción agrícola.",
-                route('agricola.pedidos.show', $pedido, false),
+                $enlace,
                 'pedido',
                 (int) $pedido->pedidoid,
             );

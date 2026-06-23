@@ -52,4 +52,70 @@ class PuntoVentaAlmacenService
             ->orderBy('nombre')
             ->get();
     }
+
+    /**
+     * @return array{
+     *     punto_nombre: string,
+     *     almacen_nombre: string,
+     *     capacidad_kg: float,
+     *     ocupado_kg: float,
+     *     disponible_kg: float,
+     *     porcentaje: float,
+     *     ingreso_kg: float,
+     *     ocupado_despues_kg: float,
+     *     disponible_despues_kg: float,
+     *     porcentaje_despues: float,
+     *     excede_capacidad: bool
+     * }
+     */
+    public function resumenCapacidadPedido(PuntoVenta $puntoVenta, float $kgIngreso = 0): array
+    {
+        $this->crearAlmacenParaPuntoVenta($puntoVenta);
+        $puntoVenta->loadMissing('almacen.unidadMedida');
+
+        $almacen = $puntoVenta->almacen;
+        if ($almacen === null) {
+            throw new \InvalidArgumentException('No se pudo vincular el almacén del punto de venta.');
+        }
+
+        $capacidadService = app(AlmacenCapacidadService::class);
+        $resumen = $capacidadService->resumen($almacen);
+        $ingreso = max(0, $kgIngreso);
+        $ocupadoDespues = $resumen['ocupado_kg'] + $ingreso;
+        $capacidadKg = $resumen['capacidad_kg'];
+        $disponibleDespues = max(0, $capacidadKg - $ocupadoDespues);
+        $porcentajeDespues = $capacidadKg > 0
+            ? min(100, round(($ocupadoDespues / $capacidadKg) * 100, 1))
+            : 0;
+
+        return [
+            'punto_nombre' => $puntoVenta->nombre,
+            'almacen_nombre' => $almacen->nombre,
+            'capacidad_kg' => $capacidadKg,
+            'ocupado_kg' => $resumen['ocupado_kg'],
+            'disponible_kg' => $resumen['disponible_kg'],
+            'porcentaje' => $resumen['porcentaje'],
+            'ingreso_kg' => $ingreso,
+            'ocupado_despues_kg' => $ocupadoDespues,
+            'disponible_despues_kg' => $disponibleDespues,
+            'porcentaje_despues' => $porcentajeDespues,
+            'excede_capacidad' => $ingreso > 0 && $ingreso > $resumen['disponible_kg'] + 0.001,
+        ];
+    }
+
+    public function validarIngresoPedido(PuntoVenta $puntoVenta, float $kgIngreso): void
+    {
+        if ($kgIngreso <= 0) {
+            return;
+        }
+
+        $this->crearAlmacenParaPuntoVenta($puntoVenta);
+        $puntoVenta->loadMissing('almacen');
+
+        if ($puntoVenta->almacen === null) {
+            throw new \InvalidArgumentException('No se pudo vincular el almacén del punto de venta.');
+        }
+
+        app(AlmacenCapacidadService::class)->validarIngresoKg($puntoVenta->almacen, $kgIngreso);
+    }
 }

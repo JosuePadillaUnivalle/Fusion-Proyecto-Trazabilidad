@@ -29,11 +29,17 @@
     </div>
 
     @can('punto_venta.delete')
-    <form method="POST" action="{{ route('punto-venta.puntos.destroy', $punto) }}" class="mt-2"
-        onsubmit="return confirm('¿Eliminar este punto de venta?');">
+    <form method="POST" action="{{ route('punto-venta.puntos.destroy', $punto) }}" class="mt-2">
         @csrf
         @method('DELETE')
-        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-trash mr-1"></i> Eliminar punto de venta</button>
+        <button type="button" class="btn btn-outline-danger btn-sm"
+            data-confirm-modal
+            data-confirm-title="Eliminar punto de venta"
+            data-confirm-message="¿Eliminar «{{ $punto->nombre }}»? Esta acción no se puede deshacer."
+            data-confirm-tone="danger">
+            <i class="fas fa-trash mr-1"></i> Eliminar punto de venta
+        </button>
     </form>
+    @include('partials.modal-confirmar-accion')
     @endcan
 @endsection

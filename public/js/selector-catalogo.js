@@ -7,6 +7,7 @@
         instances: {},
         modalEl: null,
         activeId: null,
+        _hidingForPreview: false,
         debounceTimer: null,
         almacenDebounceTimer: null,
         page: 1,
@@ -111,6 +112,21 @@
             });
 
             this.modalEl.querySelector('#selectorCatalogoLista').addEventListener('click', (e) => {
+                const verVehBtn = e.target.closest('.sel-row-ver-vehiculo-btn');
+                if (verVehBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const row = verVehBtn.closest('[data-item-id]');
+                    if (!row) {
+                        return;
+                    }
+                    this.openVehiculoPreview({
+                        id: row.getAttribute('data-item-id'),
+                        label: row.getAttribute('data-item-label'),
+                    });
+                    return;
+                }
+
                 const mapBtn = e.target.closest('.sel-row-map-btn');
                 if (mapBtn && this.activeId) {
                     e.preventDefault();
@@ -170,7 +186,7 @@
                     return;
                 }
 
-                const row = e.target.closest('[data-item-id]');
+                const row = e.target.closest('tr.selector-catalogo-row[data-item-id]');
                 if (!row || !this.activeId) {
                     return;
                 }
@@ -201,6 +217,10 @@
             });
 
             window.jQuery(this.modalEl).on('hidden.bs.modal', () => {
+                if (this._hidingForPreview) {
+                    this._hidingForPreview = false;
+                    return;
+                }
                 this.activeId = null;
                 window.setTimeout(() => {
                     this.restaurarModalPadre();
@@ -219,7 +239,73 @@
         },
 
         register(id, config) {
+            if (!config.theme && config.endpoint && String(config.endpoint).includes('vehiculos')) {
+                config.theme = 'vehiculo';
+            }
+            if (config.theme === 'vehiculo') {
+                config.colNombre = config.colNombre || 'Placa';
+                config.colDetalle = config.colDetalle || 'Vehículo';
+            }
             this.instances[id] = config;
+        },
+
+        resolveCargaContext(cfg) {
+            if (typeof cfg.getCargaContext === 'function') {
+                const ctx = cfg.getCargaContext();
+                if (ctx && (parseFloat(ctx.peso_kg) > 0 || parseFloat(ctx.volumen_m3) > 0)) {
+                    return ctx;
+                }
+            }
+            if (window.PedidoFase2 && typeof window.PedidoFase2.pesoTotalKg === 'function') {
+                const peso = window.PedidoFase2.pesoTotalKg();
+                if (peso > 0) {
+                    return {
+                        peso_kg: peso,
+                        volumen_m3: typeof window.PedidoFase2.volumenTotalM3 === 'function'
+                            ? window.PedidoFase2.volumenTotalM3()
+                            : null,
+                    };
+                }
+            }
+            if (window.PdvPedidoCargaContext) {
+                return window.PdvPedidoCargaContext;
+            }
+            if (window.AsignacionPedidoCargaContext) {
+                return window.AsignacionPedidoCargaContext;
+            }
+            if (typeof window.calcularCargaRutaDistribucion === 'function') {
+                return window.calcularCargaRutaDistribucion();
+            }
+            return { peso_kg: 0, volumen_m3: null };
+        },
+
+        openVehiculoPreview(item) {
+            if (!window.VehiculoCargaPreview || !item?.id) {
+                return;
+            }
+            const cfg = this.instances[this.activeId] || {};
+            const carga = this.resolveCargaContext(cfg);
+            const catalogModal = this.modalEl;
+            const $catalog = catalogModal && window.jQuery ? window.jQuery(catalogModal) : null;
+            const catalogWasOpen = $catalog && $catalog.hasClass('show');
+
+            const launch = function () {
+                window.VehiculoCargaPreview.open(item.id, item.label, carga, {
+                    onClose: function () {
+                        if (catalogWasOpen && $catalog) {
+                            $catalog.modal('show');
+                        }
+                    },
+                });
+            };
+
+            if (catalogWasOpen && $catalog) {
+                this._hidingForPreview = true;
+                $catalog.one('hidden.bs.modal.catalogPreview', launch);
+                $catalog.modal('hide');
+            } else {
+                launch();
+            }
         },
 
         selectedItemId(id) {
@@ -526,6 +612,9 @@
             }
 
             const actionLabel = cfg.rowAction?.label || (typeof cfg.onRowAction === 'function' ? 'Ver' : null);
+            const verVehiculoBtn = cfg.theme === 'vehiculo'
+                ? '<div class="sel-ver-vehiculo-row"><button type="button" class="sel-row-ver-vehiculo-btn" title="Ver modelado 3D y ocupación"><i class="fas fa-cube"></i><span>Ver ocupación</span></button></div>'
+                : '';
             const selectedId = this.selectedItemId(this.activeId);
 
             if (cfg.theme === 'vehiculo') {
@@ -550,9 +639,12 @@
                 if (isSuggested) rowClasses.push('selector-catalogo-row--suggested');
                 if (isSelected) rowClasses.push('selector-catalogo-row--selected');
                 const hasMap = item.extra && item.extra.lat != null && item.extra.lng != null;
-                const mapBtn = hasMap
-                    ? `<button type="button" class="btn btn-xs btn-outline-primary sel-row-map-btn" title="Ver ubicación del mayorista"><i class="fas fa-map-marker-alt mr-1"></i>Ver en mapa</button>`
+                const mapBtn = (typeof cfg.onMapClick === 'function') && hasMap
+                    ? `<button type="button" class="btn btn-xs btn-outline-primary sel-row-map-btn" title="Ver ubicación en mapa"><i class="fas fa-map-marker-alt mr-1"></i>Ver en mapa</button>`
                     : '';
+                const metaClass = cfg.theme === 'vehiculo'
+                    ? ' sel-col-meta--vehiculo'
+                    : (actionLabel ? ' sel-col-meta--with-action' : '');
                 return `
                 <tr class="${rowClasses.join(' ')}"
                     data-item-id="${item.id}"
@@ -565,7 +657,7 @@
                         ${isSelected ? '<span class="sel-badge-seleccionado">Seleccionado</span>' : ''}
                         ${!isSelected && isSuggested ? '<span class="sel-badge-sugerido">Recomendado</span>' : ''}
                     </td>
-                    <td class="sel-col-meta${actionLabel ? ' sel-col-meta--with-action' : ''}">
+                    <td class="sel-col-meta${metaClass}">
                         ${item.meta_lineas && item.meta_lineas.length
                             ? `<div class="sel-meta-stack">${item.meta_lineas.map((ln) =>
                                 `<div class="sel-meta-line"><i class="fas ${ln.icon || 'fa-info-circle'}"></i><span>${this.escape(ln.text || '')}</span></div>`
@@ -573,6 +665,7 @@
                             : `<span class="sel-col-meta-text">${item.meta ? this.escape(item.meta) : '—'}</span>`
                         }
                         ${mapBtn}
+                        ${verVehiculoBtn}
                         ${actionLabel ? `<button type="button" class="btn btn-sm btn-outline-success sel-row-action-btn" title="Ver productos en este almacén">${this.escape(actionLabel)}</button>` : ''}
                     </td>
                 </tr>`;

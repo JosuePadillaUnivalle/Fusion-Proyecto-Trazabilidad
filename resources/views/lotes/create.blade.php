@@ -34,10 +34,9 @@
             </div>
         @endif
 
-        <div class="alert alert-light border m-3 mb-0">
-            <strong><i class="fas fa-magic text-success mr-1"></i> Se completa automáticamente:</strong>
-            código de trazabilidad, estado «Planificado» y unidad en hectáreas.
-            La fecha de siembra se registrará al completar la actividad de siembra.
+        <div class="alert alert-light border m-3 mb-0 small">
+            <i class="fas fa-magic text-success mr-1"></i>
+            Nombre, trazabilidad y consumo del material de siembra se calculan solos. La siembra se registra al completar la actividad correspondiente.
         </div>
 
         <form action="{{ route('lotes.store') }}" method="POST" enctype="multipart/form-data" id="formNuevoLote">
@@ -66,20 +65,6 @@
                             <input type="hidden" name="usuarioid" value="{{ $propietarioPorDefecto }}">
                         @endif
 
-                        <div class="form-group">
-                            <label><i class="fas fa-tag mr-1"></i> Nombre del lote <span class="text-danger">*</span></label>
-                            <input type="text" name="nombre" class="form-control" maxlength="100" required
-                                   placeholder="Ej: Lote Norte A1" value="{{ old('nombre') }}">
-                            <p class="campo-guia">Un nombre corto que identifique la parcela en listados y reportes.</p>
-                        </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-ruler-combined mr-1"></i> Superficie (hectáreas) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" name="superficie" id="superficie" class="form-control" min="0.01" required
-                                   placeholder="Ej: 12.5" value="{{ old('superficie') }}">
-                            <p class="campo-guia">Área cultivable. En el mapa se dibuja un círculo según este valor (1 ha = 10.000 m²).</p>
-                        </div>
-
                         @include('lotes.partials.selector-semilla', [
                             'selectorId' => 'lote_semilla',
                             'insumoSemillaId' => $insumoSemillaId ?? '',
@@ -87,7 +72,25 @@
                             'cantidadSemillaPlanificada' => old('cantidad_semilla_planificada', ''),
                             'cantidadSemillaUnidad' => $dosisInicial['unidad'] ?? 'kg',
                             'semillaStockInicial' => $semillaStockInicial ?? null,
+                            'omitirCantidadSemilla' => true,
+                            'semillaRequerida' => true,
                         ])
+
+                        @include('lotes.partials.planificacion-cosecha', [
+                            'superficieValor' => old('superficie'),
+                            'cantidadSemillaPlanificada' => old('cantidad_semilla_planificada', ''),
+                            'cantidadSemillaUnidad' => $dosisInicial['unidad'] ?? 'kg',
+                            'catalogoTamanoConteoId' => old('catalogotamanoconteoid', ''),
+                        ])
+
+                        <div class="form-group">
+                            <label><i class="fas fa-tag mr-1"></i> Nombre del lote <span class="text-danger">*</span>
+                                <span class="badge badge-success auto-badge ml-1">Automático</span>
+                            </label>
+                            <input type="text" name="nombre" id="nombreLote" class="form-control bg-light" maxlength="100" required
+                                   placeholder="Se genera al elegir semilla / cultivo" value="{{ old('nombre') }}" readonly>
+                            <p class="campo-guia">Se genera al elegir la semilla.</p>
+                        </div>
 
                         <div class="form-group">
                             <label><i class="fas fa-road mr-1"></i> Calle o referencia</label>
@@ -134,6 +137,7 @@
 @push('scripts')
     @include('lotes.partials.mapa-calle-helper')
     @include('lotes.partials.mapa-superficie-helper')
+    @include('lotes.partials.planificacion-cosecha-helper')
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         (function () {
@@ -141,6 +145,10 @@
             const lngInput = document.getElementById('longitud');
             const ubicInput = document.getElementById('ubicacion');
             const supInput = document.getElementById('superficie');
+            const nombreInput = document.getElementById('nombreLote');
+            const semillaWrap = document.getElementById('selector_wrap_lote_semilla');
+            const urlSiguienteNombre = @json(route('lotes.siguiente-nombre'));
+            const urlPlanificar = @json(route('lotes.planificar-cosecha'));
 
             const map = L.map('map').setView([-17.7833, -63.1821], 11);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
@@ -186,7 +194,50 @@
                 redibujarCirculo();
             }
 
+            function actualizarNombreAutomatico(insumoId) {
+                if (!nombreInput || !insumoId) {
+                    return;
+                }
+                fetch(urlSiguienteNombre + '?insumoid=' + encodeURIComponent(insumoId), {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.nombre) {
+                            nombreInput.value = data.nombre;
+                        }
+                    })
+                    .catch(function () {});
+            }
+
+            semillaWrap?.addEventListener('selector-catalogo:change', function (e) {
+                const id = e.detail?.id || '';
+                if (id) {
+                    actualizarNombreAutomatico(id);
+                }
+            });
+
+            const semillaInicial = semillaWrap?.querySelector('.selector-catalogo-value')?.value || '';
+            if (semillaInicial && !nombreInput.value) {
+                actualizarNombreAutomatico(semillaInicial);
+            }
+
+            window.AgroFusionPlanificacionCosecha.vincular({
+                selectorId: 'lote_semilla',
+                superficieInputId: 'superficie',
+                cantidadInputId: 'cantidad_semilla_planificada',
+                cantidadWrapId: 'cantidadSemillaWrap',
+                urlPlanificar: urlPlanificar,
+                onHectareasChange: redibujarCirculo,
+            });
+
             document.getElementById('formNuevoLote').addEventListener('submit', function (e) {
+                const semillaId = semillaWrap?.querySelector('.selector-catalogo-value')?.value || '';
+                if (!semillaId) {
+                    e.preventDefault();
+                    alert('Seleccione la semilla o cultivo a cosechar.');
+                    return;
+                }
                 if (!latInput.value || !lngInput.value) {
                     e.preventDefault();
                     alert('Marca la ubicación del lote haciendo clic en el mapa.');
@@ -196,16 +247,6 @@
             document.getElementById('imagen')?.addEventListener('change', function () {
                 var label = this.nextElementSibling;
                 if (label) label.textContent = this.files[0]?.name || 'Elegir imagen…';
-            });
-
-            window.AgroFusionLoteMapa.vincularDosisSiembra({
-                selectorId: 'lote_semilla',
-                initialDosis: @json(($dosisInicial['tiene_dosis'] ?? false) ? [
-                    'dosis_por_ha' => $dosisInicial['por_ha'] ?? 0,
-                    'dosis_unidad' => $dosisInicial['unidad'] ?? 'kg',
-                ] : null),
-                initialCantidad: @json(old('cantidad_semilla_planificada')),
-                initialStock: @json($semillaStockInicial ?? null),
             });
         })();
     </script>

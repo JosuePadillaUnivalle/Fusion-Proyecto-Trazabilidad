@@ -149,6 +149,178 @@
             gap: 0.65rem;
         }
         #modalSelectorCatalogo .sel-col-meta--with-action .sel-col-meta-text { flex: 1; min-width: 0; }
+        /* Columna vehículo: meta arriba, botón Ver en fila separada */
+        #modalSelectorCatalogo .sel-col-meta--vehiculo {
+            display: block !important;
+            vertical-align: top;
+            padding-top: 0.85rem;
+            padding-bottom: 0.85rem;
+        }
+        #modalSelectorCatalogo .sel-col-meta--vehiculo .sel-meta-stack {
+            margin-bottom: 0;
+        }
+        #modalSelectorCatalogo .sel-ver-vehiculo-row {
+            margin-top: 0.75rem;
+            padding-top: 0.7rem;
+            border-top: 1px dashed #cbd5e1;
+        }
+        #modalSelectorCatalogo .sel-row-ver-vehiculo-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 0.35rem 0.75rem;
+            border-radius: 8px;
+            border: 1px solid #93c5fd;
+            background: #eff6ff;
+            color: #1d4ed8;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+        #modalSelectorCatalogo .sel-row-ver-vehiculo-btn:hover {
+            background: #dbeafe;
+            color: #1e40af;
+            transform: translateY(-1px);
+        }
+        #modalSelectorCatalogo .selector-catalogo-row:hover .sel-row-ver-vehiculo-btn {
+            border-color: #3b82f6;
+        }
+
+        /* Modelado 3D vehículo (compartido: detalle vehículo + selector) */
+        #modalVehiculoCargaPreview { z-index: 1070 !important; }
+        .veh-carga-preview-dialog { max-width: 680px; }
+        .veh-carga-preview-modal.veh-det-panel {
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 8px 32px rgba(15, 23, 42, 0.15) !important;
+        }
+        .veh-carga-preview-modal__head.veh-det-panel__head {
+            background: #f8faf8;
+            border-bottom: 1px solid #e9ecef;
+            padding: .85rem 1.15rem;
+            flex-direction: row;
+            align-items: flex-start;
+        }
+        .veh-carga-preview-modal__head .modal-title {
+            color: #1a252f;
+            font-size: .95rem;
+        }
+        .veh-carga-preview-modal__head .close {
+            color: #64748b;
+            opacity: 1;
+            position: absolute;
+            right: 1rem;
+            top: .85rem;
+        }
+        .veh-carga-preview-modal__tipo {
+            font-size: .75rem;
+            font-weight: 600;
+        }
+        .veh-carga-preview-modal__body {
+            padding: 1rem 1.15rem 1.1rem;
+            background: #fff;
+        }
+        .veh-caja-3d {
+            min-height: 280px;
+            height: 280px;
+            width: 100%;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            background: #e8eef4;
+        }
+        .veh-caja-3d canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+            cursor: grab;
+        }
+        .veh-caja-3d canvas:active { cursor: grabbing; }
+        .veh-caja-3d__swatch {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            vertical-align: -2px;
+            margin-right: 4px;
+        }
+        .veh-caja-3d__swatch--cabina { background: #3b6ea8; }
+        .veh-caja-3d__swatch--carga { background: rgba(72, 187, 120, 0.45); border: 1px solid #059669; }
+        .veh-caja-3d__swatch--fill { background: #f59e0b; }
+        .veh-carga-preview-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.85rem;
+        }
+        @media (max-width: 520px) {
+            .veh-carga-preview-stats { grid-template-columns: 1fr; }
+        }
+        .veh-carga-preview-stat {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 0.85rem 1rem;
+        }
+        .veh-carga-preview-stat__head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.82rem;
+            color: #475569;
+            margin-bottom: 0.45rem;
+        }
+        .veh-carga-preview-stat__head strong {
+            font-size: 0.95rem;
+            color: #0f172a;
+        }
+        .veh-carga-preview-stat__foot {
+            font-size: 0.76rem;
+            color: #64748b;
+            margin-top: 0.35rem;
+        }
+        .veh-carga-preview-bar {
+            height: 12px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            overflow: hidden;
+        }
+        .veh-carga-preview-bar__fill {
+            height: 100%;
+            border-radius: 999px;
+            transition: width 0.35s ease;
+            max-width: 100%;
+        }
+        .veh-carga-preview-bar__fill--peso { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+        .veh-carga-preview-bar__fill--vol { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+        .veh-carga-preview-bar__fill.is-danger { background: linear-gradient(90deg, #f87171, #ef4444) !important; }
+        .veh-carga-preview-bar__fill.is-warning { background: linear-gradient(90deg, #fbbf24, #f59e0b) !important; }
+        .veh-carga-preview-alert {
+            margin-top: 0.85rem;
+            padding: 0.65rem 0.85rem;
+            border-radius: 10px;
+            font-size: 0.82rem;
+        }
+        .veh-carga-preview-alert--ok {
+            background: #ecfdf5;
+            border: 1px solid #6ee7b7;
+            color: #047857;
+        }
+        .veh-carga-preview-alert--err {
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            color: #b91c1c;
+        }
+        .veh-carga-preview-modal__foot {
+            background: #fff;
+            padding: 0.85rem 1.35rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        .veh-carga-preview-modal__foot .btn-secondary {
+            border-radius: 10px;
+            font-weight: 600;
+            background: #475569;
+            border-color: #475569;
+        }
         #modalSelectorCatalogo .sel-row-action-btn {
             flex-shrink: 0;
             font-weight: 600;
@@ -759,6 +931,18 @@
     @endpush
 
     @push('scripts')
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script>
+        window.VehiculoCargaPreviewUrl = @json(rtrim(route('catalogo-selector.vehiculos'), '/'));
+    </script>
+    <script type="module" src="{{ asset('js/vehiculo-carga-preview.js') }}"></script>
     <script src="{{ asset('js/selector-catalogo.js') }}"></script>
     @endpush
 @endonce

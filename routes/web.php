@@ -21,7 +21,6 @@ use App\Http\Controllers\Web\UnidadMedidaController;
 use App\Http\Controllers\Web\GestionUsuariosController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\PedidoController;
-use App\Http\Controllers\Web\PedidoAgricolaController;
 use App\Http\Controllers\Web\PuntoVentaController;
 use App\Http\Controllers\Web\PuntoVentaInventarioController;
 use App\Http\Controllers\Web\PedidoDistribucionController;
@@ -115,6 +114,7 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::prefix('catalogo-selector')->name('catalogo-selector.')->group(function () {
         Route::get('/usuarios', [CatalogoSelectorController::class, 'usuarios'])->name('usuarios');
         Route::get('/vehiculos', [CatalogoSelectorController::class, 'vehiculos'])->name('vehiculos');
+        Route::get('/vehiculos/{vehiculo}/preview-carga', [CatalogoSelectorController::class, 'vehiculoPreviewCarga'])->name('vehiculos.preview-carga');
         Route::get('/rutas-multi', [CatalogoSelectorController::class, 'rutasMulti'])->name('rutas-multi');
         Route::get('/cultivos', [CatalogoSelectorController::class, 'cultivos'])->name('cultivos');
         Route::get('/lotes', [CatalogoSelectorController::class, 'lotes'])->name('lotes');
@@ -128,6 +128,7 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::get('/actores', [CatalogoSelectorController::class, 'actores'])->name('actores');
         Route::get('/almacenes', [CatalogoSelectorController::class, 'almacenes'])->name('almacenes');
         Route::get('/puntos-venta', [CatalogoSelectorController::class, 'puntosVenta'])->name('puntos-venta');
+        Route::get('/punto-venta-capacidad-pdv', [CatalogoSelectorController::class, 'puntoVentaCapacidadPdv'])->name('punto-venta-capacidad-pdv');
         Route::get('/productos-pedido', [CatalogoSelectorController::class, 'productosPedido'])->name('productos-pedido');
         Route::get('/producciones', [CatalogoSelectorController::class, 'producciones'])->name('producciones');
         Route::get('/producciones-stock-almacen', [CatalogoSelectorController::class, 'produccionesStockAlmacen'])->name('producciones-stock-almacen');
@@ -174,7 +175,6 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::get('lotes/create', [LoteController::class, 'create'])->name('lotes.create')->middleware('action.permission:lotes,create');
     Route::get('lotes/siguiente-nombre', [LoteController::class, 'siguienteNombre'])->name('lotes.siguiente-nombre')->middleware('action.permission:lotes,create');
     Route::get('lotes/planificar-cosecha', [LoteController::class, 'planificarCosecha'])->name('lotes.planificar-cosecha')->middleware('action.permission:lotes,read');
-    Route::post('lotes/sincronizar-operacion', [LoteController::class, 'sincronizarOperacion'])->name('lotes.sincronizar-operacion')->middleware('action.permission:lotes,update');
     Route::post('lotes', [LoteController::class, 'store'])->name('lotes.store')->middleware('action.permission:lotes,create');
     Route::get('lotes/{lote}/trazabilidad', [LoteController::class, 'trazabilidad'])->name('lotes.trazabilidad')->middleware('action.permission:lotes,read');
     Route::get('lotes/{lote}/siembra', [ActividadController::class, 'createSiembra'])->name('lotes.siembra.create')->middleware('action.permission:lotes,update');
@@ -428,16 +428,6 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::post('pedidos/{pedido}/confirmar-llegada-planta', [PedidoController::class, 'confirmarLlegadaPlanta'])->name('pedidos.confirmar-llegada-planta')->middleware('action.permission:recepcion_planta,confirm');
     Route::delete('pedidos/{pedido}', [PedidoController::class, 'destroy'])->name('pedidos.destroy')->middleware('action.permission:pedidos,delete');
 
-    // Pedidos recibidos de planta — bandeja producción agrícola
-    Route::prefix('produccion-agricola/pedidos')->name('agricola.pedidos.')->group(function () {
-        Route::get('/', [PedidoAgricolaController::class, 'index'])->name('index')->middleware('action.permission:pedidos,read');
-        Route::get('/{pedido}', [PedidoAgricolaController::class, 'show'])->name('show')->middleware('action.permission:pedidos,read');
-        Route::post('/{pedido}/aceptar', [PedidoAgricolaController::class, 'aceptar'])->name('aceptar')->middleware('action.permission:pedidos,update');
-        Route::post('/{pedido}/rechazar', [PedidoAgricolaController::class, 'rechazar'])->name('rechazar')->middleware('action.permission:pedidos,update');
-        Route::post('/{pedido}/confirmar-carga-envio', [PedidoAgricolaController::class, 'confirmarCargaEnvio'])->name('confirmar-carga-envio')->middleware('action.permission:pedidos,update');
-    });
-
-
     // Punto de venta / minoristas
     Route::prefix('punto-venta')->name('punto-venta.')->group(function () {
         Route::get('puntos', [PuntoVentaController::class, 'index'])->name('puntos.index')->middleware('action.permission:punto_venta,read');
@@ -463,12 +453,13 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::post('pedidos/{pedido}/aceptar', [PedidoDistribucionController::class, 'aceptar'])->name('pedidos.aceptar')->middleware('action.permission:pedidos_distribucion,update');
         Route::post('pedidos/{pedido}/rechazar', [PedidoDistribucionController::class, 'rechazar'])->name('pedidos.rechazar')->middleware('action.permission:pedidos_distribucion,update');
         Route::post('pedidos/{pedido}/designar-transportista', [PedidoDistribucionController::class, 'designarTransportista'])->name('pedidos.designar-transportista')->middleware('action.permission:pedidos_distribucion,update');
+        Route::post('pedidos/{pedido}/validar-capacidad-vehiculo', [PedidoDistribucionController::class, 'validarCapacidadVehiculo'])->name('pedidos.validar-capacidad-vehiculo')->middleware('action.permission:pedidos_distribucion,read');
         Route::post('pedidos/{pedido}/marcar-enviado', [PedidoDistribucionController::class, 'marcarEnviado'])->name('pedidos.marcar-enviado')->middleware('action.permission:pedidos_distribucion,update');
         Route::patch('pedidos/{pedido}/empezar-ruta', [PedidoDistribucionController::class, 'empezarRuta'])->name('pedidos.empezar-ruta');
         Route::put('pedidos/{pedido}', [PedidoDistribucionController::class, 'update'])->name('pedidos.update')->middleware('action.permission:pedidos_distribucion,update');
         Route::post('pedidos/{pedido}/reabrir-revision', [PedidoDistribucionController::class, 'reabrirRevision'])->name('pedidos.reabrir-revision')->middleware('action.permission:pedidos_distribucion,update');
         Route::post('pedidos/{pedido}/confirmar-recepcion', [PedidoDistribucionController::class, 'confirmarRecepcion'])->name('pedidos.confirmar-recepcion')->middleware('action.permission:pedidos_distribucion,update');
-        Route::post('pedidos/{pedido}/solicitar-produccion-planta', [PedidoDistribucionController::class, 'solicitarProduccionPlanta'])->name('pedidos.solicitar-produccion-planta')->middleware('action.permission:pedidos_distribucion,update');
+        Route::delete('pedidos/{pedido}', [PedidoDistribucionController::class, 'destroy'])->name('pedidos.destroy')->middleware('action.permission:pedidos_distribucion,update');
 
         Route::get('rutas-distribucion', [\App\Http\Controllers\Web\RutaDistribucionController::class, 'index'])->name('rutas.index')->middleware('action.permission:pedidos_distribucion,update');
         Route::get('rutas-distribucion/create', [\App\Http\Controllers\Web\RutaDistribucionController::class, 'create'])->name('rutas.create')->middleware('action.permission:pedidos_distribucion,update');
@@ -481,6 +472,7 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::post('rutas-distribucion/{ruta}/cierre/firma-transportista', [\App\Http\Controllers\Web\EnvioCierreDistribucionPdvController::class, 'firmaTransportista'])->name('rutas.cierre.firma-transportista')->whereNumber('ruta');
         Route::post('rutas-distribucion/{ruta}/cierre/firma-recepcion', [\App\Http\Controllers\Web\EnvioCierreDistribucionPdvController::class, 'firmaRecepcion'])->name('rutas.cierre.firma-recepcion')->whereNumber('ruta');
         Route::post('rutas-distribucion/{ruta}/cierre/finalizar', [\App\Http\Controllers\Web\EnvioCierreDistribucionPdvController::class, 'finalizar'])->name('rutas.cierre.finalizar')->whereNumber('ruta');
+        Route::patch('rutas-distribucion/{ruta}/empezar-ruta', [\App\Http\Controllers\Web\RutaDistribucionController::class, 'empezarRuta'])->name('rutas.empezar-ruta')->whereNumber('ruta');
     });
 
 
@@ -782,6 +774,14 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
             ->name('asignaciones.show')
             ->whereNumber('asignacion')
             ->middleware('action.permission:asignaciones,read');
+        Route::post('/asignaciones/{asignacion}/aceptar-pedido', [AsignacionMultipleController::class, 'aceptarPedidoAgricola'])
+            ->name('asignaciones.aceptar-pedido')
+            ->whereNumber('asignacion')
+            ->middleware('action.permission:pedidos,update');
+        Route::post('/asignaciones/{asignacion}/rechazar-pedido', [AsignacionMultipleController::class, 'rechazarPedidoAgricola'])
+            ->name('asignaciones.rechazar-pedido')
+            ->whereNumber('asignacion')
+            ->middleware('action.permission:pedidos,update');
         Route::get('/asignaciones/{asignacion}/edit', [AsignacionMultipleController::class, 'edit'])
             ->name('asignaciones.edit')
             ->whereNumber('asignacion')

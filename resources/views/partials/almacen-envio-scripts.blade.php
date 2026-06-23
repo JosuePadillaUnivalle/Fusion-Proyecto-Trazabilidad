@@ -60,19 +60,19 @@
     }
 
     function cardsEnSeccion() {
-        return $('#' + sectionId + ' .almacen-card');
+        return $('#' + sectionId + ' .almacen-destacados-grid:not(.d-none) .almacen-card, #' + sectionId + ' #almacenesContainer-' + sectionId + ' .almacen-card');
+    }
+
+    function cardPorId(id) {
+        return $('#' + sectionId + ' .almacen-card').filter(function () {
+            return String($(this).data('id')) === String(id);
+        });
     }
 
     function almacenPorId(id) {
         return (almacenesCatalogo || []).find(function (a) {
             return String(a.id) === String(id);
         }) || null;
-    }
-
-    function cardPorId(id) {
-        return cardsEnSeccion().filter(function () {
-            return String($(this).data('id')) === String(id);
-        });
     }
 
     function iconoTipo(tipo) {
@@ -111,6 +111,196 @@
         return 'high';
     }
 
+    function contenedorAlertas() {
+        const opts = $(almacenOptionsId);
+        return opts.length ? opts : $('#' + sectionId);
+    }
+
+    function itemDesdeCard($card) {
+        const id = $card.data('id');
+        const catalogo = almacenPorId(id);
+        if (catalogo) return catalogo;
+        return {
+            id: id,
+            nombre: $card.data('nombre') || '',
+            tipo: $card.data('tipo') || 'General',
+            ubicacion: $card.data('ubicacion') || '',
+            disponible: parseFloat($card.data('disponible')) || 0,
+            capacidad: parseFloat($card.data('capacidad')) || 0,
+            um: $card.data('um-almacen') || 'kg',
+        };
+    }
+
+    function metricasCapacidadItem(item) {
+        const cap = parseFloat(item.capacidad) || 0;
+        const disp = parseFloat(item.disponible) || 0;
+        const usado = Math.max(0, cap - disp);
+        const pctUsado = cap > 0 ? (usado / cap) * 100 : 0;
+        const cantidadKg = calcularProyeccionKg();
+        const pctCosecha = cap > 0 && cantidadKg > 0 ? (cantidadKg / cap) * 100 : 0;
+        const fillClass = barraClaseResumen(pctUsado);
+        return { cap, disp, usado, pctUsado, cantidadKg, pctCosecha, fillClass };
+    }
+
+    function htmlBarraApilada(pctUsado, pctCosecha, fillClass) {
+        const u = Math.min(pctUsado, 100);
+        const c = Math.min(pctCosecha, Math.max(0, 100 - u));
+        let html = '<div class="capacidad-bar capacidad-bar--stacked">';
+        html += '<div class="fill ' + fillClass + '" style="width:' + u + '%"></div>';
+        if (c > 0) {
+            html += '<div class="fill-proyeccion ' + fillClass + '" style="left:' + u + '%;width:' + c + '%;display:block;"></div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function htmlLineaProyeccion(cantidadKg, pctCosecha, disp) {
+        if (cantidadKg <= 0) return '';
+        const fmt = cantidadKg.toLocaleString('es-BO', { maximumFractionDigits: 0 });
+        let txt = 'Esta cosecha ocupará +' + fmt + ' kg';
+        if (pctCosecha > 0) {
+            txt += ' (' + pctCosecha.toFixed(1) + '% del almacén)';
+        }
+        if (cantidadKg > disp) {
+            txt += ' — excede lo disponible';
+        }
+        return '<p class="almacen-proyeccion-texto mb-0">' + txt + '</p>';
+    }
+
+    function htmlPreviewAlmacen(item, modo) {
+        if (!item) return '';
+        const m = metricasCapacidadItem(item);
+        const ubicacion = item.direccion || item.ubicacion || '';
+        const esMapa = modo === 'mapa';
+
+        if (esMapa) {
+            return (
+                '<div class="almacen-hover-preview__titulo">' + (item.nombre || '') + '</div>' +
+                '<div class="small text-muted mb-1">' +
+                    Math.round(m.disp).toLocaleString('es-BO') + ' / ' +
+                    Math.round(m.cap).toLocaleString('es-BO') + ' kg disp.' +
+                '</div>' +
+                htmlBarraApilada(m.pctUsado, m.pctCosecha, m.fillClass) +
+                (m.cantidadKg > 0 ? htmlLineaProyeccion(m.cantidadKg, m.pctCosecha, m.disp) : '')
+            );
+        }
+
+        return (
+            '<div class="almacen-hover-preview__titulo"><i class="fas fa-warehouse text-success mr-1"></i>' + (item.nombre || '') + '</div>' +
+            '<div class="almacen-hover-preview__meta">' + (item.tipo || 'General') + (ubicacion ? ' · ' + ubicacion : '') + '</div>' +
+            '<div class="small">' +
+                '<span class="text-success font-weight-bold">' + Math.round(m.disp).toLocaleString('es-BO') + '</span>' +
+                '<span class="text-muted"> / ' + Math.round(m.cap).toLocaleString('es-BO') + ' ' + (item.um || 'kg') + ' disponibles</span>' +
+            '</div>' +
+            htmlBarraApilada(m.pctUsado, m.pctCosecha, m.fillClass) +
+            (m.cantidadKg > 0
+                ? htmlLineaProyeccion(m.cantidadKg, m.pctCosecha, m.disp)
+                : '<p class="small text-muted mb-0 mt-1">' + m.pctUsado.toFixed(1) + ' % ocupado</p>')
+        );
+    }
+
+    function calcularProyeccionKg() {
+        const cantidad = cantidadActual();
+        if (cantidad <= 0) return 0;
+        return convertirAKg(cantidad, unidadActual());
+    }
+
+    function actualizarProyeccionTarjetas() {
+        const selectedId = $('#' + hiddenInputId).val();
+        const cantidadKg = calcularProyeccionKg();
+
+        $('#' + sectionId + ' .almacen-card').each(function () {
+            const $card = $(this);
+            const $proy = $card.find('.fill-proyeccion');
+            const $txt = $card.find('.almacen-proyeccion-texto');
+            const esSeleccionada = String($card.data('id')) === String(selectedId);
+
+            if (!esSeleccionada || cantidadKg <= 0) {
+                $proy.hide().css({ width: '0', left: '0' });
+                $txt.addClass('d-none').text('');
+                return;
+            }
+
+            const cap = parseFloat($card.data('capacidad')) || 0;
+            const disp = parseFloat($card.data('disponible')) || 0;
+            const usado = Math.max(0, cap - disp);
+            const pctUsado = cap > 0 ? (usado / cap) * 100 : 0;
+            const pctCosecha = cap > 0 ? (cantidadKg / cap) * 100 : 0;
+            const $fillBase = $card.find('.capacidad-bar > .fill').first();
+            let fillClass = 'low';
+            if ($fillBase.hasClass('high')) fillClass = 'high';
+            else if ($fillBase.hasClass('medium')) fillClass = 'medium';
+            else fillClass = barraClaseResumen(pctUsado);
+
+            $proy.removeClass('low medium high').addClass(fillClass);
+            $proy.css({
+                left: Math.min(pctUsado, 100) + '%',
+                width: Math.min(pctCosecha, Math.max(0, 100 - pctUsado)) + '%',
+            }).show();
+
+            $txt.removeClass('d-none').text(
+                (function () {
+                    const fmt = cantidadKg.toLocaleString('es-BO', { maximumFractionDigits: 0 });
+                    let msg = 'Esta cosecha ocupará +' + fmt + ' kg';
+                    if (pctCosecha > 0) msg += ' (' + pctCosecha.toFixed(1) + '% del almacén)';
+                    if (cantidadKg > disp) msg += ' — excede lo disponible';
+                    return msg;
+                })()
+            );
+        });
+    }
+
+    function posicionarHoverPreview(e, hoverEl) {
+        if (!hoverEl) return;
+        const pad = 14;
+        const maxW = 320;
+        const maxH = 200;
+        let x = e.clientX + pad;
+        let y = e.clientY + pad;
+        if (x + maxW > window.innerWidth - 8) x = e.clientX - maxW - pad;
+        if (y + maxH > window.innerHeight - 8) y = e.clientY - maxH - pad;
+        hoverEl.style.left = Math.max(8, x) + 'px';
+        hoverEl.style.top = Math.max(8, y) + 'px';
+    }
+
+    function bindHoverPreview() {
+        const hoverEl = document.getElementById('almacenHoverPreview-' + sectionId);
+        if (!hoverEl) return;
+
+        function mostrar(item, e, modo) {
+            hoverEl.innerHTML = htmlPreviewAlmacen(item, modo || 'modal');
+            hoverEl.classList.remove('almacen-hover-preview--breve', 'almacen-hover-preview--mapa');
+            if (modo === 'mapa') {
+                hoverEl.classList.add('almacen-hover-preview--mapa');
+            }
+            hoverEl.style.display = 'block';
+            hoverEl.setAttribute('aria-hidden', 'false');
+            posicionarHoverPreview(e, hoverEl);
+        }
+
+        function ocultar() {
+            hoverEl.style.display = 'none';
+            hoverEl.classList.remove('almacen-hover-preview--mapa');
+            hoverEl.setAttribute('aria-hidden', 'true');
+        }
+
+        $('#' + sectionId).on('mouseenter', '.almacen-card', function (e) {
+            if ($(this).closest('.almacen-destacados-grid.d-none').length) return;
+            mostrar(itemDesdeCard($(this)), e, 'modal');
+        }).on('mousemove', '.almacen-card', function (e) {
+            if (hoverEl.style.display === 'block') posicionarHoverPreview(e, hoverEl);
+        }).on('mouseleave', '.almacen-card', ocultar);
+
+        $(document).on('mouseenter', '#' + modalId + '-lista-items .almacen-modal-item', function (e) {
+            const id = $(this).data('id');
+            mostrar(almacenPorId(id), e, 'modal');
+        });
+        $(document).on('mousemove', '#' + modalId + '-lista-items .almacen-modal-item', function (e) {
+            if (hoverEl.style.display === 'block') posicionarHoverPreview(e, hoverEl);
+        });
+        $(document).on('mouseleave', '#' + modalId + '-lista-items .almacen-modal-item', ocultar);
+    }
+
     function actualizarResumenDestino(id) {
         if (!resumenDestinoId) return;
         const el = document.getElementById(resumenDestinoId);
@@ -118,7 +308,7 @@
 
         const item = almacenPorId(id);
         if (!item) {
-            el.innerHTML = '<div class="alert alert-info mb-0 py-3"><i class="fas fa-warehouse mr-1"></i> Use <strong>Cambiar almacén</strong> para elegir el destino.</div>';
+            el.innerHTML = '<div class="alert alert-info mb-0 py-3"><i class="fas fa-warehouse mr-1"></i> Elija una tarjeta sugerida o use <strong>Buscar todos</strong>.</div>';
             return;
         }
 
@@ -149,10 +339,14 @@
     }
 
     function aplicarSeleccion(id, nombre, disponible, card) {
-        cardsEnSeccion().removeClass('selected').css({ background: 'white', borderColor: '#dee2e6' });
-        cardsEnSeccion().find('.fa-check-circle').hide();
+        $('#' + sectionId + ' .almacen-card').removeClass('selected').css({ background: 'white', borderColor: '#dee2e6' });
+        $('#' + sectionId + ' .almacen-card .fa-check-circle').hide();
 
-        if (card && card.length) {
+        const cardsSel = cardPorId(id);
+        if (cardsSel.length) {
+            cardsSel.addClass('selected');
+            cardsSel.find('.fa-check-circle').show();
+        } else if (card && card.length) {
             card.addClass('selected');
             card.find('.fa-check-circle').show();
         }
@@ -172,6 +366,7 @@
         }
 
         actualizarResumenDestino(id);
+        actualizarProyeccionTarjetas();
     }
 
     function seleccionarAlmacenPorId(id, cerrarModal) {
@@ -305,7 +500,7 @@
         if (cantidad > 0 && cantidadKg > disponibleKg) {
             card.css('border-color', '#dc3545');
             if ($('#alertaCapacidad-' + sectionId).length === 0) {
-                $(almacenOptionsId).prepend(
+                contenedorAlertas().prepend(
                     '<div id="alertaCapacidad-' + sectionId + '" class="alert alert-danger p-2 small mb-2">' +
                     '⚠️ Excede capacidad: ' + cantidad + ' ' + umProduccion + ' &gt; disp. ' +
                     disponible + ' ' + umAlmacen + '</div>'
@@ -330,7 +525,7 @@
 
         if (cantidad > 0 && cantidadKg > disponibleKg) {
             if ($('#alertaCapacidad-' + sectionId).length === 0) {
-                $(almacenOptionsId).prepend(
+                contenedorAlertas().prepend(
                     '<div id="alertaCapacidad-' + sectionId + '" class="alert alert-danger p-2 small mb-2">' +
                     '⚠️ Excede capacidad: ' + cantidad + ' ' + umProduccion + ' &gt; disp. ' +
                     disponible + ' ' + umAlmacen + '</div>'
@@ -474,7 +669,33 @@
                 .addTo(mapaState.capa);
 
             marker._almacenId = item.id;
-            marker.on('mouseover', function () { this.openTooltip(); });
+            marker._almacenItem = item;
+            marker.on('mouseover', function (e) {
+                this.openTooltip();
+                const hoverEl = document.getElementById('almacenHoverPreview-' + sectionId);
+                if (hoverEl && e.originalEvent) {
+                    hoverEl.innerHTML = htmlPreviewAlmacen(item, 'mapa');
+                    hoverEl.classList.remove('almacen-hover-preview--breve');
+                    hoverEl.classList.add('almacen-hover-preview--mapa');
+                    hoverEl.style.display = 'block';
+                    hoverEl.setAttribute('aria-hidden', 'false');
+                    posicionarHoverPreview(e.originalEvent, hoverEl);
+                }
+            });
+            marker.on('mousemove', function (e) {
+                const hoverEl = document.getElementById('almacenHoverPreview-' + sectionId);
+                if (hoverEl && hoverEl.style.display === 'block' && e.originalEvent) {
+                    posicionarHoverPreview(e.originalEvent, hoverEl);
+                }
+            });
+            marker.on('mouseout', function () {
+                const hoverEl = document.getElementById('almacenHoverPreview-' + sectionId);
+                if (hoverEl) {
+                    hoverEl.style.display = 'none';
+                    hoverEl.classList.remove('almacen-hover-preview--mapa');
+                    hoverEl.setAttribute('aria-hidden', 'true');
+                }
+            });
             marker.on('click', function () {
                 seleccionarAlmacenPorId(item.id, true);
                 flashMapa('Seleccionado: ' + item.nombre);
@@ -495,6 +716,32 @@
         mapaState.inicializado = true;
     }
 
+    function aplicarFiltroDestacados(orden) {
+        $('#' + sectionId + ' .almacen-destacados-grid').addClass('d-none');
+        $('#' + sectionId + ' .almacen-destacados-grid[data-orden="' + orden + '"]').removeClass('d-none');
+
+        const hint = document.getElementById('almacen-destacados-hint-' + sectionId);
+        if (hint) {
+            const etiqueta = orden === 'menos' ? 'menos usados' : 'más usados';
+            const count = $('#' + sectionId + ' .almacen-destacados-grid[data-orden="' + orden + '"] .almacen-card').length;
+            hint.innerHTML = '<i class="fas fa-info-circle mr-1"></i> Se muestran los ' + count + ' almacenes agrícolas <strong>' + etiqueta + '</strong>.';
+        }
+
+        const id = $('#' + hiddenInputId).val();
+        if (id) {
+            const card = cardPorId(id).filter(function () {
+                return $(this).closest('.almacen-destacados-grid:not(.d-none)').length > 0;
+            });
+            $('#' + sectionId + ' .almacen-card').removeClass('selected').css({ background: 'white', borderColor: '#dee2e6' });
+            $('#' + sectionId + ' .almacen-card .fa-check-circle').hide();
+            if (card.length) {
+                card.addClass('selected');
+                card.find('.fa-check-circle').show();
+            }
+        }
+        actualizarProyeccionTarjetas();
+    }
+
     window.AlmacenEnvio = window.AlmacenEnvio || {};
     window.AlmacenEnvio.recomendar = recomendarAlmacen;
     window.AlmacenEnvio.seleccionar = function (id) {
@@ -502,8 +749,11 @@
     };
 
     $(function () {
-        if (requiereAlmacen && cardsEnSeccion().length === 1 && !$('#' + hiddenInputId).val()) {
-            cardsEnSeccion().first().trigger('click');
+        if (requiereAlmacen && !$('#' + hiddenInputId).val()) {
+            const cards = cardsEnSeccion();
+            if (cards.length) {
+                cards.first().trigger('click');
+            }
         }
 
         const seleccionInicial = $('#' + hiddenInputId).val();
@@ -511,11 +761,14 @@
             const item = almacenPorId(seleccionInicial);
             if (item) actualizarSeleccionExterna(seleccionInicial, item.nombre);
             actualizarResumenDestino(seleccionInicial);
+            actualizarProyeccionTarjetas();
         }
 
         if (productoHint) {
             recomendarAlmacen(productoHint);
         }
+
+        bindHoverPreview();
 
         if (formSelector && requiereAlmacen) {
             $(formSelector).on('submit', function (e) {
@@ -527,8 +780,9 @@
             });
         }
 
-        cardsEnSeccion().on('click', function () {
+        $('#' + sectionId).on('click', '.almacen-card', function () {
             const $card = $(this);
+            if ($card.closest('.almacen-destacados-grid.d-none').length) return;
             aplicarSeleccion(
                 $card.data('id'),
                 $card.data('nombre'),
@@ -537,7 +791,7 @@
             );
         });
 
-        cardsEnSeccion().on('keydown', function (e) {
+        $('#' + sectionId).on('keydown', '.almacen-card', function (e) {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 $(this).trigger('click');
@@ -545,16 +799,19 @@
         });
 
         if (cantidadFija === null) {
-            $('#' + cantidadInputId).on('change keyup', function () {
+            $('#' + cantidadInputId + ', #' + unidadSelectId).on('change keyup', function () {
                 const cantidad = cantidadActual();
                 const id = $('#' + hiddenInputId).val();
-                const card = cardsEnSeccion().filter('.selected');
+                const card = cardPorId(id).filter(function () {
+                    return $(this).closest('.almacen-destacados-grid:not(.d-none), #almacenesContainer-' + sectionId).length > 0;
+                }).first();
                 if (card.length) {
                     verificarCapacidad(cantidad, card.data('disponible'), card);
                 } else if (id) {
                     const item = almacenPorId(id);
                     if (item) verificarCapacidadExterna(cantidad, item.disponible, id);
                 }
+                actualizarProyeccionTarjetas();
             });
         } else {
             const card = cardsEnSeccion().filter('.selected');
@@ -587,9 +844,32 @@
             });
 
             $(document).on('click', '.btn-cambiar-almacen-modal[data-section="' + sectionId + '"]', function () {
+                $('#' + modalId + '-tab-lista').tab('show');
                 $('#' + modalId).modal('show');
             });
+
+            $(document).on('click', '.btn-buscar-almacenes[data-section="' + sectionId + '"]', function () {
+                $('#' + modalId + '-tab-lista').tab('show');
+                $('#' + modalId).modal('show');
+            });
+
+            $(document).on('click', '.btn-ver-mapa-almacenes[data-section="' + sectionId + '"]', function () {
+                $('#' + modalId).modal('show');
+                window.setTimeout(function () {
+                    $('#' + modalId + '-tab-mapa').tab('show');
+                }, 150);
+            });
+
+            $(document).on('click', '.almacen-destacados-filtro [data-filtro][data-section="' + sectionId + '"]', function () {
+                const orden = $(this).data('filtro');
+                const grupo = $(this).closest('.almacen-destacados-filtro');
+                grupo.find('[data-filtro]').removeClass('btn-success active').addClass('btn-outline-success');
+                $(this).removeClass('btn-outline-success').addClass('btn-success active');
+                aplicarFiltroDestacados(orden);
+            });
         }
+
+        actualizarProyeccionTarjetas();
     });
 })(jQuery);
 </script>

@@ -170,6 +170,8 @@
                             $det = $pedido->detalles->first();
                             $pdv = $pedido->puntoVenta;
                             $checked = in_array($pedido->pedidodistribucionid, old('pedidos', []), true);
+                            $pesoFilaRuta = app(\App\Services\TransporteCapacidadService::class)->pesoDetallePedidoDistribucion($det);
+                            $volFilaRuta = app(\App\Services\TransporteCapacidadService::class)->volumenDetallePedidoDistribucion($det);
                         @endphp
                         <tr data-pedido-id="{{ $pedido->pedidodistribucionid }}"
                             data-pdv-id="{{ $pdv?->puntoventaid }}"
@@ -177,6 +179,8 @@
                             data-lat="{{ $pdv?->latitud }}"
                             data-lng="{{ $pdv?->longitud }}"
                             data-label="{{ $pdv?->nombre ?? 'PDV' }}"
+                            data-peso-kg="{{ number_format((float) $pesoFilaRuta, 2, '.', '') }}"
+                            data-volumen-m3="{{ $volFilaRuta !== null ? number_format((float) $volFilaRuta, 4, '.', '') : '' }}"
                             class="{{ $checked ? 'selected' : '' }}">
                             <td>
                                 <input type="checkbox" class="pedido-ruta-check" name="pedidos[]"
@@ -509,6 +513,21 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         return filas;
     }
+
+    window.calcularCargaRutaDistribucion = function () {
+        let peso = 0;
+        let volumen = 0;
+        let tieneVol = false;
+        pedidosSeleccionados().forEach(function (tr) {
+            peso += parseFloat(tr.dataset.pesoKg) || 0;
+            const v = parseFloat(tr.dataset.volumenM3);
+            if (!isNaN(v) && v > 0) {
+                volumen += v;
+                tieneVol = true;
+            }
+        });
+        return { peso_kg: peso, volumen_m3: tieneVol ? volumen : null };
+    };
 
     async function redibujarMapa() {
         capasRuta.clearLayers();

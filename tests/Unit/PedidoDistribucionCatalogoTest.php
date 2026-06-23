@@ -20,7 +20,7 @@ class PedidoDistribucionCatalogoTest extends TestCase
 
         $this->assertArrayHasKey('revision', $etiquetas);
         $this->assertSame('En revisión', $etiquetas['revision']);
-        $this->assertSame('En camino', $etiquetas['camino']);
+        $this->assertSame('En ruta', $etiquetas['camino']);
         $this->assertSame('Recibido', $etiquetas['recibido']);
 
         foreach ($etiquetas as $texto) {
@@ -47,7 +47,7 @@ class PedidoDistribucionCatalogoTest extends TestCase
         $this->assertCount(2, $estados);
     }
 
-    public function test_badge_estado_muestra_etiqueta_legible_en_camino(): void
+    public function test_badge_estado_muestra_etiqueta_legible_listo_para_salida(): void
     {
         $pedido = new PedidoDistribucion([
             'estado' => PedidoDistribucionCatalogo::ESTADO_EN_TRANSITO,
@@ -55,8 +55,8 @@ class PedidoDistribucionCatalogoTest extends TestCase
 
         $badge = PedidoDistribucionCatalogo::badgeEstado($pedido);
 
-        $this->assertSame('En camino', $badge['etiqueta']);
-        $this->assertSame('primary', $badge['clase']);
+        $this->assertSame('Listo para salida', $badge['etiqueta']);
+        $this->assertSame('asignado', $badge['clase']);
     }
 
     public function test_puede_confirmar_recepcion_solo_si_esta_en_transito(): void

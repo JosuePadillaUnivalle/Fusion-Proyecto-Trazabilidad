@@ -5,10 +5,12 @@
     $cantidadSemillaPlanificada = $cantidadSemillaPlanificada ?? old('cantidad_semilla_planificada', '');
     $cantidadSemillaUnidad = $cantidadSemillaUnidad ?? old('cantidad_semilla_unidad', 'kg');
     $semillaStockInicial = $semillaStockInicial ?? null;
+    $omitirCantidadSemilla = $omitirCantidadSemilla ?? false;
+    $semillaRequerida = $semillaRequerida ?? false;
 @endphp
 
 <div class="form-group">
-    <label><i class="fas fa-seedling mr-1"></i> Semilla / cultivo a cosechar</label>
+    <label><i class="fas fa-seedling mr-1"></i> Semilla / cultivo a cosechar @if($semillaRequerida)<span class="text-danger">*</span>@endif</label>
     <div class="d-flex flex-wrap align-items-start" style="gap: 8px;">
         <div class="flex-grow-1" style="min-width: 220px;">
             @include('partials.selector-catalogo', [
@@ -18,14 +20,15 @@
                 'labelSelected' => $insumoSemillaLabel,
                 'endpoint' => route('catalogo-selector.insumos'),
                 'params' => ['tipo_slug' => 'material_siembra'],
-                'allowEmpty' => true,
-                'placeholderEmpty' => 'Opcional — seleccione semilla del inventario',
+                'allowEmpty' => ! $semillaRequerida,
+                'placeholderEmpty' => $semillaRequerida ? 'Seleccione semilla del inventario' : 'Opcional — seleccione semilla del inventario',
                 'title' => 'Seleccionar semilla',
                 'searchPlaceholder' => 'Nombre de semilla o material de siembra…',
                 'searchLabel' => 'Buscar semilla',
                 'modalIcon' => 'fa-seedling',
                 'rowIcon' => 'fa-seedling',
                 'inputGroup' => true,
+                'required' => $semillaRequerida,
             ])
             <div id="semillaStockDisponible_{{ $selectorId }}"
                  class="small mt-1 mb-0 semilla-stock-disponible {{ $semillaStockInicial ? '' : 'd-none' }} {{ ($semillaStockInicial['sin_stock'] ?? false) ? 'text-danger' : 'text-muted' }}">
@@ -47,9 +50,10 @@
         </a>
     </div>
 
+    @unless($omitirCantidadSemilla)
     <div id="cantidadSemillaWrap" class="{{ $insumoSemillaId ? '' : 'd-none' }} mt-2">
         <label class="small font-weight-bold mb-1 d-block" for="cantidad_semilla_planificada">
-            <i class="fas fa-calculator mr-1"></i> Cantidad de semilla estimada
+            <i class="fas fa-calculator mr-1"></i> Material de siembra a utilizar
         </label>
         <div class="input-group">
             <input type="number"
@@ -65,11 +69,12 @@
             </div>
         </div>
         <p class="campo-guia mb-1">
-            Se calcula según la dosis por hectárea del insumo. Puede ajustarla si sembrará más o menos.
+            Kg del insumo que planea usar (según dosis × hectáreas). Puede ajustarlo.
         </p>
         <div id="dosisSiembraPreview" class="alert alert-light border small mb-0 d-none">
             <i class="fas fa-info-circle text-success mr-1"></i>
             <span id="dosisSiembraTexto"></span>
         </div>
     </div>
+    @endunless
 </div>

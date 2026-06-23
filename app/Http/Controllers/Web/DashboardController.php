@@ -742,7 +742,7 @@ class DashboardController extends Controller
         if ($filtros->loteId) {
             $lotes->where('loteid', $filtros->loteId);
         }
-        $actividades = Actividad::query()->where('usuarioid', $uid);
+        $actividades = Actividad::query()->whereHas('lote', fn ($q) => $q->where('usuarioid', $uid));
         if ($filtros->loteId) {
             $actividades->where('loteid', $filtros->loteId);
         }
@@ -908,8 +908,10 @@ class DashboardController extends Controller
 
         $rutasPendientesSalida = (clone $rutasDistribucion)
             ->where('estado', RutaDistribucionCatalogo::ESTADO_PLANIFICADA)
+            ->with(['pedidos.detalles', 'detallesTraslado.insumo'])
             ->orderByDesc('rutadistribucionid')
-            ->get(['rutadistribucionid', 'codigo', 'nombre']);
+            ->limit(8)
+            ->get();
 
         $enviosPendientesAccion = (clone $asignaciones)
             ->with(['pedido.detalles'])

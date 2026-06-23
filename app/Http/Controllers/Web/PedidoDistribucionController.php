@@ -10,9 +10,12 @@ use App\Models\PedidoDistribucion;
 use App\Models\PuntoVenta;
 use App\Models\Usuario;
 use App\Services\DisponibilidadMayoristaPdvService;
+use App\Services\NotificacionUsuarioService;
 use App\Services\PedidoDistribucionMayoristaService;
+use App\Services\PuntoVentaAlmacenService;
 use App\Services\RecepcionPuntoVentaService;
 use App\Services\SimulacionRutaService;
+use App\Services\TransporteCapacidadService;
 use App\Support\AlmacenAmbito;
 use App\Support\EnvioTrayectoCatalogo;
 use App\Support\MayoristaAccess;
@@ -22,6 +25,7 @@ use App\Support\PuntoVentaAccess;
 use App\Support\SimulacionRutaCatalogo;
 use App\Support\UbicacionGpsParser;
 use App\Support\UsuarioRol;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -188,7 +192,7 @@ class PedidoDistribucionController extends Controller
         ]);
     }
 
-    public function store(Request $request, DisponibilidadMayoristaPdvService $disponibilidadMayorista): RedirectResponse
+    public function store(Request $request, DisponibilidadMayoristaPdvService $disponibilidadMayorista, PuntoVentaAlmacenService $almacenPdv, NotificacionUsuarioService $notificaciones): RedirectResponse
     {
         $user = $request->user();
         abort_unless(PedidoDistribucionVista::puedeCrearSolicitud($request, $user), 403);
@@ -201,9 +205,7 @@ class PedidoDistribucionController extends Controller
             EnvioTrayectoCatalogo::autorizarTrayecto($user, EnvioTrayectoCatalogo::TRAYECTO_PDV);
         }
 
-        if (! $request->filled('tipo_solicitud')) {
-            $request->merge(['tipo_solicitud' => PedidoDistribucionCatalogo::TIPO_SOLICITUD_STOCK]);
-        }
+        $request->merge(['tipo_solicitud' => PedidoDistribucionCatalogo::TIPO_SOLICITUD_STOCK]);
 
         $data = $request->validate([
             'puntoventaid' => 'required|integer|exists:punto_venta,puntoventaid',
@@ -213,29 +215,24 @@ class PedidoDistribucionController extends Controller
                 'exists:usuario,usuarioid',
             ],
             'almacen_mayorista_origenid' => [
-                $esMinorista ? 'required_if:tipo_solicitud,stock' : 'nullable',
+                $esMinorista ? 'required' : 'nullable',
                 'integer',
                 'exists:almacen,almacenid',
             ],
-            'tipo_solicitud' => 'required|in:stock,custom',
+            'tipo_solicitud' => 'required|in:stock',
             'fecha_entrega_deseada' => 'required|date|after_or_equal:today',
             'hora_entrega_deseada' => 'nullable|date_format:H:i',
             'observaciones' => 'nullable|string|max:2000',
-            'insumoid' => 'nullable|integer|exists:insumo,insumoid',
-            'insumo_presentacionid' => 'required_if:tipo_solicitud,stock|nullable|integer|exists:insumo_presentacion,insumo_presentacionid',
-            'producto_nombre' => 'required_if:tipo_solicitud,custom|nullable|string|max:200',
-            'tipo_envase' => 'required_if:tipo_solicitud,custom|nullable|string|in:bolsa,lata,frasco,bidon,caja',
+            'insumoid' => 'required|integer|exists:insumo,insumoid',
+            'insumo_presentacionid' => 'required|integer|exists:insumo_presentacion,insumo_presentacionid',
             'cantidad' => 'required|numeric|gt:0',
         ], [
             'puntoventaid.required' => 'Seleccione un punto de venta destino.',
             'minorista_usuarioid.required' => 'Seleccione el minorista destino.',
-            'tipo_solicitud.required' => 'Indique si el pedido es de stock disponible o producto nuevo.',
             'fecha_entrega_deseada.required' => 'Indique la fecha de entrega deseada.',
-            'almacen_mayorista_origenid.required_if' => 'Seleccione el mayorista desde el catálogo de productos.',
-            'insumoid.required_if' => 'Seleccione un producto disponible en almacén mayorista.',
-            'insumo_presentacionid.required_if' => 'Seleccione la presentación del producto.',
-            'producto_nombre.required_if' => 'Describa el producto solicitado.',
-            'tipo_envase.required_if' => 'Indique el tipo de envase (bolsa, lata, etc.).',
+            'almacen_mayorista_origenid.required' => 'Seleccione el mayorista desde el catálogo de productos.',
+            'insumoid.required' => 'Seleccione un producto disponible en almacén mayorista.',
+            'insumo_presentacionid.required' => 'Seleccione la presentación del producto.',
             'cantidad.required' => 'Indique la cantidad solicitada.',
             'cantidad.gt' => 'La cantidad debe ser mayor que cero.',
         ]);
@@ -259,16 +256,7 @@ class PedidoDistribucionController extends Controller
             return back()->withInput()->with('error', 'La cantidad debe ser mayor que cero.');
         }
 
-        $tipoSolicitud = (string) $data['tipo_solicitud'];
-
-        if ($tipoSolicitud === PedidoDistribucionCatalogo::TIPO_SOLICITUD_STOCK) {
-            if (empty($data['insumoid'])) {
-                return back()->withInput()->with('error', 'Seleccione un producto del catálogo mayorista.');
-            }
-            if ($esMinorista && empty($data['almacen_mayorista_origenid'])) {
-                return back()->withInput()->with('error', 'Seleccione el mayorista desde el catálogo de productos.');
-            }
-        }
+        $tipoSolicitud = PedidoDistribucionCatalogo::TIPO_SOLICITUD_STOCK;
 
         $almacenOrigenId = null;
         if ($esMayorista || $esAdmin) {
@@ -284,92 +272,86 @@ class PedidoDistribucionController extends Controller
             $almacenOrigenId = (int) $data['almacen_mayorista_origenid'];
         }
 
-        $esperaStock = false;
         $detallePayload = [
             'cantidad' => (float) $data['cantidad'],
-            'es_solicitud_custom' => $tipoSolicitud === PedidoDistribucionCatalogo::TIPO_SOLICITUD_CUSTOM,
+            'es_solicitud_custom' => false,
         ];
 
-        if ($tipoSolicitud === PedidoDistribucionCatalogo::TIPO_SOLICITUD_STOCK) {
-            $insumoRef = Insumo::query()->with('almacen')->findOrFail((int) $data['insumoid']);
-            if ($insumoRef->almacen?->ambito !== AlmacenAmbito::MAYORISTA) {
-                return back()->withInput()->with('error', 'El producto debe estar en almacén mayorista.');
-            }
+        $insumoRef = Insumo::query()->with('almacen')->findOrFail((int) $data['insumoid']);
+        if ($insumoRef->almacen?->ambito !== AlmacenAmbito::MAYORISTA) {
+            return back()->withInput()->with('error', 'El producto debe estar en almacén mayorista.');
+        }
 
-            if ($almacenOrigenId !== null && (int) $insumoRef->almacenid !== (int) $almacenOrigenId) {
-                return back()->withInput()->with('error', 'El producto no corresponde al mayorista seleccionado.');
-            }
+        if ($almacenOrigenId !== null && (int) $insumoRef->almacenid !== (int) $almacenOrigenId) {
+            return back()->withInput()->with('error', 'El producto no corresponde al mayorista seleccionado.');
+        }
 
-            if ($almacenOrigenId === null) {
-                $almacenOrigenId = (int) $insumoRef->almacenid;
-            }
+        if ($almacenOrigenId === null) {
+            $almacenOrigenId = (int) $insumoRef->almacenid;
+        }
 
-            $presentacionId = isset($data['insumo_presentacionid']) ? (int) $data['insumo_presentacionid'] : 0;
-            if ($presentacionId <= 0) {
-                $presentacionAuto = \App\Models\InsumoPresentacion::query()
-                    ->where('insumoid', (int) $data['insumoid'])
-                    ->where('activo', true)
-                    ->orderBy('insumo_presentacionid')
-                    ->first();
-                if ($presentacionAuto === null) {
-                    return back()->withInput()->with('error', 'El producto no tiene presentaciones activas.');
-                }
-                $presentacionId = (int) $presentacionAuto->insumo_presentacionid;
-            }
+        $presentacionId = (int) $data['insumo_presentacionid'];
+        $presentacion = \App\Models\InsumoPresentacion::query()
+            ->where('insumo_presentacionid', $presentacionId)
+            ->where('activo', true)
+            ->first();
 
-            $presentacion = \App\Models\InsumoPresentacion::query()
-                ->where('insumo_presentacionid', $presentacionId)
-                ->where('activo', true)
-                ->first();
+        if ($presentacion === null) {
+            return back()->withInput()->with('error', 'La presentación seleccionada no es válida.');
+        }
 
-            if ($presentacion === null) {
-                return back()->withInput()->with('error', 'La presentación seleccionada no es válida.');
-            }
+        if (! $disponibilidadMayorista->presentacionValidaParaProducto((int) $data['insumoid'], $presentacionId)) {
+            return back()->withInput()->with('error', 'La presentación no corresponde al producto seleccionado.');
+        }
 
-            if (! $disponibilidadMayorista->presentacionValidaParaProducto((int) $data['insumoid'], $presentacionId)) {
-                return back()->withInput()->with('error', 'La presentación no corresponde al producto seleccionado.');
-            }
+        if (! $disponibilidadMayorista->productoEnCatalogoMayorista((int) $data['insumoid'])) {
+            return back()->withInput()->with('error', 'El producto no está disponible en la red mayorista.');
+        }
 
-            if (! $disponibilidadMayorista->productoEnCatalogoMayorista((int) $data['insumoid'])) {
-                return back()->withInput()->with('error', 'El producto no está disponible en la red mayorista.');
-            }
+        if ($disponibilidadMayorista->necesitaEsperaStock(
+            (int) $data['insumoid'],
+            $presentacionId,
+            (float) $data['cantidad']
+        )) {
+            return back()->withInput()->with(
+                'error',
+                'La cantidad supera el stock disponible. Reduzca la cantidad o elija otra presentación con stock.'
+            );
+        }
 
-            $esperaStock = $disponibilidadMayorista->necesitaEsperaStock(
+        try {
+            $disponibilidadMayorista->resolverOrigenStock(
                 (int) $data['insumoid'],
                 $presentacionId,
                 (float) $data['cantidad']
             );
-
-            if (! $esperaStock) {
-                try {
-                    $disponibilidadMayorista->resolverOrigenStock(
-                        (int) $data['insumoid'],
-                        $presentacionId,
-                        (float) $data['cantidad']
-                    );
-                } catch (InvalidArgumentException $e) {
-                    return back()->withInput()->with('error', $e->getMessage());
-                }
-            }
-
-            $detallePayload['insumoid'] = $insumoRef->insumoid;
-            $detallePayload['insumo_presentacionid'] = $presentacion->insumo_presentacionid;
-            $detallePayload['tipo_envase'] = $presentacion->tipo_envase;
-            $detallePayload['producto_nombre'] = $insumoRef->nombre.' · '.$presentacion->nombre;
-        } else {
-            $detallePayload['producto_nombre'] = trim((string) $data['producto_nombre']);
-            $detallePayload['tipo_envase'] = (string) $data['tipo_envase'];
+        } catch (InvalidArgumentException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
         }
 
-        $pedido = DB::transaction(function () use ($data, $tipoSolicitud, $detallePayload, $request, $esperaStock, $almacenOrigenId) {
+        $kgPedido = (float) $data['cantidad'] * $presentacion->pesoNetoKg();
+        try {
+            $almacenPdv->validarIngresoPedido($punto, $kgPedido);
+        } catch (InvalidArgumentException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()->withInput()->with('error', $e->validator->errors()->first() ?? 'El pedido supera la capacidad del almacén del punto de venta.');
+        }
+
+        $detallePayload['insumoid'] = $insumoRef->insumoid;
+        $detallePayload['insumo_presentacionid'] = $presentacion->insumo_presentacionid;
+        $detallePayload['tipo_envase'] = $presentacion->tipo_envase;
+        $detallePayload['producto_nombre'] = $insumoRef->nombre.' · '.$presentacion->nombre;
+
+        $pedido = DB::transaction(function () use ($data, $tipoSolicitud, $detallePayload, $request, $almacenOrigenId) {
             $pedido = PedidoDistribucion::create([
                 'numero_solicitud' => PedidoDistribucionCatalogo::generarNumeroSolicitud(),
                 'puntoventaid' => (int) $data['puntoventaid'],
                 'almacen_mayorista_origenid' => $almacenOrigenId,
                 'estado' => PedidoDistribucionCatalogo::ESTADO_PENDIENTE,
                 'tipo_solicitud' => $tipoSolicitud,
-                'espera_stock' => $esperaStock,
-                'requiere_coordinacion_planta' => $tipoSolicitud === PedidoDistribucionCatalogo::TIPO_SOLICITUD_CUSTOM,
+                'espera_stock' => false,
+                'requiere_coordinacion_planta' => false,
                 'coordinacion_planta_resuelta' => false,
                 'fechapedido' => now(),
                 'fecha_entrega_deseada' => $data['fecha_entrega_deseada'],
@@ -385,12 +367,15 @@ class PedidoDistribucionController extends Controller
             return $pedido;
         });
 
+        if ($esMinorista) {
+            $pedido->load(['detalles.insumo', 'puntoVenta.minorista', 'almacenMayoristaOrigen']);
+            $notificaciones->solicitudPedidoMinoristaMayorista($pedido);
+        }
+
         $ctxRedirect = $esMayorista ? 'mayorista' : 'pdv';
         $mensajeExito = $esMayorista
             ? 'Envío registrado. Revise stock y asigne transporte cuando esté listo para salir.'
-            : ($esperaStock
-                ? 'Solicitud enviada sin stock actual. El mayorista la revisará y confirmará cuando haya disponibilidad para la fecha indicada.'
-                : 'Solicitud enviada. El centro mayorista revisará el pedido y preparará el envío.');
+            : 'Solicitud enviada. El centro mayorista revisará el pedido y preparará el envío.';
 
         return redirect()
             ->route('punto-venta.pedidos.show', ['pedido' => $pedido, 'ctx' => $ctxRedirect])
@@ -475,14 +460,22 @@ class PedidoDistribucionController extends Controller
             ? route('logistica.rutas-tiempo-real.show', ['tipo' => 'distribucion', 'id' => $ruta->rutadistribucionid])
             : null;
 
-        $puedeSolicitarProduccionPlanta = $puedeGestionarMayorista
-            && PedidoDistribucionCatalogo::puedeSolicitarProduccionPlanta($pedido);
+        $puedeSolicitarProduccionPlanta = false;
         $solicitudActivaPlanta = $pedido->solicitudesProduccionPlanta
             ->sortByDesc('solicitudproduccionplantaid')
             ->first();
 
+        $puedeEliminarSolicitud = $pedido->estado === PedidoDistribucionCatalogo::ESTADO_PENDIENTE
+            && (UsuarioRol::esAdminGlobal($user) || $esMinoristaDueño);
+
         $esBandejaMayorista = PedidoDistribucionVista::esBandejaMayorista($request, $user);
         $ctxVolver = $esBandejaMayorista ? 'mayorista' : 'pdv';
+
+        $capacidadSvc = app(TransporteCapacidadService::class);
+        $resumenCargaPedido = [
+            'peso_kg' => $capacidadSvc->pesoPedidosDistribucion([$pedido]),
+            'volumen_m3' => $capacidadSvc->volumenPedidosDistribucion([$pedido]),
+        ];
 
         return view('punto_venta.pedidos.show', compact(
             'pedido',
@@ -506,11 +499,58 @@ class PedidoDistribucionController extends Controller
             'urlTiempoRealPedido',
             'puedeSolicitarProduccionPlanta',
             'solicitudActivaPlanta',
+            'puedeEliminarSolicitud',
             'esBandejaMayorista',
             'ctxVolver',
             'estadoRecepcionPdv',
             'resumenCierrePdv',
+            'resumenCargaPedido',
         ));
+    }
+
+    public function validarCapacidadVehiculo(Request $request, PedidoDistribucion $pedido, TransporteCapacidadService $capacidadSvc): JsonResponse
+    {
+        abort_unless(PuntoVentaAccess::puedeVerPedido(auth()->user(), $pedido), 403);
+
+        $data = $request->validate([
+            'vehiculoid' => 'required|integer|exists:vehiculo,vehiculoid',
+        ]);
+
+        $vehiculo = \App\Models\Vehiculo::query()->with('tipoVehiculo')->findOrFail((int) $data['vehiculoid']);
+        $pesoKg = $capacidadSvc->pesoPedidosDistribucion([$pedido]);
+        $volumenM3 = $capacidadSvc->volumenPedidosDistribucion([$pedido]);
+        $cap = $capacidadSvc->capacidadEfectiva($vehiculo);
+        $ok = true;
+        $mensaje = '';
+
+        try {
+            $capacidadSvc->validarCarga($vehiculo, $pesoKg, $volumenM3);
+        } catch (InvalidArgumentException $e) {
+            $ok = false;
+            $mensaje = $e->getMessage();
+        }
+
+        $pctKg = $cap['kg'] > 0 ? round(($pesoKg / $cap['kg']) * 100, 1) : null;
+        $pctM3 = ($cap['m3'] > 0 && $volumenM3 !== null && $volumenM3 > 0)
+            ? round(($volumenM3 / $cap['m3']) * 100, 1)
+            : null;
+        $pctUso = max($pctKg ?? 0, $pctM3 ?? 0);
+
+        return response()->json([
+            'ok' => $ok,
+            'mensaje' => $mensaje,
+            'capacidad_kg' => $cap['kg'],
+            'capacidad_m3' => $cap['m3'],
+            'peso_kg' => round($pesoKg, 2),
+            'volumen_m3' => $volumenM3 !== null ? round($volumenM3, 3) : null,
+            'porcentaje_uso' => $pctUso > 0 ? $pctUso : $pctKg,
+            'porcentaje_peso' => $pctKg,
+            'porcentaje_volumen' => $pctM3,
+            'vehiculo' => $vehiculo->placa,
+            'recomendacion' => $ok
+                ? 'El vehículo seleccionado cubre peso y volumen de este pedido.'
+                : 'Elija otro vehículo o reduzca la cantidad solicitada.',
+        ]);
     }
 
     public function ubicacionPuntoVenta(Request $request, PedidoDistribucion $pedido): View
@@ -571,6 +611,34 @@ class PedidoDistribucionController extends Controller
         return view('punto_venta.pedidos.contexto.ubicacion', compact('pedido', 'contexto', 'volverUrl', 'tipo'));
     }
 
+    public function destroy(PedidoDistribucion $pedido): RedirectResponse
+    {
+        abort_unless(PuntoVentaAccess::puedeVerPedido(auth()->user(), $pedido), 403);
+
+        $user = auth()->user();
+        $esMinoristaDueño = UsuarioRol::esMinorista($user)
+            && (int) $pedido->puntoVenta?->usuarioid === (int) $user->usuarioid;
+
+        if ($pedido->estado !== PedidoDistribucionCatalogo::ESTADO_PENDIENTE) {
+            return back()->with([
+                'error' => 'Solo puede eliminar solicitudes que aún no fueron aceptadas por el mayorista.',
+                'error_modal' => true,
+                'error_modal_titulo' => 'No se puede eliminar',
+            ]);
+        }
+
+        if (! UsuarioRol::esAdminGlobal($user) && ! $esMinoristaDueño) {
+            abort(403);
+        }
+
+        $pedido->detalles()->delete();
+        $pedido->delete();
+
+        return redirect()
+            ->route('punto-venta.pedidos.index', ['ctx' => 'pdv'])
+            ->with('success', 'Solicitud eliminada.');
+    }
+
     public function aceptar(PedidoDistribucion $pedido): RedirectResponse
     {
         abort_unless(UsuarioRol::puedeGestionarDistribucionMayorista(auth()->user()), 403);
@@ -617,23 +685,6 @@ class PedidoDistribucionController extends Controller
             ->with('success', 'Solicitud rechazada.');
     }
 
-    public function solicitarProduccionPlanta(PedidoDistribucion $pedido): RedirectResponse
-    {
-        abort_unless(UsuarioRol::puedeGestionarDistribucionMayorista(auth()->user()), 403);
-
-        try {
-            $solicitud = app(\App\Services\SolicitudProduccionPlantaService::class)
-                ->crearDesdePedido($pedido, auth()->user());
-        } catch (\Throwable $e) {
-            return back()->with('error', $e->getMessage());
-        }
-
-        return back()->with(
-            'success',
-            'Solicitud '.$solicitud->numero_solicitud.' enviada a planta. Cuando la producción esté lista podrá asignar transportista.'
-        );
-    }
-
     public function designarTransportista(Request $request, PedidoDistribucion $pedido): RedirectResponse
     {
         abort_unless(UsuarioRol::puedeGestionarDistribucionMayorista(auth()->user()), 403);
@@ -657,7 +708,13 @@ class PedidoDistribucionController extends Controller
                 ->with('error', $e->getMessage());
         }
 
-        return back()->with('success', 'Transportista y vehículo asignados. Marque en ruta cuando el vehículo salga hacia el punto de venta.');
+        return redirect()
+            ->route('punto-venta.pedidos.show', [
+                'pedido' => $pedido->fresh(),
+                'ctx' => 'mayorista',
+                'paso' => 4,
+            ])
+            ->with('success', 'Transportista y vehículo asignados. El chofer debe completar el cierre operativo (condiciones del vehículo, incidentes y firmas) antes de salir en ruta.');
     }
 
     /** @deprecated Alias de designarTransportista — conserva la ruta histórica. */

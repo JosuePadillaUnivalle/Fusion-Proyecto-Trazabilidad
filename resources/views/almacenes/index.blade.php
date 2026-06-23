@@ -119,7 +119,15 @@
             view-default="table"
             :nuevo-href="route(($rutaPrefijo ?? 'almacen-agricola').'.create')"
             nuevo-can="inventario.create"
-        />
+        >
+            <x-slot:tools>
+                @if(!empty($almacenesMapa))
+                <button type="button" class="btn btn-outline-success btn-sm ml-1" id="btnVerMapaAlmacenes">
+                    <i class="fas fa-map-marked-alt mr-1"></i> Ver en mapa
+                </button>
+                @endif
+            </x-slot:tools>
+        </x-modulo-index-header>
 
         <div id="filtrosAlmacenesPanel" class="filtros-panel collapse">
             <div class="row">
@@ -287,6 +295,8 @@
         </div>
         @endif
     </div>
+
+    @include('almacenes.partials.mapa-index')
 
 </div>
 @endsection

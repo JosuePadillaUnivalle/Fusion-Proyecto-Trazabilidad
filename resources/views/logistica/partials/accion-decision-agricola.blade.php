@@ -35,9 +35,8 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('agricola.pedidos.aceptar', $pedido) }}" class="mb-2">
+    <form method="POST" action="{{ route('logistica.asignaciones.aceptar-pedido', $asignacion) }}" class="mb-2">
         @csrf
-        <input type="hidden" name="volver" value="logistica">
         <button type="button" class="btn btn-success btn-block font-weight-bold"
                 @disabled(($erroresStock ?? []) !== [])
                 data-confirm-modal
@@ -50,9 +49,8 @@
 
     <details class="env-rechazo-details">
         <summary class="small text-muted" style="cursor:pointer;">Rechazar solicitud</summary>
-        <form method="POST" action="{{ route('agricola.pedidos.rechazar', $pedido) }}" class="mt-2">
+        <form method="POST" action="{{ route('logistica.asignaciones.rechazar-pedido', $asignacion) }}" class="mt-2">
             @csrf
-            <input type="hidden" name="volver" value="logistica">
             <div class="form-group mb-2">
                 <label class="small text-muted mb-1">Motivo (opcional)</label>
                 <textarea name="motivo_rechazo" class="form-control form-control-sm" rows="2" maxlength="500" placeholder="Indique por qué no puede atenderse"></textarea>

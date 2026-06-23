@@ -86,7 +86,11 @@ class DistribucionRutaService
 
             $capacidad = app(TransporteCapacidadService::class);
             $capacidad->validarAsignacion($transportista, $vehiculo);
-            $capacidad->validarCarga($vehiculo, $capacidad->pesoPedidosDistribucion($ordenPedidos));
+            $capacidad->validarCarga(
+                $vehiculo,
+                $capacidad->pesoPedidosDistribucion($ordenPedidos),
+                $capacidad->volumenPedidosDistribucion($ordenPedidos)
+            );
         }
 
         return DB::transaction(function () use (
@@ -297,6 +301,24 @@ class DistribucionRutaService
         });
 
         return true;
+    }
+
+    public function asegurarTransportistaMayorista(int $transportistaId): void
+    {
+        $usuario = \App\Models\Usuario::query()
+            ->with('perfilTransportista')
+            ->where('usuarioid', $transportistaId)
+            ->where('role', 'transportista')
+            ->first();
+
+        if ($usuario === null) {
+            throw new InvalidArgumentException('Transportista no válido.');
+        }
+
+        $ambito = $usuario->perfilTransportista?->ambito_flota ?? TransportistaFlotaCatalogo::AGRICOLA;
+        if ($ambito !== TransportistaFlotaCatalogo::MAYORISTA) {
+            throw new InvalidArgumentException('Seleccione un transportista de flota mayorista.');
+        }
     }
 
     public function asegurarTransportistaPlanta(int $transportistaId): void

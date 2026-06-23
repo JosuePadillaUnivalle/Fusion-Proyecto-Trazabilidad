@@ -8,6 +8,8 @@ use App\Services\UsuarioUsernameService;
 use App\Support\CuentaEstado;
 use App\Support\RegistroValidacion;
 use App\Support\TiposLicenciaBolivia;
+use App\Support\MayoristaLoginNotificacion;
+use App\Support\MayoristaPedidoNotificacionVista;
 use App\Support\OperarioPlantaLoginNotificacion;
 use App\Support\OperarioPlantaTareaNotificacionVista;
 use App\Support\PlantaLoginEnvio;
@@ -26,25 +28,36 @@ class AuthController extends Controller
 {
     public function showLoginForm(Request $request)
     {
-        $usuarioActual = Auth::check() ? Auth::user() : null;
+        if (Auth::check() && ! $request->boolean('_sesion_limpia')) {
+            $this->cerrarSesionActiva($request);
+
+            return redirect()
+                ->route('login', ['_sesion_limpia' => 1])
+                ->with('info', 'Sesión anterior cerrada. Ingrese con la cuenta deseada.')
+                ->withCookie($this->cookieOlvidarRecordarme())
+                ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+                ->header('Pragma', 'no-cache');
+        }
 
         return response()
-            ->view('auth.login', compact('usuarioActual'))
+            ->view('auth.login')
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->header('Pragma', 'no-cache');
     }
 
     public function login(Request $request)
     {
-        if (Auth::check()) {
-            $this->cerrarSesionActiva($request);
-            Cookie::queue($this->cookieOlvidarRecordarme());
-        }
-
         $credentials = $request->validate([
             'email' => 'required|email',
             'password' => 'required|string',
         ]);
+
+        if (Auth::check()) {
+            Auth::logout();
+            $request->session()->regenerateToken();
+        }
+
+        Cookie::queue($this->cookieOlvidarRecordarme());
 
         if (! Auth::attempt(
             ['email' => $credentials['email'], 'password' => $credentials['password']],
@@ -52,7 +65,8 @@ class AuthController extends Controller
         )) {
             return back()
                 ->withErrors(['email' => 'Credenciales inválidas.'])
-                ->withInput($request->only('email'));
+                ->withInput($request->only('email'))
+                ->withCookie($this->cookieOlvidarRecordarme());
         }
 
         $user = Auth::user();
@@ -96,6 +110,14 @@ class AuthController extends Controller
             if ($nuevasTareas !== []) {
                 OperarioPlantaTareaNotificacionVista::marcarVistas((int) $user->usuarioid, $nuevasTareas);
                 $request->session()->put('operario_planta_nuevas_tareas', $nuevasTareas);
+            }
+        }
+
+        if (UsuarioRol::puedeGestionarDistribucionMayorista($user) && ! UsuarioRol::esMinorista($user)) {
+            $nuevasSolicitudes = MayoristaLoginNotificacion::nuevasSolicitudesDesdeLogin($user, $ultimoLoginPrevio);
+            if ($nuevasSolicitudes !== []) {
+                MayoristaPedidoNotificacionVista::marcarVistas((int) $user->usuarioid, $nuevasSolicitudes);
+                $request->session()->put('mayorista_nuevas_solicitudes', $nuevasSolicitudes);
             }
         }
 
@@ -193,7 +215,7 @@ class AuthController extends Controller
         $this->cerrarSesionActiva($request);
 
         return redirect()
-            ->route('login')
+            ->route('login', ['_sesion_limpia' => 1])
             ->with('success', 'Sesión cerrada correctamente.')
             ->withCookie($this->cookieOlvidarRecordarme())
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')

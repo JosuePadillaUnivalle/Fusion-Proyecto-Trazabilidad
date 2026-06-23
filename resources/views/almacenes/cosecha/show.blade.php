@@ -95,15 +95,19 @@
                                             <a href="{{ $linea['url_origen'] }}" class="btn btn-sm btn-outline-info" title="Ver detalle"><i class="fas fa-eye"></i></a>
                                         @endif
                                         @if(! empty($linea['url_edit']))
+                                            @can('inventario.update')
                                             <a href="{{ $linea['url_edit'] }}" class="btn btn-sm btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>
+                                            @endcan
                                         @endif
                                         @if(! empty($linea['url_destroy']))
+                                            @can('inventario.delete')
                                             <form action="{{ $linea['url_destroy'] }}" method="POST" class="d-inline m-0 on-submit-confirm"
                                                   data-confirm-title="¿Eliminar esta entrada?"
                                                   data-confirm-text="Se quitará {{ number_format($linea['cantidad'], 2) }} {{ $linea['unidad'] }} del almacén de planta.">
                                                 @csrf @method('DELETE')
                                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
                                             </form>
+                                            @endcan
                                         @endif
                                     </div>
                                 </td>

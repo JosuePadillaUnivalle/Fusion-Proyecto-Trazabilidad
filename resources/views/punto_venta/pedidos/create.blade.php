@@ -187,6 +187,9 @@ body.modal-mapa-mayorista-open .modal-backdrop:last-of-type { z-index: 1065 !imp
                                     <i class="fas fa-map-marked-alt"></i>
                                     <span>Ver puntos de venta en mapa</span>
                                 </button>
+                                @if($esAdmin ?? false)
+                                <small class="form-text text-muted mb-0" id="txtAyudaMapaPdv">El mapa muestra solo los puntos del minorista seleccionado.</small>
+                                @endif
                             </div>
                         @endif
 
@@ -271,7 +274,6 @@ body.modal-mapa-mayorista-open .modal-backdrop:last-of-type { z-index: 1065 !imp
     var pdvSeleccionadoId = @json(old('puntoventaid', $oldPuntoId ?? ''));
     var esAdmin = @json($esAdmin ?? false);
     var minoristaSeleccionadoId = @json(old('minorista_usuarioid', $oldMinoristaId ?? ''));
-    var tipoSolicitudActual = @json(old('tipo_solicitud', 'stock'));
     var stockMaxUnidades = null;
     var stockUnidadEtiqueta = 'unidades';
     var presentacionesEndpoint = @json(route('catalogo-selector.presentaciones-producto'));
@@ -281,6 +283,119 @@ body.modal-mapa-mayorista-open .modal-backdrop:last-of-type { z-index: 1065 !imp
     var oldAlmacenMayoristaId = @json(old('almacen_mayorista_origenid', ''));
     var productoMayoristaExtra = null;
     var nombreProductoActual = '';
+    var capacidadPdvEndpoint = @json(route('catalogo-selector.punto-venta-capacidad-pdv'));
+    var capacidadPdvExcede = false;
+    var capacidadPdvTimer = null;
+
+    function fmtKg(n) {
+        return Number(n || 0).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function getPdvSeleccionadoId() {
+        var val = document.querySelector('#selector_wrap_dist_punto_venta .selector-catalogo-value')?.value;
+        return val ? String(val) : (pdvSeleccionadoId ? String(pdvSeleccionadoId) : '');
+    }
+
+    function renderCapacidadPdv(data) {
+        var panel = document.getElementById('panelCapacidadPdv');
+        if (!panel || !data) return;
+
+        panel.classList.remove('d-none');
+        capacidadPdvExcede = !!data.excede_capacidad;
+        panel.classList.toggle('is-excedido', capacidadPdvExcede);
+
+        var txtNombre = document.getElementById('txtCapacidadPdvNombre');
+        if (txtNombre) txtNombre.textContent = (data.punto_nombre || 'Punto de venta') + ' · ' + (data.almacen_nombre || 'Almacén');
+
+        var txtTotal = document.getElementById('txtCapacidadTotal');
+        var txtDisp = document.getElementById('txtCapacidadDisponible');
+        var txtPct = document.getElementById('txtCapacidadPorcentaje');
+        if (txtTotal) txtTotal.textContent = fmtKg(data.capacidad_kg);
+        if (txtDisp) {
+            txtDisp.textContent = fmtKg(data.ingreso_kg > 0 ? data.disponible_despues_kg : data.disponible_kg);
+        }
+        if (txtPct) txtPct.textContent = String(data.ingreso_kg > 0 ? data.porcentaje_despues : data.porcentaje);
+
+        var rowIngreso = document.getElementById('rowCapacidadIngreso');
+        var txtIngreso = document.getElementById('txtCapacidadIngresoKg');
+        if (data.ingreso_kg > 0 && rowIngreso && txtIngreso) {
+            rowIngreso.classList.remove('d-none');
+            txtIngreso.textContent = fmtKg(data.ingreso_kg) + ' kg';
+        } else {
+            rowIngreso?.classList.add('d-none');
+        }
+
+        var barBase = document.getElementById('barCapacidadBase');
+        var barProy = document.getElementById('barCapacidadProyeccion');
+        var pctBase = Math.min(100, parseFloat(data.porcentaje || 0));
+        var pctDespues = Math.min(100, parseFloat(data.ingreso_kg > 0 ? data.porcentaje_despues : data.porcentaje || 0));
+        if (barBase) barBase.style.width = pctBase + '%';
+        if (barProy) {
+            if (data.ingreso_kg > 0) {
+                barProy.classList.remove('d-none');
+                barProy.style.width = pctDespues + '%';
+            } else {
+                barProy.classList.add('d-none');
+                barProy.style.width = '0%';
+            }
+        }
+
+        var hint = document.getElementById('txtCapacidadHint');
+        var alerta = document.getElementById('alertaCapacidadPdv');
+        var txtAlerta = document.getElementById('txtAlertaCapacidadPdv');
+        if (data.ingreso_kg > 0 && capacidadPdvExcede) {
+            hint?.classList.add('d-none');
+            alerta?.classList.remove('d-none');
+            if (txtAlerta) {
+                txtAlerta.textContent = 'Necesita ' + fmtKg(data.ingreso_kg) + ' kg y solo hay ' + fmtKg(data.disponible_kg) + ' kg libres en el almacén del punto de venta.';
+            }
+        } else if (data.ingreso_kg > 0) {
+            hint?.classList.add('d-none');
+            alerta?.classList.add('d-none');
+        } else if (hint) {
+            hint.classList.remove('d-none');
+            alerta?.classList.add('d-none');
+            hint.innerHTML = '<i class="fas fa-info-circle mr-1"></i> Ocupado: ' + fmtKg(data.ocupado_kg) + ' kg · Disponible: ' + fmtKg(data.disponible_kg) + ' kg. Indique cantidad para proyectar el ingreso.';
+        }
+    }
+
+    function actualizarPreviewCapacidadPdv() {
+        if (capacidadPdvTimer) clearTimeout(capacidadPdvTimer);
+        capacidadPdvTimer = setTimeout(function () {
+            var pdvId = getPdvSeleccionadoId();
+            var panel = document.getElementById('panelCapacidadPdv');
+            if (!pdvId || !panel) {
+                panel?.classList.add('d-none');
+                capacidadPdvExcede = false;
+                return;
+            }
+
+            var extra = extraPresentacionSeleccionada();
+            var qty = cantidadSolicitada();
+            var params = new URLSearchParams({ puntoventaid: pdvId });
+            if (extra && qty > 0 && parseFloat(extra.peso_neto_kg || 0) > 0) {
+                params.set('cantidad', String(qty));
+                params.set('peso_neto_kg', String(extra.peso_neto_kg));
+            }
+
+            fetch(capacidadPdvEndpoint + '?' + params.toString(), {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (json) {
+                    if (json && json.data) {
+                        renderCapacidadPdv(json.data);
+                    } else {
+                        panel.classList.add('d-none');
+                        capacidadPdvExcede = false;
+                    }
+                })
+                .catch(function () {
+                    panel.classList.add('d-none');
+                    capacidadPdvExcede = false;
+                });
+        }, 200);
+    }
 
     function renderMapaMayoristaCatalogo(lat, lng, popupText) {
         var el = document.getElementById('mapaMayoristaCatalogo');
@@ -428,7 +543,7 @@ body.modal-mapa-mayorista-open .modal-backdrop:last-of-type { z-index: 1065 !imp
         if (!extra || extra.tiene_stock) return;
         var producto = obtenerNombreProducto();
         var pres = extra.presentacion_nombre || 'esta presentación';
-        var mensaje = 'No hay stock de ' + producto + ' en ' + pres + ' en este momento. Puede enviar la solicitud y el mayorista la aceptará cuando haya disponibilidad, o elija otra presentación.';
+        var mensaje = 'No hay stock de ' + producto + ' en ' + pres + '. Elija otra presentación o producto con stock disponible.';
         if (window.Swal) {
             Swal.fire({ icon: 'info', title: 'Sin stock actual', text: mensaje, confirmButtonText: 'Entendido' });
         } else {
@@ -615,13 +730,15 @@ body.modal-mapa-mayorista-open .modal-backdrop:last-of-type { z-index: 1065 !imp
     }
 
     function validarStockCantidad() {
+        actualizarPreviewCapacidadPdv();
+
         var wrap = document.getElementById('wrapCantidad');
         var alerta = document.getElementById('alertaStockExcedido');
         var txtAlerta = document.getElementById('txtAlertaStockExcedido');
         var extra = extraPresentacionSeleccionada();
         document.getElementById('panelEsperaStock')?.classList.add('d-none');
 
-        if (!document.getElementById('cantidad') || tipoSolicitudActual !== 'stock') {
+        if (!document.getElementById('cantidad') || !document.getElementById('selectPresentacionMayorista')?.value) {
             wrap?.classList.remove('is-invalid');
             alerta?.classList.add('d-none');
             return true;
@@ -658,22 +775,6 @@ body.modal-mapa-mayorista-open .modal-backdrop:last-of-type { z-index: 1065 !imp
         return true;
     }
 
-    function setTipoSolicitud(tipo) {
-        tipoSolicitudActual = tipo;
-        document.getElementById('tipo_solicitud').value = tipo;
-        document.getElementById('bloqueStock')?.classList.toggle('d-none', tipo !== 'stock');
-        document.getElementById('bloqueCustom')?.classList.toggle('d-none', tipo !== 'custom');
-        document.querySelectorAll('.pdv-tipo-btn').forEach(function (btn) {
-            btn.classList.toggle('is-active', btn.getAttribute('data-tipo') === tipo);
-        });
-        if (tipo === 'custom') {
-            stockMaxUnidades = null;
-            document.getElementById('wrapCantidad')?.classList.remove('is-invalid');
-            document.getElementById('alertaStockExcedido')?.classList.add('d-none');
-            document.getElementById('badgeUnidad').textContent = 'unidades';
-        } else validarStockCantidad();
-    }
-
     function puntosMapaFiltrados() {
         if (!esAdmin || !minoristaSeleccionadoId) return puntosVentaMapa;
         return puntosVentaMapa.filter(function (p) { return String(p.minorista_usuarioid) === String(minoristaSeleccionadoId); });
@@ -705,6 +806,7 @@ body.modal-mapa-mayorista-open .modal-backdrop:last-of-type { z-index: 1065 !imp
         document.querySelectorAll('#listaPdvMapaDestino .pdv-mapa-chip').forEach(function (chip) {
             chip.classList.toggle('is-active', chip.getAttribute('data-pdv-id') === pdvSeleccionadoId);
         });
+        actualizarPreviewCapacidadPdv();
     }
 
     function crearIconoPdv(pdv, seleccionado) {
@@ -814,10 +916,6 @@ body.modal-mapa-mayorista-open .modal-backdrop:last-of-type { z-index: 1065 !imp
         syncBloqueoDestinoAdmin();
         @endif
 
-        document.querySelectorAll('.pdv-tipo-btn').forEach(function (btn) {
-            btn.addEventListener('click', function () { setTipoSolicitud(btn.getAttribute('data-tipo')); });
-        });
-
         CatalogoSelector.register('dist_producto_mayorista', {
             endpoint: @json(route('catalogo-selector.productos-mayorista-pdv')),
             title: 'Productos por mayorista',
@@ -855,7 +953,14 @@ body.modal-mapa-mayorista-open .modal-backdrop:last-of-type { z-index: 1065 !imp
             cargarPresentaciones(oldInsumoId, oldPresentacionId, productoMayoristaExtra);
         }
 
+        actualizarPreviewCapacidadPdv();
+
         document.getElementById('cantidad')?.addEventListener('input', validarStockCantidad);
+
+        document.getElementById('selector_wrap_dist_punto_venta')?.addEventListener('selector-catalogo:change', function () {
+            pdvSeleccionadoId = getPdvSeleccionadoId();
+            actualizarPreviewCapacidadPdv();
+        });
 
         document.getElementById('formPedidoDist').addEventListener('submit', function (e) {
             var form = this;
@@ -874,48 +979,39 @@ body.modal-mapa-mayorista-open .modal-backdrop:last-of-type { z-index: 1065 !imp
                 avisoValidacion('Datos incompletos', 'Indique la fecha de entrega deseada.');
                 return;
             }
-            if (tipoSolicitudActual === 'stock') {
-                if (!document.querySelector('#selector_wrap_dist_producto_mayorista .selector-catalogo-value')?.value) {
-                    e.preventDefault();
-                    avisoValidacion('Producto requerido', 'Seleccione un producto disponible en almacén mayorista.');
-                    return;
-                }
-                if (!document.getElementById('selectPresentacionMayorista')?.value) {
-                    e.preventDefault();
-                    avisoValidacion('Presentación requerida', 'Seleccione la presentación del producto.');
-                    return;
-                }
-                if (!cantidadSolicitada()) {
-                    e.preventDefault();
-                    avisoValidacion('Cantidad requerida', 'Indique cuántas unidades necesita.');
-                    return;
-                }
-                var extra = extraPresentacionSeleccionada();
-                if (necesitaEsperaStock(extra, cantidadSolicitada())) {
-                    e.preventDefault();
-                    var qty = cantidadSolicitada();
-                    var unidad = extra?.unidad_etiqueta || 'unidades';
-                    var disp = parseFloat(extra?.stock_unidades || 0);
-                    var html = disp > 0
-                        ? 'Solicita <strong>' + qty + ' ' + unidad + '</strong> y solo hay <strong>' + Math.floor(disp) + '</strong> disponibles.<br><br>¿Enviar la solicitud igual?'
-                        : 'No hay stock ahora para <strong>' + qty + ' ' + unidad + '</strong>.<br><br>¿Enviar la solicitud igual? El mayorista la revisará.';
-                    if (window.Swal) {
-                        Swal.fire({
-                            icon: 'warning',
-                            title: 'Stock insuficiente',
-                            html: html,
-                            showCancelButton: true,
-                            confirmButtonText: 'Enviar solicitud',
-                            cancelButtonText: 'Revisar datos',
-                        }).then(function (r) { if (r.isConfirmed) form.submit(); });
-                    } else if (window.confirm('Stock insuficiente. ¿Enviar solicitud igual?')) {
-                        form.submit();
-                    }
-                    return;
-                }
-            } else if (!document.getElementById('producto_nombre')?.value.trim() || !document.getElementById('tipo_envase')?.value) {
+            if (!document.querySelector('#selector_wrap_dist_producto_mayorista .selector-catalogo-value')?.value) {
                 e.preventDefault();
-                avisoValidacion('Datos incompletos', 'Complete la descripción y el tipo de envase.');
+                avisoValidacion('Producto requerido', 'Seleccione un producto disponible en almacén mayorista.');
+                return;
+            }
+            if (!document.getElementById('selectPresentacionMayorista')?.value) {
+                e.preventDefault();
+                avisoValidacion('Presentación requerida', 'Seleccione la presentación del producto.');
+                return;
+            }
+            if (!cantidadSolicitada()) {
+                e.preventDefault();
+                avisoValidacion('Cantidad requerida', 'Indique cuántas unidades necesita.');
+                return;
+            }
+            if (capacidadPdvExcede) {
+                e.preventDefault();
+                avisoValidacion(
+                    'Capacidad del almacén excedida',
+                    'El pedido supera el espacio disponible en el almacén del punto de venta. Reduzca la cantidad o elija otro punto de venta.'
+                );
+                return;
+            }
+            var extra = extraPresentacionSeleccionada();
+            if (necesitaEsperaStock(extra, cantidadSolicitada())) {
+                e.preventDefault();
+                var qty = cantidadSolicitada();
+                var unidad = extra?.unidad_etiqueta || 'unidades';
+                var disp = parseFloat(extra?.stock_unidades || 0);
+                var mensaje = disp > 0
+                    ? 'Solicita ' + qty + ' ' + unidad + ' y solo hay ' + Math.floor(disp) + ' disponibles. Reduzca la cantidad o elija otra presentación.'
+                    : 'No hay stock para esta presentación. Elija otra presentación o producto con stock.';
+                avisoValidacion('Stock insuficiente', mensaje);
             }
         });
     });

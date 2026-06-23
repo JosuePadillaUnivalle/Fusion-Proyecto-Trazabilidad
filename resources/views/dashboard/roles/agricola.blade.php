@@ -57,9 +57,9 @@
                 <p class="role-metric__lbl">Cosecha ({{ $filtros->etiquetaPeriodo() }})</p>
             </div>
             <div class="role-metric" style="background:linear-gradient(135deg,#7c3aed,#8b5cf6)">
-                <i class="fas fa-shopping-cart role-metric__icon"></i>
+                <i class="fas fa-truck role-metric__icon"></i>
                 <div class="role-metric__val">{{ $stats['pedidos_pendientes'] }}</div>
-                <p class="role-metric__lbl">Pedidos pend.</p>
+                <p class="role-metric__lbl">Envíos por aprobar</p>
             </div>
         </div>
 
@@ -152,10 +152,10 @@
                         <span class="role-acc-tile__icon role-acc-tile__icon--prod"><i class="fas fa-tractor"></i></span>
                         <span><span class="role-acc-tile__lbl">Cosechas</span><span class="role-acc-tile__sub">Registro de producción</span></span>
                     </a>
-                    @can('pedidos.view')
-                    <a href="{{ route('agricola.pedidos.index') }}" class="role-acc-tile">
-                        <span class="role-acc-tile__icon role-acc-tile__icon--log"><i class="fas fa-truck-loading"></i></span>
-                        <span><span class="role-acc-tile__lbl">Pedidos de planta</span><span class="role-acc-tile__sub">Solicitudes y envíos</span></span>
+                    @can('envios.view')
+                    <a href="{{ route('logistica.asignaciones.listado') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--log"><i class="fas fa-truck"></i></span>
+                        <span><span class="role-acc-tile__lbl">Envíos</span><span class="role-acc-tile__sub">Agrícola → planta</span></span>
                     </a>
                     @endcan
                     <a href="{{ route('climas.index') }}" class="role-acc-tile">

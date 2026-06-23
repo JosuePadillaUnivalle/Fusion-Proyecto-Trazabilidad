@@ -22,6 +22,7 @@ class Almacen extends Model
         'tipoalmacenid',
         'ambito',
         'activo',
+        'responsable_usuarioid',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class Almacen extends Model
         'unidadmedidaid' => 'integer',
         'tipoalmacenid'  => 'integer',
         'activo'         => 'boolean',
+        'responsable_usuarioid' => 'integer',
     ];
 
     protected $hidden = [
@@ -56,5 +58,10 @@ class Almacen extends Model
     public function usuarios()
     {
         return $this->hasMany(Usuario::class, 'almacenid', 'almacenid');
+    }
+
+    public function responsable()
+    {
+        return $this->belongsTo(Usuario::class, 'responsable_usuarioid', 'usuarioid');
     }
 }

@@ -350,4 +350,45 @@
 @media (max-width: 575.98px) {
     .modulo-env .veh-det-grid { grid-template-columns: 1fr; }
 }
+.modulo-env .veh-caja-3d,
+.veh-caja-3d {
+    min-height: 280px;
+    height: 280px;
+    width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    background: #e8eef4;
+}
+.veh-caja-3d canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    cursor: grab;
+}
+.veh-caja-3d canvas:active { cursor: grabbing; }
+.veh-caja-3d__swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    vertical-align: -2px;
+    margin-right: 4px;
+}
+.veh-caja-3d__swatch--cabina { background: #3b6ea8; }
+.veh-caja-3d__swatch--carga { background: rgba(72, 187, 120, 0.45); border: 1px solid #059669; }
+.veh-caja-3d__swatch--fill { background: #f59e0b; }
 </style>
+
+@once
+@push('scripts')
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+}
+</script>
+@endpush
+@endonce

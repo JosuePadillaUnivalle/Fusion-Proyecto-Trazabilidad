@@ -242,6 +242,20 @@
 }
 .pdv-flota-panel--chofer .panel-icon { background: #dbeafe; color: #1d4ed8; }
 .pdv-flota-panel--vehiculo .panel-icon { background: #d1fae5; color: #047857; }
+.pdv-vehiculo-sugerido-chip {
+    display: inline-block;
+    margin-left: .45rem;
+    padding: .12rem .5rem;
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #047857;
+    background: #d1fae5;
+    border: 1px solid #6ee7b7;
+    border-radius: 999px;
+    vertical-align: middle;
+}
 
 /* Contenido bajo el flujo de 5 pasos — estilo ejecutivo (sin colores LED) */
 .pdv-paso-panel .pdv-info-grid { gap: .75rem; margin-bottom: 0; }
@@ -314,6 +328,34 @@
     font-size: .88rem; font-weight: 600; color: #0f172a; line-height: 1.35;
 }
 .pdv-paso-panel .pdv-revision-banner__sub { font-size: .78rem; color: #64748b; margin-top: .2rem; }
+.pdv-capacidad-vehiculo {
+    border: 1px solid #bbf7d0; border-radius: 12px;
+    background: linear-gradient(160deg, #f0fdf4 0%, #ecfdf5 100%);
+    padding: 1rem 1.1rem;
+}
+.pdv-capacidad-vehiculo.is-excedido { border-color: #fecaca; background: linear-gradient(160deg, #fef2f2 0%, #fff1f2 100%); }
+.pdv-capacidad-vehiculo__title { font-weight: 700; color: #166534; font-size: .92rem; margin-bottom: .35rem; }
+.pdv-capacidad-vehiculo.is-excedido .pdv-capacidad-vehiculo__title { color: #b91c1c; }
+.pdv-capacidad-vehiculo__stats { font-size: .82rem; color: #475569; }
+.pdv-capacidad-vehiculo__bar { height: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; margin-top: .5rem; }
+.pdv-capacidad-vehiculo__bar-fill { height: 100%; border-radius: 999px; transition: width .25s ease; background: #22c55e; }
+.pdv-capacidad-vehiculo.is-excedido .pdv-capacidad-vehiculo__bar-fill { background: #ef4444; }
+.pdv-capacidad-vehiculo__hint { font-size: .78rem; color: #64748b; margin: .45rem 0 0; }
+.pdv-capacidad-vehiculo__alerta { display: none; font-size: .82rem; color: #b91c1c; margin-top: .45rem; }
+.pdv-capacidad-vehiculo.is-excedido .pdv-capacidad-vehiculo__alerta { display: block; }
+.pdv-espera-mayorista {
+    display: flex; gap: .85rem; align-items: flex-start;
+    padding: .85rem 1rem; border-radius: 10px;
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+    border: 1px solid #fde68a;
+}
+.pdv-espera-mayorista__icon {
+    flex-shrink: 0; width: 2.25rem; height: 2.25rem;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; background: #f59e0b; color: #fff; font-size: .95rem;
+}
+.pdv-espera-mayorista__title { font-weight: 700; color: #92400e; font-size: .9rem; margin-bottom: .15rem; }
+.pdv-espera-mayorista__text { font-size: .82rem; color: #78350f; margin: 0; line-height: 1.45; }
 .pdv-paso-panel .pdv-stock-row {
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem;
     padding: .75rem 1rem; border-radius: 10px;
@@ -553,10 +595,6 @@
                                         Cantidad solicitada: {{ $det ? number_format($det->cantidad, 0).' '.$unidad : '—' }}.
                                         El mayorista aceptará o rechazará según disponibilidad para la fecha indicada.
                                     </div>
-                                @elseif($pendienteMayorista)
-                                    <div class="pdv-revision-banner__sub">
-                                        El mayorista verificará stock y confirmará el despacho hacia su punto de venta.
-                                    </div>
                                 @endif
                             </div>
                         </div>
@@ -572,6 +610,53 @@
                             </span>
                         </div>
                         @endif
+                    </div>
+
+                    <div class="pdv-paso-panel" data-panel="3">
+                        <div class="pdv-capacidad-vehiculo mb-3" id="panelCapacidadVehiculoPdv"
+                             data-peso-kg="{{ number_format((float) ($resumenCargaPedido['peso_kg'] ?? 0), 2, '.', '') }}"
+                             data-volumen-m3="{{ $resumenCargaPedido['volumen_m3'] ?? '' }}"
+                             data-endpoint="{{ route('punto-venta.pedidos.validar-capacidad-vehiculo', $pedido) }}">
+                            <div class="pdv-capacidad-vehiculo__title">
+                                <i class="fas fa-truck-loading mr-1"></i> Recomendación de capacidad del vehículo
+                            </div>
+                            <div class="pdv-capacidad-vehiculo__stats">
+                                Carga del pedido:
+                                <strong>{{ number_format((float) ($resumenCargaPedido['peso_kg'] ?? 0), 2) }} kg</strong>
+                                @if(! empty($resumenCargaPedido['volumen_m3']))
+                                    · <strong>{{ number_format((float) $resumenCargaPedido['volumen_m3'], 3) }} m³</strong>
+                                @endif
+                                ({{ $det ? number_format($det->cantidad, 0).' '.$unidad : '—' }})
+                            </div>
+                            <p class="pdv-capacidad-vehiculo__hint mb-0" id="txtCapacidadVehiculoPdv">
+                                Seleccione chofer y vehículo a la derecha para ver si la carga cabe (peso y volumen).
+                            </p>
+                            <div class="d-none" id="wrapCapacidadVehiculoPdv">
+                                <div class="d-flex justify-content-between align-items-center mt-2 small">
+                                    <span id="txtCapacidadVehiculoResumen"></span>
+                                    <strong id="txtCapacidadVehiculoPct"></strong>
+                                </div>
+                                <div class="pdv-capacidad-vehiculo__bar">
+                                    <div class="pdv-capacidad-vehiculo__bar-fill" id="barCapacidadVehiculoPdv" style="width:0%"></div>
+                                </div>
+                                <p class="pdv-capacidad-vehiculo__hint mb-0" id="txtCapacidadVehiculoRecomendacion"></p>
+                                <p class="pdv-capacidad-vehiculo__alerta mb-0" id="alertaCapacidadVehiculoPdv"></p>
+                            </div>
+                        </div>
+                        <div class="pdv-info-grid mb-0">
+                            <div class="pdv-info-tile">
+                                <span class="pdv-info-tile__icon pdv-info-tile__icon--prod"><i class="fas fa-box"></i></span>
+                                <span class="pdv-info-tile__label">Producto a despachar</span>
+                                <div class="pdv-info-tile__value">{{ $det?->producto_nombre ?? '—' }}</div>
+                                <div class="pdv-info-tile__sub">{{ $det ? number_format($det->cantidad, 2).' '.$unidad : '' }}</div>
+                            </div>
+                            <div class="pdv-info-tile">
+                                <span class="pdv-info-tile__icon pdv-info-tile__icon--pdv"><i class="fas fa-store"></i></span>
+                                <span class="pdv-info-tile__label">Destino</span>
+                                <div class="pdv-info-tile__value text-success">{{ $pedido->puntoVenta?->nombre ?? '—' }}</div>
+                                <div class="pdv-info-tile__sub">{{ $pedido->puntoVenta?->resumenUbicacion() ?: 'Sin calle de referencia' }}</div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="pdv-paso-panel" data-panel="resumen">
@@ -634,11 +719,11 @@
                 </div>
             </div>
 
-            @if(($puedeGestionarMayorista ?? false) && $pendienteMayorista && $erroresStock !== [] && ! ($det?->es_solicitud_custom ?? false))
+            @if(($puedeGestionarMayorista ?? false) && $pendienteMayorista && $erroresStock !== [])
             <div class="alert alert-warning">
                 <strong><i class="fas fa-info-circle mr-1"></i>Stock mayorista limitado:</strong>
                 <ul class="mb-0 pl-3 mt-1">@foreach($erroresStock as $err)<li>{{ $err }}</li>@endforeach</ul>
-                <p class="mb-0 mt-2 small">Puede aceptar igual; al confirmar se coordinará con planta si no hay stock cercano al punto de venta.</p>
+                <p class="mb-0 mt-2 small">Revise la cantidad o rechace la solicitud si no puede abastecer desde su almacén.</p>
             </div>
             @endif
         </div>
@@ -662,10 +747,10 @@
                 <div class="card-body">
                     <p class="text-muted small mb-3">
                         @if($pedido->espera_stock)
-                            El minorista solicitó una presentación sin stock actual para el {{ $pedido->fecha_entrega_deseada?->format('d/m/Y') ?? '—' }}.
-                            Acepte si podrá abastecer a tiempo, o rechace la solicitud.
+                            El minorista solicitó una cantidad mayor al stock actual para el {{ $pedido->fecha_entrega_deseada?->format('d/m/Y') ?? '—' }}.
+                            Acepte solo si puede abastecer a tiempo, o rechace la solicitud.
                         @else
-                            Al aceptar se asignará el almacén mayorista más cercano al punto de venta con stock, o quedará pendiente de coordinación con planta.
+                            Al aceptar se confirmará el almacén mayorista de origen y podrá asignar transporte.
                         @endif
                     </p>
                     <form method="POST" action="{{ route('punto-venta.pedidos.aceptar', $pedido) }}" class="mb-3">
@@ -713,9 +798,29 @@
             </div>
             @elseif($pendienteMayorista && ($esMinoristaDueño ?? false))
             <div class="card pdv-card card-outline card-warning mb-3">
-                <div class="card-body small mb-0">
-                    <i class="fas fa-hourglass-half mr-1"></i>
-                    Su solicitud está en revisión. El mayorista confirmará cuando haya stock y despacho disponible.
+                <div class="card-body py-3">
+                    <div class="pdv-espera-mayorista mb-3 mb-md-2">
+                        <div class="pdv-espera-mayorista__icon"><i class="fas fa-hourglass-half"></i></div>
+                        <div>
+                            <div class="pdv-espera-mayorista__title">Solicitud en revisión</div>
+                            <p class="pdv-espera-mayorista__text mb-0">
+                                Su solicitud está en revisión. El mayorista confirmará el stock y despacho disponible.
+                            </p>
+                        </div>
+                    </div>
+                    @if($puedeEliminarSolicitud ?? false)
+                    <form method="POST" action="{{ route('punto-venta.pedidos.destroy', $pedido) }}">
+                        @csrf
+                        @method('DELETE')
+                        <button type="button" class="btn btn-outline-danger btn-sm btn-block"
+                            data-confirm-modal
+                            data-confirm-title="Eliminar solicitud"
+                            data-confirm-message="¿Eliminar esta solicitud? Aún no fue aceptada por el mayorista."
+                            data-confirm-tone="danger">
+                            <i class="fas fa-trash mr-1"></i> Eliminar solicitud
+                        </button>
+                    </form>
+                    @endif
                 </div>
             </div>
             @else
@@ -727,41 +832,14 @@
             @endif
             </div>
 
-            @if(($puedeSolicitarProduccionPlanta ?? false) || ($pedido->requiere_coordinacion_planta && ! ($pedido->coordinacion_planta_resuelta ?? false)))
-            <div class="pdv-sidebar-paso" data-sidebar-paso="2">
-            <div class="card pdv-card card-outline card-info mb-3">
-                <div class="card-header bg-white py-2">
-                    <h3 class="card-title mb-0 font-weight-bold"><i class="fas fa-industry text-info mr-1"></i> Coordinación con planta</h3>
-                </div>
-                <div class="card-body">
-                    @if($pedido->requiere_coordinacion_planta && ! ($pedido->coordinacion_planta_resuelta ?? false))
-                        <p class="text-muted small mb-2">Este pedido requiere producción o abastecimiento desde planta antes de asignar transportista.</p>
-                        @if($solicitudActivaPlanta ?? null)
-                            <p class="mb-2"><strong>{{ $solicitudActivaPlanta->numero_solicitud }}</strong> · {{ \App\Support\SolicitudProduccionPlantaCatalogo::etiquetaEstado($solicitudActivaPlanta->estado) }}</p>
-                            <a href="{{ route('planta.solicitudes-produccion.show', $solicitudActivaPlanta) }}" class="btn btn-outline-info btn-sm btn-block">Ver solicitud en planta</a>
-                        @elseif($puedeSolicitarProduccionPlanta ?? false)
-                            <form method="POST" action="{{ route('punto-venta.pedidos.solicitar-produccion-planta', $pedido) }}">
-                                @csrf
-                                <button type="submit" class="btn btn-info btn-block">
-                                    <i class="fas fa-paper-plane mr-1"></i> Solicitar producción a planta
-                                </button>
-                            </form>
-                        @endif
-                    @elseif($pedido->coordinacion_planta_resuelta ?? false)
-                        <p class="text-success small mb-0"><i class="fas fa-check mr-1"></i>Planta completó la solicitud. Verifique stock y designe transportista.</p>
-                    @endif
-                </div>
-            </div>
-            </div>
-            @endif
-
             <div class="pdv-sidebar-paso" data-sidebar-paso="3">
             @if($puedeDesignarTransportista)
             <div class="card pdv-card card-outline card-success mb-3">
                 <div class="card-header bg-white py-2"><h3 class="card-title mb-0 font-weight-bold"><i class="fas fa-user-tie text-success mr-1"></i> Designar transportista</h3></div>
                 <div class="card-body">
                     <p class="text-muted small mb-3">
-                        Asigne un <strong>transportista de flota mayorista</strong> y su <strong>vehículo</strong>. La salida en ruta se marca en el paso siguiente.
+                        Asigne un <strong>transportista de flota mayorista</strong> y su <strong>vehículo</strong>.
+                        Luego el transportista completará el cierre operativo (condiciones, incidentes y firmas) antes de salir en ruta.
                     </p>
                     <form method="POST" action="{{ route('punto-venta.pedidos.designar-transportista', $pedido) }}" id="formDespachoPedidoPdv">
                         @csrf
@@ -786,6 +864,7 @@
                             <label class="small font-weight-bold mb-2 d-block">
                                 <span class="panel-icon"><i class="fas fa-truck"></i></span>
                                 Vehículo <span class="text-danger">*</span>
+                                <span class="pdv-vehiculo-sugerido-chip d-none" id="chipVehiculoSugeridoPdv">Sugerido</span>
                             </label>
                             <div class="input-group">
                                 <input type="text" id="txtVehiculoPedidoPdv" class="form-control bg-white" readonly
@@ -802,7 +881,7 @@
                         <button type="button" class="btn btn-success btn-block btn-lg"
                                 id="btnConfirmarDespachoPedidoPdv"
                                 data-confirm-title="Designar transportista"
-                                data-confirm-message="¿Asignar este chofer y vehículo al pedido? Podrá marcar en ruta cuando el vehículo salga."
+                                data-confirm-message="¿Asignar este chofer y vehículo al pedido? El transportista deberá completar el cierre operativo antes de salir en ruta."
                                 data-confirm-tone="success">
                             <i class="fas fa-user-check mr-1"></i> Designar transportista
                         </button>
@@ -847,7 +926,7 @@
                         <i class="fas fa-user-clock mr-1 text-warning"></i>
                         Transportista asignado, esperando confirmación del transportista.
                     @else
-                        <i class="fas fa-route mr-1"></i> Marque en ruta cuando el vehículo salga hacia el punto de venta.
+                        <i class="fas fa-route mr-1"></i> El transportista debe completar el cierre operativo y marcar en ruta desde el panel de salida.
                     @endif
                 </div>
             </div>
@@ -890,7 +969,6 @@
                     ])
                 </div>
             </div>
-            @endif
             @elseif($pedido->estado === 'recibido')
             <div class="card pdv-card card-outline card-success mb-3">
                 <div class="card-body text-success small mb-0">
@@ -905,9 +983,16 @@
             </div>
             @elseif($pendienteMayorista && $esMinoristaDueño)
             <div class="card pdv-card card-outline card-warning mb-3">
-                <div class="card-body small mb-0">
-                    <i class="fas fa-hourglass-half mr-1 text-warning"></i>
-                    Su solicitud está pendiente de revisión por el centro mayorista.
+                <div class="card-body py-3">
+                    <div class="pdv-espera-mayorista mb-0">
+                        <div class="pdv-espera-mayorista__icon"><i class="fas fa-hourglass-half"></i></div>
+                        <div>
+                            <div class="pdv-espera-mayorista__title">Solicitud en revisión</div>
+                            <p class="pdv-espera-mayorista__text mb-0">
+                                Su solicitud está en revisión. El mayorista confirmará el stock y despacho disponible.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
             @elseif($pedido->estado === 'confirmado' && ! $transportistaDesignado)
@@ -934,6 +1019,11 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    window.PdvPedidoCargaContext = {
+        peso_kg: {{ number_format((float) ($resumenCargaPedido['peso_kg'] ?? 0), 2, '.', '') }},
+        volumen_m3: @json($resumenCargaPedido['volumen_m3'] ?? null),
+    };
+
     const flujo = document.getElementById('pdvPedidoFlujo');
     const pasoInicial = flujo ? (flujo.dataset.pasoInicial || 'resumen') : 'resumen';
     const pasoFlujo = flujo ? parseInt(flujo.dataset.pasoFlujo || '3', 10) : 3;
@@ -956,6 +1046,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var showPanel = false;
             if (key === '1') showPanel = pk === '1';
             else if (key === '2') showPanel = pk === '2';
+            else if (key === '3') showPanel = pk === '3';
             else showPanel = pk === 'resumen';
             panel.classList.toggle('is-visible', showPanel);
         });
@@ -1032,6 +1123,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const inputVehiculo = document.getElementById('vehiculo_pedido_pdv_id');
     const btnVehiculo = document.getElementById('btnBuscarVehiculoPedidoPdv');
     const btnConfirmar = document.getElementById('btnConfirmarDespachoPedidoPdv');
+    const chipSugerido = document.getElementById('chipVehiculoSugeridoPdv');
+    let vehiculoSugeridoIdActivo = null;
+
+    function mostrarChipSugerido(mostrar) {
+        chipSugerido?.classList.toggle('d-none', !mostrar);
+    }
+
+    function esVehiculoSugerido(id) {
+        return vehiculoSugeridoIdActivo != null && String(id) === String(vehiculoSugeridoIdActivo);
+    }
 
     CatalogoSelector.register('pdv_pedido_transportista', {
         endpoint: @json(route('catalogo-selector.usuarios')),
@@ -1050,6 +1151,8 @@ document.addEventListener('DOMContentLoaded', function () {
             inputVehiculo.value = '';
             document.getElementById('txtVehiculoPedidoPdv').value = '';
             btnVehiculo.disabled = false;
+            mostrarChipSugerido(false);
+            vehiculoSugeridoIdActivo = null;
             const vehiculoSugerido = item.extra?.vehiculoid || null;
             CatalogoSelector.instances.pdv_pedido_vehiculo.params = {
                 transportista_usuarioid: item.id,
@@ -1057,9 +1160,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 ambito_flota: 'mayorista',
             };
             CatalogoSelector.instances.pdv_pedido_vehiculo.suggestedItemId = vehiculoSugerido;
+            vehiculoSugeridoIdActivo = vehiculoSugerido;
             if (vehiculoSugerido && item.extra?.placa) {
                 inputVehiculo.value = vehiculoSugerido;
                 document.getElementById('txtVehiculoPedidoPdv').value = item.extra.placa;
+                mostrarChipSugerido(true);
+                validarCapacidadVehiculoPdv();
             }
         },
     });
@@ -1074,12 +1180,77 @@ document.addEventListener('DOMContentLoaded', function () {
         theme: 'vehiculo',
         colNombre: 'Placa',
         colDetalle: 'Vehículo',
-        params: { transportista_usuarioid: inputTransportista?.value || '', solo_transportista: '1' },
+        params: { transportista_usuarioid: inputTransportista?.value || '', solo_transportista: '1', ambito_flota: 'mayorista' },
+        beforeOpen: function (cfg) {
+            const tid = inputTransportista?.value || '';
+            cfg.params = {
+                transportista_usuarioid: tid,
+                solo_transportista: '1',
+                ambito_flota: 'mayorista',
+            };
+            cfg.suggestedItemId = vehiculoSugeridoIdActivo;
+        },
         onSelect: function (item) {
             inputVehiculo.value = item.id;
             document.getElementById('txtVehiculoPedidoPdv').value = item.label;
+            mostrarChipSugerido(esVehiculoSugerido(item.id) || item.sugerido === true);
+            validarCapacidadVehiculoPdv();
         },
     });
+
+    function validarCapacidadVehiculoPdv() {
+        const panel = document.getElementById('panelCapacidadVehiculoPdv');
+        const vehiculoId = inputVehiculo?.value;
+        if (!panel || !vehiculoId) return;
+
+        const wrap = document.getElementById('wrapCapacidadVehiculoPdv');
+        const resumen = document.getElementById('txtCapacidadVehiculoResumen');
+        const pctEl = document.getElementById('txtCapacidadVehiculoPct');
+        const barra = document.getElementById('barCapacidadVehiculoPdv');
+        const hint = document.getElementById('txtCapacidadVehiculoPdv');
+        const recom = document.getElementById('txtCapacidadVehiculoRecomendacion');
+        const alerta = document.getElementById('alertaCapacidadVehiculoPdv');
+
+        fetch(panel.dataset.endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+            },
+            body: JSON.stringify({ vehiculoid: parseInt(vehiculoId, 10) }),
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                const pct = data.porcentaje_uso ?? 0;
+                panel.classList.toggle('is-excedido', !data.ok);
+                if (hint) hint.classList.add('d-none');
+                if (wrap) wrap.classList.remove('d-none');
+                if (resumen) {
+                    resumen.textContent = (data.vehiculo || 'Vehículo') + ' — '
+                        + (data.capacidad_kg ? Number(data.capacidad_kg).toFixed(0) + ' kg' : '')
+                        + (data.capacidad_m3 ? ' / ' + Number(data.capacidad_m3).toFixed(1) + ' m³' : '');
+                }
+                if (pctEl) {
+                    pctEl.textContent = Number(pct).toFixed(1) + '% usado';
+                    pctEl.className = 'font-weight-bold ' + (pct >= 100 ? 'text-danger' : pct >= 85 ? 'text-warning' : 'text-success');
+                }
+                if (barra) barra.style.width = Math.min(100, Math.max(0, pct)) + '%';
+                if (recom) recom.textContent = data.recomendacion || '';
+                if (alerta) alerta.textContent = data.ok ? '' : (data.mensaje || 'La carga supera la capacidad del vehículo.');
+            })
+            .catch(function () {
+                if (hint) hint.textContent = 'No se pudo validar la capacidad. Intente de nuevo.';
+            });
+    }
+
+    if (inputVehiculo?.value) {
+        vehiculoSugeridoIdActivo = CatalogoSelector.instances.pdv_pedido_vehiculo?.suggestedItemId || null;
+        if (esVehiculoSugerido(inputVehiculo.value)) {
+            mostrarChipSugerido(true);
+        }
+        validarCapacidadVehiculoPdv();
+    }
 
     document.getElementById('btnBuscarTransportistaPedidoPdv')?.addEventListener('click', function () {
         CatalogoSelector.open('pdv_pedido_transportista');

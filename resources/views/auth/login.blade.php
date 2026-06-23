@@ -15,13 +15,10 @@
     </div>
 @endif
 
-@if(isset($usuarioActual) && $usuarioActual)
+@if(session('info'))
     <div class="alert alert-success">
-        <i class="fas fa-user-check"></i>
-        <span>
-            Sesión activa como <strong>{{ $usuarioActual->nombre }} {{ $usuarioActual->apellido }}</strong>.
-            Inicie sesión con otra cuenta para cambiar de usuario.
-        </span>
+        <i class="fas fa-info-circle"></i>
+        <span>{{ session('info') }}</span>
     </div>
 @endif
 
@@ -32,24 +29,24 @@
     </div>
 @endif
 
-<form method="POST" action="{{ route('login.post') }}">
+<form method="POST" action="{{ route('login.post') }}" id="formLoginAgrofusion">
     @csrf
 
     <div class="form-group">
         <label for="email">Correo electrónico</label>
         <div class="input-wrapper">
-            <input 
-                id="email" 
-                type="email" 
-                name="email" 
-                value="{{ old('email') }}" 
-                required 
-                autocomplete="username"
+            <input
+                id="email"
+                type="email"
+                name="email"
+                value="{{ old('email') }}"
+                required
+                autocomplete="username email"
                 autocorrect="off"
                 autocapitalize="none"
                 spellcheck="false"
-                autofocus
-                class="form-control" 
+                @if(! old('email')) autofocus @endif
+                class="form-control"
                 placeholder="tu@correo.com"
             >
             <i class="fas fa-envelope"></i>
@@ -59,13 +56,13 @@
     <div class="form-group">
         <label for="password">Contraseña</label>
         <div class="input-wrapper">
-            <input 
-                id="password" 
-                type="password" 
-                name="password" 
-                required 
+            <input
+                id="password"
+                type="password"
+                name="password"
+                required
                 autocomplete="current-password"
-                class="form-control" 
+                class="form-control"
                 placeholder="••••••••"
             >
             <i class="fas fa-lock"></i>
@@ -74,12 +71,12 @@
 
     <div class="remember-row">
         <div class="checkbox-wrapper">
-            <input type="checkbox" id="remember" name="remember">
+            <input type="checkbox" id="remember" name="remember" value="1">
             <label for="remember">Recordarme</label>
         </div>
     </div>
 
-    <button type="submit" class="btn-login">
+    <button type="submit" class="btn-login" id="btnLoginAgrofusion">
         <i class="fas fa-sign-in-alt"></i>
         Iniciar Sesión
     </button>
@@ -89,3 +86,18 @@
     </div>
 </form>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var form = document.getElementById('formLoginAgrofusion');
+    var btn = document.getElementById('btnLoginAgrofusion');
+    if (!form || !btn) return;
+
+    form.addEventListener('submit', function () {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Ingresando…';
+    });
+});
+</script>
+@endpush

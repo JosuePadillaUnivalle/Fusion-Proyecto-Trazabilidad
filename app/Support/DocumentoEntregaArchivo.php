@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 
 final class DocumentoEntregaArchivo
 {
-    private const PDF_VERSION = 6;
+    private const PDF_VERSION = 7;
 
     /** @var array<string, string> */
     private const TIPOS_ETIQUETA = [
@@ -125,44 +125,63 @@ final class DocumentoEntregaArchivo
                 ->first();
         }
 
-        $rutaTraslado = null;
+        $rutaOperacion = null;
+        $esRutaPdv = false;
         $rutaId = (int) ($documento->metadata['rutadistribucionid'] ?? 0);
-        if ($envio === null && $rutaId > 0 && ($documento->metadata['envio_cierre_planta_mayorista'] ?? false)) {
-            $rutaTraslado = RutaDistribucion::query()
-                ->with([
+        if ($envio === null && $rutaId > 0) {
+            $esTrasladoPlanta = (bool) ($documento->metadata['envio_cierre_planta_mayorista'] ?? false);
+            $esRutaPdv = (bool) ($documento->metadata['envio_cierre_mayorista_pdv'] ?? false);
+            if ($esTrasladoPlanta || $esRutaPdv) {
+                $with = [
                     'transportista',
                     'vehiculo.tipoVehiculo',
-                    'almacenPlantaOrigen',
-                    'almacenMayoristaDestino',
                     'paradas',
-                    'detallesTraslado.insumo.unidadMedida',
                     'checklistCondicionVehiculo.detalles.condicion',
                     'checklistIncidente.detalles.tipoIncidente',
                     'firmaTransportista',
                     'firmaRecepcion',
                     'llegadaConfirmadaPor',
-                ])
-                ->find($rutaId);
+                ];
+                if ($esRutaPdv) {
+                    $with = array_merge($with, [
+                        'pedidos.detalles.insumo.unidadMedida',
+                        'pedidos.detalles.presentacion',
+                        'pedidos.puntoVenta',
+                        'almacenOrigen',
+                    ]);
+                } else {
+                    $with = array_merge($with, [
+                        'almacenPlantaOrigen',
+                        'almacenMayoristaDestino',
+                        'detallesTraslado.insumo.unidadMedida',
+                    ]);
+                }
+                $rutaOperacion = RutaDistribucion::query()->with($with)->find($rutaId);
+            }
         }
 
         $pedido = $documento->pedido ?? $envio?->pedido;
+        if ($pedido === null && $rutaOperacion !== null) {
+            $pedido = $rutaOperacion->pedidos->first();
+        }
         $pedidoReferencia = $pedido?->numero_solicitud
             ?? ($documento->pedidoid ? '#'.$documento->pedidoid : null)
-            ?? $rutaTraslado?->codigo
+            ?? $rutaOperacion?->codigo
             ?? $documento->externo_envio_id;
         $vehiculoRef = $envio?->vehiculo_ref
-            ?? $rutaTraslado?->vehiculo?->placa
+            ?? $rutaOperacion?->vehiculo?->placa
             ?? null;
         $estadoVehiculo = EnvioCierreAgricolaCatalogo::etiquetaEstadoVehiculo(
             $envio?->checklistCondicionVehiculo?->estado_general
-                ?? $rutaTraslado?->checklistCondicionVehiculo?->estado_general
+                ?? $rutaOperacion?->checklistCondicionVehiculo?->estado_general
         );
-        $transportista = $envio?->transportista ?? $rutaTraslado?->transportista ?? $documento->usuario;
+        $transportista = $envio?->transportista ?? $rutaOperacion?->transportista ?? $documento->usuario;
         $transportistaNombre = DocumentoEntregaCatalogo::etiquetaUsuario($transportista);
 
         $destinoCliente = '—';
         $direccionEntrega = '—';
-        if ($pedido !== null) {
+        $firmaRecepcionEtiqueta = 'Firma recepción en destino';
+        if ($pedido !== null && ! $esRutaPdv) {
             $destinoCliente = EnvioPedidoService::etiquetaPlantaDestinoLista($pedido)
                 ?? EnvioPedidoService::etiquetaPlantaDestinoPedido($pedido)
                 ?? '—';
@@ -173,36 +192,77 @@ final class DocumentoEntregaArchivo
             if ($direccionEntrega === '') {
                 $direccionEntrega = '—';
             }
-        } elseif ($rutaTraslado !== null) {
-            $destinoCliente = $rutaTraslado->almacenMayoristaDestino?->nombre ?? '—';
-            $direccionEntrega = trim((string) ($rutaTraslado->almacenMayoristaDestino?->direccion ?? ''));
+            $firmaRecepcionEtiqueta = 'Firma recepción en planta';
+        } elseif ($esRutaPdv && $rutaOperacion !== null) {
+            $pdv = $pedido?->puntoVenta ?? $rutaOperacion->pedidos->first()?->puntoVenta;
+            $paradaPdv = $rutaOperacion->paradas?->firstWhere('tipo', RutaDistribucionCatalogo::PARADA_ENTREGA_PDV);
+            $destinoCliente = $pdv?->nombre
+                ?? ($paradaPdv ? str_replace('Entrega: ', '', (string) $paradaPdv->destino) : null)
+                ?? '—';
+            $direccionEntrega = trim((string) ($pdv?->direccion ?? ''));
             if ($direccionEntrega === '' && $destinoCliente !== '—') {
                 $direccionEntrega = $destinoCliente;
             }
             if ($direccionEntrega === '') {
                 $direccionEntrega = '—';
             }
+            $firmaRecepcionEtiqueta = 'Firma recepción en punto de venta';
+        } elseif ($rutaOperacion !== null && ! $esRutaPdv) {
+            $destinoCliente = $rutaOperacion->almacenMayoristaDestino?->nombre ?? '—';
+            $direccionEntrega = trim((string) ($rutaOperacion->almacenMayoristaDestino?->direccion ?? ''));
+            if ($direccionEntrega === '' && $destinoCliente !== '—') {
+                $direccionEntrega = $destinoCliente;
+            }
+            if ($direccionEntrega === '') {
+                $direccionEntrega = '—';
+            }
+            $firmaRecepcionEtiqueta = 'Firma recepción en almacén mayorista';
         }
 
         $cargadoPor = DocumentoEntregaCatalogo::etiquetaUsuario($documento->usuario);
+
+        $almacenOrigenNombre = $documento->almacen?->nombre
+            ?? $envio?->almacen?->nombre
+            ?? $rutaOperacion?->almacenOrigen?->nombre
+            ?? $rutaOperacion?->almacenPlantaOrigen?->nombre
+            ?? '—';
 
         $lineasProducto = [];
         foreach ($pedido?->detalles ?? [] as $detalle) {
             $empaque = PedidoCatalogo::descripcionEmpaqueDetalle($detalle->observaciones);
             $obsUsuario = PedidoCatalogo::observacionesUsuarioDetalle($detalle->observaciones);
+            $nombreProducto = $detalle->cultivo_personalizado
+                ?? $detalle->producto_nombre
+                ?? $detalle->insumo?->nombre
+                ?? 'Producto';
+            $unidad = $detalle->insumo?->unidadMedida?->abreviatura ?? 'kg';
 
             $lineasProducto[] = [
-                'producto' => $detalle->cultivo_personalizado
-                    ?? $detalle->insumo?->nombre
-                    ?? 'Producto',
-                'cantidad' => number_format((float) $detalle->cantidad, 2, '.', '').' u.',
-                'empaquetaje' => $empaque ?? '—',
+                'producto' => $nombreProducto,
+                'cantidad' => number_format((float) $detalle->cantidad, 2, '.', '').' '.$unidad,
+                'empaquetaje' => $empaque ?? ($detalle->presentacion?->nombre ?? '—'),
                 'observaciones' => $obsUsuario ?: '—',
             ];
         }
 
-        if ($lineasProducto === [] && $rutaTraslado !== null) {
-            foreach ($rutaTraslado->detallesTraslado as $detalle) {
+        if ($lineasProducto === [] && $esRutaPdv && $rutaOperacion !== null) {
+            foreach ($rutaOperacion->pedidos as $pedidoRuta) {
+                foreach ($pedidoRuta->detalles as $detalle) {
+                    $empaque = PedidoCatalogo::descripcionEmpaqueDetalle($detalle->observaciones);
+                    $obsUsuario = PedidoCatalogo::observacionesUsuarioDetalle($detalle->observaciones);
+                    $lineasProducto[] = [
+                        'producto' => $detalle->producto_nombre ?? $detalle->insumo?->nombre ?? 'Producto',
+                        'cantidad' => number_format((float) $detalle->cantidad, 2, '.', '')
+                            .' '.($detalle->insumo?->unidadMedida?->abreviatura ?? 'kg'),
+                        'empaquetaje' => $empaque ?? ($detalle->presentacion?->nombre ?? '—'),
+                        'observaciones' => $obsUsuario ?: '—',
+                    ];
+                }
+            }
+        }
+
+        if ($lineasProducto === [] && $rutaOperacion !== null && ! $esRutaPdv) {
+            foreach ($rutaOperacion->detallesTraslado as $detalle) {
                 $lineasProducto[] = [
                     'producto' => $detalle->producto_nombre ?? $detalle->insumo?->nombre ?? 'Producto',
                     'cantidad' => number_format((float) $detalle->cantidad, 2, '.', '')
@@ -225,15 +285,17 @@ final class DocumentoEntregaArchivo
 
         if ($envio?->estado === 'entregado') {
             $textoObservaciones .= ' Envío marcado como entregado en el sistema.';
-        } elseif ($rutaTraslado?->estado === RutaDistribucionCatalogo::ESTADO_COMPLETADA) {
-            $textoObservaciones .= ' Traslado completado en el sistema.';
+        } elseif ($rutaOperacion?->estado === RutaDistribucionCatalogo::ESTADO_COMPLETADA) {
+            $textoObservaciones .= $esRutaPdv
+                ? ' Entrega completada en el punto de venta.'
+                : ' Traslado completado en el sistema.';
         }
 
-        $operacionChecklistCondicion = $envio?->checklistCondicionVehiculo ?? $rutaTraslado?->checklistCondicionVehiculo;
-        $operacionChecklistIncidente = $envio?->checklistIncidente ?? $rutaTraslado?->checklistIncidente;
-        $operacionFirmaTransportista = $envio?->firmaTransportista ?? $rutaTraslado?->firmaTransportista;
-        $operacionFirmaRecepcion = $envio?->firmaRecepcion ?? $rutaTraslado?->firmaRecepcion;
-        $operacionLlegadaAt = $envio?->llegada_confirmada_at ?? $rutaTraslado?->llegada_confirmada_at;
+        $operacionChecklistCondicion = $envio?->checklistCondicionVehiculo ?? $rutaOperacion?->checklistCondicionVehiculo;
+        $operacionChecklistIncidente = $envio?->checklistIncidente ?? $rutaOperacion?->checklistIncidente;
+        $operacionFirmaTransportista = $envio?->firmaTransportista ?? $rutaOperacion?->firmaTransportista;
+        $operacionFirmaRecepcion = $envio?->firmaRecepcion ?? $rutaOperacion?->firmaRecepcion;
+        $operacionLlegadaAt = $envio?->llegada_confirmada_at ?? $rutaOperacion?->llegada_confirmada_at;
 
         $condicionesLineas = [];
         foreach ($operacionChecklistCondicion?->detalles ?? [] as $det) {
@@ -269,11 +331,22 @@ final class DocumentoEntregaArchivo
             if ($rutaLogistica === '' || $rutaLogistica === null) {
                 $rutaLogistica = '—';
             }
-        } elseif ($rutaTraslado !== null) {
-            $origen = $rutaTraslado->almacenPlantaOrigen?->nombre ?? 'Planta';
-            $destino = $rutaTraslado->almacenMayoristaDestino?->nombre ?? 'Mayorista';
-            $rutaLogistica = $origen.' → '.$destino;
+        } elseif ($rutaOperacion !== null) {
+            if ($esRutaPdv) {
+                $origen = $rutaOperacion->almacenOrigen?->nombre ?? 'Centro mayorista';
+                $destino = $destinoCliente !== '—' ? $destinoCliente : 'Punto de venta';
+                $rutaLogistica = $origen.' → '.$destino;
+            } else {
+                $origen = $rutaOperacion->almacenPlantaOrigen?->nombre ?? 'Planta';
+                $destino = $rutaOperacion->almacenMayoristaDestino?->nombre ?? 'Mayorista';
+                $rutaLogistica = $origen.' → '.$destino;
+            }
         }
+
+        $estadoEnvioRaw = $envio?->estado ?? $rutaOperacion?->estado ?? 'pendiente';
+        $estadoEnvio = $estadoEnvioRaw === RutaDistribucionCatalogo::ESTADO_COMPLETADA
+            ? 'Completada'
+            : ucfirst(str_replace('_', ' ', (string) $estadoEnvioRaw));
 
         return [
             'documento' => $documento,
@@ -287,8 +360,9 @@ final class DocumentoEntregaArchivo
             'destinoCliente' => $destinoCliente,
             'direccionEntrega' => $direccionEntrega,
             'cargadoPor' => $cargadoPor,
+            'almacenOrigenNombre' => $almacenOrigenNombre,
             'rutaLogistica' => $rutaLogistica,
-            'estadoEnvio' => ucfirst(str_replace('_', ' ', (string) ($envio?->estado ?? $rutaTraslado?->estado ?? 'pendiente'))),
+            'estadoEnvio' => $estadoEnvio,
             'lineasProducto' => $lineasProducto,
             'textoObservaciones' => $textoObservaciones,
             'condicionesLineas' => $condicionesLineas,
@@ -298,6 +372,7 @@ final class DocumentoEntregaArchivo
             'observacionesIncidentes' => $operacionChecklistIncidente?->observaciones,
             'firmaTransportistaImg' => $operacionFirmaTransportista?->imagenfirma,
             'firmaRecepcionImg' => $operacionFirmaRecepcion?->imagenfirma,
+            'firmaRecepcionEtiqueta' => $firmaRecepcionEtiqueta,
             'llegadaConfirmadaAt' => $operacionLlegadaAt,
         ];
     }

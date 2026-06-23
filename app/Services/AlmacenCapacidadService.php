@@ -8,6 +8,7 @@ use App\Models\Insumo;
 use App\Models\LoteProduccionPedido;
 use App\Models\ProduccionAlmacenamiento;
 use App\Models\UnidadMedida;
+use App\Support\AlmacenAmbito;
 use App\Support\InsumoCatalogo;
 use App\Support\ProductoPlantaCatalogo;
 use Illuminate\Validation\ValidationException;
@@ -71,10 +72,7 @@ class AlmacenCapacidadService
             ->get()
             ->sum(fn (ProduccionAlmacenamiento $row) => $this->convertirAKg((float) $row->cantidad, $row->unidadMedida));
 
-        $insumoKg = (float) InsumoCatalogo::aplicarFiltroOperativo(
-            Insumo::query()->with('unidadMedida')->where('almacenid', $almacen->almacenid)
-        )
-            ->get()
+        $insumoKg = (float) $this->insumosEnAlmacen($almacen)
             ->sum(fn (Insumo $insumo) => $this->convertirAKg((float) $insumo->stock, $insumo->unidadMedida));
 
         $productoPlantaKg = $this->productoPlantaKgEnAlmacen($almacen);
@@ -161,6 +159,23 @@ class AlmacenCapacidadService
                     .number_format($resumen['disponible_kg'], 2).' kg.',
             ]);
         }
+    }
+
+    private function insumosEnAlmacen(Almacen $almacen)
+    {
+        $query = Insumo::query()
+            ->with('unidadMedida')
+            ->where('almacenid', $almacen->almacenid);
+
+        if (($almacen->ambito ?? '') === AlmacenAmbito::MAYORISTA) {
+            $query = InsumoCatalogo::aplicarFiltroProductoTerminado($query);
+        } elseif (($almacen->ambito ?? '') === AlmacenAmbito::PUNTO_VENTA) {
+            // Inventario PDV: productos terminados recibidos del mayorista
+        } else {
+            $query = InsumoCatalogo::aplicarFiltroOperativo($query);
+        }
+
+        return $query->get();
     }
 
     private function nombreProductoLote(?LoteProduccionPedido $lote): ?string

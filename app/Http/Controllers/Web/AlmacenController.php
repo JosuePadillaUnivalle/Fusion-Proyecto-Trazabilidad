@@ -14,6 +14,8 @@ use App\Models\AlmacenajeLoteProduccion;
 
 use App\Models\Insumo;
 
+use App\Models\InsumoPresentacion;
+
 use App\Models\ProduccionAlmacenamiento;
 
 use App\Models\TipoAlmacen;
@@ -22,6 +24,8 @@ use App\Models\UnidadMedida;
 
 use App\Services\AlmacenCapacidadService;
 
+use App\Services\InventarioPresentacionService;
+
 use App\Services\UbicacionesAlmacenService;
 
 use App\Support\AlmacenAmbito;
@@ -29,6 +33,12 @@ use App\Support\AlmacenAmbito;
 use App\Support\AlmacenPlantaCosechaCatalogo;
 
 use App\Support\InsumoCatalogo;
+
+use App\Support\MayoristaAccess;
+
+use App\Support\UbicacionGpsParser;
+
+use App\Support\UsuarioRol;
 
 use Illuminate\Http\Request;
 
@@ -44,6 +54,8 @@ class AlmacenController extends Controller
 
         private readonly AlmacenCapacidadService $capacidadService,
 
+        private readonly InventarioPresentacionService $inventarioPresentacion,
+
     ) {}
 
 
@@ -56,17 +68,13 @@ class AlmacenController extends Controller
 
         $ambito = $ctx['ambito'];
 
-        $q = AlmacenAmbito::scope(Almacen::query(), $ambito);
+        $q = $this->queryAlmacenesVisibles($request, $ambito);
 
 
 
-        $almacenesPagina = AlmacenAmbito::scope(
+        $almacenesPagina = (clone $q)
 
-            Almacen::with(['unidadMedida']),
-
-            $ambito
-
-        )
+            ->with(['unidadMedida'])
 
             ->orderBy('almacenid', 'desc')
 
@@ -117,6 +125,8 @@ class AlmacenController extends Controller
         return view('almacenes.index', array_merge(compact('almacenesPagina', 'stats', 'ocupacionPorId'), $ctx, [
 
             'almacenes' => $almacenesPagina,
+
+            'almacenesMapa' => $this->almacenesParaMapaIndex($request, $ambito, $ctx['rutaPrefijo'] ?? 'almacen-agricola'),
 
         ]));
 
@@ -184,6 +194,10 @@ class AlmacenController extends Controller
 
         $data['tipoalmacenid'] = $this->tipoAlmacenPorDefecto();
 
+        if (Schema::hasColumn('almacen', 'responsable_usuarioid') && $request->user()) {
+            $data['responsable_usuarioid'] = (int) $request->user()->usuarioid;
+        }
+
 
 
         Almacen::create($data);
@@ -214,7 +228,7 @@ class AlmacenController extends Controller
 
         $contenidos = $this->contenidoAlmacen($almacen);
 
-        if (($almacen->ambito ?? '') === AlmacenAmbito::PLANTA) {
+        if (in_array($almacen->ambito ?? '', [AlmacenAmbito::PLANTA, AlmacenAmbito::AGRICOLA], true)) {
             $contenidos = AlmacenPlantaCosechaCatalogo::consolidarItemsPlanta(
                 $contenidos,
                 $almacen,
@@ -308,6 +322,15 @@ class AlmacenController extends Controller
         $ctx = AlmacenAmbito::contexto($request);
 
         $this->asegurarAmbitoAlmacen($almacen, $ctx['ambito']);
+
+        $eval = \App\Support\AlmacenEliminacionCatalogo::evaluar($almacen);
+        if (! $eval['ok']) {
+            return back()->with([
+                'error' => $eval['mensaje'],
+                'error_modal' => true,
+                'error_modal_titulo' => $eval['titulo'],
+            ]);
+        }
 
         $almacen->delete();
 
@@ -476,6 +499,7 @@ class AlmacenController extends Controller
     {
         $items = collect();
         $esPlanta = ($almacen->ambito ?? '') === AlmacenAmbito::PLANTA;
+        $esMayorista = ($almacen->ambito ?? '') === AlmacenAmbito::MAYORISTA;
 
         $insumosQuery = Insumo::query()->with(['tipo', 'unidadMedida'])
             ->where('almacenid', $almacen->almacenid);
@@ -492,6 +516,9 @@ class AlmacenController extends Controller
                         ->orWhere('descripcion', 'like', 'Recepción pedido%');
                 });
             }
+        } elseif ($esMayorista) {
+            $insumosQuery = InsumoCatalogo::aplicarFiltroProductoTerminado($insumosQuery)
+                ->with(['presentaciones.tipoEmpaque']);
         } else {
             $insumosQuery = InsumoCatalogo::aplicarFiltroOperativo($insumosQuery);
         }
@@ -503,16 +530,25 @@ class AlmacenController extends Controller
                 continue;
             }
 
+            if ($esMayorista) {
+                $fila = $this->filaMayoristaConsolidada($almacen, $insumo);
+                if ($fila !== null) {
+                    $items->push($fila);
+                }
+
+                continue;
+            }
+
             $tipoNombre = $insumo->tipo?->nombre ?? 'Insumo';
             $slug = InsumoCatalogo::slugFromNombreTipo($tipoNombre) ?? 'insumo';
-            $esRecepcionPedido = AlmacenPlantaCosechaCatalogo::esRecepcionPedidoInsumo($insumo);
+            $esRecepcionPedido = ! $esMayorista && AlmacenPlantaCosechaCatalogo::esRecepcionPedidoInsumo($insumo);
             $kg = $this->capacidadService->convertirAKg((float) $insumo->stock, $insumo->unidadMedida);
             $claveCultivo = AlmacenPlantaCosechaCatalogo::claveCultivo($insumo->nombre);
 
             $items->push((object) [
-                'categoria' => $esRecepcionPedido ? 'cosecha' : 'insumo',
-                'tipo_label' => $esRecepcionPedido ? 'Cosecha' : $tipoNombre,
-                'tipo_filtro' => $esRecepcionPedido ? 'cosecha' : $slug,
+                'categoria' => $esMayorista ? 'producto_terminado' : ($esRecepcionPedido ? 'cosecha' : 'insumo'),
+                'tipo_label' => $esMayorista ? 'Producto terminado' : ($esRecepcionPedido ? 'Cosecha' : $tipoNombre),
+                'tipo_filtro' => $esMayorista ? 'producto_terminado' : ($esRecepcionPedido ? 'cosecha' : $slug),
                 'nombre' => $esRecepcionPedido
                     ? AlmacenPlantaCosechaCatalogo::etiquetaCultivo($insumo->nombre)
                     : $insumo->nombre,
@@ -620,6 +656,148 @@ class AlmacenController extends Controller
         }
 
         return $items->sortByDesc('fecha_orden')->values();
+    }
+
+    /**
+     * Una fila por producto; el desglose por empaque queda en inventario.show.
+     */
+    private function filaMayoristaConsolidada(Almacen $almacen, Insumo $insumo): ?object
+    {
+        $this->inventarioPresentacion->asegurarInventarioDesdeStock(
+            (int) $almacen->almacenid,
+            (int) $insumo->insumoid
+        );
+
+        $presentaciones = $insumo->relationLoaded('presentaciones')
+            ? $insumo->presentaciones->where('activo', true)->sortBy('orden')->values()
+            : InsumoPresentacion::query()
+                ->with('tipoEmpaque')
+                ->where('insumoid', $insumo->insumoid)
+                ->where('activo', true)
+                ->orderBy('orden')
+                ->orderBy('nombre')
+                ->get();
+
+        $totalUnidades = 0.0;
+        $totalKg = 0.0;
+        $empaquesConStock = 0;
+        $nombresEmpaque = [];
+        $etiquetasUnidad = [];
+
+        foreach ($presentaciones as $presentacion) {
+            $unidades = $this->inventarioPresentacion->stockTotalUnidades(
+                (int) $almacen->almacenid,
+                (int) $presentacion->insumo_presentacionid
+            );
+            $kg = $this->inventarioPresentacion->stockTotalKg(
+                (int) $almacen->almacenid,
+                (int) $presentacion->insumo_presentacionid
+            );
+
+            if ($unidades <= 0 && $kg <= 0) {
+                continue;
+            }
+
+            if ($kg <= 0 && $unidades > 0) {
+                $kg = $unidades * $presentacion->pesoNetoKg();
+            }
+
+            $totalUnidades += $unidades;
+            $totalKg += $kg;
+            $empaquesConStock++;
+            $nombresEmpaque[] = trim($presentacion->nombre);
+            $etiquetasUnidad[] = $presentacion->etiquetaUnidad();
+        }
+
+        if ($totalKg <= 0 && $totalUnidades <= 0) {
+            return null;
+        }
+
+        if ($totalKg <= 0) {
+            $totalKg = $this->capacidadService->convertirAKg((float) $insumo->stock, $insumo->unidadMedida);
+        }
+
+        $empaque = match (true) {
+            $empaquesConStock === 0 => '—',
+            $empaquesConStock === 1 => $nombresEmpaque[0],
+            default => $empaquesConStock.' presentaciones',
+        };
+
+        $unidadEtiqueta = count(array_unique($etiquetasUnidad)) === 1
+            ? ($etiquetasUnidad[0] ?? 'empaques')
+            : 'empaques';
+
+        return (object) [
+            'categoria' => 'producto_terminado',
+            'tipo_label' => 'Producto terminado',
+            'tipo_filtro' => 'producto_terminado',
+            'nombre' => $insumo->nombre,
+            'detalle' => $insumo->descripcion ? \Illuminate\Support\Str::limit($insumo->descripcion, 60) : '—',
+            'cantidad' => $totalUnidades > 0 ? $totalUnidades : (float) $insumo->stock,
+            'unidad' => $totalUnidades > 0 ? $unidadEtiqueta : ($insumo->unidadMedida?->abreviatura ?? 'kg'),
+            'kg' => $totalKg,
+            'empaque' => $empaque,
+            'fecha_orden' => 0,
+            'search' => strtolower(trim($insumo->nombre.' '.implode(' ', $nombresEmpaque).' producto terminado')),
+            'insumoid' => $insumo->insumoid,
+            'origen_tipo' => 'insumo',
+        ];
+    }
+
+    private function queryAlmacenesVisibles(Request $request, string $ambito)
+    {
+        $query = AlmacenAmbito::scope(Almacen::query(), $ambito);
+        $user = $request->user();
+
+        if (! $user || UsuarioRol::esAdminGlobal($user)) {
+            return $query;
+        }
+
+        if ($ambito === AlmacenAmbito::MAYORISTA) {
+            return MayoristaAccess::scopeAlmacenesMayorista($query, $user);
+        }
+
+        if (
+            $ambito === AlmacenAmbito::AGRICOLA
+            && UsuarioRol::esJefeAgricultor($user)
+            && Schema::hasColumn('almacen', 'responsable_usuarioid')
+        ) {
+            return $query->where('responsable_usuarioid', (int) $user->usuarioid);
+        }
+
+        return $query;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function almacenesParaMapaIndex(Request $request, string $ambito, string $rutaPrefijo): array
+    {
+        $almacenes = $this->queryAlmacenesVisibles($request, $ambito)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get();
+
+        $items = [];
+
+        foreach ($almacenes as $almacen) {
+            $resuelto = UbicacionGpsParser::resolverAlmacen(
+                (int) $almacen->almacenid,
+                $almacen->nombre,
+                $almacen->ubicacion
+            );
+
+            $nombre = (string) $almacen->nombre;
+            $items[] = [
+                'id' => (int) $almacen->almacenid,
+                'nombre' => $nombre,
+                'lat' => $resuelto['lat'],
+                'lng' => $resuelto['lng'],
+                'direccion' => $resuelto['direccion'],
+                'search' => mb_strtolower($nombre.' '.($resuelto['direccion'] ?? '')),
+                'url' => route($rutaPrefijo.'.show', $almacen),
+            ];
+        }
+
+        return $items;
     }
 
 }

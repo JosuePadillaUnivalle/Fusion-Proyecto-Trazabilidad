@@ -5,6 +5,8 @@ namespace App\Http\Middleware;
 use App\Support\CuentaEstado;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureCuentaAprobada
@@ -29,7 +31,10 @@ class EnsureCuentaAprobada
                 default => 'Tu cuenta no está activa.',
             };
 
-            return redirect()->route('login')->withErrors(['email' => $mensaje]);
+            return redirect()
+                ->route('login', ['_sesion_limpia' => 1])
+                ->withErrors(['email' => $mensaje])
+                ->withCookie(Cookie::forget(Auth::getRecallerName()));
         }
 
         return $next($request);

@@ -158,10 +158,72 @@ class TransporteCapacidadService
         $coleccion = $pedidos instanceof Collection ? $pedidos : collect($pedidos);
 
         return (float) $coleccion->sum(function (PedidoDistribucion $pedido) {
-            $pedido->loadMissing('detalles');
+            $pedido->loadMissing('detalles.presentacion');
 
-            return (float) $pedido->detalles->sum(fn ($d) => (float) ($d->cantidad ?? 0));
+            return (float) $pedido->detalles->sum(fn ($d) => $this->pesoDetallePedidoDistribucion($d));
         });
+    }
+
+    /**
+     * @param  Collection<int, PedidoDistribucion>|array<int, PedidoDistribucion>  $pedidos
+     */
+    public function volumenPedidosDistribucion(Collection|array $pedidos): ?float
+    {
+        $coleccion = $pedidos instanceof Collection ? $pedidos : collect($pedidos);
+        $total = 0.0;
+        $tieneVolumen = false;
+
+        foreach ($coleccion as $pedido) {
+            $pedido->loadMissing('detalles.presentacion.tipoEmpaque');
+            foreach ($pedido->detalles as $detalle) {
+                $volumen = $this->volumenDetallePedidoDistribucion($detalle);
+                if ($volumen === null) {
+                    continue;
+                }
+                $tieneVolumen = true;
+                $total += $volumen;
+            }
+        }
+
+        return $tieneVolumen ? round($total, 4) : null;
+    }
+
+    public function pesoDetallePedidoDistribucion(mixed $detalle): float
+    {
+        $cantidad = (float) ($detalle->cantidad ?? 0);
+        if ($cantidad <= 0) {
+            return 0.0;
+        }
+
+        $detalle->loadMissing('presentacion');
+        if ($detalle->presentacion !== null) {
+            return $cantidad * $detalle->presentacion->pesoNetoKg();
+        }
+
+        return $cantidad;
+    }
+
+    public function volumenDetallePedidoDistribucion(mixed $detalle): ?float
+    {
+        $cantidad = (int) floor((float) ($detalle->cantidad ?? 0));
+        if ($cantidad <= 0) {
+            return 0.0;
+        }
+
+        $detalle->loadMissing('presentacion.tipoEmpaque');
+        $empaque = $detalle->presentacion?->tipoEmpaque;
+        if ($empaque === null) {
+            return null;
+        }
+
+        $largo = (float) ($empaque->largo_cm ?? 0) / 100;
+        $ancho = (float) ($empaque->ancho_cm ?? 0) / 100;
+        $alto = (float) ($empaque->alto_cm ?? 0) / 100;
+        if ($largo <= 0 || $ancho <= 0 || $alto <= 0) {
+            return null;
+        }
+
+        return round($cantidad * $largo * $ancho * $alto, 4);
     }
 
     public function resumenCarga(float $pesoKg, ?float $volumenM3 = null): array

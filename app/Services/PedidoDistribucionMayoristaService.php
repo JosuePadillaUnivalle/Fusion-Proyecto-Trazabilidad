@@ -363,13 +363,10 @@ class PedidoDistribucionMayoristaService
         $capacidad = app(TransporteCapacidadService::class);
 
         $capacidad->validarAsignacionYCarga(
-
             $transportista,
-
             $vehiculo,
-
-            $capacidad->pesoPedidosDistribucion([$pedido])
-
+            $capacidad->pesoPedidosDistribucion([$pedido]),
+            $capacidad->volumenPedidosDistribucion([$pedido])
         );
 
 

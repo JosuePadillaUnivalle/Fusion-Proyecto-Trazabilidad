@@ -45,11 +45,16 @@
             <a href="{{ route('punto-venta.puntos.edit', $punto) }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-edit mr-1"></i> Editar</a>
             @endcan
             @can('punto_venta.delete')
-            <form method="POST" action="{{ route('punto-venta.puntos.destroy', $punto) }}" class="d-inline"
-                onsubmit="return confirm('¿Eliminar este punto de venta?');">
+            <form method="POST" action="{{ route('punto-venta.puntos.destroy', $punto) }}" class="d-inline">
                 @csrf
                 @method('DELETE')
-                <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-trash mr-1"></i> Eliminar</button>
+                <button type="button" class="btn btn-outline-danger btn-sm"
+                    data-confirm-modal
+                    data-confirm-title="Eliminar punto de venta"
+                    data-confirm-message="¿Eliminar «{{ $punto->nombre }}»? Esta acción no se puede deshacer."
+                    data-confirm-tone="danger">
+                    <i class="fas fa-trash mr-1"></i> Eliminar
+                </button>
             </form>
             @endcan
         </div>
@@ -220,7 +225,6 @@
         </div>
     </div>
 
-    @include('partials.modal-confirmar-accion')
 @endsection
 
 @if($punto->latitud && $punto->longitud)

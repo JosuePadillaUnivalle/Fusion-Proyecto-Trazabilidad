@@ -6,7 +6,9 @@ use App\Models\CertificacionLote;
 use App\Models\EvaluacionFinalLoteProduccion;
 use App\Models\Lote;
 use App\Models\LoteProduccionPedido;
+use App\Models\Usuario;
 use Illuminate\Support\Collection;
+use App\Support\UsuarioRol;
 
 class CertificacionIndexService
 {
@@ -138,7 +140,7 @@ class CertificacionIndexService
     }
 
     /** @return array{pendientes: Collection, evaluaciones: Collection, stats: array<string, int>, ambito: string} */
-    public function datosCampo(): array
+    public function datosCampo(?Usuario $user = null): array
     {
         $estadoCosechado = EstadoLoteCatalogo::idsPorSlugs(['cosechado']);
 
@@ -147,6 +149,12 @@ class CertificacionIndexService
             ->whereHas('producciones')
             ->orderByDesc('loteid');
 
+        if ($user && UsuarioRol::debeAcotarPorAsignacion($user)) {
+            $query->where('usuarioid', (int) $user->usuarioid);
+        } elseif ($user && UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
+            $query->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($user));
+        }
+
         if ($estadoCosechado !== []) {
             $query->whereIn('estadolotetipoid', $estadoCosechado);
         }
@@ -154,6 +162,12 @@ class CertificacionIndexService
         $lotesCosechados = $query->get();
 
         $idsEvaluados = CertificacionLote::query()
+            ->when($user && UsuarioRol::debeAcotarPorAsignacion($user), function ($q) use ($user) {
+                $q->whereHas('lote', fn ($l) => $l->where('usuarioid', (int) $user->usuarioid));
+            })
+            ->when($user && UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user), function ($q) use ($user) {
+                $q->whereHas('lote', fn ($l) => $l->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($user)));
+            })
             ->pluck('loteid')
             ->unique()
             ->all();
@@ -162,21 +176,34 @@ class CertificacionIndexService
             ->filter(fn (Lote $l) => ! in_array($l->loteid, $idsEvaluados, true))
             ->values();
 
-        $evaluaciones = CertificacionLote::query()
+        $evaluacionesQuery = CertificacionLote::query()
             ->with(['lote.cultivo', 'usuario'])
-            ->orderByDesc('fecha_certificacion')
-            ->limit(20)
-            ->get();
+            ->orderByDesc('fecha_certificacion');
 
-        $totalCertificados = CertificacionLote::query()
-            ->where('resultado', CertificacionLote::RAZON_CERTIFICADO)
-            ->distinct('loteid')
-            ->count('loteid');
+        if ($user && UsuarioRol::debeAcotarPorAsignacion($user)) {
+            $evaluacionesQuery->whereHas('lote', fn ($l) => $l->where('usuarioid', (int) $user->usuarioid));
+        } elseif ($user && UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
+            $evaluacionesQuery->whereHas('lote', fn ($l) => $l->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($user)));
+        }
 
-        $totalNoConformes = CertificacionLote::query()
-            ->where('resultado', CertificacionLote::RAZON_NO_CONFORME)
-            ->distinct('loteid')
-            ->count('loteid');
+        $evaluaciones = $evaluacionesQuery->limit(20)->get();
+
+        $certificadosQuery = CertificacionLote::query()
+            ->where('resultado', CertificacionLote::RAZON_CERTIFICADO);
+        $noConformesQuery = CertificacionLote::query()
+            ->where('resultado', CertificacionLote::RAZON_NO_CONFORME);
+
+        if ($user && UsuarioRol::debeAcotarPorAsignacion($user)) {
+            $certificadosQuery->whereHas('lote', fn ($l) => $l->where('usuarioid', (int) $user->usuarioid));
+            $noConformesQuery->whereHas('lote', fn ($l) => $l->where('usuarioid', (int) $user->usuarioid));
+        } elseif ($user && UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
+            $ids = UsuarioRol::idsUsuariosBajoJefeAgricultor($user);
+            $certificadosQuery->whereHas('lote', fn ($l) => $l->whereIn('usuarioid', $ids));
+            $noConformesQuery->whereHas('lote', fn ($l) => $l->whereIn('usuarioid', $ids));
+        }
+
+        $totalCertificados = $certificadosQuery->distinct('loteid')->count('loteid');
+        $totalNoConformes = $noConformesQuery->distinct('loteid')->count('loteid');
 
         return [
             'ambito' => 'campo',

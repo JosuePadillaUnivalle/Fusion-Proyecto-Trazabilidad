@@ -63,9 +63,9 @@
                 <p class="inicio-kpi__lbl">Cosecha kg</p>
             </div>
             <div class="inicio-kpi" style="background:linear-gradient(135deg,#7c3aed,#8b5cf6)">
-                <i class="fas fa-shopping-cart inicio-kpi__icon"></i>
+                <i class="fas fa-truck inicio-kpi__icon"></i>
                 <div class="inicio-kpi__val">{{ $stats['pedidos_pendientes'] }}</div>
-                <p class="inicio-kpi__lbl">Pedidos pend.</p>
+                <p class="inicio-kpi__lbl">Envíos por aprobar</p>
             </div>
         </div>
 

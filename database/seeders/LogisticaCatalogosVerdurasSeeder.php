@@ -261,6 +261,11 @@ class LogisticaCatalogosVerdurasSeeder extends Seeder
             ['patron' => '%espinaca%', 'empaque' => $bandeja, 'calibres' => [
                 ['nombre' => 'Manojo estándar (250 g)', 'conteo' => 12, 'peso' => 0.250],
             ]],
+            ['patron' => '%repollo%', 'empaque' => $caja, 'calibres' => [
+                ['nombre' => 'Pequeño (800 g)', 'conteo' => 18, 'peso' => 0.800],
+                ['nombre' => 'Mediano (1,2 kg)', 'conteo' => 12, 'peso' => 1.200],
+                ['nombre' => 'Grande (1,8 kg)', 'conteo' => 8, 'peso' => 1.800],
+            ]],
         ];
 
         foreach ($catalogo as $grupo) {

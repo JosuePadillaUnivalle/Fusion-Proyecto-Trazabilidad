@@ -16,9 +16,12 @@ use App\Support\EstadoLoteCatalogo;
 use App\Support\EvidenciaFoto;
 use App\Support\LoteTrazabilidadService;
 use App\Support\UbicacionGpsParser;
+use App\Support\UsuarioRol;
 use Illuminate\Support\Collection;
 use App\Services\AlmacenCapacidadService;
+use App\Services\CosechaPresentacionService;
 use App\Services\OperacionAgricolaAutomaticaService;
+use App\Services\PlanificacionCosechaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -28,6 +31,8 @@ class ProduccionController extends Controller
         private readonly AlmacenCapacidadService $capacidadService,
         private readonly LoteTrazabilidadService $trazabilidadService,
         private readonly CertificacionCampoService $certificacionCampo,
+        private readonly CosechaPresentacionService $presentacionCosecha,
+        private readonly PlanificacionCosechaService $planificacionCosecha,
     ) {
         $this->middleware(function ($request, $next) {
             if ($request->user()?->hasRole('transportista')) {
@@ -151,6 +156,13 @@ class ProduccionController extends Controller
             });
         }
 
+        $user = $request->user();
+        if ($user && UsuarioRol::debeAcotarPorAsignacion($user)) {
+            $query->whereHas('lote', fn ($q) => $q->where('usuarioid', (int) $user->usuarioid));
+        } elseif ($user && UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
+            $query->whereHas('lote', fn ($q) => $q->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($user)));
+        }
+
         return $query;
     }
 
@@ -182,7 +194,9 @@ class ProduccionController extends Controller
                 ->where('capacidad', '>', 0),
             AlmacenAmbito::AGRICOLA
         )->get();
-        $almacenes = $this->almacenesDestacadosParaCosecha($almacenesTodos);
+        $almacenesMasUsados = $this->almacenesDestacadosParaCosecha($almacenesTodos, 'mas');
+        $almacenesMenosUsados = $this->almacenesDestacadosParaCosecha($almacenesTodos, 'menos');
+        $almacenes = $almacenesMasUsados;
         $resumenesCapacidad = $almacenesTodos
             ->mapWithKeys(fn (Almacen $almacen) => [
                 $almacen->almacenid => $this->capacidadService->resumen($almacen),
@@ -199,16 +213,48 @@ class ProduccionController extends Controller
 
         $returnUrl = $this->validReturnUrl($request->input('return'));
 
+        $estimacionLoteInicial = null;
+        $loteActivo = null;
+        $usarLoteFijo = false;
+        if ($lotePreseleccionado) {
+            $loteActivo = $lotes->firstWhere('loteid', $lotePreseleccionado)
+                ?? Lote::with(['usuario', 'cultivo', 'insumoSemilla', 'estadoTipo', 'catalogoTamanoConteo.tipoEmpaque'])
+                    ->find($lotePreseleccionado);
+            if ($loteActivo) {
+                $estimacionLoteInicial = $this->planificacionCosecha->estimacionUiDesdeLote($loteActivo);
+            }
+            $usarLoteFijo = $loteActivo !== null && ($lotes->count() === 1 || $loteidParam);
+        }
+
+        $selectedAlmacenId = old('almacenid');
+        $almacenDestinoPreview = null;
+        $resumenAlmacenPreview = null;
+        if ($selectedAlmacenId) {
+            $almacenDestinoPreview = $almacenesTodos->firstWhere('almacenid', (int) $selectedAlmacenId);
+            if ($almacenDestinoPreview) {
+                $resumenAlmacenPreview = $resumenesCapacidad[$almacenDestinoPreview->almacenid] ?? null;
+            }
+        }
+
         return view('producciones.create', compact(
             'lotes',
             'unidades',
             'almacenes',
+            'almacenesMasUsados',
+            'almacenesMenosUsados',
             'almacenesTodos',
             'almacenesCatalogo',
             'resumenesCapacidad',
             'lotePreseleccionado',
             'lotePreseleccionadoLabel',
-            'returnUrl'
+            'returnUrl',
+            'estimacionLoteInicial',
+            'loteActivo',
+            'usarLoteFijo',
+            'selectedAlmacenId',
+            'almacenDestinoPreview',
+            'resumenAlmacenPreview',
+            'loteidParam',
         ));
     }
 
@@ -219,12 +265,13 @@ class ProduccionController extends Controller
             'cantidad' => 'required|numeric|min:0.01',
             'unidadmedidaid' => 'required|exists:unidadmedida,unidadmedidaid',
             'observaciones' => 'nullable|string',
-            'almacenid' => 'nullable|exists:almacen,almacenid',
+            'almacenid' => 'required|exists:almacen,almacenid',
             'evidencia_foto' => 'required|image|mimes:jpeg,jpg,png,webp|max:5120',
         ], [
             'evidencia_foto.required' => 'Debe subir una foto de la cosecha realizada.',
             'evidencia_foto.image' => 'El archivo debe ser una imagen.',
             'evidencia_foto.max' => 'La imagen no puede superar 5 MB.',
+            'almacenid.required' => 'Debe seleccionar el almacén agrícola de destino.',
         ]);
 
         DB::beginTransaction();
@@ -244,6 +291,8 @@ class ProduccionController extends Controller
             $destinoAlmacenamiento = DestinoProduccion::whereRaw('LOWER(TRIM(nombre)) = ?', ['almacenamiento'])->first();
             $unidadProduccion = UnidadMedida::find($data['unidadmedidaid']);
             $cantidadBaseKg = $this->capacidadService->convertirAKg((float) $data['cantidad'], $unidadProduccion);
+            $lote->loadMissing(['catalogoTamanoConteo.tipoEmpaque', 'insumoSemilla']);
+            $presentacion = $this->resolverPresentacionCosecha($lote, $cantidadBaseKg);
 
             $rutaEvidencia = EvidenciaFoto::guardar($request->file('evidencia_foto'), 'producciones_evidencia');
 
@@ -252,6 +301,9 @@ class ProduccionController extends Controller
                 'cantidad' => $data['cantidad'],
                 'unidadmedidaid' => $data['unidadmedidaid'],
                 'cantidad_base' => $cantidadBaseKg,
+                'catalogotamanoconteoid' => $presentacion['calibre_id'] ?? null,
+                'cantidad_unidades' => $presentacion['unidades'] ?? null,
+                'cantidad_empaques' => $presentacion['empaques'] ?? null,
                 'fechacosecha' => now()->toDateString(),
                 'destinoproduccionid' => $destinoAlmacenamiento->destinoproduccionid ?? null,
                 'observaciones' => $data['observaciones'] ?? null,
@@ -302,8 +354,11 @@ class ProduccionController extends Controller
                     'almacenid' => $almacen->almacenid,
                     'cantidad' => $data['cantidad'],
                     'unidadmedidaid' => $data['unidadmedidaid'],
+                    'catalogotamanoconteoid' => $presentacion['calibre_id'] ?? null,
+                    'cantidad_unidades' => $presentacion['unidades'] ?? null,
+                    'cantidad_empaques' => $presentacion['empaques'] ?? null,
                     'fechaentrada' => now(),
-                    'observaciones' => "Cosecha del lote {$lote->nombre}",
+                    'observaciones' => $this->observacionAlmacenCosecha($lote, $presentacion),
                 ]);
 
                 $mensajeAlmacen = " y almacenado en {$almacen->nombre}";
@@ -325,7 +380,7 @@ class ProduccionController extends Controller
                     'loteid' => $lote->loteid,
                     'estadolotetipoid' => $estadoCosechadoId,
                     'fecha_cambio' => now(),
-                    'observaciones' => "Cosecha: {$data['cantidad']} {$unidad->abreviatura}" . $mensajeAlmacen,
+                    'observaciones' => $this->observacionHistorialCosecha($data, $unidad, $presentacion, $mensajeAlmacen),
                     'usuarioid' => $lote->usuarioid,
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -337,8 +392,7 @@ class ProduccionController extends Controller
             DB::commit();
 
             $unidad = UnidadMedida::find($data['unidadmedidaid']);
-            $mensaje = "¡Cosecha registrada! {$data['cantidad']} {$unidad->abreviatura} de {$lote->cultivo->nombre}"
-                .$mensajeAlmacen.'.';
+            $mensaje = $this->mensajeExitoCosecha($data, $lote, $unidad, $presentacion, $mensajeAlmacen);
             if ($mensajeAlmacen === '') {
                 $mensaje .= ' Certifique el lote en Certificaciones y luego envíelo al almacén desde la trazabilidad del lote.';
             } else {
@@ -364,9 +418,22 @@ class ProduccionController extends Controller
 
     public function show(Produccion $produccion)
     {
-        $produccion->load(['lote.usuario', 'lote.insumoSemilla', 'lote.cultivo', 'destino', 'unidadMedida', 'almacenamientos.almacen', 'ventas']);
+        $produccion->load([
+            'lote.usuario',
+            'lote.insumoSemilla',
+            'lote.cultivo',
+            'lote.catalogoTamanoConteo.tipoEmpaque',
+            'destino',
+            'unidadMedida',
+            'catalogoTamanoConteo.tipoEmpaque',
+            'almacenamientos.almacen',
+            'almacenamientos.catalogoTamanoConteo.tipoEmpaque',
+            'ventas',
+        ]);
 
-        return view('producciones.show', compact('produccion'));
+        $presentacion = $this->presentacionRegistrada($produccion);
+
+        return view('producciones.show', compact('produccion', 'presentacion'));
     }
 
     public function edit(Produccion $produccion)
@@ -393,7 +460,7 @@ class ProduccionController extends Controller
     }
 
     /** @return Collection<int, Almacen> */
-    private function almacenesDestacadosParaCosecha(Collection $almacenes): Collection
+    private function almacenesDestacadosParaCosecha(Collection $almacenes, string $orden = 'mas'): Collection
     {
         if ($almacenes->count() <= 4) {
             return $almacenes->values();
@@ -404,10 +471,15 @@ class ProduccionController extends Controller
             ->groupBy('almacenid')
             ->pluck('total', 'almacenid');
 
-        return $almacenes
-            ->sortByDesc(fn (Almacen $almacen) => (int) ($usoPorAlmacen[$almacen->almacenid] ?? 0))
-            ->take(4)
-            ->values();
+        $ordenados = $almacenes->sortByDesc(
+            fn (Almacen $almacen) => (int) ($usoPorAlmacen[$almacen->almacenid] ?? 0)
+        );
+
+        if ($orden === 'menos') {
+            return $ordenados->reverse()->take(4)->values();
+        }
+
+        return $ordenados->take(4)->values();
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -451,5 +523,93 @@ class ProduccionController extends Controller
         }
 
         return $return;
+    }
+
+    /** @return array<string, mixed> */
+    private function resolverPresentacionCosecha(Lote $lote, float $cantidadBaseKg): array
+    {
+        $calibre = $lote->catalogoTamanoConteo;
+        if (! $calibre && $lote->insumosemillaid) {
+            $ctx = $this->planificacionCosecha->contexto((int) $lote->insumosemillaid);
+            $calibreId = $ctx['calibre_default_id'] ?? null;
+            if ($calibreId) {
+                $calibre = \App\Models\CatalogoTamanoConteo::query()
+                    ->with('tipoEmpaque')
+                    ->find((int) $calibreId);
+            }
+        }
+
+        return $this->presentacionCosecha->desdeKg($cantidadBaseKg, $calibre);
+    }
+
+    /** @return array<string, mixed> */
+    private function presentacionRegistrada(Produccion $produccion): array
+    {
+        if ($produccion->cantidad_unidades !== null && $produccion->cantidad_empaques !== null) {
+            $calibre = $produccion->catalogoTamanoConteo ?? $produccion->lote?->catalogoTamanoConteo;
+            $empaqueLabel = CosechaPresentacionService::etiquetaEmpaquePlural($calibre?->tipoEmpaque?->nombre);
+
+            return [
+                'ok' => true,
+                'kg' => round((float) ($produccion->cantidad_base ?? $produccion->cantidad), 2),
+                'unidades' => (int) $produccion->cantidad_unidades,
+                'empaques' => (int) $produccion->cantidad_empaques,
+                'empaque_label' => $empaqueLabel,
+                'calibre_nombre' => $calibre?->nombre,
+                'resumen' => number_format((int) $produccion->cantidad_empaques, 0, ',', '.').' '.$empaqueLabel
+                    .' · '.number_format((int) $produccion->cantidad_unidades, 0, ',', '.').' unidades · '
+                    .number_format((float) ($produccion->cantidad_base ?? 0), 2, ',', '.').' kg',
+            ];
+        }
+
+        $almacenActivo = $produccion->almacenamientos
+            ?->whereNull('fechasalida')
+            ->sortByDesc('fechaentrada')
+            ->first();
+
+        if ($almacenActivo) {
+            return $this->presentacionCosecha->paraAlmacenamiento($almacenActivo);
+        }
+
+        return $this->presentacionCosecha->paraProduccion($produccion);
+    }
+
+    /** @param  array<string, mixed>  $presentacion */
+    private function observacionAlmacenCosecha(Lote $lote, array $presentacion): string
+    {
+        $base = "Cosecha del lote {$lote->nombre}";
+        if ($presentacion['ok'] ?? false) {
+            return $base.' · '.($presentacion['resumen'] ?? '');
+        }
+
+        return $base;
+    }
+
+    /** @param  array<string, mixed>  $data */
+    /** @param  array<string, mixed>  $presentacion */
+    private function observacionHistorialCosecha(array $data, UnidadMedida $unidad, array $presentacion, string $mensajeAlmacen): string
+    {
+        $txt = "Cosecha: {$data['cantidad']} {$unidad->abreviatura}";
+        if ($presentacion['ok'] ?? false) {
+            $txt .= ' · '.($presentacion['resumen'] ?? '');
+        }
+
+        return $txt.$mensajeAlmacen;
+    }
+
+    /** @param  array<string, mixed>  $data */
+    /** @param  array<string, mixed>  $presentacion */
+    private function mensajeExitoCosecha(array $data, Lote $lote, UnidadMedida $unidad, array $presentacion, string $mensajeAlmacen): string
+    {
+        $cultivo = $lote->cultivo?->nombre ?? $lote->cultivo_etiqueta ?? 'cultivo';
+        $mensaje = "¡Cosecha registrada! {$data['cantidad']} {$unidad->abreviatura} de {$cultivo}";
+        if ($presentacion['ok'] ?? false) {
+            $mensaje .= ' ('.($presentacion['resumen'] ?? '').')';
+        }
+        if ($mensajeAlmacen !== '') {
+            $mensaje .= $mensajeAlmacen;
+        }
+
+        return $mensaje;
     }
 }

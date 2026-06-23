@@ -26,6 +26,10 @@ use App\Services\CatalogoProductoPlantaPdvService;
 use App\Services\DisponibilidadMayoristaPdvService;
 use App\Services\InventarioPresentacionService;
 use App\Services\ProductoPlantaInventarioService;
+use App\Services\PuntoVentaAlmacenService;
+use App\Services\TransporteCapacidadService;
+use App\Services\VehiculoDimensionesService;
+use InvalidArgumentException;
 use App\Support\ActividadDetalleCatalogo;
 use App\Support\BusquedaTexto;
 use App\Support\CultivoSiembraCatalogo;
@@ -33,7 +37,6 @@ use App\Support\InsumoCatalogo;
 use App\Support\PedidoCatalogo;
 use App\Support\ProcesoPlantaCatalogo;
 use App\Support\PuntoVentaAccess;
-use App\Services\TransporteCapacidadService;
 use App\Services\VehiculoFlotaEstadoService;
 use App\Support\EstadoVehiculoCatalogo;
 use App\Support\LicenciaConduccionCatalogo;
@@ -272,6 +275,83 @@ class CatalogoSelectorController extends Controller
                 ]),
             ];
         });
+    }
+
+    public function vehiculoPreviewCarga(Request $request, Vehiculo $vehiculo): JsonResponse
+    {
+        $request->validate([
+            'peso_kg' => 'nullable|numeric|min:0',
+            'volumen_m3' => 'nullable|numeric|min:0',
+        ]);
+
+        $capSvc = app(TransporteCapacidadService::class);
+        $dimSvc = app(VehiculoDimensionesService::class);
+        $vehiculo->loadMissing('tipoVehiculo');
+
+        $pesoKg = max(0, (float) $request->input('peso_kg', 0));
+        $volumenM3 = $request->filled('volumen_m3')
+            ? max(0, (float) $request->input('volumen_m3'))
+            : null;
+        if (($volumenM3 === null || $volumenM3 <= 0) && $pesoKg > 0) {
+            $volumenM3 = $capSvc->volumenDesdePeso($pesoKg);
+        }
+
+        $cap = $capSvc->capacidadEfectiva($vehiculo);
+        $dims = $dimSvc->dimensionesEfectivas($vehiculo);
+        $m3Util = $dims['m3_util'] > 0 ? (float) $dims['m3_util'] : (float) $cap['m3'];
+
+        $pctKg = $cap['kg'] > 0 ? round(($pesoKg / $cap['kg']) * 100, 1) : null;
+        $pctM3 = ($m3Util > 0 && $volumenM3 !== null && $volumenM3 > 0)
+            ? round(($volumenM3 / $m3Util) * 100, 1)
+            : null;
+        $pctUso = max($pctKg ?? 0, $pctM3 ?? 0);
+
+        $limitePor = null;
+        if ($pctKg !== null && $pctM3 !== null) {
+            $limitePor = $pctKg >= $pctM3 ? 'peso' : 'volumen';
+        } elseif ($pctM3 !== null) {
+            $limitePor = 'volumen';
+        } elseif ($pctKg !== null) {
+            $limitePor = 'peso';
+        }
+
+        $ok = true;
+        $mensaje = '';
+        try {
+            if ($pesoKg > 0) {
+                $capSvc->validarCarga($vehiculo, $pesoKg, $volumenM3);
+            }
+        } catch (InvalidArgumentException $e) {
+            $ok = false;
+            $mensaje = $e->getMessage();
+        }
+
+        $tipoCodigo = strtoupper($vehiculo->tipoVehiculo?->codigo ?? 'CAMIONETA');
+
+        return response()->json([
+            'ok' => $ok,
+            'mensaje' => $mensaje,
+            'limite_por' => $limitePor,
+            'vehiculo' => [
+                'placa' => $vehiculo->placa,
+                'tipo_codigo' => $tipoCodigo,
+                'tipo_nombre' => $vehiculo->tipoVehiculo?->nombre ?? 'Vehículo',
+            ],
+            'dimensiones' => $dims,
+            'capacidad_kg' => $cap['kg'],
+            'capacidad_m3' => $cap['m3'],
+            'm3_util' => $m3Util,
+            'carga_peso_kg' => round($pesoKg, 2),
+            'carga_volumen_m3' => $volumenM3 !== null ? round($volumenM3, 3) : null,
+            'porcentaje_peso' => $pctKg,
+            'porcentaje_volumen' => $pctM3,
+            'porcentaje_uso' => $pctUso > 0 ? $pctUso : $pctKg,
+            'recomendacion' => $pesoKg <= 0
+                ? 'Indique productos y cantidades del envío para estimar la ocupación.'
+                : ($ok
+                    ? 'La carga cabe en este vehículo según peso y volumen registrados.'
+                    : 'Reduzca la cantidad, divida en otro envío o elija un vehículo con mayor capacidad.'),
+        ]);
     }
 
     public function rutasMulti(Request $request): JsonResponse
@@ -998,6 +1078,29 @@ class CatalogoSelectorController extends Controller
                 ],
             ];
         });
+    }
+
+    public function puntoVentaCapacidadPdv(Request $request, PuntoVentaAlmacenService $almacenPdv): JsonResponse
+    {
+        $puntoId = (int) $request->query('puntoventaid', 0);
+        if ($puntoId <= 0) {
+            return response()->json(['data' => null]);
+        }
+
+        $punto = PuntoVenta::query()->find($puntoId);
+        if ($punto === null) {
+            return response()->json(['data' => null], 404);
+        }
+
+        abort_unless(PuntoVentaAccess::puedeVerPunto($request->user(), $punto), 403);
+
+        $cantidad = max(0, (float) $request->query('cantidad', 0));
+        $pesoNetoKg = max(0, (float) $request->query('peso_neto_kg', 0));
+        $kgIngreso = $cantidad > 0 && $pesoNetoKg > 0 ? $cantidad * $pesoNetoKg : 0;
+
+        $resumen = $almacenPdv->resumenCapacidadPedido($punto, $kgIngreso);
+
+        return response()->json(['data' => $resumen]);
     }
 
     public function productosPedido(Request $request): JsonResponse

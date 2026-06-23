@@ -116,6 +116,22 @@ class PlantillasTransformacionSeeder extends Seeder
                 ],
             ],
             [
+                'nombre' => 'Cebolla deshidratada en polvo',
+                'producto_ejemplo' => 'Cebolla deshidratada en polvo',
+                'palabras_clave' => ['cebolla', 'polvo', 'deshidratada', 'deshidratado'],
+                'descripcion' => 'Transformación de cebolla fresca a polvo deshidratado comercial.',
+                'pasos' => [
+                    ['proceso' => 'Preparación de Materias Primas', 'maquina' => 'L-100', 'notas' => 'Recepción, pesaje y lavado de cebolla fresca de campo'],
+                    ['proceso' => 'Preparación de Materias Primas', 'maquina' => 'BC-20', 'notas' => 'Pelado, corte en láminas y selección de calibre'],
+                    ['proceso' => 'Secado', 'maquina' => 'SC-500', 'notas' => 'Deshidratación térmica hasta humedad objetivo'],
+                    ['proceso' => 'Mezclado', 'maquina' => 'MX-200', 'notas' => 'Molienda fina a polvo homogéneo'],
+                    ['proceso' => 'Preparación de Materias Primas', 'maquina' => 'BC-20', 'notas' => 'Tamizado y control de granulometría'],
+                    ['proceso' => 'Envasado', 'maquina' => 'EV-700', 'notas' => 'Envasado en bolsa aluminizada anti-humedad'],
+                    ['proceso' => 'Etiquetado', 'maquina' => 'ET-800', 'notas' => 'Lote, fecha y datos nutricionales'],
+                    ['proceso' => 'Empaquetado', 'maquina' => 'SE-10', 'notas' => 'Embalaje para despacho a centro mayorista'],
+                ],
+            ],
+            [
                 'nombre' => 'Mix vegetal ensalada',
                 'producto_ejemplo' => 'Mix vegetal',
                 'palabras_clave' => ['mix', 'ensalada', 'vegetal', 'lechuga'],

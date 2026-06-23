@@ -16,6 +16,110 @@
     --inicio-title: #9a3412;
     --inicio-icon-bg: linear-gradient(135deg, #ea580c, #f59e0b);
 }
+.inicio-pendientes-card {
+    border-radius: 14px;
+    border: 1px solid #fcd34d;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    box-shadow: 0 4px 16px rgba(234, 88, 12, 0.1);
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+}
+.inicio-pendientes-card--asignado {
+    border-color: #86efac;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    box-shadow: 0 4px 16px rgba(22, 163, 74, 0.1);
+}
+.inicio-pendientes-card__head {
+    display: flex;
+    align-items: flex-start;
+    gap: .85rem;
+    padding: 1rem 1.15rem .85rem;
+}
+.inicio-pendientes-card__icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1.05rem;
+    color: #fff;
+    background: linear-gradient(135deg, #ea580c, #f59e0b);
+    box-shadow: 0 3px 10px rgba(234, 88, 12, 0.25);
+}
+.inicio-pendientes-card--asignado .inicio-pendientes-card__icon {
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+    box-shadow: 0 3px 10px rgba(22, 163, 74, 0.25);
+}
+.inicio-pendientes-card__title {
+    font-size: .95rem;
+    font-weight: 800;
+    color: #9a3412;
+    margin-bottom: .15rem;
+}
+.inicio-pendientes-card--asignado .inicio-pendientes-card__title { color: #14532d; }
+.inicio-pendientes-card__sub {
+    font-size: .82rem;
+    color: #78716c;
+    margin: 0;
+    line-height: 1.4;
+}
+.inicio-pendientes-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0 .85rem .85rem;
+    display: flex;
+    flex-direction: column;
+    gap: .55rem;
+}
+.inicio-pendiente-item {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .75rem .9rem;
+    border-radius: 11px;
+    background: #fff;
+    border: 1px solid #fde68a;
+    border-left: 4px solid #f59e0b;
+    text-decoration: none !important;
+    color: inherit;
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.inicio-pendientes-card--asignado .inicio-pendiente-item {
+    border-color: #bbf7d0;
+    border-left-color: #22c55e;
+}
+.inicio-pendiente-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+    border-color: #f59e0b;
+}
+.inicio-pendientes-card--asignado .inicio-pendiente-item:hover { border-color: #22c55e; }
+.inicio-pendiente-item__body { flex: 1; min-width: 0; }
+.inicio-pendiente-item__codigo {
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 700;
+    font-size: .88rem;
+    color: #92400e;
+    margin-bottom: .1rem;
+}
+.inicio-pendientes-card--asignado .inicio-pendiente-item__codigo { color: #14532d; }
+.inicio-pendiente-item__meta {
+    display: block;
+    font-size: .8rem;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.inicio-pendiente-item__arrow {
+    color: #d97706;
+    font-size: .85rem;
+    flex-shrink: 0;
+}
+.inicio-pendientes-card--asignado .inicio-pendiente-item__arrow { color: #16a34a; }
 </style>
 @endpush
 
@@ -38,39 +142,56 @@
         @include('partials.dashboard-alertas')
 
         @if(($envios_pendientes_accion ?? collect())->isNotEmpty())
-            @php $envioAsignado = $envios_pendientes_accion->first(); @endphp
-            <div class="alert alert-success border-success shadow-sm mb-3" role="alert">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="inicio-pendientes-card inicio-pendientes-card--asignado" role="alert">
+                <div class="inicio-pendientes-card__head">
+                    <div class="inicio-pendientes-card__icon"><i class="fas fa-truck-loading"></i></div>
                     <div>
-                        <i class="fas fa-truck-loading mr-1"></i>
-                        <strong>Tiene {{ $envios_pendientes_accion->count() }} envío(s) asignado(s) listo(s) para recoger.</strong>
-                        @if($envioAsignado)
-                            <span class="d-block small mt-1">
-                                Próximo: <strong>{{ $envioAsignado->externo_envio_id ?? $envioAsignado->pedido?->numero_solicitud }}</strong>
-                                — {{ $envioAsignado->pedido?->detalles?->first()?->cultivo_personalizado ?? 'Producto agrícola' }}
-                            </span>
-                        @endif
+                        <div class="inicio-pendientes-card__title">
+                            {{ $envios_pendientes_accion->count() }} envío(s) listo(s) para recoger
+                        </div>
+                        <p class="inicio-pendientes-card__sub">Seleccione un envío para revisar condiciones y comenzar el cierre operativo.</p>
                     </div>
-                    <a href="{{ route('logistica.asignaciones.show', $envioAsignado) }}" class="btn btn-success btn-sm font-weight-bold">
-                        <i class="fas fa-clipboard-check mr-1"></i> Ir al envío asignado
-                    </a>
                 </div>
+                <ul class="inicio-pendientes-lista">
+                    @foreach($envios_pendientes_accion as $envio)
+                    <li>
+                        <a href="{{ route('logistica.asignaciones.show', $envio) }}" class="inicio-pendiente-item">
+                            <div class="inicio-pendiente-item__body">
+                                <span class="inicio-pendiente-item__codigo">{{ $envio->externo_envio_id ?? $envio->pedido?->numero_solicitud ?? '#'.$envio->envioasignacionmultipleid }}</span>
+                                <span class="inicio-pendiente-item__meta">{{ $envio->pedido?->detalles?->first()?->cultivo_personalizado ?? 'Producto agrícola' }}</span>
+                            </div>
+                            <i class="fas fa-arrow-right inicio-pendiente-item__arrow"></i>
+                        </a>
+                    </li>
+                    @endforeach
+                </ul>
             </div>
         @endif
 
         @if(($rutas_pendientes_salida ?? collect())->isNotEmpty())
-            @php $rutaPendiente = $rutas_pendientes_salida->first(); @endphp
-            <div class="alert alert-warning border-warning shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3" role="alert">
-                <div>
-                    <i class="fas fa-exclamation-circle mr-1"></i>
-                    <strong>Tiene {{ $rutas_pendientes_salida->count() }} envío(s) pendiente(s) de salida.</strong>
-                    @if($rutaPendiente)
-                        <span class="d-block small mt-1">Próximo: <strong>{{ $rutaPendiente->codigo }}</strong> — debe aceptar la solicitud e iniciar el cierre operativo.</span>
-                    @endif
+            <div class="inicio-pendientes-card" role="alert">
+                <div class="inicio-pendientes-card__head">
+                    <div class="inicio-pendientes-card__icon"><i class="fas fa-exclamation-circle"></i></div>
+                    <div>
+                        <div class="inicio-pendientes-card__title">
+                            {{ $rutas_pendientes_salida->count() }} envío(s) pendiente(s) de salida
+                        </div>
+                        <p class="inicio-pendientes-card__sub">Debe aceptar la solicitud e iniciar el cierre operativo de cada envío.</p>
+                    </div>
                 </div>
-                <a href="{{ \App\Support\RutaDistribucionNavegacion::urlVer($rutaPendiente) }}" class="btn btn-warning btn-sm font-weight-bold">
-                    <i class="fas fa-shipping-fast mr-1"></i> Ir al envío pendiente
-                </a>
+                <ul class="inicio-pendientes-lista">
+                    @foreach($rutas_pendientes_salida as $ruta)
+                    <li>
+                        <a href="{{ \App\Support\RutaDistribucionNavegacion::urlVer($ruta) }}" class="inicio-pendiente-item">
+                            <div class="inicio-pendiente-item__body">
+                                <span class="inicio-pendiente-item__codigo">{{ $ruta->codigo }}</span>
+                                <span class="inicio-pendiente-item__meta">{{ \App\Support\RutaDistribucionNavegacion::resumenProducto($ruta) }}</span>
+                            </div>
+                            <i class="fas fa-arrow-right inicio-pendiente-item__arrow"></i>
+                        </a>
+                    </li>
+                    @endforeach
+                </ul>
             </div>
         @endif
 

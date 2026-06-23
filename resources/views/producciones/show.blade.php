@@ -44,6 +44,8 @@
 
     $fotoUrl = \App\Support\EvidenciaFoto::urlDesdeImagenUrl($produccion->imagenurl);
 
+    $presentacion = $presentacion ?? ['ok' => false];
+    $kgPresentacion = (float) ($presentacion['kg'] ?? $produccion->cantidad_base ?? $produccion->cantidad ?? 0);
 @endphp
 
 
@@ -794,9 +796,13 @@
 
             <div class="cos-det__metric">
 
+                @if($presentacion['ok'] ?? false)
+                <div class="cos-det__metric-val">{{ number_format($presentacion['unidades'] ?? 0, 0) }} <span style="font-size:1rem;font-weight:600;">ud</span></div>
+                <div class="cos-det__metric-lbl">{{ number_format($kgPresentacion, 2) }} kg · {{ number_format($presentacion['empaques'] ?? 0, 0) }} {{ $presentacion['empaque_label'] ?? 'Cajas' }}</div>
+                @else
                 <div class="cos-det__metric-val">{{ number_format($produccion->cantidad ?? 0, 2) }} <span style="font-size:1rem;font-weight:600;">{{ $umAbbr }}</span></div>
-
                 <div class="cos-det__metric-lbl">Cantidad cosechada</div>
+                @endif
 
             </div>
 
@@ -822,7 +828,12 @@
 
                         <span class="cos-det__field-value cos-det__field-value--accent">
 
-                            {{ number_format($produccion->cantidad ?? 0, 2) }} {{ $umNombre }}
+                            @if($presentacion['ok'] ?? false)
+                                {{ number_format($presentacion['unidades'] ?? 0, 0) }} unidades<br>
+                                <span class="text-muted font-weight-normal">{{ number_format($kgPresentacion, 2) }} kg · {{ number_format($presentacion['empaques'] ?? 0, 0) }} {{ $presentacion['empaque_label'] ?? 'cajas' }}</span>
+                            @else
+                                {{ number_format($produccion->cantidad ?? 0, 2) }} {{ $umNombre }}
+                            @endif
 
                         </span>
 
@@ -875,11 +886,18 @@
                                     <span>{{ $almacenActivo->almacen->nombre }}</span>
 
                                     @if($almacenActivo->almacen->ubicacion)
-
+                                        @php
+                                            $ubicAlmacenVisible = \App\Support\UbicacionGpsParser::textoDireccionVisible(
+                                                $almacenActivo->almacen->ubicacion,
+                                                $almacenActivo->almacen->nombre,
+                                                (int) $almacenActivo->almacen->almacenid
+                                            );
+                                        @endphp
+                                        @if($ubicAlmacenVisible)
                                         <span class="cos-chip__sep" aria-hidden="true"></span>
 
-                                        <span class="cos-chip__ubic"><i class="fas fa-map-pin mr-1"></i>{{ $almacenActivo->almacen->ubicacion }}</span>
-
+                                        <span class="cos-chip__ubic"><i class="fas fa-map-pin mr-1"></i>{{ $ubicAlmacenVisible }}</span>
+                                        @endif
                                     @endif
 
                                 </span>

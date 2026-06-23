@@ -62,7 +62,7 @@
     @else
         <div class="alert alert-info mb-0 py-3">
             <i class="fas fa-warehouse mr-1"></i>
-            Aún no hay almacén de destino. Use <strong>Cambiar almacén</strong> para elegir dónde ingresará la cosecha.
+            Aún no hay almacén de destino. Elija una de las tarjetas sugeridas o use <strong>Buscar todos</strong>.
         </div>
     @endif
 </div>

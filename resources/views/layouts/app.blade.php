@@ -991,6 +991,7 @@
     @include('partials.estilos-ejecutivo-global')
     @include('dashboard.partials.estilos-dash-ejecutivo')
     @include('partials.small-box-footer-styles')
+    @include('partials.login-notificacion-estilos')
 </head>
 
 @php
@@ -1009,9 +1010,6 @@
     $esMayoristaOperativo = $authUser && \App\Support\UsuarioRol::esMayorista($authUser) && ! $isAdmin;
     $pendientesSolicitudes = $isAdmin
         ? \App\Models\Usuario::where('estado_cuenta', \App\Support\CuentaEstado::PENDIENTE)->count()
-        : 0;
-    $pedidosPendientesJefeAgr = ($esJefeAgr && ! $isAdmin && $authUser?->can('pedidos.view'))
-        ? \App\Support\PedidoCatalogo::contarPendientesAgricola()
         : 0;
     $roleCss     = strtolower($userRole);
 @endphp
@@ -1083,7 +1081,6 @@
                     $almMayOpen = request()->routeIs('almacen-mayorista.*');
                     $prodAgrOpen = request()->routeIs('producciones.*', 'climas.*');
                     if (! ($esJefeAgr && ! $isAdmin)) {
-                        $prodAgrOpen = $prodAgrOpen || request()->routeIs('agricola.pedidos.*');
                     }
                     $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'plantillas-transformacion.*', 'maquinas-planta.*', 'procesamiento.*', 'tareas-planta.*', 'certificaciones-planta.*', 'produccion-planta.catalogos.*');
                     $envListadoActivo = request()->routeIs(
@@ -1179,7 +1176,7 @@
                 </li>
                 @endcanany
 
-                {{-- Producción agrícola (cosechas, clima y pedidos de planta) --}}
+                {{-- Producción agrícola (cosechas y clima) --}}
                 <li class="ag-nav-li">
                     <a href="#" class="ag-nav-a {{ $prodAgrOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-prod-agr">
                         <i class="ag-nav-icon fas fa-seedling"></i>
@@ -1190,11 +1187,6 @@
                         @unless(auth()->user()?->hasRole('transportista'))
                         <li class="ag-sub-li"><a href="{{ route('producciones.index') }}" class="ag-sub-a {{ request()->routeIs('producciones.*') ? 'active' : '' }}">Cosechas</a></li>
                         @endunless
-                        @can('pedidos.view')
-                        @if(! $esJefeAgr || $isAdmin)
-                        <li class="ag-sub-li"><a href="{{ route('agricola.pedidos.index') }}" class="ag-sub-a {{ request()->routeIs('agricola.pedidos.*') ? 'active' : '' }}">Pedidos de planta</a></li>
-                        @endif
-                        @endcan
                         <li class="ag-sub-li"><a href="{{ route('climas.index') }}" class="ag-sub-a {{ request()->routeIs('climas.*') ? 'active' : '' }}">Clima</a></li>
                     </ul>
                 </li>
@@ -1233,18 +1225,6 @@
                 </li>
                 @endif
 
-                @can('pedidos.view')
-                @if($esJefeAgr && ! $isAdmin)
-                <li class="ag-nav-li">
-                    <a href="{{ route('agricola.pedidos.index') }}" class="ag-nav-a {{ request()->routeIs('agricola.pedidos.*') ? 'active' : '' }}">
-                        <i class="ag-nav-icon fas fa-shopping-cart"></i>
-                        <span class="ag-nav-text">Pedidos</span>
-                        @if($pedidosPendientesJefeAgr > 0)
-                            <span class="badge badge-warning ml-auto">{{ $pedidosPendientesJefeAgr }}</span>
-                        @endif
-                    </a>
-                </li>
-                @endif
                 @if($esJefeAgr && ! $isAdmin && ($puedeEnvios || $puedeSubmenuEnviosScoped))
                 <li class="ag-nav-li">
                     <a href="#" class="ag-nav-a {{ $envAgrOpen ? 'active group-open' : '' }}" data-toggle-sub="sub-env-agr">
@@ -1257,7 +1237,6 @@
                     </ul>
                 </li>
                 @endif
-                @endcan
                 @endif
 
                 @if($showOperLogistica)
@@ -1612,11 +1591,15 @@
 
         @include('partials.modal-bienvenida')
         @include('partials.modal-aviso')
+        @include('partials.modal-confirmar-accion')
+        @include('partials.flash-error-modal')
         @include('partials.transportista-asignacion-login-modal')
         @include('partials.operario-planta-tarea-login-modal')
+        @include('partials.mayorista-pedido-login-modal')
         @once
             @include('partials.selector-catalogo-assets')
             @include('partials.selector-catalogo-modal')
+            @include('partials.modal-vehiculo-carga-preview')
         @endonce
 
         {{-- FOOTER --}}

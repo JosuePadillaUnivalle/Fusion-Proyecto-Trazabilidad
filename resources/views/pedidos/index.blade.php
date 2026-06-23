@@ -86,9 +86,8 @@
     @else
         <div class="alert alert-light border pedidos-alert mb-3">
             <i class="fas fa-leaf text-success mr-1"></i>
-            Los pedidos nuevos quedan <strong>pendientes de producción agrícola</strong>.
-            Logística solo puede asignar envíos después de que agrícola acepte y reserve stock en
-            <a href="{{ route('agricola.pedidos.index') }}">Producción → Pedidos de planta</a>.
+            Los envíos agrícola → planta quedan <strong>pendientes de aprobación</strong> hasta que producción agrícola confirme y reserve stock en
+            <a href="{{ route('logistica.asignaciones.listado') }}">Envíos → Listado de envíos</a>.
         </div>
     @endif
 
@@ -258,10 +257,14 @@
                                     @endif
                                 @elseif(\App\Support\PedidoCatalogo::puedeAsignarTransportista($pedido))
                                     @can('pedidos.update')
+                                    @php
+                                        $pesoPedidoAsign = app(\App\Services\TransporteCapacidadService::class)->pesoPedido($pedido);
+                                    @endphp
                                     <button type="button"
                                             class="btn btn-link btn-sm p-0 text-primary btn-asignar-transportista"
                                             data-pedido-id="{{ $pedido->pedidoid }}"
                                             data-pedido-label="{{ $pedido->numero_solicitud }}"
+                                            data-peso-kg="{{ number_format((float) $pesoPedidoAsign, 2, '.', '') }}"
                                             title="Asignar transportista">
                                         <i class="fas fa-user-plus mr-1"></i>Sin asignar
                                     </button>
@@ -395,6 +398,9 @@ document.addEventListener('DOMContentLoaded', function () {
         endpoint: @json(route('catalogo-selector.vehiculos')),
         title: 'Asignar vehículo',
         searchPlaceholder: 'Buscar por placa, marca o modelo…',
+        theme: 'vehiculo',
+        colNombre: 'Placa',
+        colDetalle: 'Vehículo',
         params: {},
         filter: {
             param: 'solo_transportista',
@@ -415,6 +421,10 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.btn-asignar-transportista').forEach(function (btn) {
         btn.addEventListener('click', function () {
             pedidoIdAsignar = this.dataset.pedidoId;
+            window.AsignacionPedidoCargaContext = {
+                peso_kg: parseFloat(this.dataset.pesoKg) || 0,
+                volumen_m3: null,
+            };
             transportistaPendiente = null;
             transportistaLabelPendiente = '';
             const label = this.dataset.pedidoLabel || '';

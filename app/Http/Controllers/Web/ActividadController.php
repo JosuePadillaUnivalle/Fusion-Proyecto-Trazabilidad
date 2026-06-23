@@ -673,9 +673,9 @@ class ActividadController extends Controller
         $user = $request->user();
 
         if (UsuarioRol::debeAcotarPorAsignacion($user)) {
-            $query->where('usuarioid', (int) $user->usuarioid);
+            $query->whereHas('lote', fn ($q) => $q->where('usuarioid', (int) $user->usuarioid));
         } elseif (UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
-            $query->whereIn('usuarioid', UsuarioRol::idsEmpleadosOperativosDeJefeAgricultor($user));
+            $query->whereHas('lote', fn ($q) => $q->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($user)));
         }
 
         return $query;

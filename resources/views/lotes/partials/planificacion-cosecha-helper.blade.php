@@ -17,13 +17,12 @@
         const objetivoUnidadesWrap = document.getElementById('planObjetivoUnidadesWrap');
         const objetivoEmpaquesWrap = document.getElementById('planObjetivoEmpaquesWrap');
         const cosechaPreview = document.getElementById('planCosechaPreview');
-        const cosechaTexto = document.getElementById('planCosechaTexto');
         const errorPreview = document.getElementById('planErrorPreview');
         const errorTexto = document.getElementById('planErrorTexto');
         const modoRadios = document.querySelectorAll('input[name="plan_modo_ui"]');
         const modoCards = document.querySelectorAll('.plan-modo-card');
-        const hectareasHint = document.getElementById('planHectareasHint');
         const resultadoGrid = document.getElementById('planResultadoGrid');
+        const insumoUsoNombre = document.getElementById('planInsumoUsoNombre');
         const urlPlanificar = config.urlPlanificar;
         const onHectareasChange = config.onHectareasChange;
 
@@ -39,6 +38,17 @@
         let timer = null;
         let semillaEditadaManual = false;
         let haEditadaManual = false;
+
+        function nombreInsumoSeleccionado() {
+            return semillaWrap?.querySelector('.selector-catalogo-label')?.value?.trim() || 'Material de siembra';
+        }
+
+        function actualizarEtiquetaInsumo() {
+            const nombre = nombreInsumoSeleccionado();
+            if (insumoUsoNombre) {
+                insumoUsoNombre.textContent = nombre ? '(' + nombre + ')' : '';
+            }
+        }
 
         function toggleSuperficie(mostrar) {
             if (superficieWrap) {
@@ -73,30 +83,23 @@
                 const radio = card.querySelector('input[type="radio"]');
                 card.classList.toggle('active', !!(radio && radio.checked));
             });
-            hectareasHint?.classList.toggle('d-none', modo !== 'hectareas');
             objetivoUnidadesWrap?.classList.toggle('d-none', modo !== 'unidades');
             objetivoEmpaquesWrap?.classList.toggle('d-none', modo !== 'empaques');
-            supInput.readOnly = modo !== 'hectareas';
-            supInput.classList.toggle('bg-light', modo !== 'hectareas');
             if (superficieWrap) {
                 superficieWrap.classList.remove('d-none');
                 superficieWrap.classList.toggle('plan-superficie-calculada', modo !== 'hectareas');
             }
+            supInput.readOnly = modo !== 'hectareas';
+            supInput.classList.toggle('bg-light', modo !== 'hectareas');
         }
 
         function renderResultado(res) {
-            if (!resultadoGrid || !cosechaTexto) return;
+            if (!resultadoGrid) return;
             const emp = res.calibre?.empaque_label || 'Cajas';
-            const porCaja = res.calibre?.conteo_por_empaque;
             resultadoGrid.innerHTML =
                 '<div class="plan-resultado-item"><strong>' + fmtNum(res.unidades_estimadas, 0) + '</strong><span>Unidades</span></div>'
                 + '<div class="plan-resultado-item"><strong>' + fmtNum(res.empaques_estimados, 0) + '</strong><span>' + emp + '</span></div>'
                 + '<div class="plan-resultado-item"><strong>' + fmtNum(res.kg_cosecha_estimados, 0) + ' kg</strong><span>Cosecha</span></div>';
-            let txt = res.resumen || '';
-            if (porCaja) {
-                txt += ' Aprox. ' + fmtNum(porCaja, 0) + ' unidades por caja.';
-            }
-            cosechaTexto.textContent = txt;
         }
 
         function mostrarError(msg) {
@@ -108,6 +111,7 @@
             }
             errorTexto.textContent = msg;
             errorPreview.classList.remove('d-none');
+            panel?.classList.remove('d-none');
             cosechaPreview?.classList.add('d-none');
         }
 
@@ -128,8 +132,10 @@
                 return;
             }
             const empaque = etiquetaEmpaqueCorto(c);
-            hint.textContent = 'Cada caja llevará aprox. ' + fmtNum(c.conteo_por_empaque, 0) + ' unidades (' + empaque + ').';
+            hint.textContent = '~' + fmtNum(c.conteo_por_empaque, 0) + ' u./caja · ' + fmtNum(c.peso_promedio_kg, 2) + ' kg/u.';
             hint.classList.remove('d-none');
+        }
+
         function sincronizarCalibreHidden() {
             if (calibreHidden && calibreSelect?.value) {
                 calibreHidden.value = calibreSelect.value;
@@ -159,6 +165,35 @@
             calibreInicial = '';
         }
 
+        let ultimoContexto = null;
+
+        function modoAvanzadoDisponible(ctx) {
+            return !!(ctx.tiene_rendimiento && ctx.calibres && ctx.calibres.length);
+        }
+
+        function actualizarModosDisponibles(ctx) {
+            const avanzado = modoAvanzadoDisponible(ctx);
+            modoCards.forEach(function (card) {
+                const radio = card.querySelector('input[type="radio"]');
+                const val = radio?.value;
+                const bloqueado = !avanzado && val !== 'hectareas';
+                card.classList.toggle('opacity-50', bloqueado);
+                card.style.pointerEvents = bloqueado ? 'none' : '';
+                if (bloqueado) {
+                    radio.disabled = true;
+                } else {
+                    radio.disabled = false;
+                }
+            });
+            if (!avanzado) {
+                const haRadio = document.querySelector('input[name="plan_modo_ui"][value="hectareas"]');
+                if (haRadio) {
+                    haRadio.checked = true;
+                }
+                actualizarModoUi();
+            }
+        }
+
         function cargarContexto(id) {
             insumoId = id;
             if (!id) {
@@ -180,26 +215,68 @@
                         mostrarError(ctx.mensaje || 'No se pudo cargar planificación.');
                         return;
                     }
-                    if (!ctx.tiene_rendimiento || !ctx.calibres || !ctx.calibres.length) {
+
+                    const puedePlanificar = ctx.tiene_dosis || modoAvanzadoDisponible(ctx);
+                    if (!puedePlanificar) {
                         panel?.classList.add('d-none');
-                        mostrarError('');
+                        mostrarError('Este cultivo no tiene dosis ni rendimiento configurados. Ingrese las hectáreas manualmente.');
                         return;
                     }
+
                     panel?.classList.remove('d-none');
                     mostrarError('');
-                    poblarCalibres(ctx.calibres, calibreInicial || ctx.calibre_default_id);
-                    if (cantWrap) cantWrap.classList.remove('d-none');
-                    recalcular();
+                    ultimoContexto = ctx;
+
+                    if (modoAvanzadoDisponible(ctx)) {
+                        poblarCalibres(ctx.calibres, calibreInicial || ctx.calibre_default_id);
+                        actualizarModosDisponibles(ctx);
+                        if (cantWrap) cantWrap.classList.remove('d-none');
+                        recalcular();
+                    } else {
+                        actualizarModosDisponibles(ctx);
+                        if (cantWrap) cantWrap.classList.remove('d-none');
+                        mostrarError('Modo básico: ingrese hectáreas para calcular la semilla.');
+                        recalcularBasico(ctx);
+                    }
                 })
                 .catch(function () {
                     panel?.classList.add('d-none');
+                    mostrarError('No se pudo conectar con el servidor de planificación.');
                 });
+        }
+
+        function recalcularBasico(ctx) {
+            const ha = parseFloat(supInput.value);
+            if (!ha || ha <= 0 || !ctx.tiene_dosis) {
+                return;
+            }
+            const semilla = Math.round((ctx.dosis_por_ha || 0) * ha * 1000) / 1000;
+            if (!semillaEditadaManual && cantInput && semilla > 0) {
+                cantInput.value = semilla;
+            }
+            if (unidadSpan && ctx.dosis_unidad) {
+                unidadSpan.textContent = ctx.dosis_unidad;
+            }
+            if (dosisPreview && dosisTexto) {
+                dosisTexto.textContent = fmtNum(ctx.dosis_por_ha, 2) + ' ' + (ctx.dosis_unidad || 'kg') + '/ha × '
+                    + fmtNum(ha, 2) + ' ha = ' + fmtNum(semilla, 2) + ' ' + (ctx.dosis_unidad || 'kg');
+                dosisPreview.classList.remove('d-none');
+            }
+            actualizarEtiquetaInsumo();
+            cosechaPreview?.classList.add('d-none');
         }
 
         function recalcular() {
             clearTimeout(timer);
             timer = setTimeout(function () {
-                if (!insumoId || !calibreSelect?.value) {
+                if (!insumoId) {
+                    return;
+                }
+                if ((!calibreSelect?.value || !modoAvanzadoDisponible(ultimoContexto || {})) && ultimoContexto?.tiene_dosis) {
+                    recalcularBasico(ultimoContexto);
+                    return;
+                }
+                if (!calibreSelect?.value) {
                     return;
                 }
                 const params = new URLSearchParams({
@@ -241,14 +318,14 @@
                         }
 
                         if (dosisPreview && dosisTexto) {
-                            const semTxt = res.semilla_cantidad !== null
-                                ? fmtNum(res.semilla_cantidad, 2) + ' ' + (res.semilla_unidad || 'kg') + ' de semilla'
-                                : 'semilla según dosis';
-                            dosisTexto.textContent = 'Referencia: '
-                                + fmtNum(res.dosis_por_ha, 2) + ' ' + (res.semilla_unidad || 'kg') + '/ha × '
-                                + fmtNum(res.hectareas, 2) + ' ha = ' + semTxt + '.';
+                            const u = res.semilla_unidad || 'kg';
+                            const cant = res.semilla_cantidad;
+                            dosisTexto.textContent = fmtNum(res.dosis_por_ha, 2) + ' ' + u + '/ha × '
+                                + fmtNum(res.hectareas, 2) + ' ha = '
+                                + (cant !== null ? fmtNum(cant, 2) + ' ' + u : '—');
                             dosisPreview.classList.remove('d-none');
                         }
+                        actualizarEtiquetaInsumo();
 
                         if (cosechaPreview) {
                             renderResultado(res);
@@ -309,8 +386,12 @@
             const id = e.detail?.id || '';
             if (!id) {
                 cargarContexto('');
+                if (insumoUsoNombre) {
+                    insumoUsoNombre.textContent = '';
+                }
                 return;
             }
+            actualizarEtiquetaInsumo();
             cargarContexto(id);
         });
 

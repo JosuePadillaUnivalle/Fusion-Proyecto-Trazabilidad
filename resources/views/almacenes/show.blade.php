@@ -251,12 +251,15 @@
 
                 <div class="card-body">
 
+                    @can('inventario.update')
                     <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.edit', $almacen) }}" class="btn btn-warning btn-block mb-3 shadow-sm">
 
                         <i class="fas fa-edit mr-2"></i>Editar Datos
 
                     </a>
+                    @endcan
 
+                    @can('inventario.delete')
                     <hr>
 
                     <form action="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.destroy', $almacen) }}" method="POST"
@@ -274,6 +277,7 @@
                         </button>
 
                     </form>
+                    @endcan
 
                     <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.index') }}" class="btn btn-link btn-block mt-3 text-secondary">
 
@@ -365,7 +369,8 @@
 
                         <option value="cosecha">Cosecha</option>
 
-                        <option value="producto_planta">Producto terminado</option>
+                        <option value="producto_planta">Producto terminado (planta)</option>
+                        <option value="producto_terminado">Producto terminado</option>
 
                     </select>
 
@@ -417,7 +422,7 @@
 
                         <th>Producto</th><th>Categoría</th><th>Tipo</th><th>Empaque</th>
 
-                        <th class="text-right">Cantidad</th><th class="text-right">Equivalente (kg)</th><th>Detalle</th>
+                        <th class="text-right">{{ ($ambito ?? '') === 'mayorista' ? 'Cantidad (empaques)' : 'Cantidad' }}</th><th class="text-right">Equivalente (kg)</th><th>Detalle</th>
 
                         <th class="text-center text-nowrap">Acciones</th>
 
@@ -433,7 +438,7 @@
 
                             <td><strong class="text-success">{{ $item->nombre }}</strong></td>
 
-                            <td><span class="badge badge-{{ match($item->categoria) { 'cosecha', 'cosecha_consolidada' => 'info', 'producto_planta' => 'warning', default => 'secondary' } }}">{{ match($item->categoria) { 'cosecha', 'cosecha_consolidada' => 'Cosecha', 'producto_planta' => 'Producto terminado', default => 'Insumo' } }}</span></td>
+                            <td><span class="badge badge-{{ match($item->categoria) { 'cosecha', 'cosecha_consolidada' => 'info', 'producto_planta', 'producto_terminado' => 'warning', default => 'secondary' } }}">{{ match($item->categoria) { 'cosecha', 'cosecha_consolidada' => 'Cosecha', 'producto_planta', 'producto_terminado' => 'Producto terminado', default => 'Insumo' } }}</span></td>
 
                             <td>{{ $item->tipo_label }}</td>
 
@@ -442,7 +447,8 @@
                             <td class="text-right">
                                 @php
                                     $uLower = strtolower($item->unidad ?? '');
-                                    $esUnidad = $item->categoria === 'producto_planta' && ! str_contains($uLower, 'kg');
+                                    $esUnidad = in_array($item->categoria, ['producto_planta', 'producto_terminado'], true)
+                                        && ! str_contains($uLower, 'kg');
                                 @endphp
                                 {{ number_format($item->cantidad, $esUnidad ? 0 : 2) }}
                                 <small class="text-muted">{{ $item->unidad }}</small>
@@ -467,29 +473,53 @@
                                         @endcan
                                     @elseif($item->categoria === 'cosecha_consolidada' && ! empty($item->accion_ver))
                                         <a href="{{ $item->accion_ver }}" class="btn btn-sm btn-outline-info" title="Ver detalles"><i class="fas fa-eye"></i></a>
+                                        @can('inventario.delete')
                                         @if(! empty($item->accion_destroy))
                                             @if($item->destroy_es_gestion ?? false)
                                                 <a href="{{ $item->accion_destroy }}" class="btn btn-sm btn-outline-danger" title="Eliminar entradas"><i class="fas fa-trash"></i></a>
                                             @else
-                                                <form action="{{ $item->accion_destroy }}" method="POST" class="d-inline m-0 on-submit-confirm" data-confirm-title="¿Eliminar entrada?" data-confirm-text="Se quitará este stock del almacén de planta.">
+                                                <form action="{{ $item->accion_destroy }}" method="POST" class="d-inline m-0 on-submit-confirm" data-confirm-title="¿Eliminar entrada?" data-confirm-text="Se quitará este stock del almacén.">
                                                     @csrf @method('DELETE')
                                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
                                                 </form>
                                             @endif
                                         @endif
+                                        @endcan
                                     @elseif($item->categoria === 'cosecha' && ! empty($item->produccionid))
                                         <a href="{{ route('producciones.show', $item->produccionid) }}" class="btn btn-sm btn-outline-info" title="Ver"><i class="fas fa-eye"></i></a>
+                                        @can('inventario.update')
                                         <a href="{{ route('producciones.edit', $item->produccionid) }}" class="btn btn-sm btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>
+                                        @endcan
+                                        @can('inventario.delete')
                                         <form action="{{ route('producciones.destroy', $item->produccionid) }}" method="POST" class="d-inline m-0 on-submit-confirm" data-confirm-title="¿Eliminar cosecha?" data-confirm-text="Se eliminará el registro de producción y su almacenamiento.">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
                                         </form>
-                                    @elseif($item->categoria === 'producto_planta' && ! empty($item->lote_produccion_pedido_id))
-                                        <a href="{{ route('procesamiento.show', $item->lote_produccion_pedido_id) }}" class="btn btn-sm btn-outline-info" title="Ver detalles"><i class="fas fa-eye"></i></a>
-                                        <form action="{{ route('procesamiento.destroy', $item->lote_produccion_pedido_id) }}" method="POST" class="d-inline m-0 on-submit-confirm" data-confirm-title="¿Eliminar producto terminado?" data-confirm-text="Se quitará este lote del almacén de planta.">
+                                        @endcan
+                                    @elseif($item->categoria === 'cosecha' && ($item->origen_tipo ?? '') === 'recepcion_pedido' && ! empty($item->insumoid))
+                                        @php
+                                            $claveCosecha = $item->clave_cultivo ?? \App\Support\AlmacenPlantaCosechaCatalogo::claveCultivo((string) $item->nombre);
+                                        @endphp
+                                        <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.cosecha.show', [$almacen, $claveCosecha]) }}" class="btn btn-sm btn-outline-info" title="Ver detalles"><i class="fas fa-eye"></i></a>
+                                    @elseif($item->categoria === 'producto_terminado' && ! empty($item->insumoid))
+                                        <a href="{{ route(($rutaPrefijo ?? 'almacen-mayorista').'.inventario.show', [$almacen, $item->insumoid]) }}" class="btn btn-sm btn-outline-info" title="Ver detalles"><i class="fas fa-eye"></i></a>
+                                        @can('inventario.update')
+                                        <a href="{{ route(($rutaPrefijo ?? 'almacen-mayorista').'.inventario.edit', [$almacen, $item->insumoid]) }}" class="btn btn-sm btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>
+                                        @endcan
+                                        @can('inventario.delete')
+                                        <form action="{{ route(($rutaPrefijo ?? 'almacen-mayorista').'.inventario.destroy', [$almacen, $item->insumoid]) }}" method="POST" class="d-inline m-0 on-submit-confirm" data-confirm-title="¿Eliminar producto?" data-confirm-text="Se quitará este producto del almacén mayorista.">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
                                         </form>
+                                        @endcan
+                                    @elseif($item->categoria === 'producto_planta' && ! empty($item->lote_produccion_pedido_id))
+                                        <a href="{{ route('procesamiento.show', $item->lote_produccion_pedido_id) }}" class="btn btn-sm btn-outline-info" title="Ver detalles"><i class="fas fa-eye"></i></a>
+                                        @can('inventario.delete')
+                                        <form action="{{ route('procesamiento.destroy', $item->lote_produccion_pedido_id) }}" method="POST" class="d-inline m-0 on-submit-confirm" data-confirm-title="¿Eliminar producto terminado?" data-confirm-text="Se quitará este lote del almacén.">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
+                                        </form>
+                                        @endcan
                                     @else
                                         <span class="text-muted small">—</span>
                                     @endif

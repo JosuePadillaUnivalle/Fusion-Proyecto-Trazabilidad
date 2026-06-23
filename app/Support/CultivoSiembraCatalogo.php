@@ -31,6 +31,11 @@ final class CultivoSiembraCatalogo
             'mango' => ['por_ha' => 200.0, 'unidad' => 'unidad', 'etiqueta_unidad' => 'plantas'],
             'pimentón' => ['por_ha' => 0.25, 'unidad' => 'kg', 'etiqueta_unidad' => 'kilogramos'],
             'pimenton' => ['por_ha' => 0.25, 'unidad' => 'kg', 'etiqueta_unidad' => 'kilogramos'],
+            'repollo' => ['por_ha' => 0.15, 'unidad' => 'kg', 'etiqueta_unidad' => 'kilogramos'],
+            'brócoli' => ['por_ha' => 0.35, 'unidad' => 'kg', 'etiqueta_unidad' => 'kilogramos'],
+            'brocoli' => ['por_ha' => 0.35, 'unidad' => 'kg', 'etiqueta_unidad' => 'kilogramos'],
+            'pepino' => ['por_ha' => 0.5, 'unidad' => 'kg', 'etiqueta_unidad' => 'kilogramos'],
+            'espinaca' => ['por_ha' => 8.0, 'unidad' => 'kg', 'etiqueta_unidad' => 'kilogramos'],
         ];
 
         foreach ($tabla as $fragmento => $dosis) {
@@ -66,6 +71,55 @@ final class CultivoSiembraCatalogo
             'por_ha' => (float) ($porHa ?? 0),
             'unidad' => (string) ($unidad ?? 'kg'),
             'etiqueta_unidad' => $etiqueta ?? 'kilogramos',
+            'superficie_ha' => $superficie,
+            'sugerido' => $sugerido,
+            'tiene_dosis' => $tieneDosis,
+            'insumoid' => (int) $insumo->insumoid,
+            'insumo_nombre' => $insumo->nombre,
+        ];
+    }
+
+    /**
+     * Dosis sugerida para fertilizantes y plaguicidas según hectáreas del lote.
+     *
+     * @return array{
+     *     por_ha: float,
+     *     unidad: string,
+     *     etiqueta_unidad: string,
+     *     superficie_ha: float,
+     *     sugerido: float,
+     *     tiene_dosis: bool,
+     *     insumoid: int,
+     *     insumo_nombre: string
+     * }
+     */
+    public static function sugerenciaAplicacionInsumo(\App\Models\Insumo $insumo, float $superficieHa): array
+    {
+        $porHa = $insumo->dosis_por_ha;
+        $unidad = $insumo->dosis_unidad;
+        $etiqueta = null;
+
+        if ($porHa === null || (float) $porHa <= 0 || $unidad === null || trim((string) $unidad) === '') {
+            $fallback = InsumoDosisReferenciaCatalogo::paraInsumo($insumo);
+            if ($fallback) {
+                $porHa = $fallback['por_ha'];
+                $unidad = $fallback['unidad'];
+                $etiqueta = $fallback['etiqueta_unidad'];
+            } else {
+                $unidad = $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? 'kg';
+            }
+        } else {
+            $etiqueta = self::etiquetaUnidadAmigable((string) $unidad);
+        }
+
+        $superficie = max(0.0, $superficieHa);
+        $tieneDosis = $porHa !== null && (float) $porHa > 0;
+        $sugerido = $tieneDosis ? round((float) $porHa * $superficie, 2) : 0.0;
+
+        return [
+            'por_ha' => (float) ($porHa ?? 0),
+            'unidad' => (string) ($unidad ?? 'kg'),
+            'etiqueta_unidad' => $etiqueta ?? self::etiquetaUnidadAmigable((string) ($unidad ?? 'kg')),
             'superficie_ha' => $superficie,
             'sugerido' => $sugerido,
             'tiene_dosis' => $tieneDosis,
@@ -218,6 +272,11 @@ final class CultivoSiembraCatalogo
             'maíz' => ['kg_ha' => 8000.0, 'etiqueta' => '8.000 kg/ha'],
             'maiz' => ['kg_ha' => 8000.0, 'etiqueta' => '8.000 kg/ha'],
             'mango' => ['kg_ha' => 12000.0, 'etiqueta' => '12.000 kg/ha'],
+            'repollo' => ['kg_ha' => 45000.0, 'etiqueta' => '45.000 kg/ha'],
+            'brócoli' => ['kg_ha' => 18000.0, 'etiqueta' => '18.000 kg/ha'],
+            'brocoli' => ['kg_ha' => 18000.0, 'etiqueta' => '18.000 kg/ha'],
+            'pepino' => ['kg_ha' => 25000.0, 'etiqueta' => '25.000 kg/ha'],
+            'espinaca' => ['kg_ha' => 12000.0, 'etiqueta' => '12.000 kg/ha'],
         ];
 
         foreach ($tabla as $fragmento => $dato) {

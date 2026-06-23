@@ -1145,6 +1145,12 @@ class LoteTrazabilidadService
         if ($siembraPendiente) {
             $siembraPendiente->loadMissing('usuario');
         }
+        $user = $request->user();
+        $puedeCompletarSiembraDirecta = $siguienteFase === 'siembra'
+            && ! $this->siembraCompletada($lote)
+            && $siembraPendiente === null
+            && $user
+            && (int) $lote->usuarioid === (int) $user->usuarioid;
         $urlAsignarActividad = $faseActual === 'en_crecimiento'
             ? $this->urlAsignarActividadEnCrecimiento($lote)
             : null;
@@ -1172,7 +1178,16 @@ class LoteTrazabilidadService
             'certificacion_campo' => $certCampo->ultima($lote),
             'puede_asignar_siembra' => $siguienteFase === 'siembra'
                 && ! $this->siembraCompletada($lote)
-                && $siembraPendiente === null,
+                && $siembraPendiente === null
+                && ! $puedeCompletarSiembraDirecta,
+            'puede_completar_siembra_directa' => $puedeCompletarSiembraDirecta,
+            'url_completar_siembra' => $puedeCompletarSiembraDirecta
+                ? route('lotes.siembra.create', [
+                    'lote' => $lote,
+                    'completar' => 1,
+                    'return' => $this->returnUrlTrazabilidad($lote),
+                ])
+                : null,
             'actividad_siembra_pendiente' => $siembraPendiente ? [
                 'actividadid' => (int) $siembraPendiente->actividadid,
                 'titulo' => $siembraPendiente->descripcion ?: ($siembraPendiente->tipoActividad->nombre ?? 'Siembra'),
@@ -1484,12 +1499,19 @@ class LoteTrazabilidadService
             ->groupBy('almacenid')
             ->pluck('total', 'almacenid');
 
-        $almacenes = $almacenesTodos->count() <= 4
+        $ordenados = $almacenesTodos->count() <= 4
             ? $almacenesTodos->values()
-            : $almacenesTodos
-                ->sortByDesc(fn (Almacen $a) => (int) ($usoPorAlmacen[$a->almacenid] ?? 0))
-                ->take(4)
-                ->values();
+            : $almacenesTodos->sortByDesc(fn (Almacen $a) => (int) ($usoPorAlmacen[$a->almacenid] ?? 0));
+
+        $almacenesMasUsados = $almacenesTodos->count() <= 4
+            ? $almacenesTodos->values()
+            : $ordenados->take(4)->values();
+
+        $almacenesMenosUsados = $almacenesTodos->count() <= 4
+            ? $almacenesTodos->values()
+            : $ordenados->reverse()->take(4)->values();
+
+        $almacenes = $almacenesMasUsados;
 
         $resumenesCapacidad = $almacenesTodos
             ->mapWithKeys(fn (Almacen $a) => [$a->almacenid => $capacidadService->resumen($a)])
@@ -1527,6 +1549,8 @@ class LoteTrazabilidadService
 
         return [
             'almacenes' => $almacenes,
+            'almacenesMasUsados' => $almacenesMasUsados,
+            'almacenesMenosUsados' => $almacenesMenosUsados,
             'almacenesTodos' => $almacenesTodos,
             'almacenesCatalogo' => $almacenesCatalogo,
             'resumenesCapacidad' => $resumenesCapacidad,

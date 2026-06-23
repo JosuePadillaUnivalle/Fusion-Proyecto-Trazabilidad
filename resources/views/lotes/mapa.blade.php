@@ -721,6 +721,7 @@
                         <h6 style="margin-bottom: 12px; color: var(--text-dark); font-weight: 600;">
                             <i class="fas fa-filter mr-2"></i>Filtros
                         </h6>
+                        @unless(\App\Support\UsuarioRol::debeAcotarPorAsignacion(auth()->user()))
                         <div class="filter-group">
                             <label>Propietario</label>
                             @include('partials.selector-catalogo', [
@@ -742,6 +743,7 @@
                                 'variant' => 'filtros',
                             ])
                         </div>
+                        @endunless
                         <div class="filter-group">
                             <label>Cultivo</label>
                             @include('partials.selector-catalogo', [
@@ -867,11 +869,6 @@
                                 <a href="#" id="btnTrazabilidad" class="btn btn-outline-success btn-sm lot-action-btn">
                                     <i class="fas fa-route mr-1"></i> Trazabilidad
                                 </a>
-                                @can('lotes.update')
-                                <a href="#" id="btnEditar" class="btn btn-outline-secondary btn-sm lot-action-btn">
-                                    <i class="fas fa-edit mr-1"></i> Editar lote
-                                </a>
-                                @endcan
                             </div>
                         </div>
                     </div>
@@ -1013,7 +1010,6 @@ var lotesData = @json($lotesConCoordenadas);
 var mapaStatsPdf = @json($stats);
 var rutasLote = {
     show: @json(route('lotes.show', ['lote' => '__ID__'])),
-    edit: @json(route('lotes.edit', ['lote' => '__ID__'])),
     trazabilidad: @json(route('lotes.trazabilidad', ['lote' => '__ID__']))
 };
 
@@ -1277,8 +1273,6 @@ function mostrarPanelLote(lote, desdeGrupo) {
 
     document.getElementById('btnVerDetalle').href = urlLote(rutasLote.show, lote.id);
     document.getElementById('btnTrazabilidad').href = urlLote(rutasLote.trazabilidad, lote.id);
-    var btnEditar = document.getElementById('btnEditar');
-    if (btnEditar) btnEditar.href = urlLote(rutasLote.edit, lote.id);
 
     var btnVolver = document.getElementById('btnVolverGrupo');
     if (btnVolver) {

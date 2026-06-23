@@ -345,7 +345,7 @@ final class DashboardCharts
         $completadasMes = [];
         $pendientesMes = [];
         foreach ($meses as $mes) {
-            $base = Actividad::query()->where('usuarioid', $uid);
+            $base = Actividad::query()->whereHas('lote', fn ($q) => $q->where('usuarioid', $uid));
             if ($filtros->loteId) {
                 $base->where('loteid', $filtros->loteId);
             }
@@ -371,7 +371,7 @@ final class DashboardCharts
             ->get();
 
         $tiposActividad = Actividad::query()
-            ->where('usuarioid', $uid)
+            ->whereHas('lote', fn ($q) => $q->where('usuarioid', $uid))
             ->when($filtros->loteId, fn ($q) => $q->where('loteid', $filtros->loteId))
             ->join('tipoactividad', 'actividad.tipoactividadid', '=', 'tipoactividad.tipoactividadid')
             ->select('tipoactividad.nombre', DB::raw('COUNT(*) as total'));

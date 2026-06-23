@@ -102,36 +102,14 @@
                                   placeholder="Opcional...">{{ old('observaciones') }}</textarea>
                     </div>
 
-                    @if(empty($puedeDesignarResponsable))
-                        <div class="form-group mb-0">
-                            <div class="custom-control custom-checkbox">
-                                <input type="checkbox" class="custom-control-input" id="completar_ahora" name="completar" value="1"
-                                    @checked(old('completar', request()->boolean('completar')))>
-                                <label class="custom-control-label" for="completar_ahora">
-                                    Ya realicé esta actividad (marcar como completada al guardar)
-                                </label>
-                            </div>
-                            <small class="form-text text-muted">
-                                Si solo la registra para después, déjela sin marcar; quedará pendiente en su panel.
-                            </small>
-                            <div id="actividadEvidenciaWrap" class="mt-3 p-3 border rounded bg-light" style="{{ old('completar', request()->boolean('completar')) ? '' : 'display:none;' }}">
-                                <label class="font-weight-bold d-block mb-1">
-                                    <i class="fas fa-camera mr-1 text-success"></i> Foto de evidencia <span class="text-danger">*</span>
-                                </label>
-                                <input type="file" name="evidencia_foto" id="actividadEvidenciaFoto"
-                                       accept="image/jpeg,image/jpg,image/png,image/webp">
-                                @error('evidencia_foto')
-                                    <small class="text-danger d-block mt-1">{{ $message }}</small>
-                                @enderror
-                            </div>
-                        </div>
-                    @else
-                        <div class="alert alert-light border small mb-0">
-                            <i class="fas fa-bell text-info mr-1"></i>
-                            La actividad quedará <strong>pendiente</strong> hasta que el agricultor asignado la marque como completada
-                            (usted también puede completarla después desde Actividades).
-                        </div>
-                    @endif
+                    <div class="alert alert-light border small mb-0">
+                        <i class="fas fa-bell text-info mr-1"></i>
+                        @if(!empty($puedeDesignarResponsable))
+                            La actividad quedará <strong>pendiente</strong> hasta que el agricultor asignado la marque como completada.
+                        @else
+                            La actividad quedará <strong>pendiente</strong> hasta que la marque como completada desde Actividades o la trazabilidad del lote.
+                        @endif
+                    </div>
 
                 </div>
 
@@ -209,19 +187,6 @@
 
 @push('scripts')
 <script>
-(function () {
-    var check = document.getElementById('completar_ahora');
-    var wrap = document.getElementById('actividadEvidenciaWrap');
-    var input = document.getElementById('actividadEvidenciaFoto');
-    function toggle() {
-        if (!wrap || !check) return;
-        wrap.style.display = check.checked ? '' : 'none';
-        if (input) input.required = check.checked;
-    }
-    check?.addEventListener('change', toggle);
-    toggle();
-})();
-
 document.getElementById('selector_wrap_actividad_lote')?.addEventListener('selector-catalogo:change', function (e) {
     const extra = e.detail.extra || {};
     @if(!empty($puedeDesignarResponsable))

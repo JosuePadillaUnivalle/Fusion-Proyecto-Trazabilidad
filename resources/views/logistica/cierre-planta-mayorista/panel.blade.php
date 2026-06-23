@@ -262,6 +262,7 @@
     $vistaMinoristaEspera = $vistaMinoristaEspera ?? false;
     $vistaReceptorEspera = $vistaMayoristaEspera || $vistaMinoristaEspera;
     $ui = $uiCierre ?? \App\Support\EnvioCierreRutaUiCatalogo::plantaMayorista();
+    $esCierrePdv = ($ui['tipo_tiempo_real'] ?? '') === 'distribucion';
     $recibidoEnDestino = (bool) ($resumen[$ui['recibido_key']] ?? false);
     $estadoRecepcion = $estadoRecepcion ?? [];
     $etiquetaPaso = static function (string $p) use ($esTransportista): string {
@@ -476,13 +477,13 @@
                     <div class="w-100">
                         @if($esTransportista)
                             <strong class="d-block text-success">Recorrido iniciado</strong>
-                            <span class="small text-muted">Avance al paso «Confirmar llegada» cuando esté en el almacén mayorista.</span>
+                            <span class="small text-muted">Avance al paso «Confirmar llegada» cuando esté en {{ $ui['destino_articulo'] }}.</span>
                         @else
                         <strong class="d-block text-success">Recorrido en curso</strong>
-                        <span class="small text-muted">Avance: {{ number_format((float) ($resumen['progreso'] ?? 0), 0) }}% hacia el almacén mayorista.</span>
+                        <span class="small text-muted">Avance: {{ number_format((float) ($resumen['progreso'] ?? 0), 0) }}% hacia {{ $ui['destino_articulo'] }}.</span>
                         @endif
                         @if($ruta->fecha_salida)
-                            <div class="small text-muted mt-1">Salida de planta: {{ $ruta->fecha_salida->format('d/m/Y H:i') }}</div>
+                            <div class="small text-muted mt-1">Salida del {{ $ui['origen_salida'] }}: {{ $ruta->fecha_salida->format('d/m/Y H:i') }}</div>
                         @endif
                         @if(! $soloLecturaPaso() && ! $esTransportista)
                         <div class="cierre-ag-progress-wrap">
@@ -495,9 +496,17 @@
                     </div>
                 </div>
             @elseif(($resumen['puede_empezar_ruta'] ?? false) && ! $soloLecturaPaso())
-                <p class="small text-muted mb-3">Condiciones registradas. Inicie el recorrido hacia el almacén mayorista cuando salga de planta.</p>
+                <p class="small text-muted mb-3">Condiciones registradas. Inicie el recorrido hacia {{ $ui['destino_articulo'] }} cuando salga del {{ $ui['origen_salida'] }}.</p>
                 <div class="cierre-ag-ruta-actions">
-                    @include('logistica.partials.accion-empezar-ruta-cierre-traslado', ['ruta' => $ruta, 'bloque' => true])
+                    @if($esCierrePdv)
+                        @include('logistica.partials.accion-empezar-ruta-cierre-distribucion-pdv', [
+                            'ruta' => $ruta,
+                            'rutaPrefijo' => $rutaPrefijo,
+                            'bloque' => true,
+                        ])
+                    @else
+                        @include('logistica.partials.accion-empezar-ruta-cierre-traslado', ['ruta' => $ruta, 'bloque' => true])
+                    @endif
                     @include('logistica.partials.btn-ver-recorrido-mapa', [
                         'paradasMapa' => $paradasMapa ?? [],
                         'bloque' => true,
@@ -510,11 +519,11 @@
                     <span class="cierre-ag-status__icon"><i class="fas fa-shipping-fast"></i></span>
                     <div class="w-100">
                         <strong class="d-block text-success">Salida registrada</strong>
-                        <span class="small text-muted">El traslado salió de planta hacia el mayorista.</span>
+                        <span class="small text-muted">El envío salió del {{ $ui['origen_salida'] }} hacia {{ $ui['destino_articulo'] }}.</span>
                         <div class="cierre-ag-detalle-meta">
                             @if($ruta->fecha_salida)
                             <div class="cierre-ag-detalle-meta__item">
-                                <span class="cierre-ag-detalle-meta__label">Salida de planta</span>
+                                <span class="cierre-ag-detalle-meta__label">Salida del {{ $ui['origen_salida'] }}</span>
                                 {{ $ruta->fecha_salida->format('d/m/Y H:i') }}
                             </div>
                             @endif
@@ -524,10 +533,15 @@
                                 {{ $ruta->vehiculo->placa }}
                             </div>
                             @endif
-                            @if($ruta->almacenMayoristaDestino?->nombre)
+                            @if(! $esCierrePdv && $ruta->almacenMayoristaDestino?->nombre)
                             <div class="cierre-ag-detalle-meta__item">
                                 <span class="cierre-ag-detalle-meta__label">Destino</span>
                                 {{ $ruta->almacenMayoristaDestino->nombre }}
+                            </div>
+                            @elseif($esCierrePdv)
+                            <div class="cierre-ag-detalle-meta__item">
+                                <span class="cierre-ag-detalle-meta__label">Destino</span>
+                                {{ $ui['destino_label'] }}
                             </div>
                             @endif
                         </div>
@@ -601,7 +615,7 @@
             @elseif(($resumen['en_ruta'] ?? false) && ! $soloLecturaPaso())
                 <div class="cierre-ag-llegada-hint">
                     <i class="fas fa-info-circle mt-1"></i>
-                    <span>En camino hacia el almacén mayorista ({{ number_format((float) ($resumen['progreso'] ?? 0), 0) }}%). Primero debe llegar al destino para confirmar la llegada.</span>
+                    <span>En camino hacia {{ $ui['destino_articulo'] }} ({{ number_format((float) ($resumen['progreso'] ?? 0), 0) }}%). Primero debe llegar al destino para confirmar la llegada.</span>
                 </div>
                 <div class="cierre-ag-progress-wrap">
                     @include('logistica.partials.progreso-simulacion-transportista', [
@@ -696,7 +710,7 @@
                     <input type="hidden" name="sin_incidentes" value="1">
                 </form>
             @else
-                <p class="text-muted small mb-0">Confirme la llegada al almacén mayorista para continuar.</p>
+                <p class="text-muted small mb-0">Confirme la llegada a {{ $ui['destino_articulo'] }} para continuar.</p>
             @endif
         </div>
     </div>
@@ -786,8 +800,9 @@
                     </div>
                 </div>
             @elseif(($resumen['puede_firmar_recepcion'] ?? false) && ! $soloLecturaPaso())
-                <p class="small text-muted mb-1">{{ $ui['firma_recepcion_hint'] }}</p>
-                <p class="small text-muted mb-3"><i class="fas fa-signature mr-1" style="color:#7c3aed;"></i> Firma del transportista completada.</p>
+                @if(! $esTransportista)
+                <p class="small text-muted mb-3"><i class="fas fa-signature mr-1" style="color:#7c3aed;"></i> {{ $ui['firma_recepcion_hint'] }}</p>
+                @endif
                 <canvas class="cierre-ag-firma-box" data-firma-canvas="recepcion" width="400" height="160"></canvas>
                 <div class="cierre-ag-firma-actions">
                     <button type="button" class="btn btn-outline-secondary btn-sm btn-limpiar-firma" data-target="recepcion">Limpiar</button>

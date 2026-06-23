@@ -358,6 +358,7 @@ class CierreEnvioDistribucionPdvService
     {
         if (
             $this->esAdminOperativo($usuario)
+            || $this->esTransportistaAsignado($usuario, $ruta)
             || PuntoVentaAccess::puedeFirmarRecepcionRuta($usuario, $ruta)
         ) {
             return;
@@ -427,6 +428,8 @@ class CierreEnvioDistribucionPdvService
         $slug = preg_replace('/[^a-zA-Z0-9_-]+/', '_', $codigo) ?: 'distribucion';
         $path = 'documentos/entrega/'.$slug.'_pdv_'.now()->format('Ymd_His').'.pdf';
 
+        $primerPedido = $ruta->pedidos()->with('detalles')->first();
+
         $existente = DocumentoEntrega::query()
             ->where('metadata->rutadistribucionid', $ruta->rutadistribucionid)
             ->where('tipo_documento', 'guia_transporte')
@@ -434,14 +437,17 @@ class CierreEnvioDistribucionPdvService
             ->first();
 
         if ($existente) {
+            if ($primerPedido && ! $existente->pedidoid) {
+                $existente->update(['pedidoid' => $primerPedido->pedidodistribucionid]);
+            }
             DocumentoEntregaArchivo::generarPdfOperativo($existente);
 
-            return $existente;
+            return $existente->fresh();
         }
 
         $documento = DocumentoEntrega::create([
             'externo_envio_id' => $codigo,
-            'pedidoid' => null,
+            'pedidoid' => $primerPedido?->pedidodistribucionid,
             'usuarioid' => $usuario->usuarioid,
             'tipo_documento' => 'guia_transporte',
             'titulo' => 'Comprobante de entrega PDV — '.$codigo,

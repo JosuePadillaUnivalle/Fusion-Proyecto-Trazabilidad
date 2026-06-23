@@ -18,6 +18,9 @@ class Produccion extends Model
         'cantidad',
         'unidadmedidaid',
         'cantidad_base',
+        'catalogotamanoconteoid',
+        'cantidad_unidades',
+        'cantidad_empaques',
         'fechacosecha',
         'destinoproduccionid',
         'almacendestinoid',
@@ -33,6 +36,9 @@ class Produccion extends Model
         'cantidad'            => 'float',
         'unidadmedidaid'      => 'integer',
         'cantidad_base'       => 'float',
+        'catalogotamanoconteoid' => 'integer',
+        'cantidad_unidades'   => 'integer',
+        'cantidad_empaques'   => 'integer',
         'destinoproduccionid' => 'integer',
         'almacendestinoid'    => 'integer',
         'procesoplantaid'     => 'integer',
@@ -66,6 +72,11 @@ class Produccion extends Model
     public function unidadMedida()
     {
         return $this->belongsTo(UnidadMedida::class, 'unidadmedidaid', 'unidadmedidaid');
+    }
+
+    public function catalogoTamanoConteo()
+    {
+        return $this->belongsTo(CatalogoTamanoConteo::class, 'catalogotamanoconteoid', 'catalogotamanoconteoid');
     }
 
     public function almacenamientos()

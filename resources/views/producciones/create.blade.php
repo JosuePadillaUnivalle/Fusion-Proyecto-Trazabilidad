@@ -75,6 +75,47 @@
         color: #334155;
         margin-bottom: .4rem;
     }
+    .cosecha-presentacion {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .75rem;
+        margin-top: .85rem;
+    }
+    @media (max-width: 767px) {
+        .cosecha-presentacion { grid-template-columns: 1fr; }
+    }
+    .cosecha-pres-card {
+        background: linear-gradient(160deg, #f0fdf4, #fff);
+        border: 1px solid #bbf7d0;
+        border-radius: 12px;
+        padding: .85rem 1rem;
+        text-align: center;
+    }
+    .cosecha-pres-card--meta {
+        background: linear-gradient(160deg, #eff6ff, #fff);
+        border-color: #bfdbfe;
+    }
+    .cosecha-pres-card__val {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #14532d;
+        line-height: 1.2;
+    }
+    .cosecha-pres-card--meta .cosecha-pres-card__val { color: #1e40af; }
+    .cosecha-pres-card__lbl {
+        font-size: .72rem;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #64748b;
+        margin-top: .25rem;
+        font-weight: 700;
+    }
+    .cosecha-pres-titulo {
+        font-size: .82rem;
+        font-weight: 700;
+        color: #334155;
+        margin: .5rem 0 .35rem;
+    }
 </style>
 @endpush
 
@@ -97,59 +138,77 @@
                     {{-- Lote --}}
                     <div class="form-group">
                         <label><i class="fas fa-map-marked-alt mr-1 text-success"></i> Lote a cosechar <span class="text-danger">*</span></label>
-                        <div class="guia-campo mb-2">
-                            <strong>¿Para qué sirve?</strong> Identifica el lote cuyas actividades de crecimiento ya están completas
-                            (riego, control de plagas y fertilización) o que está en estado <em>listo para cosecha</em>.
-                        </div>
-                        @include('partials.selector-catalogo', [
-                            'id' => 'produccion_lote',
-                            'name' => 'loteid',
-                            'value' => $lotePreseleccionado ?? '',
-                            'labelSelected' => $lotePreseleccionadoLabel ?? '',
-                            'endpoint' => route('catalogo-selector.lotes'),
-                            'params' => ['solo_cosecha' => '1'],
-                            'title' => 'Seleccionar lote listo para cosecha',
-                            'searchPlaceholder' => 'Nombre, código TRAZ o ubicación…',
-                            'inputGroup' => true,
-                            'required' => true,
-                        ])
-                        @if($lotes->isEmpty())
-                            <small class="form-text text-warning">
-                                <i class="fas fa-exclamation-triangle"></i> No hay lotes listos para cosechar.
-                                Completa las actividades de crecimiento en <a href="{{ route('lotes.index') }}">Gestión de lotes</a> antes de registrar la cosecha.
-                            </small>
+                        @if(!empty($usarLoteFijo) && $loteActivo)
+                            @include('partials.cosecha-lote-preview', [
+                                'lote' => $loteActivo,
+                                'estimacion' => $estimacionLoteInicial,
+                            ])
                         @else
-                            <small class="form-text text-muted">
-                                {{ $lotes->count() === 1 ? 'Un solo lote disponible — ya está preseleccionado.' : 'Lotes con actividades de crecimiento completas o listos para cosecha.' }}
-                            </small>
+                            <div class="guia-campo mb-2">
+                                <strong>¿Para qué sirve?</strong> Identifica el lote cuyas actividades de crecimiento ya están completas
+                                (riego, control de plagas y fertilización) o que está en estado <em>listo para cosecha</em>.
+                            </div>
+                            @include('partials.selector-catalogo', [
+                                'id' => 'produccion_lote',
+                                'name' => 'loteid',
+                                'value' => $lotePreseleccionado ?? '',
+                                'labelSelected' => $lotePreseleccionadoLabel ?? '',
+                                'endpoint' => route('catalogo-selector.lotes'),
+                                'params' => ['solo_cosecha' => '1'],
+                                'title' => 'Seleccionar lote listo para cosecha',
+                                'searchPlaceholder' => 'Nombre, código TRAZ o ubicación…',
+                                'inputGroup' => true,
+                                'required' => true,
+                            ])
+                            @if($lotes->isEmpty())
+                                <small class="form-text text-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> No hay lotes listos para cosechar.
+                                    Completa las actividades de crecimiento en <a href="{{ route('lotes.index') }}">Gestión de lotes</a> antes de registrar la cosecha.
+                                </small>
+                            @else
+                                <small class="form-text text-muted">
+                                    Lotes con actividades de crecimiento completas o listos para cosecha.
+                                </small>
+                            @endif
                         @endif
                     </div>
 
+                    @if(empty($usarLoteFijo))
                     <div id="loteInfo" class="info-panel mb-3" style="{{ ($lotePreseleccionado ?? null) ? '' : 'display: none;' }}">
                         <strong><i class="fas fa-leaf mr-1 text-success"></i> Cultivo:</strong> <span id="infoCultivo"></span>
                         <span class="mx-2">|</span>
                         <strong><i class="fas fa-user mr-1"></i> Responsable:</strong> <span id="infoResponsable"></span>
                     </div>
+                    @endif
 
                     {{-- Cantidad --}}
                     <div class="form-group">
                         <label><i class="fas fa-balance-scale mr-1 text-success"></i> Cantidad cosechada <span class="text-danger">*</span></label>
                         <div class="guia-campo mb-2">
-                            <strong>Peso o volumen</strong> obtenido en esta cosecha. El sistema convierte automáticamente a kilogramos para inventario y almacén.
+                            <strong>Kilogramos cosechados.</strong> Se sugiere la meta planificada; puede ajustar el valor si la cosecha real fue distinta.
                         </div>
+
+                        <div id="cosechaMetaPlanificada" class="d-none mb-3">
+                            <div class="cosecha-pres-titulo"><i class="fas fa-bullseye text-primary mr-1"></i> Meta planificada al crear el lote</div>
+                            <div class="cosecha-presentacion" id="cosechaMetaCards"></div>
+                            <small id="cosechaMetaCalibre" class="text-muted d-none mt-2"></small>
+                        </div>
+
                         <div class="row cantidad-cosecha-row">
                             <div class="col-md-8">
+                                <label class="d-block small font-weight-bold mb-1">Kilogramos cosechados <span class="text-danger">*</span></label>
                                 <input type="number" step="0.01" name="cantidad" id="cantidad"
-                                       class="form-control" min="0.01" required value="{{ old('cantidad') }}"
-                                       placeholder="Ej: 500">
+                                       class="form-control" min="0.01" required
+                                       value="{{ old('cantidad', $estimacionLoteInicial['kg_cosecha_estimados'] ?? '') }}"
+                                       placeholder="Ej: 18000">
                             </div>
                             <div class="col-md-4">
-                                <label class="d-block">Unidad <span class="text-danger">*</span></label>
+                                <label class="d-block small font-weight-bold mb-1">Unidad <span class="text-danger">*</span></label>
                                 <select name="unidadmedidaid" id="unidadmedidaid" class="form-control" required>
                                     @foreach($unidades as $u)
                                         <option value="{{ $u->unidadmedidaid }}"
                                                 data-abrev="{{ $u->abreviatura }}"
-                                                {{ $u->abreviatura == 'kg' ? 'selected' : '' }}>
+                                                {{ (old('unidadmedidaid') ? old('unidadmedidaid') == $u->unidadmedidaid : $u->abreviatura == 'kg') ? 'selected' : '' }}>
                                             {{ $u->abreviatura }} ({{ $u->nombre }})
                                         </option>
                                     @endforeach
@@ -160,21 +219,18 @@
 
                     @include('partials.almacen-envio-selector', [
                         'almacenes' => $almacenes,
+                        'almacenesMasUsados' => $almacenesMasUsados ?? $almacenes,
+                        'almacenesMenosUsados' => $almacenesMenosUsados ?? collect(),
                         'almacenesTodos' => $almacenesTodos ?? collect(),
                         'resumenesCapacidad' => $resumenesCapacidad ?? [],
                         'sectionId' => 'almacenSection',
                         'hiddenInputId' => 'almacenid',
-                        'selectedAlmacenId' => old('almacenid'),
+                        'selectedAlmacenId' => $selectedAlmacenId ?? old('almacenid'),
                         'etiquetaAmbito' => 'agrícola',
-                        'almacenRequerido' => false,
-                        'guiaTexto' => 'Puede registrar la cosecha sin almacén. Después de certificar el lote en Certificaciones, envíelo al almacén desde la trazabilidad del lote.',
-                        'instruccion' => 'Si el lote ya está certificado, puede elegir ahora el almacén agrícola de destino',
+                        'almacenRequerido' => true,
+                        'modoPreview' => true,
+                        'guiaTexto' => 'Toda cosecha debe indicar el almacén agrícola de destino. Elija uno de los sugeridos o busque otro en el listado completo.',
                     ])
-                    <div class="alert alert-light border small mt-2 mb-0">
-                        <i class="fas fa-route text-success mr-1"></i>
-                        El flujo es: <strong>cosecha → certificación → envío al almacén</strong>.
-                        No necesita almacén ni certificación para registrar la cosecha.
-                    </div>
 
                     {{-- Evidencia fotográfica --}}
                     <div class="form-group mt-4">
@@ -228,11 +284,57 @@
     'hiddenInputId' => 'almacenid',
     'formSelector' => 'form[action*="producciones"]',
     'almacenesCatalogo' => $almacenesCatalogo ?? [],
-    'requiereAlmacen' => false,
+    'requiereAlmacen' => true,
+    'cantidadInputId' => 'cantidad',
+    'unidadSelectId' => 'unidadmedidaid',
 ])
 <script>
     $(document).ready(function() {
         const wrapLoteProd = document.getElementById('selector_wrap_produccion_lote');
+        let estimacionActual = @json($estimacionLoteInicial);
+
+        function fmtNum(n, dec) {
+            const x = Number(n);
+            if (!Number.isFinite(x)) return '—';
+            return x.toLocaleString('es-BO', { maximumFractionDigits: dec ?? 2 });
+        }
+
+        function pintarTarjetas(container, datos, esMeta) {
+            if (!container || !datos) return;
+            const cls = esMeta ? 'cosecha-pres-card cosecha-pres-card--meta' : 'cosecha-pres-card';
+            container.innerHTML =
+                '<div class="' + cls + '"><div class="cosecha-pres-card__val">' + fmtNum(datos.unidades, 0) + '</div><div class="cosecha-pres-card__lbl">Unidades</div></div>' +
+                '<div class="' + cls + '"><div class="cosecha-pres-card__val">' + fmtNum(datos.kg, 2) + '</div><div class="cosecha-pres-card__lbl">Kilogramos</div></div>' +
+                '<div class="' + cls + '"><div class="cosecha-pres-card__val">' + fmtNum(datos.empaques, 0) + '</div><div class="cosecha-pres-card__lbl">' + (datos.empaque_label || 'Cajas') + '</div></div>';
+        }
+
+        function mostrarMetaPlanificada(est) {
+            const wrap = document.getElementById('cosechaMetaPlanificada');
+            const cards = document.getElementById('cosechaMetaCards');
+            const calibreHint = document.getElementById('cosechaMetaCalibre');
+            if (!est || !est.kg_cosecha_estimados) {
+                wrap?.classList.add('d-none');
+                calibreHint?.classList.add('d-none');
+                return;
+            }
+            pintarTarjetas(cards, {
+                kg: est.kg_cosecha_estimados,
+                unidades: est.unidades_estimadas,
+                empaques: est.empaques_estimados,
+                empaque_label: est.empaque_label || 'Cajas',
+            }, true);
+            wrap?.classList.remove('d-none');
+            if (calibreHint && est.calibre_nombre) {
+                let txt = 'Calibre: ' + est.calibre_nombre;
+                if (est.unidades_por_caja) {
+                    txt += ' · ' + est.unidades_por_caja + ' unidades por caja';
+                }
+                calibreHint.textContent = txt;
+                calibreHint.classList.remove('d-none');
+            } else {
+                calibreHint?.classList.add('d-none');
+            }
+        }
 
         function onLoteProduccionSeleccionado(extra) {
             if (extra && (extra.cultivo || extra.responsable)) {
@@ -245,23 +347,40 @@
             } else {
                 $('#loteInfo').slideUp();
             }
+            estimacionActual = extra?.estimacion_cosecha || null;
+            mostrarMetaPlanificada(estimacionActual);
+            if (estimacionActual?.kg_cosecha_estimados && !@json(old('cantidad'))) {
+                const cantInput = document.getElementById('cantidad');
+                if (cantInput && !cantInput.value) {
+                    cantInput.value = estimacionActual.kg_cosecha_estimados;
+                }
+            }
         }
 
         wrapLoteProd?.addEventListener('selector-catalogo:change', function (e) {
             onLoteProduccionSeleccionado(e.detail.extra || {});
         });
 
-        @if($lotePreseleccionado && $lotes->isNotEmpty())
+        @if(!empty($usarLoteFijo) && $loteActivo)
+            onLoteProduccionSeleccionado({
+                cultivo: @json($loteActivo->cultivo->nombre ?? 'Sin cultivo'),
+                responsable: @json(trim(($loteActivo->usuario->nombre ?? '').' '.($loteActivo->usuario->apellido ?? ''))),
+                estimacion_cosecha: @json($estimacionLoteInicial),
+            });
+        @elseif($lotePreseleccionado && $lotes->isNotEmpty())
             @php $loteIni = $lotes->firstWhere('loteid', $lotePreseleccionado); @endphp
             @if($loteIni)
             onLoteProduccionSeleccionado({
                 cultivo: @json($loteIni->cultivo->nombre ?? 'Sin cultivo'),
                 responsable: @json(trim(($loteIni->usuario->nombre ?? '').' '.($loteIni->usuario->apellido ?? ''))),
+                estimacion_cosecha: @json($estimacionLoteInicial),
             });
             @endif
+        @else
+            mostrarMetaPlanificada(estimacionActual);
         @endif
 
-        // SMART UNIT CONVERSION v2 (Normalized Logic)
+        $('#cantidad, #unidadmedidaid').on('change keyup blur', checkSmartConversion);
         function checkSmartConversion() {
             const cantidadInput = $('#cantidad');
             const unidadSelect = $('#unidadmedidaid');
@@ -358,10 +477,6 @@
                 }
             });
         }
-
-        $('#cantidad, #unidadmedidaid').on('change keyup blur', function() {
-            checkSmartConversion();
-        });
     });
 </script>
 @endpush

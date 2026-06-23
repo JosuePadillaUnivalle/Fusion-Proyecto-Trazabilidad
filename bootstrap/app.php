@@ -8,6 +8,8 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -35,7 +37,11 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response()->json(['message' => $e->getMessage()], 422);
             }
 
-            return back()->with('error', $e->getMessage());
+            return back()->with([
+                'error' => $e->getMessage(),
+                'error_modal' => true,
+                'error_modal_titulo' => 'No se puede eliminar',
+            ]);
         });
 
         $exceptions->render(function (QueryException $e, Request $request) {
@@ -50,7 +56,11 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             if ($request->isMethod('DELETE') || $request->isMethod('POST')) {
-                return back()->with('error', $mensaje);
+                return back()->with([
+                    'error' => $mensaje,
+                    'error_modal' => true,
+                    'error_modal_titulo' => 'No se puede eliminar',
+                ]);
             }
 
             return null;
@@ -61,6 +71,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 || $request->ajax()
                 || $request->header('X-Requested-With') === 'XMLHttpRequest') {
                 return response()->json(['message' => 'Sesión renovada.', 'reload' => true], 419);
+            }
+
+            if ($request->routeIs('login.post')) {
+                return redirect()
+                    ->route('login', ['_sesion_limpia' => 1])
+                    ->withErrors(['email' => 'La sesión expiró. Vuelva a ingresar sus credenciales.'])
+                    ->withCookie(Cookie::forget(Auth::getRecallerName()));
             }
 
             $destino = $request->headers->get('referer');

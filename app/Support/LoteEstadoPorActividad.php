@@ -17,7 +17,7 @@ class LoteEstadoPorActividad
     /** @var array<string, string> tipo de actividad (slug) → nombre de estado en catálogo */
     private const MAPEO = [
         'labranza' => 'planificado',
-        'siembra' => 'sembrado',
+        'siembra' => 'en crecimiento',
         'riego' => 'en crecimiento',
         'fumigación' => 'en crecimiento',
         'fumigacion' => 'en crecimiento',
@@ -40,7 +40,7 @@ class LoteEstadoPorActividad
         }
 
         if (str_contains($key, 'siembra')) {
-            return 'sembrado';
+            return 'en crecimiento';
         }
         if (str_contains($key, 'riego') || str_contains($key, 'fumig') || str_contains($key, 'fertil') || str_contains($key, 'plaga')) {
             return 'en crecimiento';
@@ -136,8 +136,8 @@ class LoteEstadoPorActividad
     {
         return [
             'Labranza' => 'Planificado',
-            'Siembra' => 'Sembrado',
-            'Riego / Fumigación / Fertilización' => 'En crecimiento',
+            'Siembra' => 'En crecimiento',
+            'Riego / Fumigación / Fertilización' => 'En crecimiento (actividades de campo)',
             'Cosecha' => 'Cosechado',
         ];
     }

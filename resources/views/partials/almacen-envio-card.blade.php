@@ -24,8 +24,10 @@
          aria-pressed="{{ $isSelected ? 'true' : 'false' }}"
          data-id="{{ $almacen->almacenid }}"
          data-disponible="{{ $disponible }}"
+         data-capacidad="{{ $capacidad }}"
          data-nombre="{{ $almacen->nombre }}"
          data-um-almacen="{{ $umEtiqueta }}"
+         data-ubicacion="{{ $almacen->ubicacion ?? '' }}"
          data-tipo="{{ strtolower($almacen->tipoAlmacen->nombre ?? 'general') }}"
          data-tags="{{ strtolower($almacen->nombre . ' ' . ($almacen->tipoAlmacen->nombre ?? '') . ' ' . ($almacen->ubicacion ?? '')) }}">
         <div class="d-flex align-items-start">
@@ -57,9 +59,11 @@
                         </span>
                     @endif
                 </div>
-                <div class="capacidad-bar">
+                <div class="capacidad-bar capacidad-bar--stacked">
                     <div class="fill {{ $fillClass }}" style="width: {{ min($porcentaje, 100) }}%"></div>
+                    <div class="fill-proyeccion {{ $fillClass }}" style="display: none; width: 0;"></div>
                 </div>
+                <p class="almacen-proyeccion-texto d-none mb-0"></p>
             </div>
             <div class="ml-2">
                 <i class="fas fa-check-circle text-success fa-lg" style="{{ $isSelected ? '' : 'display: none;' }}"></i>

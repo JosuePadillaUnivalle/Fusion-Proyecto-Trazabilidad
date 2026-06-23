@@ -62,7 +62,7 @@
         </tr>
         <tr>
             <td class="label">Almacén origen</td>
-            <td>{{ $documento->almacen?->nombre ?? $envio?->almacen?->nombre ?? '—' }}</td>
+            <td>{{ $almacenOrigenNombre ?? $documento->almacen?->nombre ?? $envio?->almacen?->nombre ?? '—' }}</td>
             <td class="label">Estado del vehículo</td>
             <td>{{ $estadoVehiculo ?? '—' }}</td>
         </tr>
@@ -162,7 +162,7 @@
                 @if(!empty($firmaRecepcionImg))
                     <img src="{{ $firmaRecepcionImg }}" alt="Firma recepción" style="max-height:60px;max-width:180px;">
                 @endif
-                <br>Firma recepción en planta<br><small>{{ $destinoCliente ?? ($pedido?->nombre_planta ?? 'Planta') }}</small>
+                <br>{{ $firmaRecepcionEtiqueta ?? 'Firma recepción en destino' }}<br><small>{{ $destinoCliente ?? '—' }}</small>
             </td>
         </tr>
     </table>

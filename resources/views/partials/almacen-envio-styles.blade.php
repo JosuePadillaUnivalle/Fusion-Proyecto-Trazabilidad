@@ -59,6 +59,38 @@
     .capacidad-bar .fill.low { background: #28a745; }
     .capacidad-bar .fill.medium { background: #ffc107; }
     .capacidad-bar .fill.high { background: #dc3545; }
+    .capacidad-bar--stacked {
+        position: relative;
+        overflow: hidden;
+    }
+    .capacidad-bar--stacked .fill {
+        position: relative;
+        z-index: 1;
+    }
+    .capacidad-bar .fill-proyeccion {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        z-index: 2;
+        opacity: 0.42;
+        border-radius: 3px;
+        display: none;
+        pointer-events: none;
+    }
+    .capacidad-bar .fill-proyeccion.low { background: #28a745; }
+    .capacidad-bar .fill-proyeccion.medium { background: #ffc107; }
+    .capacidad-bar .fill-proyeccion.high { background: #dc3545; }
+    .almacen-proyeccion-texto {
+        font-size: .72rem;
+        color: #2c5530;
+        margin-top: .35rem;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+    .almacen-card.selected .almacen-proyeccion-texto {
+        color: #1e4620;
+    }
     .guia-campo {
         background: #f8fbf8;
         border-left: 3px solid #2c5530;
@@ -169,5 +201,63 @@
         position: absolute; z-index: 1000; top: 10px; left: 50%; transform: translateX(-50%);
         background: #1e293b; color: #fff; padding: .4rem .85rem; border-radius: 8px;
         font-size: .8rem; display: none; pointer-events: none;
+    }
+    .almacen-hover-preview {
+        position: fixed;
+        z-index: 1080;
+        display: none;
+        pointer-events: none;
+        max-width: 320px;
+        background: #fff;
+        border: 2px solid #28a745;
+        border-radius: 12px;
+        padding: .85rem 1rem;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+    }
+    .almacen-hover-preview__titulo {
+        font-weight: 700;
+        color: #1a252f;
+        font-size: .95rem;
+        margin-bottom: .25rem;
+    }
+    .almacen-hover-preview__meta {
+        font-size: .78rem;
+        color: #6c757d;
+        margin-bottom: .5rem;
+    }
+    .almacen-hover-preview--breve {
+        max-width: 260px;
+        padding: .55rem .75rem;
+        font-size: .82rem;
+        line-height: 1.35;
+        border-width: 1px;
+    }
+    .almacen-hover-preview--mapa {
+        max-width: 280px;
+        padding: .65rem .85rem;
+    }
+    .almacen-hover-preview .capacidad-bar {
+        margin-top: .35rem;
+    }
+    .almacen-hover-preview .fill-proyeccion {
+        opacity: 0.42;
+    }
+    .almacen-hover-preview .almacen-proyeccion-texto {
+        font-size: .72rem;
+        color: #2c5530;
+        margin-top: .35rem;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+    .almacen-destacados-filtro .btn {
+        font-weight: 600;
+        font-size: .78rem;
+    }
+    .almacen-destacados-filtro .btn.active {
+        box-shadow: 0 2px 6px rgba(40, 167, 69, .25);
+    }
+    .cosecha-lote-preview {
+        border-color: #28a745 !important;
+        background: linear-gradient(160deg, #f0fdf4, #fff) !important;
     }
 </style>

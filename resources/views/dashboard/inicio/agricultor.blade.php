@@ -9,6 +9,7 @@
 
 @push('styles')
 @include('dashboard.partials.inicio-estilos')
+@include('dashboard.partials.panel-accesos-styles')
 <style>
 .inicio-agricultor {
     --inicio-border: rgba(22, 163, 74, .15);
@@ -64,6 +65,55 @@
                 <i class="fas fa-check-circle inicio-kpi__icon"></i>
                 <div class="inicio-kpi__val">{{ $stats['completadas_mes'] }}</div>
                 <p class="inicio-kpi__lbl">Completadas</p>
+            </div>
+        </div>
+
+        <div class="card role-acc-card mb-4">
+            <div class="role-acc-card__head">
+                <h3><i class="fas fa-bolt text-success mr-2"></i>Atajos rápidos</h3>
+            </div>
+            <div class="role-acc-grupo">
+                <div class="role-acc-grupo__titulo">Mi trabajo en campo</div>
+                <div class="role-acc-grid">
+                    @can('lotes.view')
+                    <a href="{{ route('lotes.index') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--prod"><i class="fas fa-map"></i></span>
+                        <span><span class="role-acc-tile__lbl">Mis lotes</span><span class="role-acc-tile__sub">Parcelas asignadas</span></span>
+                    </a>
+                    <a href="{{ route('lotes.mapa') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--prod"><i class="fas fa-map-marked-alt"></i></span>
+                        <span><span class="role-acc-tile__lbl">Mapa de lotes</span><span class="role-acc-tile__sub">Ubicación geográfica</span></span>
+                    </a>
+                    @endcan
+                    <a href="{{ route('actividades.index') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--prod"><i class="fas fa-tasks"></i></span>
+                        <span><span class="role-acc-tile__lbl">Actividades</span><span class="role-acc-tile__sub">Tareas del lote</span></span>
+                    </a>
+                    <a href="{{ route('actividades.calendario') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--prod"><i class="fas fa-calendar-alt"></i></span>
+                        <span><span class="role-acc-tile__lbl">Calendario</span><span class="role-acc-tile__sub">Agenda semanal</span></span>
+                    </a>
+                    <a href="{{ route('producciones.index') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--prod"><i class="fas fa-tractor"></i></span>
+                        <span><span class="role-acc-tile__lbl">Mis cosechas</span><span class="role-acc-tile__sub">Producción registrada</span></span>
+                    </a>
+                    @can('certificaciones.view')
+                    <a href="{{ route('certificaciones.index') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--com"><i class="fas fa-certificate"></i></span>
+                        <span><span class="role-acc-tile__lbl">Certificaciones</span><span class="role-acc-tile__sub">Calidad de mi lote</span></span>
+                    </a>
+                    @endcan
+                    @can('inventario.view')
+                    <a href="{{ route('insumos.index') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--adm"><i class="fas fa-flask"></i></span>
+                        <span><span class="role-acc-tile__lbl">Insumos</span><span class="role-acc-tile__sub">Consulta de catálogo</span></span>
+                    </a>
+                    <a href="{{ route('almacen-agricola.index') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--log"><i class="fas fa-warehouse"></i></span>
+                        <span><span class="role-acc-tile__lbl">Almacenes</span><span class="role-acc-tile__sub">Destinos de cosecha</span></span>
+                    </a>
+                    @endcan
+                </div>
             </div>
         </div>
 

@@ -53,13 +53,6 @@
 @endpush
 
 @section('content')
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show">{{ session('success') }}<button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
-    @endif
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show">{{ session('error') }}<button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
-    @endif
-
     <div class="card pdv-card card-outline card-success card-modulo-main elevation-1">
         <x-modulo-index-header
             titulo="Minoristas y puntos de venta"
@@ -111,11 +104,16 @@
                         </a>
                         @endcan
                         @can('punto_venta.delete')
-                        <form method="POST" action="{{ route('punto-venta.puntos.destroy', $punto) }}" class="d-inline"
-                            onsubmit="return confirm('¿Eliminar {{ $punto->nombre }}?');">
+                        <form method="POST" action="{{ route('punto-venta.puntos.destroy', $punto) }}" class="d-inline">
                             @csrf
                             @method('DELETE')
-                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar"
+                                data-confirm-modal
+                                data-confirm-title="Eliminar punto de venta"
+                                data-confirm-message="¿Eliminar «{{ $punto->nombre }}»? Esta acción no se puede deshacer."
+                                data-confirm-tone="danger">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </form>
                         @endcan
                     </div>

@@ -978,6 +978,12 @@
             return total;
         },
 
+        volumenTotalM3() {
+            const peso = this.pesoTotalKg();
+            if (peso <= 0) return null;
+            return Math.round((peso / 200) * 1000) / 1000;
+        },
+
         textoCapacidadAmigable(peso, cap, pct) {
             const restante = Math.max(0, cap - peso);
             let estado = 'Va con buen margen de espacio.';

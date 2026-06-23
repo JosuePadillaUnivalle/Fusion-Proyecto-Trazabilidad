@@ -51,5 +51,7 @@ class MayoristaDemoSeeder extends Seeder
             ->update(['responsable_usuarioid' => $usuario->usuarioid]);
 
         $this->command?->info("Mayorista demo: Mayorista@gmail.com / password · Almacenes vinculados: {$vinculados}");
+
+        $this->call(AlmacenPiraiStockSeeder::class);
     }
 }
