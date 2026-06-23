@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PlantillaTransformacionPaso extends Model
 {
@@ -37,5 +38,10 @@ class PlantillaTransformacionPaso extends Model
     public function maquina(): BelongsTo
     {
         return $this->belongsTo(MaquinaPlanta::class, 'maquinaplantaid', 'maquinaplantaid');
+    }
+
+    public function variables(): HasMany
+    {
+        return $this->hasMany(PlantillaTransformacionPasoVariable::class, 'plantillapasoid', 'plantillapasoid');
     }
 }

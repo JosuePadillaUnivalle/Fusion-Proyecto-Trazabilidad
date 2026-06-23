@@ -14,6 +14,7 @@ class PuntoVentaInventarioPresentacionService
 {
     /**
      * Líneas de inventario PDV con unidades de empaque y equivalente en kg.
+     * Fuente principal: stock en el almacén del punto de venta (no depende de pedidos recibidos).
      *
      * @param  Collection<int, PuntoVenta>  $puntos
      * @return Collection<int, array{
@@ -33,104 +34,134 @@ class PuntoVentaInventarioPresentacionService
             return collect();
         }
 
-        $puntoIds = $puntos->pluck('puntoventaid')->filter()->values()->all();
-        $almacenIds = $puntos->pluck('almacenid')->filter()->values()->all();
+        $almacenIds = $puntos->pluck('almacenid')->filter()->unique()->values()->all();
+        if ($almacenIds === []) {
+            return collect();
+        }
 
-        $detalles = DetallePedidoDistribucion::query()
-            ->with([
-                'presentacion.tipoEmpaque',
-                'insumo.unidadMedida',
-                'pedido' => fn ($q) => $q->with('puntoVenta'),
-            ])
+        $puntosPorAlmacen = $puntos->keyBy(fn (PuntoVenta $p) => (int) $p->almacenid);
+        $puntoIds = $puntos->pluck('puntoventaid')->filter()->values()->all();
+        $detallesRecientes = $this->detallesRecientesPorPunto($puntoIds);
+
+        $lineas = Insumo::query()
+            ->with(['unidadMedida', 'almacen'])
+            ->whereIn('almacenid', $almacenIds)
+            ->where('stock', '>', 0)
+            ->orderBy('nombre')
+            ->get()
+            ->map(function (Insumo $insumo) use ($puntosPorAlmacen, $detallesRecientes) {
+                $punto = $puntosPorAlmacen->get((int) $insumo->almacenid);
+                if ($punto === null) {
+                    return null;
+                }
+
+                $detalle = $this->detalleRecienteParaInsumo($detallesRecientes, $punto, $insumo);
+                if ($detalle !== null) {
+                    return $this->lineaDesdeDetalle($punto, $insumo, $detalle);
+                }
+
+                return $this->lineaDesdeInsumoAlmacen($punto, $insumo);
+            })
+            ->filter()
+            ->filter(fn (array $linea) => $this->coincideBusqueda($linea, $terminoBusqueda))
+            ->values();
+
+        return $lineas->sortBy(fn (array $row) => $row['producto_nombre'].'|'.$row['presentacion_nombre'])->values();
+    }
+
+    /**
+     * @param  list<int>  $puntoIds
+     * @return Collection<int, DetallePedidoDistribucion>
+     */
+    private function detallesRecientesPorPunto(array $puntoIds): Collection
+    {
+        if ($puntoIds === []) {
+            return collect();
+        }
+
+        return DetallePedidoDistribucion::query()
+            ->with(['presentacion.tipoEmpaque', 'insumo.unidadMedida', 'pedido.puntoVenta'])
             ->whereHas('pedido', function ($q) use ($puntoIds) {
                 $q->whereIn('puntoventaid', $puntoIds)
                     ->where('estado', PedidoDistribucionCatalogo::ESTADO_RECIBIDO);
             })
             ->orderByDesc('detallepedidodistribucionid')
             ->get();
+    }
 
-        $lineas = collect();
-        $clavesUsadas = [];
+    /** @param  Collection<int, DetallePedidoDistribucion>  $detalles */
+    private function detalleRecienteParaInsumo(Collection $detalles, PuntoVenta $punto, Insumo $insumo): ?DetallePedidoDistribucion
+    {
+        $nombreInsumo = Str::lower(trim($insumo->nombre));
 
-        foreach ($detalles as $detalle) {
-            $punto = $detalle->pedido?->puntoVenta;
-            if ($punto === null || ! $punto->almacenid) {
-                continue;
+        return $detalles->first(function (DetallePedidoDistribucion $detalle) use ($punto, $nombreInsumo) {
+            if ((int) ($detalle->pedido?->puntoventaid ?? 0) !== (int) $punto->puntoventaid) {
+                return false;
             }
 
-            $presentacion = $this->resolverPresentacion($detalle);
-            $nombreBase = $this->nombreBaseProducto($detalle);
-            $clave = $punto->puntoventaid.'|'.($presentacion?->insumo_presentacionid ?? 0).'|'.Str::lower($nombreBase);
+            $candidatos = array_filter([
+                Str::lower(trim((string) $detalle->producto_nombre)),
+                Str::lower(trim((string) ($detalle->insumo?->nombre ?? ''))),
+            ]);
 
-            if (isset($clavesUsadas[$clave])) {
-                continue;
+            foreach ($candidatos as $nombre) {
+                if ($nombre === '' || $nombre === $nombreInsumo) {
+                    return true;
+                }
+                if (str_starts_with($nombreInsumo, $nombre.' · ')) {
+                    return true;
+                }
+                if (str_starts_with($nombre, explode(' · ', $nombreInsumo, 2)[0].' · ')) {
+                    return true;
+                }
             }
 
-            $insumoPdv = $this->resolverInsumoPdv($punto, $detalle, $nombreBase);
-            $kg = (float) ($insumoPdv?->stock ?? 0);
-            if ($insumoPdv === null || $kg <= 0) {
-                continue;
-            }
-            $pesoNeto = $presentacion?->pesoNetoKg() ?? 0;
-            $unidades = $presentacion && $pesoNeto > 0
-                ? round($kg / $pesoNeto, fmod($kg / $pesoNeto, 1.0) === 0.0 ? 0 : 2)
-                : (float) $detalle->cantidad;
-            $unidadEtiqueta = $presentacion?->etiquetaUnidad() ?? 'unidades';
+            return false;
+        });
+    }
 
-            $linea = [
-                'insumo' => $insumoPdv,
-                'punto' => $punto,
-                'producto_nombre' => $nombreBase,
-                'presentacion_nombre' => $presentacion?->nombre ?? '—',
-                'unidades' => $unidades,
-                'unidad_etiqueta' => $unidadEtiqueta,
-                'kg' => $kg,
-                'etiqueta_stock' => $this->etiquetaStock($unidades, $unidadEtiqueta, $kg),
-            ];
+    /** @return array{insumo: Insumo, punto: PuntoVenta, producto_nombre: string, presentacion_nombre: string, unidades: float, unidad_etiqueta: string, kg: float, etiqueta_stock: string} */
+    private function lineaDesdeDetalle(PuntoVenta $punto, Insumo $insumo, DetallePedidoDistribucion $detalle): array
+    {
+        $presentacion = $this->resolverPresentacion($detalle);
+        $nombreBase = $this->nombreBaseProducto($detalle);
+        $kg = (float) $insumo->stock;
+        $pesoNeto = $presentacion?->pesoNetoKg() ?? 0;
+        $unidades = $presentacion && $pesoNeto > 0
+            ? round($kg / $pesoNeto, fmod($kg / $pesoNeto, 1.0) === 0.0 ? 0 : 2)
+            : (float) $detalle->cantidad;
+        $unidadEtiqueta = $presentacion?->etiquetaUnidad() ?? 'unidades';
 
-            if ($this->coincideBusqueda($linea, $terminoBusqueda)) {
-                $lineas->push($linea);
-                $clavesUsadas[$clave] = true;
-            }
-        }
+        return [
+            'insumo' => $insumo,
+            'punto' => $punto,
+            'producto_nombre' => $nombreBase,
+            'presentacion_nombre' => $presentacion?->nombre ?? '—',
+            'unidades' => $unidades,
+            'unidad_etiqueta' => $unidadEtiqueta,
+            'kg' => $kg,
+            'etiqueta_stock' => $this->etiquetaStock($unidades, $unidadEtiqueta, $kg),
+        ];
+    }
 
-        $insumosSinDetalle = Insumo::query()
-            ->with(['unidadMedida', 'almacen'])
-            ->whereIn('almacenid', $almacenIds)
-            ->where('stock', '>', 0)
-            ->orderBy('nombre')
-            ->get()
-            ->filter(fn (Insumo $insumo) => ! $lineas->contains(
-                fn (array $row) => (int) $row['insumo']->insumoid === (int) $insumo->insumoid
-            ));
+    /** @return array{insumo: Insumo, punto: PuntoVenta, producto_nombre: string, presentacion_nombre: string, unidades: float, unidad_etiqueta: string, kg: float, etiqueta_stock: string} */
+    private function lineaDesdeInsumoAlmacen(PuntoVenta $punto, Insumo $insumo): array
+    {
+        $inferida = $this->inferirDesdePresentacionProducto($insumo);
+        $nombreProducto = str_contains($insumo->nombre, ' · ')
+            ? trim(explode(' · ', $insumo->nombre, 2)[0])
+            : $insumo->nombre;
 
-        foreach ($insumosSinDetalle as $insumo) {
-            $punto = $puntos->firstWhere('almacenid', $insumo->almacenid);
-            if ($punto === null) {
-                continue;
-            }
-
-            $inferida = $this->inferirDesdePresentacionProducto($insumo);
-            $nombreProducto = str_contains($insumo->nombre, ' · ')
-                ? trim(explode(' · ', $insumo->nombre, 2)[0])
-                : $insumo->nombre;
-            $linea = [
-                'insumo' => $insumo,
-                'punto' => $punto,
-                'producto_nombre' => $nombreProducto,
-                'presentacion_nombre' => $inferida['presentacion_nombre'],
-                'unidades' => $inferida['unidades'],
-                'unidad_etiqueta' => $inferida['unidad_etiqueta'],
-                'kg' => (float) $insumo->stock,
-                'etiqueta_stock' => $inferida['etiqueta_stock'],
-            ];
-
-            if ($this->coincideBusqueda($linea, $terminoBusqueda)) {
-                $lineas->push($linea);
-            }
-        }
-
-        return $lineas->sortBy(fn (array $row) => $row['producto_nombre'].'|'.$row['presentacion_nombre'])->values();
+        return [
+            'insumo' => $insumo,
+            'punto' => $punto,
+            'producto_nombre' => $nombreProducto,
+            'presentacion_nombre' => $inferida['presentacion_nombre'],
+            'unidades' => $inferida['unidades'],
+            'unidad_etiqueta' => $inferida['unidad_etiqueta'],
+            'kg' => (float) $insumo->stock,
+            'etiqueta_stock' => $inferida['etiqueta_stock'],
+        ];
     }
 
     /** @return array{presentacion_nombre: string, unidades: float, unidad_etiqueta: string, etiqueta_stock: string} */
@@ -187,32 +218,6 @@ class PuntoVentaInventarioPresentacionService
             'unidad_etiqueta' => $unidadEtiqueta,
             'etiqueta_stock' => $this->etiquetaStock($unidades, $unidadEtiqueta, (float) $insumo->stock),
         ];
-    }
-
-    private function resolverInsumoPdv(PuntoVenta $punto, DetallePedidoDistribucion $detalle, string $nombreBase): ?Insumo
-    {
-        $candidatos = array_values(array_filter([
-            $detalle->producto_nombre,
-            $nombreBase,
-            $detalle->insumo?->nombre,
-        ], fn ($nombre) => filled($nombre)));
-
-        foreach ($candidatos as $nombre) {
-            $insumo = Insumo::query()
-                ->where('almacenid', $punto->almacenid)
-                ->where(function ($q) use ($nombre, $nombreBase) {
-                    $q->whereRaw('LOWER(TRIM(nombre)) = ?', [Str::lower(trim($nombre))])
-                        ->orWhereRaw('LOWER(TRIM(nombre)) = ?', [Str::lower(trim($nombreBase))])
-                        ->orWhereRaw('LOWER(TRIM(nombre)) LIKE ?', [Str::lower(trim($nombreBase)).' · %']);
-                })
-                ->first();
-
-            if ($insumo !== null) {
-                return $insumo;
-            }
-        }
-
-        return null;
     }
 
     private function resolverPresentacion(DetallePedidoDistribucion $detalle): ?InsumoPresentacion

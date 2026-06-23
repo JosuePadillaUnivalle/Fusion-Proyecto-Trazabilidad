@@ -60,6 +60,9 @@ if (-not (Test-Path "database/database.sqlite")) {
 Write-Host "==> Reparando roles y permisos"
 php artisan agrofusion:reparar-permisos
 
+Write-Host "==> Asegurando stock demo (planta + mayorista)"
+php artisan agrofusion:asegurar-datos-demo
+
 if (-not (Test-Path "public/storage")) {
     Write-Host "==> php artisan storage:link"
     php artisan storage:link

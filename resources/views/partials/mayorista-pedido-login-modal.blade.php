@@ -1,11 +1,12 @@
 @php
     $solicitudes = session('mayorista_nuevas_solicitudes', []);
+    $clavesJson = json_encode(array_column($solicitudes, 'clave'));
 @endphp
 
 @if(! empty($solicitudes))
 <div class="login-notif-scrim" id="mayPedScrim" aria-hidden="true"></div>
 
-<div class="modal fade login-notif-modal-root" id="modalMayoristaPedido" tabindex="-1" role="dialog" aria-labelledby="modalMayoristaPedidoTitulo" aria-hidden="true" data-backdrop="false" data-keyboard="true">
+<div class="modal fade login-notif-modal-root" id="modalMayoristaPedido" tabindex="-1" role="dialog" aria-labelledby="modalMayoristaPedidoTitulo" aria-hidden="true" data-backdrop="false" data-keyboard="true" data-login-notif-alcance="mayorista" data-login-notif-claves="{{ $clavesJson }}">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content login-notif-modal login-notif-modal--mayorista">
             <div class="login-notif-modal__accent" aria-hidden="true"></div>
@@ -49,7 +50,13 @@
                     <li class="login-notif-modal__item">
                         <div class="login-notif-modal__item-body">
                             <span class="login-notif-modal__codigo">{{ $row['codigo'] }}</span>
-                            <span class="login-notif-modal__meta">{{ $row['minorista'] }} · {{ $row['producto'] }}</span>
+                            <span class="login-notif-modal__meta">
+                                @if(($row['tipo'] ?? '') === 'recepcion_planta')
+                                    {{ $row['producto'] }} · {{ $row['minorista'] }}
+                                @else
+                                    {{ $row['minorista'] }} · {{ $row['producto'] }}
+                                @endif
+                            </span>
                             <span class="login-notif-modal__qty">{{ $row['cantidad'] }}</span>
                         </div>
                         <a href="{{ $row['url'] }}" class="btn btn-sm login-notif-modal__cta">

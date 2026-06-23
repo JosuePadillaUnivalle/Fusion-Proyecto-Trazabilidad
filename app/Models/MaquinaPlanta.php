@@ -27,6 +27,11 @@ class MaquinaPlanta extends Model
         return $this->hasMany(ProcesoMaquinaPlanta::class, 'maquinaplantaid', 'maquinaplantaid');
     }
 
+    public function variablesSugeridas(): HasMany
+    {
+        return $this->hasMany(MaquinaVariablePlanta::class, 'maquinaplantaid', 'maquinaplantaid');
+    }
+
     public function tieneImagen(): bool
     {
         return filled($this->imagenurl);

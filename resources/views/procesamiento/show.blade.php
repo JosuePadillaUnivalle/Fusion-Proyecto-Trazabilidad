@@ -173,11 +173,58 @@
     .lp-ruta-paso.is-actual { box-shadow: 0 0 0 2px rgba(245,158,11,.35); }
     .lp-ruta-paso.is-en-curso { box-shadow: 0 0 0 2px rgba(59,130,246,.35); }
     .lp-ruta-paso__lock { font-size: .68rem; display: block; margin-top: 2px; }
-    .lp-asignaciones-pendientes { margin-top: 1rem; }
+    .lp-asignaciones-pendientes { margin-top: 0; }
     .lp-asignaciones-pendientes__titulo {
         font-size: .78rem; font-weight: 700; text-transform: uppercase;
         letter-spacing: .04em; color: #92400e; margin-bottom: .65rem;
     }
+    .lp-accion-actual {
+        background: linear-gradient(180deg, #fff 0%, #f8fbf8 100%);
+        border: 1px solid #d1e7d4; border-radius: 14px;
+        padding: 1rem 1.15rem; margin-top: 1rem;
+        box-shadow: 0 4px 18px rgba(30,70,32,.06);
+    }
+    .lp-accion-actual__head {
+        display: flex; align-items: center; justify-content: space-between;
+        flex-wrap: wrap; gap: .5rem; margin-bottom: .85rem;
+    }
+    .lp-accion-actual__head h6 {
+        margin: 0; font-weight: 700; color: #1e4620; font-size: .95rem;
+    }
+    .lp-accion-actual__badge {
+        font-size: .72rem; font-weight: 700; padding: .3rem .65rem;
+        border-radius: 999px; background: #fef3c7; color: #92400e;
+    }
+    .lp-transform-toolbar {
+        display: flex; align-items: center; justify-content: space-between;
+        flex-wrap: wrap; gap: .65rem; margin-bottom: .85rem;
+    }
+    .lp-transform-toolbar__title {
+        font-weight: 700; color: #1e4620; font-size: .92rem; margin: 0;
+    }
+    .lp-transform-toolbar__meta { font-size: .78rem; color: #64748b; }
+    .lp-timeline-shell {
+        background: linear-gradient(180deg, #f8fbf8 0%, #fff 100%);
+        border: 1px solid #e2ebe3; border-radius: 14px; padding: .85rem 1rem;
+    }
+    .lp-preview-params {
+        background: linear-gradient(135deg, #f0fdf4 0%, #fff 100%);
+        border: 1px solid #bbf7d0; border-radius: 12px;
+        padding: .85rem 1rem;
+    }
+    .lp-preview-params__title { font-size: .85rem; font-weight: 700; color: #1e4620; margin-bottom: .5rem; }
+    .lp-preview-params__note { font-size: .75rem; color: #64748b; margin-top: .55rem; margin-bottom: 0; line-height: 1.45; }
+    .lp-preview-params__grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+        gap: .5rem;
+    }
+    .lp-preview-params__card {
+        background: #fff; border: 1px solid #d1e7d4; border-radius: 10px;
+        padding: .55rem .65rem; display: flex; flex-direction: column; gap: .2rem;
+    }
+    .lp-preview-params__card-label { font-size: .72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+    .lp-preview-params__card-range { font-size: .82rem; color: #1e4620; line-height: 1.35; }
+    .lp-preview-params__card-range strong { color: #2c5530; font-weight: 800; }
     .lp-paso--pendiente {
         border-color: #fbbf24;
         background: linear-gradient(135deg, #fffbeb 0%, #fff 100%);
@@ -387,26 +434,41 @@
         </div>
         <div class="card-body">
             <div id="lp-ajax-flash" class="d-none"></div>
+
             @if($panelActivo === 'transformacion')
-            <p class="small text-muted mb-3">
-                @if(!empty($rutaPlantilla))
-                    Siga el <strong>proceso de transformación</strong> paso a paso. El formulario sugiere el siguiente proceso y máquina.
-                @else
-                    Registre cada etapa con el proceso de planta, la maquinaria utilizada y el horario.
+            <div class="lp-transform-toolbar">
+                <div>
+                    <p class="lp-transform-toolbar__title mb-0">
+                        <i class="fas fa-seedling mr-1 text-success"></i>
+                        {{ $lote->plantillaTransformacion?->nombre ?? 'Línea manual' }}
+                    </p>
+                    <p class="lp-transform-toolbar__meta mb-0" id="lp-toolbar-etapa-meta">
+                        Etapa {{ $ordenEtapaActual ?? 1 }} de {{ count($rutaPlantilla ?? []) ?: '—' }}
+                        @if(!empty($siguientePasoPlantilla)) · Siguiente: <strong>{{ $siguientePasoPlantilla->proceso?->nombre }}</strong>@endif
+                    </p>
+                </div>
+                @if(!empty($puedeEditarRuta))
+                <button type="button" class="btn btn-sm btn-outline-success" data-toggle="collapse" data-target="#lpEditorRutaCollapse" aria-expanded="false">
+                    <i class="fas fa-route mr-1"></i> Editar ruta pendiente
+                </button>
                 @endif
-                La transformación se cierra al registrar <strong>{{ \App\Support\ProcesoPlantaCatalogo::PROCESO_CIERRE_TRANSFORMACION }}</strong>.
-            </p>
+            </div>
             @endif
 
-            @if(!empty($rutaPlantilla))
-            <div class="mb-3 p-2 rounded border" style="background:#f8fbf8;">
-                <div class="small font-weight-bold text-success mb-2">
-                    <i class="fas fa-project-diagram mr-1"></i>
-                    Proceso: {{ $lote->plantillaTransformacion?->nombre ?? 'Predefinido' }}
-                    @if($lote->plantillaTransformacion)
-                        <a href="{{ route('plantillas-transformacion.show', $lote->plantillaTransformacion) }}" class="ml-2 font-weight-normal">Ver detalle</a>
-                    @endif
+            @if(!empty($timelineVisual))
+            <div class="lp-timeline-shell mb-0">
+                <div id="lp-timeline-visual">
+                    @include('planta.partials.timeline-transformacion', [
+                        'items' => $timelineVisual,
+                        'sortable' => !empty($puedeEditarRuta) && $panelActivo === 'transformacion',
+                        'rutaUrl' => route('procesamiento.actualizar-ruta', $lote),
+                        'rutaPasosJson' => $rutaPasosJson ?? [],
+                        'etapasCompletadas' => $etapasCompletadasRuta ?? 0,
+                    ])
                 </div>
+            </div>
+            @elseif(!empty($rutaPlantilla))
+            <div class="lp-timeline-shell mb-0">
                 <div class="lp-stepper" id="lp-ruta-plantilla-pasos">
                     @foreach($rutaPlantilla as $idx => $paso)
                     @php
@@ -434,93 +496,68 @@
             </div>
             @endif
 
-            <div id="lp-lista-etapas-completadas">
-            @forelse($etapas_transformacion ?? [] as $etapa)
-                <div class="lp-paso done {{ !empty($etapa['es_cierre']) ? 'cierre' : '' }} d-flex align-items-start">
-                    <span class="lp-timeline-num">{{ $etapa['numero'] }}</span>
-                    <div class="flex-grow-1">
-                        <strong>{{ $etapa['proceso'] }}</strong>
-                        @if(!empty($etapa['es_cierre']))
-                            <span class="badge badge-info ml-1">Cierre</span>
-                        @endif
-                        <br>
-                        <small class="text-muted">
-                            <i class="fas fa-industry mr-1"></i>{{ $etapa['maquina'] }}
-                            · <i class="far fa-clock mr-1"></i>
-                            {{ optional($etapa['inicio'])->format('d/m/Y H:i') }}
-                            → {{ optional($etapa['fin'])->format('d/m/Y H:i') }}
-                            @if($etapa['operador']) · {{ $etapa['operador'] }} @endif
-                        </small>
-                        @if($etapa['observaciones'])
-                            <br><small class="text-secondary">{{ $etapa['observaciones'] }}</small>
-                        @endif
-                    </div>
-                    <span class="badge badge-success"><i class="fas fa-check"></i></span>
-                </div>
-            @empty
-                @if($panelActivo === 'transformacion')
-                <p class="text-muted small mb-3" id="lp-etapas-vacio">Aún no hay etapas registradas. Ejemplo para papas fritas: Preparación de materias primas (pelar/cortar) → Tratamiento térmico (freír) → Empaquetado.</p>
-                @endif
-            @endforelse
-            </div>
-
-            @if(!empty($asignacionesPendientesLote) && $asignacionesPendientesLote->count())
-            <div class="lp-asignaciones-pendientes" id="lp-asignaciones-pendientes">
-                <div class="lp-asignaciones-pendientes__titulo">
-                    <i class="fas fa-user-clock mr-1"></i>Asignaciones pendientes ({{ $asignacionesPendientesLote->count() }})
-                </div>
-                @foreach($asignacionesPendientesLote as $asig)
-                <div class="lp-paso lp-paso--pendiente d-flex flex-wrap" data-asignacion-id="{{ $asig->asignacionetapaplantaid }}">
-                    <span class="lp-timeline-num" aria-hidden="true"><i class="fas fa-hourglass-half" style="font-size:.7rem"></i></span>
-                    <div class="flex-grow-1 min-width-0">
-                        <strong class="d-block">{{ $asig->proceso?->nombre }}</strong>
-                        <div class="lp-paso-meta">
-                            <i class="fas fa-industry mr-1"></i>{{ $asig->maquina?->nombre }}
-                            <span class="mx-1">·</span>
-                            <i class="fas fa-user-cog mr-1"></i><strong>{{ $asig->operador?->nombreCompleto() }}</strong>
-                            @if($asig->observaciones)
-                                <br><span class="text-secondary">{{ $asig->observaciones }}</span>
-                            @endif
-                            @if(\App\Support\ProductoPlantaCatalogo::esProcesoEmpaquetado($asig->proceso?->nombre))
-                                @php $prevEmp = \App\Support\ProductoPlantaCatalogo::vistaPreviaEmpaquetado($lote, app(\App\Services\AlmacenCapacidadService::class)); @endphp
-                                @if($prevEmp)
-                                <div class="alert alert-light border small py-2 px-3 mt-2 mb-0" style="background:#f0fdf4;border-color:#bbf7d0!important">
-                                    <strong class="text-success d-block mb-1"><i class="fas fa-box-open mr-1"></i>{{ $prevEmp['titulo'] }}</strong>
-                                    <span class="d-block"><i class="fas fa-archive text-muted mr-1"></i><strong>Empaque:</strong> {{ $prevEmp['empaque'] }}</span>
-                                    <span class="d-block"><i class="fas fa-cubes text-muted mr-1"></i><strong>Cantidad:</strong> {{ $prevEmp['unidades'] }}</span>
-                                    <span class="d-block"><i class="fas fa-weight text-muted mr-1"></i>{{ $prevEmp['kg_producto'] }} · {{ $prevEmp['kg_materia'] }}</span>
-                                </div>
-                                @endif
-                            @endif
-                        </div>
-                    </div>
-                    @if(!empty($puedeAsignarEtapa))
-                    <div class="lp-paso--pendiente__accion">
-                        <form method="POST" action="{{ route('procesamiento.completar-etapa-asignada', [$lote, $asig]) }}" class="mb-0 js-lp-guardar-scroll"
-                              data-ajax-lp-action="completar-etapa">
-                            @csrf
-                            <button type="button" class="btn btn-success btn-sm font-weight-bold"
-                                    data-confirm-modal
-                                    data-confirm-tone="success"
-                                    data-confirm-title="Completar fase"
-                                    data-confirm-message="¿Marcar «{{ $asig->proceso?->nombre }}» como completada? Se retirará la alerta de {{ $asig->operador?->nombreCompleto() }}.">
-                                <i class="fas fa-check mr-1"></i>Marcar completada
-                            </button>
-                        </form>
-                    </div>
-                    @endif
-                </div>
-                @endforeach
+            @if(!empty($puedeEditarRuta) && $panelActivo === 'transformacion')
+            <div class="collapse mt-3" id="lpEditorRutaCollapse">
+                @include('procesamiento.partials.editor-ruta-lote', [
+                    'lote' => $lote,
+                    'rutaPlantilla' => $rutaPlantilla,
+                    'procesosPlanta' => $procesosPlanta,
+                    'mapaCompatibilidad' => $mapaCompatibilidad,
+                    'maquinasPlanta' => $maquinasPlanta,
+                    'etapasCompletadasRuta' => $etapasCompletadasRuta ?? 0,
+                ])
             </div>
             @endif
 
             @if($panelActivo === 'transformacion' && in_array($fase_actual, ['transformacion', 'creacion']) && empty($transformacion_completa))
-            @if(!empty($puedeAsignarEtapa))
-            <div class="lp-form-etapa mt-3 {{ empty($puedeAsignarNuevaEtapa) ? 'd-none' : '' }}" id="lp-form-registrar-etapa">
-                <h6 class="font-weight-bold text-success mb-3">
-                    <i class="fas fa-user-plus mr-1"></i>
-                    Asignar etapa {{ $ordenEtapaActual ?? 1 }} a operario
-                </h6>
+            <div class="lp-accion-actual" id="lp-accion-actual">
+                @if((empty($asignacionesPendientesLote) || $asignacionesPendientesLote->isEmpty()) && !empty($mensajeBloqueoAsignacion) && empty($puedeAsignarNuevaEtapa))
+                <div class="alert alert-warning py-2 px-3 mb-0 small" id="lp-bloqueo-asignacion">
+                    <i class="fas fa-lock mr-1"></i>{{ $mensajeBloqueoAsignacion }}
+                </div>
+                @endif
+
+                @if(!empty($asignacionesPendientesLote) && $asignacionesPendientesLote->count())
+                <div class="lp-asignaciones-pendientes" id="lp-asignaciones-pendientes">
+                    <div class="lp-accion-actual__head">
+                        <h6><i class="fas fa-user-clock mr-1 text-warning"></i> Etapa en curso — completar asignación</h6>
+                        <span class="lp-accion-actual__badge">{{ $asignacionesPendientesLote->count() }} pendiente{{ $asignacionesPendientesLote->count() > 1 ? 's' : '' }}</span>
+                    </div>
+                    @foreach($asignacionesPendientesLote as $asig)
+                    <div class="lp-paso lp-paso--pendiente d-flex flex-wrap border-0 shadow-sm" data-asignacion-id="{{ $asig->asignacionetapaplantaid }}" style="background:#fffbeb;border-color:#fde68a!important">
+                        <div class="flex-grow-1 min-width-0 mb-2 mb-md-0">
+                            <strong class="d-block text-dark">{{ $asig->proceso?->nombre }}</strong>
+                            <div class="lp-paso-meta small text-muted">
+                                <i class="fas fa-industry mr-1"></i>{{ $asig->maquina?->nombre }}
+                                <span class="mx-1">·</span>
+                                <i class="fas fa-user-cog mr-1"></i>{{ $asig->operador?->nombreCompleto() }}
+                            </div>
+                        </div>
+                        @if(!empty($puedeAsignarEtapa))
+                        <div class="w-100">
+                            <form method="POST" action="{{ route('procesamiento.completar-etapa-asignada', [$lote, $asig]) }}" class="mb-0 js-lp-guardar-scroll"
+                                  data-ajax-lp-action="completar-etapa">
+                                @csrf
+                                @include('planta.partials.form-parametros-etapa', [
+                                    'parametrosRequeridos' => $parametrosPorAsignacion[$asig->asignacionetapaplantaid] ?? [],
+                                    'prefix' => 'parametros',
+                                    'inputIdPrefix' => 'lp-asig-'.$asig->asignacionetapaplantaid,
+                                ])
+                                <button type="submit" class="btn btn-success btn-sm font-weight-bold mt-2">
+                                    <i class="fas fa-check mr-1"></i> Marcar completada
+                                </button>
+                            </form>
+                        </div>
+                        @endif
+                    </div>
+                    @endforeach
+                </div>
+
+                @elseif(!empty($puedeAsignarEtapa) && !empty($puedeAsignarNuevaEtapa))
+                <div class="lp-accion-actual__head">
+                    <h6 id="lp-titulo-asignar-etapa"><i class="fas fa-user-plus mr-1"></i> Asignar etapa {{ $ordenEtapaActual ?? 1 }}</h6>
+                </div>
+                <div class="lp-form-etapa border-0 p-0 bg-transparent" id="lp-form-registrar-etapa">
                 @php $empaquePlan = \App\Support\ProductoPlantaCatalogo::empaquePlanificadoResumen($lote); @endphp
                 @if($empaquePlan)
                 <div class="alert alert-light border small py-2 px-3 mb-3">
@@ -541,7 +578,7 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <small class="lp-etapa-hint">
+                            <small class="lp-etapa-hint" id="lp-hint-proceso-etapa">
                                 @if(!empty($siguientePasoPlantilla))
                                     <span class="text-success"><i class="fas fa-magic mr-1"></i>Etapa {{ $ordenEtapaActual ?? 1 }}: {{ $siguientePasoPlantilla->proceso?->nombre }}</span>
                                 @elseif(!empty($rutaPlantilla))
@@ -599,7 +636,7 @@
                                     'size' => 'sm',
                                 ])
                             </div>
-                            <small class="lp-etapa-hint d-block" id="hintOperadorEtapa">Primero elija maquinaria…</small>
+                            <small class="lp-etapa-hint" id="hintOperadorEtapa">Primero elija maquinaria…</small>
                         </div>
                         <div class="col-md-3 lp-etapa-field">
                             <label class="small font-weight-bold lp-etapa-label">Observaciones</label>
@@ -609,6 +646,16 @@
                             <small class="lp-etapa-hint">&nbsp;</small>
                         </div>
                     </div>
+
+                    <div id="lpPreviewParamsAsignar" class="lp-preview-params mb-3" style="display:none">
+                        <div class="lp-preview-params__title"><i class="fas fa-clipboard-check mr-1"></i> Lo que debe controlar el operario</div>
+                        <div id="lpPreviewParamsAsignarBody" class="lp-preview-params__grid"></div>
+                        <p class="lp-preview-params__note">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            En su panel de tareas registrará el valor medido en planta. Debe quedar dentro del rango indicado.
+                        </p>
+                    </div>
+
                     <div class="form-row">
                         <div class="col-md-12 form-group mb-0 d-flex justify-content-end">
                             <button type="submit" class="btn btn-success btn-sm font-weight-bold">
@@ -617,18 +664,35 @@
                         </div>
                     </div>
                 </form>
-            </div>
-            @elseif(!empty($puedeAsignarEtapa) && empty($puedeAsignarNuevaEtapa) && !empty($mensajeBloqueoAsignacion))
-            <div class="alert alert-light border mt-3 mb-0 small text-muted" id="lp-bloqueo-asignacion">
-                <i class="fas fa-lock mr-1"></i>{{ $mensajeBloqueoAsignacion }}
-            </div>
-            @elseif(\App\Support\UsuarioRol::esOperarioPlanta(auth()->user()))
-            <div class="alert alert-info py-2 px-3 mt-3 mb-0 small">
-                <i class="fas fa-info-circle mr-1"></i>
-                Las etapas se asignan desde el jefe de planta. Revise sus tareas en
-                <a href="{{ route('tareas-planta.index') }}" class="alert-link font-weight-bold">Mis tareas de transformación</a>.
+                </div>
+                @elseif(\App\Support\UsuarioRol::esOperarioPlanta(auth()->user()))
+                <div class="alert alert-info py-2 px-3 mb-0 small">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Las etapas las asigna el jefe de planta. Revise
+                    <a href="{{ route('tareas-planta.index') }}" class="alert-link font-weight-bold">mis tareas</a>.
+                </div>
+                @endif
             </div>
             @endif
+
+            @if($panelActivo !== 'transformacion' && count($etapas_transformacion ?? []) > 0)
+            <div id="lp-lista-etapas-completadas" class="mt-3">
+            @foreach($etapas_transformacion ?? [] as $etapa)
+                <div class="lp-paso done {{ !empty($etapa['es_cierre']) ? 'cierre' : '' }} d-flex align-items-start">
+                    <span class="lp-timeline-num">{{ $etapa['numero'] }}</span>
+                    <div class="flex-grow-1">
+                        <strong>{{ $etapa['proceso'] }}</strong>
+                        <br><small class="text-muted">
+                            <i class="fas fa-industry mr-1"></i>{{ $etapa['maquina'] }}
+                            · {{ optional($etapa['inicio'])->format('d/m/Y H:i') }} → {{ optional($etapa['fin'])->format('d/m/Y H:i') }}
+                        </small>
+                    </div>
+                    <span class="badge badge-success"><i class="fas fa-check"></i></span>
+                </div>
+            @endforeach
+            </div>
+            @else
+            <div id="lp-lista-etapas-completadas" class="d-none" aria-hidden="true"></div>
             @endif
         </div>
     </div>
@@ -948,6 +1012,7 @@
 
     function seleccionarMaquina(item) {
         inputMaquina.value = item.id;
+        inputMaquina.dispatchEvent(new Event('change'));
         mostrarMaquinaElegida(item);
         bloquearOperario(false);
         if (window.jQuery && modalMaquina) window.jQuery(modalMaquina).modal('hide');
@@ -1058,11 +1123,124 @@
         ] : null;
     @endphp
     const sugerido = @json($sugeridoPasoJs);
+    let parametrosPreviewBase = @json($parametrosPreviewEtapa ?? []);
+    const urlVariablesMaquinaPreview = @json(url('/maquinas-planta/__ID__/variables-sugeridas'));
+
+    function fmtRango(n) {
+        const v = Number(n);
+        return Number.isInteger(v) ? String(v) : v.toFixed(1);
+    }
+
+    function renderPreviewParams(params) {
+        const box = document.getElementById('lpPreviewParamsAsignar');
+        const body = document.getElementById('lpPreviewParamsAsignarBody');
+        if (!box || !body) return;
+        if (!params || !params.length) {
+            box.style.display = 'none';
+            body.innerHTML = '';
+            return;
+        }
+        let html = '';
+        params.forEach(function (p) {
+            const unidad = p.unidad ? ' ' + p.unidad : '';
+            html += '<div class="lp-preview-params__card">' +
+                '<span class="lp-preview-params__card-label">' + (p.nombre || '—') + '</span>' +
+                '<span class="lp-preview-params__card-range">Entre <strong>' + fmtRango(p.valor_minimo) + '</strong> y <strong>' + fmtRango(p.valor_maximo) + '</strong>' + unidad + '</span>' +
+                '</div>';
+        });
+        body.innerHTML = html;
+        box.style.display = 'block';
+    }
+
+    window.LpActualizarEtapaAsignar = function (datos) {
+        if (!datos) return;
+
+        const titulo = document.getElementById('lp-titulo-asignar-etapa');
+        if (titulo) {
+            titulo.innerHTML = '<i class="fas fa-user-plus mr-1"></i> Asignar etapa ' + (datos.orden || 1);
+        }
+
+        const meta = document.getElementById('lp-toolbar-etapa-meta');
+        if (meta) {
+            const total = datos.total_etapas || '—';
+            const proc = datos.proceso_nombre ? ' · Siguiente: <strong>' + datos.proceso_nombre + '</strong>' : '';
+            meta.innerHTML = 'Etapa ' + (datos.orden || 1) + ' de ' + total + proc;
+        }
+
+        const hint = document.getElementById('lp-hint-proceso-etapa');
+        if (hint && datos.proceso_nombre) {
+            hint.innerHTML = '<span class="text-success"><i class="fas fa-magic mr-1"></i>Etapa ' + datos.orden + ': ' + datos.proceso_nombre + '</span>';
+        }
+
+        if (selectProceso && datos.procesoplantaid) {
+            selectProceso.value = String(datos.procesoplantaid);
+            actualizarEstadoProceso();
+        }
+
+        if (datos.maquinaplantaid && inputMaquina) {
+            inputMaquina.value = String(datos.maquinaplantaid);
+            inputMaquina.dispatchEvent(new Event('change'));
+            if (labelMaquina) {
+                labelMaquina.value = (datos.maquina_nombre || 'Maquinaria sugerida')
+                    + (datos.maquina_codigo ? ' (' + datos.maquina_codigo + ')' : '');
+            }
+            bloquearOperario(false);
+        }
+
+        const obs = document.querySelector('#formAsignarEtapa input[name="observaciones"]');
+        if (obs && datos.notas) {
+            obs.value = datos.notas;
+        }
+
+        parametrosPreviewBase = datos.parametros_preview || [];
+        actualizarPreviewParams(datos.maquinaplantaid || null);
+    };
+
+    function actualizarPreviewParams(maquinaId) {
+        if (!maquinaId) {
+            renderPreviewParams(parametrosPreviewBase);
+            return;
+        }
+        const url = urlVariablesMaquinaPreview.replace('__ID__', String(maquinaId));
+        fetch(url, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!parametrosPreviewBase.length) {
+                    const desdeMaq = (data.variables || []).map(function (v) {
+                        return {
+                            nombre: v.nombre,
+                            unidad: v.unidad,
+                            valor_minimo: parseFloat(v.valor_minimo || 0),
+                            valor_maximo: parseFloat(v.valor_maximo || 0),
+                            maq_minimo: parseFloat(v.valor_minimo || 0),
+                            maq_maximo: parseFloat(v.valor_maximo || 0),
+                        };
+                    });
+                    renderPreviewParams(desdeMaq);
+                    return;
+                }
+                const mapaMaq = {};
+                (data.variables || []).forEach(function (v) {
+                    mapaMaq[v.variableestandarid] = v;
+                });
+                const merged = parametrosPreviewBase.map(function (p) {
+                    const m = mapaMaq[p.variableestandarid];
+                    return Object.assign({}, p, {
+                        maq_minimo: m ? parseFloat(m.valor_minimo) : p.maq_minimo,
+                        maq_maximo: m ? parseFloat(m.valor_maximo) : p.maq_maximo,
+                    });
+                });
+                renderPreviewParams(merged);
+            })
+            .catch(function () { renderPreviewParams(parametrosPreviewBase); });
+    }
+
     if (sugerido && sugerido.procesoplantaid) {
         selectProceso.value = String(sugerido.procesoplantaid);
         actualizarEstadoProceso();
         if (sugerido.maquinaplantaid) {
             inputMaquina.value = String(sugerido.maquinaplantaid);
+            inputMaquina.dispatchEvent(new Event('change'));
             if (labelMaquina) {
                 labelMaquina.value = (sugerido.maquina_nombre || 'Maquinaria sugerida')
                     + (sugerido.maquina_codigo ? ' (' + sugerido.maquina_codigo + ')' : '');
@@ -1071,6 +1249,16 @@
         }
         const obs = document.querySelector('#formAsignarEtapa input[name="observaciones"]');
         if (obs && sugerido.notas && !obs.value) obs.value = sugerido.notas;
+        actualizarPreviewParams(sugerido.maquinaplantaid || null);
+    } else {
+        actualizarPreviewParams(null);
+    }
+
+    const inputMaquinaObs = document.getElementById('inputMaquinaEtapa');
+    if (inputMaquinaObs) {
+        inputMaquinaObs.addEventListener('change', function () {
+            actualizarPreviewParams(inputMaquinaObs.value ? parseInt(inputMaquinaObs.value, 10) : null);
+        });
     }
 })();
 
@@ -1189,13 +1377,23 @@
         const obs = etapa.observaciones
             ? '<br><small class="text-secondary">' + escHtml(etapa.observaciones) + '</small>' : '';
         const operador = etapa.operador ? ' · ' + escHtml(etapa.operador) : '';
+        let params = '';
+        if (Array.isArray(etapa.parametros_medidos) && etapa.parametros_medidos.length) {
+            params = '<div class="mt-1">';
+            etapa.parametros_medidos.forEach(function (pm) {
+                const unidad = pm.unidad ? ' ' + escHtml(pm.unidad) : '';
+                params += '<span class="badge badge-light border text-success mr-1">' +
+                    escHtml(pm.nombre) + ': ' + escHtml(Number(pm.valor).toFixed(1)) + unidad + '</span>';
+            });
+            params += '</div>';
+        }
 
         return '<div class="lp-paso done lp-paso--entrada d-flex align-items-start">' +
             '<span class="lp-timeline-num">' + escHtml(etapa.numero) + '</span>' +
             '<div class="flex-grow-1"><strong>' + escHtml(etapa.proceso) + '</strong>' + cierre + '<br>' +
             '<small class="text-muted"><i class="fas fa-industry mr-1"></i>' + escHtml(etapa.maquina) +
             ' · <i class="far fa-clock mr-1"></i>' + escHtml(etapa.inicio_fmt) + ' → ' + escHtml(etapa.fin_fmt) +
-            operador + '</small>' + obs + '</div>' +
+            operador + '</small>' + obs + params + '</div>' +
             '<span class="badge badge-success"><i class="fas fa-check"></i></span></div>';
     }
 
@@ -1275,6 +1473,10 @@
                         window.location.reload();
                         return;
                     }
+                    if (document.getElementById('lp-timeline-visual')) {
+                        window.location.reload();
+                        return;
+                    }
                     if (card) {
                         card.style.transition = 'opacity .3s ease';
                         card.style.opacity = '0';
@@ -1293,6 +1495,11 @@
                             html += htmlRutaPaso(paso, idx, prev);
                         });
                         ruta.innerHTML = html;
+                    }
+
+                    const timeline = document.getElementById('lp-timeline-visual');
+                    if (timeline && data.timeline_html) {
+                        timeline.innerHTML = data.timeline_html;
                     }
 
                     const formAsignar = document.getElementById('lp-form-registrar-etapa');
@@ -1323,6 +1530,14 @@
                 });
         },
     };
+
+    document.addEventListener('submit', function (e) {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        if (form.dataset.ajaxLpAction !== 'completar-etapa' || !window.LpProcesamientoAjax) return;
+        e.preventDefault();
+        window.LpProcesamientoAjax.completarEtapa(form);
+    });
 })();
 </script>
 @endpush

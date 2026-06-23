@@ -1082,7 +1082,7 @@
                     $prodAgrOpen = request()->routeIs('producciones.*', 'climas.*');
                     if (! ($esJefeAgr && ! $isAdmin)) {
                     }
-                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'plantillas-transformacion.*', 'maquinas-planta.*', 'procesamiento.*', 'tareas-planta.*', 'certificaciones-planta.*', 'produccion-planta.catalogos.*');
+                    $prodPlaMenuOpen = request()->routeIs('procesos-planta.*', 'plantillas-transformacion.*', 'maquinas-planta.*', 'variables-estandar.*', 'procesamiento.*', 'tareas-planta.*', 'certificaciones-planta.*', 'produccion-planta.catalogos.*');
                     $envListadoActivo = request()->routeIs(
                         'logistica.asignaciones.listado',
                         'logistica.asignaciones.show',
@@ -1325,11 +1325,13 @@
                         <li class="ag-sub-li"><a href="{{ route('procesos-planta.index') }}" class="ag-sub-a {{ request()->routeIs('procesos-planta.*') ? 'active' : '' }}">Procesos de planta</a></li>
                         <li class="ag-sub-li"><a href="{{ route('plantillas-transformacion.index') }}" class="ag-sub-a {{ request()->routeIs('plantillas-transformacion.*') ? 'active' : '' }}">Procesos de transformación</a></li>
                         <li class="ag-sub-li"><a href="{{ route('maquinas-planta.index') }}" class="ag-sub-a {{ request()->routeIs('maquinas-planta.*') ? 'active' : '' }}">Máquinas de planta</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('variables-estandar.index') }}" class="ag-sub-a {{ request()->routeIs('variables-estandar.*') ? 'active' : '' }}">Variables estándar</a></li>
                         <li class="ag-sub-li"><a href="{{ route('produccion-planta.catalogos.index', 'tipos-empaque') }}" class="ag-sub-a {{ request()->routeIs('produccion-planta.catalogos.*') ? 'active' : '' }}">Tipos de empaque</a></li>
                         @elseif($authUser && \App\Support\UsuarioRol::esOperarioPlanta($authUser))
                         <li class="ag-sub-li"><a href="{{ route('procesos-planta.index') }}" class="ag-sub-a {{ request()->routeIs('procesos-planta.*') ? 'active' : '' }}">Procesos de planta</a></li>
                         <li class="ag-sub-li"><a href="{{ route('plantillas-transformacion.index') }}" class="ag-sub-a {{ request()->routeIs('plantillas-transformacion.*') ? 'active' : '' }}">Procesos de transformación</a></li>
                         <li class="ag-sub-li"><a href="{{ route('maquinas-planta.index') }}" class="ag-sub-a {{ request()->routeIs('maquinas-planta.*') ? 'active' : '' }}">Máquinas de planta</a></li>
+                        <li class="ag-sub-li"><a href="{{ route('variables-estandar.index') }}" class="ag-sub-a {{ request()->routeIs('variables-estandar.*') ? 'active' : '' }}">Variables estándar</a></li>
                         <li class="ag-sub-li"><a href="{{ route('produccion-planta.catalogos.index', 'tipos-empaque') }}" class="ag-sub-a {{ request()->routeIs('produccion-planta.catalogos.*') ? 'active' : '' }}">Tipos de empaque</a></li>
                         @endif
                     </ul>
@@ -1595,7 +1597,10 @@
         @include('partials.flash-error-modal')
         @include('partials.transportista-asignacion-login-modal')
         @include('partials.operario-planta-tarea-login-modal')
+        @include('partials.agricultor-actividad-login-modal')
+        @include('partials.jefe-agricultor-envio-login-modal')
         @include('partials.mayorista-pedido-login-modal')
+        @include('partials.minorista-envio-login-modal')
         @include('partials.jefe-planta-traslado-login-modal')
         @include('partials.login-notificacion-mount')
         @once

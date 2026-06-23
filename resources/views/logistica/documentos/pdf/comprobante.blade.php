@@ -109,6 +109,13 @@
         {{ $textoObservaciones }}
     </div>
 
+    @if(!empty($observacionPersonal))
+    <div class="nota">
+        <strong>Observacion Personal:</strong>
+        {{ $observacionPersonal }}
+    </div>
+    @endif
+
     @if(!empty($condicionesLineas))
     <strong style="display:block;margin-top:16px;">Registro de condiciones de transporte</strong>
     <table class="productos">

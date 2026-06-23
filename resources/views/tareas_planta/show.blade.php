@@ -99,6 +99,14 @@
     </div>
 
     <div class="tp-detail-grid">
+        @if(!empty($timelineLote))
+        <div class="tp-card mb-3" style="grid-column: 1 / -1">
+            <div class="tp-card-hd"><i class="fas fa-route text-success mr-2"></i>Ruta del lote</div>
+            <div class="p-3">
+                @include('planta.partials.timeline-transformacion', ['items' => $timelineLote, 'compacto' => true])
+            </div>
+        </div>
+        @endif
         <div class="tp-card">
             <div class="tp-card-hd"><i class="fas fa-clipboard-list text-success mr-2"></i>Detalle de la tarea</div>
             <div class="tp-kv">
@@ -201,11 +209,12 @@
                     </div>
                     <form method="POST" action="{{ route('tareas-planta.completar', $tarea) }}" class="mb-0">
                         @csrf
-                        <button type="button" class="btn btn-success btn-block tp-btn-complete"
-                                data-confirm-modal
-                                data-confirm-tone="success"
-                                data-confirm-title="Completar tarea"
-                                data-confirm-message="¿Confirma que finalizó «{{ $tarea->proceso?->nombre }}» en {{ $tarea->maquina?->nombre }}?">
+                        @include('planta.partials.form-parametros-etapa', [
+                            'parametrosRequeridos' => $parametrosRequeridos ?? [],
+                            'prefix' => 'parametros',
+                            'inputIdPrefix' => 'tp-param',
+                        ])
+                        <button type="submit" class="btn btn-success btn-block tp-btn-complete">
                             <i class="fas fa-check-double mr-1"></i>Completar tarea
                         </button>
                     </form>

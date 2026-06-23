@@ -25,8 +25,8 @@ class PlantillaTransformacionDisponibilidadTest extends TestCase
     public function test_cualquiera_compatible_con_una_maquina_activa_no_bloquea(): void
     {
         $proceso = ProcesoPlanta::create(['nombre' => 'Empaquetado', 'activo' => true]);
-        $activa = $this->crearMaquinaEmpaquetadora('SE-A', true);
-        $mantenimiento = $this->crearMaquinaEmpaquetadora('SE-B', false);
+        $activa = $this->crearMaquinaEmpaquetadora('SE-10', true);
+        $mantenimiento = $this->crearMaquinaEmpaquetadora('SE-11', false);
 
         ProcesoMaquinaPlanta::create([
             'procesoplantaid' => $proceso->procesoplantaid,
@@ -57,8 +57,8 @@ class PlantillaTransformacionDisponibilidadTest extends TestCase
     public function test_cualquiera_compatible_con_todas_en_mantenimiento_bloquea(): void
     {
         $proceso = ProcesoPlanta::create(['nombre' => 'Empaquetado', 'activo' => true]);
-        $m1 = $this->crearMaquinaEmpaquetadora('SE-1', false);
-        $m2 = $this->crearMaquinaEmpaquetadora('SE-2', false);
+        $m1 = $this->crearMaquinaEmpaquetadora('SE-10', false);
+        $m2 = $this->crearMaquinaEmpaquetadora('SE-11', false);
 
         foreach ([$m1, $m2] as $i => $maq) {
             ProcesoMaquinaPlanta::create([
@@ -87,7 +87,7 @@ class PlantillaTransformacionDisponibilidadTest extends TestCase
         $proceso = ProcesoPlanta::create(['nombre' => 'Envasado', 'activo' => true]);
         $maquina = MaquinaPlanta::create([
             'nombre' => 'Envasadora test',
-            'codigo' => 'EV-T',
+            'codigo' => 'EV-700',
             'activo' => $maquinaActiva,
         ]);
 

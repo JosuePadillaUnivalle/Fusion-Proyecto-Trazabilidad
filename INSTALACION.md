@@ -19,6 +19,8 @@ php artisan serve --port=8001
 
 Abrir: **http://127.0.0.1:8001**
 
+> **Importante (sesión):** deja `PHP_CLI_SERVER_WORKERS=1` y `SESSION_DRIVER=file`. Usa **una sola URL** en el navegador (solo `http://127.0.0.1:8001` **o** solo la IP WiFi; no alternes entre ambas). Los enlaces del menú ya se adaptan al host actual, pero la cookie de sesión sigue ligada al dominio con el que entraste.
+
 ## Opción B — Manual
 
 ```powershell
@@ -50,6 +52,7 @@ Ejecuta el reparador de permisos:
 
 ```powershell
 php artisan agrofusion:reparar-permisos
+php artisan agrofusion:asegurar-datos-demo
 ```
 
 Eso sincroniza roles Spatie, la matriz de permisos y los usuarios demo.
@@ -60,14 +63,16 @@ Si la base quedó vacía o corrupta:
 php artisan migrate --force
 php artisan db:seed --force
 php artisan agrofusion:reparar-permisos
+php artisan agrofusion:asegurar-datos-demo
 ```
 
 ## Errores frecuentes
 
 | Síntoma | Causa | Solución |
 |---------|-------|----------|
-| 404 al asignar siembra | Falta tipo «Siembra» en catálogo | `php artisan agrofusion:reparar-permisos` |
-| 403 al crear lotes / asignar actividades | Sesión con rol agricultor o permisos no sembrados | Login como admin + `php artisan agrofusion:reparar-permisos` |
+| 404 al asignar siembra | Falta tipo «Siembra» en catálogo | `php artisan agrofusion:reparar-permisos` y `agrofusion:asegurar-datos-demo` |
+| 403 al crear lotes / asignar actividades | Sesión con rol agricultor o permisos no sembrados | Login como admin + reparar permisos y datos demo |
+| Almacén mayorista/planta vacío | Stock demo no sembrado | `php artisan agrofusion:asegurar-datos-demo` |
 | Página en blanco / 500 | Falta `APP_KEY` o dependencias | `composer install` + `php artisan key:generate` |
 | Sin imágenes / evidencias | Falta enlace storage | `php artisan storage:link` |
 | Base vacía | Se corrió `migrate:fresh` | Volver a clonar o ejecutar `php artisan db:seed` |

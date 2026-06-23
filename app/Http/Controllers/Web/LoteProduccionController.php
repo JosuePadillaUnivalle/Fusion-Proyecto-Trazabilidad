@@ -23,9 +23,12 @@ use App\Support\AlmacenajeLoteCondiciones;
 use App\Support\AsignacionEtapaPlantaService;
 use App\Support\EmpaquePlantaCatalogo;
 use App\Support\LoteProduccionNombre;
+use App\Support\LoteProduccionParametrosService;
+use App\Support\LoteProduccionRutaService;
 use App\Support\LoteProduccionTrazabilidadService;
 use App\Support\LoteProduccionTransformacionService;
 use App\Support\MaquinaProcesoCompatibilidad;
+use App\Support\ParametroRangoPlanta;
 use App\Support\ProcesoPlantaCatalogo;
 use App\Support\ProductoPlantaCatalogo;
 use App\Support\UsuarioRol;
@@ -232,6 +235,14 @@ class LoteProduccionController extends Controller
         );
 
         $loteProduccion->load('plantillaTransformacion.pasos.proceso', 'plantillaTransformacion.pasos.maquina');
+
+        $rutaService = app(LoteProduccionRutaService::class);
+        $rutaService->asegurarRuta($loteProduccion);
+        $rutaService->repararEmpaquetadoAlFinal($loteProduccion);
+        $loteProduccion->refresh();
+
+        $this->transformacion->limpiarAsignacionesObsoletas($loteProduccion);
+
         $rutaPlantilla = $this->transformacion->rutaPlantilla($loteProduccion);
         $siguientePasoPlantilla = $this->transformacion->siguientePasoPlantilla($loteProduccion);
         $user = auth()->user();
@@ -239,12 +250,39 @@ class LoteProduccionController extends Controller
         $operadoresPlanta = $puedeAsignarEtapa
             ? UsuarioRol::queryOperariosPlanta()->orderBy('nombre')->orderBy('apellido')->get()
             : collect();
-        $asignacionesPendientesLote = AsignacionEtapaPlanta::query()
-            ->with(['proceso', 'maquina', 'operador'])
-            ->where('loteproduccionpedidoid', $loteProduccion->loteproduccionpedidoid)
-            ->pendientes()
-            ->orderByDesc('creado_en')
-            ->get();
+        $asignacionesPendientesLote = $this->transformacion->asignacionesPendientes($loteProduccion);
+
+        $parametrosLote = app(LoteProduccionParametrosService::class)
+            ->parametrosEfectivosPorPlantilla($loteProduccion);
+        $ordenActual = $this->transformacion->ordenPasoActual($loteProduccion);
+        $parametrosEtapaActual = null;
+        if ($rutaService->tieneRuta($loteProduccion)) {
+            $pasoRuta = $rutaService->pasoEnOrden($loteProduccion, $ordenActual);
+            if ($pasoRuta) {
+                $pasoRuta->loadMissing(['proceso', 'variables.variableEstandar']);
+                $parametrosEtapaActual = [
+                    'orden' => $ordenActual,
+                    'proceso' => $pasoRuta->proceso?->nombre ?? '—',
+                    'variables' => $pasoRuta->variables->map(fn ($v) => [
+                        'nombre' => $v->variableEstandar?->nombre ?? '—',
+                        'unidad' => $v->variableEstandar?->unidad,
+                        'valor_minimo' => (float) $v->valor_minimo,
+                        'valor_maximo' => (float) $v->valor_maximo,
+                        'es_override' => false,
+                    ])->values()->all(),
+                ];
+            }
+        } else {
+            $parametrosEtapaActual = collect($parametrosLote)->firstWhere('orden', $ordenActual);
+        }
+
+        $parametrosPorAsignacion = [];
+        foreach ($asignacionesPendientesLote as $asig) {
+            $parametrosPorAsignacion[(int) $asig->asignacionetapaplantaid] = app(LoteProduccionParametrosService::class)
+                ->parametrosRequeridosParaAsignacion($asig);
+        }
+
+        $timelineVisual = $this->transformacion->timelineVisual($loteProduccion);
 
         return view('procesamiento.show', array_merge($dash, [
             'lote' => $loteProduccion,
@@ -270,7 +308,18 @@ class LoteProduccionController extends Controller
             'asignacionesPendientesLote' => $asignacionesPendientesLote,
             'puedeAsignarNuevaEtapa' => $puedeAsignarEtapa && $this->asignacionEtapa->puedeAsignar($loteProduccion),
             'mensajeBloqueoAsignacion' => $this->transformacion->mensajeBloqueoAsignacion($loteProduccion),
-            'ordenEtapaActual' => $this->transformacion->ordenPasoActual($loteProduccion),
+            'ordenEtapaActual' => $ordenActual,
+            'parametrosLote' => $parametrosLote,
+            'parametrosEtapaActual' => $parametrosEtapaActual,
+            'parametrosPorAsignacion' => $parametrosPorAsignacion,
+            'timelineVisual' => $timelineVisual,
+            'puedeEditarRuta' => $puedeAsignarEtapa
+                && empty($dash['transformacion_completa'] ?? false)
+                && ($dash['fase_actual'] ?? '') === 'transformacion',
+            'etapasCompletadasRuta' => $this->transformacion->etapasCompletadasCount($loteProduccion),
+            'parametrosPreviewEtapa' => app(LoteProduccionParametrosService::class)
+                ->parametrosParaEtapaActual($loteProduccion, (int) ($siguientePasoPlantilla?->maquinaplantaid ?? 0)),
+            'rutaPasosJson' => app(LoteProduccionRutaService::class)->payloadPasosParaSincronizar($loteProduccion),
         ]));
     }
 
@@ -311,8 +360,18 @@ class LoteProduccionController extends Controller
 
         $respondeJson = $request->expectsJson() || $request->ajax();
 
+        $data = $request->validate([
+            'parametros' => ['nullable', 'array'],
+            'parametros.*.variableestandarid' => ['required_with:parametros', 'integer'],
+            'parametros.*.valor' => ['required_with:parametros', 'numeric'],
+        ]);
+
         try {
-            $registro = $this->asignacionEtapa->completarPorSupervisor($asignacion, $request->user());
+            $registro = $this->asignacionEtapa->completarPorSupervisor(
+                $asignacion,
+                $request->user(),
+                array_values($data['parametros'] ?? []),
+            );
         } catch (\InvalidArgumentException $e) {
             if ($respondeJson) {
                 return response()->json(['ok' => false, 'message' => $e->getMessage()], 422);
@@ -351,9 +410,13 @@ class LoteProduccionController extends Controller
                     'operador' => $ultima['operador'],
                     'observaciones' => $ultima['observaciones'],
                     'es_cierre' => ! empty($ultima['es_cierre']),
+                    'parametros_medidos' => $ultima['parametros_medidos'] ?? [],
                 ] : null,
                 'transformacion_completa' => $this->trazabilidad->transformacionCompleta($loteProduccion),
                 'ruta_plantilla' => $this->transformacion->rutaPlantilla($loteProduccion),
+                'timeline_html' => view('planta.partials.timeline-transformacion', [
+                    'items' => $this->transformacion->timelineVisual($loteProduccion),
+                ])->render(),
                 'mensaje_bloqueo' => $this->transformacion->mensajeBloqueoAsignacion($loteProduccion),
                 'puede_asignar_nueva' => $this->asignacionEtapa->puedeAsignar($loteProduccion),
                 'asignaciones_pendientes_count' => $this->transformacion->asignacionesPendientes($loteProduccion)->count(),
@@ -361,6 +424,54 @@ class LoteProduccionController extends Controller
         }
 
         return redirect()->route('procesamiento.show', $loteProduccion);
+    }
+
+    public function actualizarRuta(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse|JsonResponse
+    {
+        abort_unless(UsuarioRol::gestionaPlanta($request->user()) || $request->user()?->hasRole('admin'), 403);
+
+        if ($this->trazabilidad->transformacionCompleta($loteProduccion)) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => 'La transformación ya finalizó.'], 422);
+            }
+
+            return back()->with('error', 'La transformación ya finalizó; no puede modificar la ruta.');
+        }
+
+        $data = $request->validate([
+            'pasos' => ['required', 'array', 'min:1'],
+            'pasos.*.loteproduccionrutapasoid' => ['nullable', 'integer'],
+            'pasos.*.procesoplantaid' => ['required', 'integer', 'exists:proceso_planta,procesoplantaid'],
+            'pasos.*.maquinaplantaid' => ['nullable', 'integer', 'exists:maquina_planta,maquinaplantaid'],
+            'pasos.*.notas' => ['nullable', 'string', 'max:255'],
+            'pasos.*.variables' => ['nullable', 'array'],
+            'pasos.*.variables.*.variableestandarid' => ['required_with:pasos.*.variables', 'integer'],
+            'pasos.*.variables.*.valor_minimo' => ['required_with:pasos.*.variables', 'numeric'],
+            'pasos.*.variables.*.valor_maximo' => ['required_with:pasos.*.variables', 'numeric'],
+        ]);
+
+        try {
+            app(LoteProduccionRutaService::class)->sincronizarRuta($loteProduccion, $data['pasos']);
+        } catch (\InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => $e->getMessage()], 422);
+            }
+
+            return back()->with('error', $e->getMessage())->withInput();
+        }
+
+        $loteProduccion->refresh();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'etapa_asignar' => $this->transformacion->datosEtapaAsignacion($loteProduccion),
+            ]);
+        }
+
+        return redirect()
+            ->route('procesamiento.show', $loteProduccion)
+            ->with('success', 'Ruta del lote actualizada.');
     }
 
     public function registrarEtapa(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse
@@ -679,6 +790,12 @@ class LoteProduccionController extends Controller
             'empaque_nombre_personalizado' => ['nullable', 'string', 'max:120'],
             'empaque_peso_neto_kg' => ['nullable', 'numeric', 'min:0.001'],
             'empaque_tipo_envase' => ['nullable', 'string', Rule::in(['bolsa', 'lata', 'frasco', 'bidon', 'caja'])],
+            'personalizar_parametros' => ['nullable'],
+            'parametros_lote' => ['nullable', 'array'],
+            'parametros_lote.*.plantillapasoid' => ['required_with:personalizar_parametros', 'integer'],
+            'parametros_lote.*.variableestandarid' => ['required_with:personalizar_parametros', 'integer', 'exists:variable_estandar,variableestandarid'],
+            'parametros_lote.*.valor_minimo' => ['required_with:personalizar_parametros', 'numeric'],
+            'parametros_lote.*.valor_maximo' => ['required_with:personalizar_parametros', 'numeric'],
         ], [
             'materias.size' => 'Solo puede usar una materia prima por lote.',
         ]);
@@ -725,7 +842,7 @@ class LoteProduccionController extends Controller
 
         if (! empty($data['plantillatransformacionid'])) {
             $plantilla = \App\Models\PlantillaTransformacion::query()
-                ->with(['pasos.maquina'])
+                ->with(['pasos.maquina', 'pasos.variables'])
                 ->find((int) $data['plantillatransformacionid']);
 
             if (! $plantilla || ! $plantilla->estaOperativa()) {
@@ -733,6 +850,32 @@ class LoteProduccionController extends Controller
 
                 return back()->withInput()->with('error', 'No se puede asignar ese proceso: hay máquinas en mantenimiento ('.$maquinas.').');
             }
+
+            if (! empty($data['personalizar_parametros']) && ! empty($data['parametros_lote'])) {
+                $pasosPorId = $plantilla->pasos->keyBy('plantillapasoid');
+                $nombres = \App\Models\VariableEstandar::query()->pluck('nombre', 'variableestandarid')->all();
+
+                foreach ($data['parametros_lote'] as $fila) {
+                    $paso = $pasosPorId->get((int) ($fila['plantillapasoid'] ?? 0));
+                    $maqId = $paso?->maquinaplantaid ? (int) $paso->maquinaplantaid : null;
+                    $varId = (int) ($fila['variableestandarid'] ?? 0);
+                    $error = ParametroRangoPlanta::validarRango(
+                        $maqId,
+                        $varId,
+                        (float) ($fila['valor_minimo'] ?? 0),
+                        (float) ($fila['valor_maximo'] ?? 0),
+                        $nombres[$varId] ?? null,
+                    );
+                    if ($error !== null) {
+                        return back()->withInput()->with('error', $error);
+                    }
+                }
+            }
+        }
+
+        $parametrosLote = null;
+        if (! empty($data['personalizar_parametros']) && ! empty($data['parametros_lote'])) {
+            $parametrosLote = array_values($data['parametros_lote']);
         }
 
         try {
@@ -751,6 +894,7 @@ class LoteProduccionController extends Controller
                 $data['empaque_nombre_personalizado'] ?? null,
                 isset($data['empaque_peso_neto_kg']) ? (float) $data['empaque_peso_neto_kg'] : null,
                 $data['empaque_tipo_envase'] ?? null,
+                $parametrosLote,
             );
         } catch (\InvalidArgumentException $e) {
             return back()->withInput()->with('error', $e->getMessage());

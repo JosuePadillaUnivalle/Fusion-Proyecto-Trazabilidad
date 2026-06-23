@@ -1,11 +1,12 @@
 @php
     $tareasPlanta = session('operario_planta_nuevas_tareas', []);
+    $clavesJson = json_encode(array_column($tareasPlanta, 'clave'));
 @endphp
 
 @if(! empty($tareasPlanta))
 <div class="login-notif-scrim" id="plantaTareaScrim" aria-hidden="true"></div>
 
-<div class="modal fade login-notif-modal-root" id="modalOperarioPlantaTarea" tabindex="-1" role="dialog" aria-labelledby="modalOperarioPlantaTareaTitulo" aria-hidden="true" data-backdrop="false" data-keyboard="true">
+<div class="modal fade login-notif-modal-root" id="modalOperarioPlantaTarea" tabindex="-1" role="dialog" aria-labelledby="modalOperarioPlantaTareaTitulo" aria-hidden="true" data-backdrop="false" data-keyboard="true" data-login-notif-alcance="operario_planta" data-login-notif-claves="{{ $clavesJson }}">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
         <div class="modal-content login-notif-modal login-notif-modal--planta">
             <div class="login-notif-modal__accent" aria-hidden="true"></div>

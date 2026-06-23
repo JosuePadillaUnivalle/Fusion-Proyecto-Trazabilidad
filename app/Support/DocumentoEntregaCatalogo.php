@@ -120,23 +120,7 @@ final class DocumentoEntregaCatalogo
 
     public static function puedeEditar(DocumentoEntrega $documento, ?Usuario $user): bool
     {
-        if ($user === null) {
-            return false;
-        }
-
-        if (UsuarioRol::esTransportista($user)) {
-            return false;
-        }
-
-        if (UsuarioRol::esAdminGlobal($user)) {
-            return true;
-        }
-
-        if (! $user->can('documentos.update')) {
-            return false;
-        }
-
-        return ! self::esAutomatico($documento);
+        return false;
     }
 
     public static function puedeEliminar(DocumentoEntrega $documento, ?Usuario $user): bool

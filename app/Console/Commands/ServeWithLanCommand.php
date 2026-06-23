@@ -28,12 +28,17 @@ class ServeWithLanCommand extends ServeCommand
         }
 
         $this->components->twoColumnDetail('PC (contraseñas Chrome)', 'http://127.0.0.1:'.$port);
+        $this->components->warn('Use siempre la misma URL en el navegador (127.0.0.1 o IP WiFi, no ambas) para no perder la sesión.');
 
         return parent::handle();
     }
 
     protected function startProcess($hasEnvironment)
     {
+        putenv('PHP_CLI_SERVER_WORKERS=1');
+        $_ENV['PHP_CLI_SERVER_WORKERS'] = '1';
+        $_SERVER['PHP_CLI_SERVER_WORKERS'] = '1';
+
         $lanUrl = LanNetworkResolver::resolvePublicUrl((int) $this->port());
         if ($lanUrl) {
             putenv('APP_PUBLIC_URL='.$lanUrl);

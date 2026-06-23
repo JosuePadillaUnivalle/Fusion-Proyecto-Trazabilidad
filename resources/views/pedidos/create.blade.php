@@ -2844,7 +2844,6 @@
                     ambito_planta: '1',
                     solo_con_stock: '1',
                     solo_producto_terminado: '1',
-                    solo_con_presentacion: '1',
                     almacenid: almacenId || '',
                 };
                 cfg.title = 'Productos terminados en planta';
@@ -2873,7 +2872,6 @@
                 ambito_planta: '1',
                 solo_con_stock: '1',
                 solo_producto_terminado: '1',
-                solo_con_presentacion: '1',
                 almacenid: almacenPlantaTrasladoId() || '',
             },
             rowIcon: 'fa-box',
@@ -3088,11 +3086,19 @@
                 return;
             }
             let falta = false;
+            let faltaPresentacion = false;
             filas.forEach(function (fila) {
                 if (!fila.querySelector('.selector-catalogo-value')?.value) falta = true;
+                const pres = fila.querySelector('[data-field="presentacion"]');
+                if (pres && !pres.disabled && !pres.value) faltaPresentacion = true;
                 const cant = parseFloat(fila.querySelector('[data-field="cantidad"]')?.value || '0');
                 if (!Number.isFinite(cant) || cant <= 0) falta = true;
             });
+            if (faltaPresentacion) {
+                e.preventDefault();
+                aviso('Seleccione la presentación (empaque) de cada producto terminado.');
+                return;
+            }
             if (falta) {
                 e.preventDefault();
                 aviso('Complete producto y cantidad en cada línea del traslado.');

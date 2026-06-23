@@ -18,4 +18,9 @@ class VariableEstandar extends Model
     {
         return $this->hasMany(VariableProcesoMaquinaPlanta::class, 'variableestandarid', 'variableestandarid');
     }
+
+    public function variablesMaquina(): HasMany
+    {
+        return $this->hasMany(MaquinaVariablePlanta::class, 'variableestandarid', 'variableestandarid');
+    }
 }

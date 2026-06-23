@@ -57,7 +57,7 @@
 
     <div class="remember-row">
         <div class="checkbox-wrapper">
-            <input type="checkbox" id="remember" name="remember" value="1">
+            <input type="checkbox" id="remember" name="remember" value="1" checked>
             <label for="remember">Recordarme</label>
         </div>
     </div>

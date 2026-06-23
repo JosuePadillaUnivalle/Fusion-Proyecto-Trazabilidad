@@ -99,7 +99,8 @@
                             <a href="{{ route('plantillas-transformacion.edit', $p) }}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fas fa-edit"></i></a>
                             @endcan
                             @can('lote_produccion.delete')
-                            <form method="POST" action="{{ route('plantillas-transformacion.destroy', $p) }}" class="d-inline" onsubmit="return confirm('¿Eliminar este proceso de transformación?')">
+                            <form method="POST" action="{{ route('plantillas-transformacion.destroy', $p) }}" class="d-inline on-submit-confirm"
+                                  data-confirm-title="¿Eliminar proceso?" data-confirm-text="Se eliminará «{{ $p->nombre }}» y sus etapas. Esta acción no se puede deshacer.">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
                             </form>
@@ -116,3 +117,35 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.querySelectorAll('.on-submit-confirm').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var el = this;
+        var titulo = el.dataset.confirmTitle || '¿Eliminar proceso?';
+        var mensaje = el.dataset.confirmText || 'Esta acción no se puede deshacer.';
+        if (window.ModalConfirmar && typeof ModalConfirmar.confirmar === 'function') {
+            ModalConfirmar.confirmar({ titulo: titulo, mensaje: mensaje, tono: 'danger', btnText: 'Eliminar' })
+                .then(function (ok) { if (ok) el.submit(); });
+            return;
+        }
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: titulo,
+                text: mensaje,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then(function (r) { if (r.isConfirmed) el.submit(); });
+            return;
+        }
+        if (confirm(mensaje)) el.submit();
+    });
+});
+</script>
+@endpush
