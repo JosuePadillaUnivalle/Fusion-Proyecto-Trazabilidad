@@ -87,7 +87,7 @@ class CierreEnvioPlantaMayoristaService
             $pasoActual = EnvioCierreAgricolaCatalogo::PASO_EN_RUTA;
         }
 
-        return [
+        return app(RecepcionQrFirmaService::class)->enriquecerResumen([
             'paso_actual' => $pasoActual,
             'tiene_condiciones' => $tieneCondiciones,
             'en_ruta' => $enRuta,
@@ -107,7 +107,7 @@ class CierreEnvioPlantaMayoristaService
             'puede_firmar_recepcion' => $llegadaConfirmada && $tieneIncidentes && ! $recibido
                 && $firmaTransportista && ! $firmaRecepcion,
             'puede_finalizar' => $llegadaConfirmada && $tieneIncidentes && $firmaTransportista && $firmaRecepcion && ! $recibido,
-        ];
+        ], $ruta);
     }
 
     /**
@@ -267,8 +267,11 @@ class CierreEnvioPlantaMayoristaService
         $firma = FirmaTransportistaEnvio::create([
             'rutadistribucionid' => $ruta->rutadistribucionid,
             'imagenfirma' => $this->normalizarImagenFirma($imagenBase64),
+            'nombrefirmante' => RecepcionQrFirmaService::nombreDesdeUsuario($usuario),
             'fechafirma' => now(),
         ]);
+
+        app(RecepcionQrFirmaService::class)->ensureToken($ruta);
 
         app(NotificacionUsuarioService::class)->trasladoPlantaPendienteFirmaMayorista($ruta->fresh(['almacenMayoristaDestino', 'transportista']));
 

@@ -25,6 +25,8 @@ use App\Http\Controllers\Web\PuntoVentaController;
 use App\Http\Controllers\Web\PuntoVentaInventarioController;
 use App\Http\Controllers\Web\PedidoDistribucionController;
 use App\Http\Controllers\Web\TrazabilidadPublicaController;
+use App\Http\Controllers\Web\RecepcionQrPublicaController;
+use App\Http\Controllers\Web\CierreFirmasEstadoController;
 use App\Http\Controllers\Web\UserProfileController;
 
 // 🔹 nuevos controladores web de almacenamiento
@@ -92,10 +94,15 @@ Route::match(['get', 'post'], '/logout', [AuthController::class, 'logout'])->nam
 
 Route::get('/trazabilidad/{codigo}', [TrazabilidadPublicaController::class, 'show'])->name('trazabilidad.publica');
 
+Route::get('/recepcion/{token}', [RecepcionQrPublicaController::class, 'show'])->name('recepcion.publica');
+Route::post('/recepcion/{token}', [RecepcionQrPublicaController::class, 'firmar'])->name('recepcion.publica.firmar');
+
 
 // RUTAS PROTEGIDAS (REQUIEREN ESTAR LOGUEADO)
 
 Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
+
+    Route::get('/api/cierre/firmas-estado', [CierreFirmasEstadoController::class, 'show'])->name('cierre.firmas-estado');
 
     // Perfil de Usuario
     Route::get('/perfil', [UserProfileController::class, 'show'])->name('profile.show');

@@ -5,21 +5,16 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class FirmaRecepcionEnvio extends Model
+class RecepcionQrEnvio extends Model
 {
-    protected $table = 'firma_recepcion_envio';
-    protected $primaryKey = 'firmarecepcionid';
+    protected $table = 'recepcion_qr_envio';
+
+    protected $primaryKey = 'recepcionqrenvioid';
 
     protected $fillable = [
-        'envioasignacionmultipleid',
+        'token',
         'rutadistribucionid',
-        'imagenfirma',
-        'nombrefirmante',
-        'fechafirma',
-    ];
-
-    protected $casts = [
-        'fechafirma' => 'datetime',
+        'envioasignacionmultipleid',
     ];
 
     public function ruta(): BelongsTo
