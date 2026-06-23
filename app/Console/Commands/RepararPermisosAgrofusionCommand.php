@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Database\Seeders\AdminUserSeeder;
+use Database\Seeders\CatalogosOperacionAgricolaSeeder;
 use Database\Seeders\ConsolidacionRolesPermisosSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -22,6 +23,7 @@ class RepararPermisosAgrofusionCommand extends Command
         $this->call('db:seed', ['--class' => RoleSeeder::class, '--force' => true]);
         $this->call('db:seed', ['--class' => ConsolidacionRolesPermisosSeeder::class, '--force' => true]);
         $this->call('db:seed', ['--class' => RolePermissionSeeder::class, '--force' => true]);
+        $this->call('db:seed', ['--class' => CatalogosOperacionAgricolaSeeder::class, '--force' => true]);
         $this->call('db:seed', ['--class' => AdminUserSeeder::class, '--force' => true]);
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();

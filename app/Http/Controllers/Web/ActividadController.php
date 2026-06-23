@@ -644,10 +644,19 @@ class ActividadController extends Controller
 
     private function tipoActividadSiembra(): TipoActividad
     {
-        return TipoActividad::query()
+        $existente = TipoActividad::query()
             ->whereRaw('LOWER(TRIM(nombre)) LIKE ?', ['%siembra%'])
             ->orderBy('tipoactividadid')
-            ->firstOrFail();
+            ->first();
+
+        if ($existente) {
+            return $existente;
+        }
+
+        return TipoActividad::updateOrCreate(
+            ['nombre' => 'Siembra'],
+            ['descripcion' => 'Siembra']
+        );
     }
 
     private function autorizarLoteParaActividad(Request $request, Lote $lote): void

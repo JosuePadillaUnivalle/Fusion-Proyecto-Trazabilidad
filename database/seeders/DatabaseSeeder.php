@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             ConsolidacionRolesPermisosSeeder::class,
             RolePermissionSeeder::class,
+            CatalogosOperacionAgricolaSeeder::class,
             AdminUserSeeder::class,
             DatosPruebaSeeder::class,
             // DemoCatalogosBaseSeeder::class, // Ejecutar manualmente por bloque cuando se requiera

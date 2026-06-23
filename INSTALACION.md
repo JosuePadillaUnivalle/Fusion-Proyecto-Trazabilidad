@@ -66,6 +66,7 @@ php artisan agrofusion:reparar-permisos
 
 | Síntoma | Causa | Solución |
 |---------|-------|----------|
+| 404 al asignar siembra | Falta tipo «Siembra» en catálogo | `php artisan agrofusion:reparar-permisos` |
 | 403 al crear lotes / asignar actividades | Sesión con rol agricultor o permisos no sembrados | Login como admin + `php artisan agrofusion:reparar-permisos` |
 | Página en blanco / 500 | Falta `APP_KEY` o dependencias | `composer install` + `php artisan key:generate` |
 | Sin imágenes / evidencias | Falta enlace storage | `php artisan storage:link` |

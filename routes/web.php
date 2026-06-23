@@ -180,7 +180,7 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::get('lotes/{lote}/trazabilidad', [LoteController::class, 'trazabilidad'])->name('lotes.trazabilidad')->middleware('action.permission:lotes,read');
     Route::get('lotes/{lote}/siembra', [ActividadController::class, 'createSiembra'])->name('lotes.siembra.create')->middleware('action.permission:lotes,read');
     Route::post('lotes/{lote}/siembra', [ActividadController::class, 'storeSiembra'])->name('lotes.siembra.store')->middleware('action.permission:lotes,read');
-    Route::post('lotes/{lote}/asignar-siembra', [ActividadController::class, 'asignarSiembra'])->name('lotes.siembra.asignar')->middleware('action.permission:lotes,update');
+    Route::post('lotes/{lote}/asignar-siembra', [ActividadController::class, 'asignarSiembra'])->name('lotes.siembra.asignar')->middleware('action.permission:lotes,read');
     Route::post('lotes/{lote}/enviar-almacen', [LoteController::class, 'enviarAlmacen'])->name('lotes.enviar-almacen')->middleware('action.permission:lotes,update');
     Route::get('lotes/{lote}/cambiar-estado', [LoteController::class, 'cambiarEstadoForm'])->name('lotes.cambiar-estado')->middleware('action.permission:lotes,update');
     Route::post('lotes/{lote}/cambiar-estado', [LoteController::class, 'cambiarEstadoStore'])->name('lotes.cambiar-estado.store')->middleware('action.permission:lotes,update');

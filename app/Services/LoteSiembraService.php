@@ -100,7 +100,9 @@ class LoteSiembraService
 
             $prioridadId = Prioridad::query()->orderBy('prioridadid')->value('prioridadid');
 
-
+            if (! $prioridadId) {
+                $prioridadId = Prioridad::firstOrCreate(['nombre' => 'Media'], ['nombre' => 'Media'])->prioridadid;
+            }
 
             return Actividad::create([
 
@@ -144,13 +146,27 @@ class LoteSiembraService
 
     {
 
-        return TipoActividad::query()
+        $existente = TipoActividad::query()
 
             ->whereRaw('LOWER(TRIM(nombre)) LIKE ?', ['%siembra%'])
 
             ->orderBy('tipoactividadid')
 
-            ->firstOrFail();
+            ->first();
+
+        if ($existente) {
+
+            return $existente;
+
+        }
+
+        return TipoActividad::updateOrCreate(
+
+            ['nombre' => 'Siembra'],
+
+            ['descripcion' => 'Siembra']
+
+        );
 
     }
 

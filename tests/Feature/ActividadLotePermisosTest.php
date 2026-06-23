@@ -8,6 +8,7 @@ use App\Models\Lote;
 use App\Models\TipoActividad;
 use App\Models\UnidadMedida;
 use App\Models\Usuario;
+use Database\Seeders\CatalogosOperacionAgricolaSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -21,6 +22,7 @@ class ActividadLotePermisosTest extends TestCase
     private function createUser(string $roleName, array $overrides = []): Usuario
     {
         $this->seed(RolePermissionSeeder::class);
+        $this->seed(CatalogosOperacionAgricolaSeeder::class);
         $role = Role::findOrCreate($roleName, 'web');
 
         $user = Usuario::create(array_merge([
@@ -110,5 +112,36 @@ class ActividadLotePermisosTest extends TestCase
                 'return' => route('lotes.trazabilidad', $lote, absolute: false),
             ]))
             ->assertOk();
+    }
+
+    public function test_admin_puede_asignar_siembra_desde_trazabilidad(): void
+    {
+        $admin = $this->createUser('admin');
+        $agricultor = $this->createUser('agricultor', [
+            'email' => 'agri.siembra@test.local',
+            'nombreusuario' => 'agri_siembra',
+        ]);
+        $estado = EstadoLoteTipo::query()->whereRaw('LOWER(nombre) LIKE ?', ['%planif%'])->first()
+            ?? EstadoLoteTipo::query()->firstOrFail();
+        $lote = Lote::create([
+            'usuarioid' => $agricultor->usuarioid,
+            'nombre' => 'Lote siembra test',
+            'ubicacion' => 'Parcela test',
+            'superficie' => 1,
+            'unidadsuperficieid' => UnidadMedida::query()->firstOrCreate(
+                ['abreviatura' => 'ha'],
+                ['nombre' => 'Hectárea', 'categoria' => 'superficie']
+            )->unidadmedidaid,
+            'cultivoid' => Cultivo::query()->firstOrCreate(['nombre' => 'Tomate'], ['detalle' => 'Test'])->cultivoid,
+            'estadolotetipoid' => $estado->estadolotetipoid,
+            'fechacreacion' => now(),
+            'fechamodificacion' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('lotes.siembra.asignar', $lote), [
+                'usuarioid' => $agricultor->usuarioid,
+            ])
+            ->assertRedirect(route('lotes.trazabilidad', $lote));
     }
 }
