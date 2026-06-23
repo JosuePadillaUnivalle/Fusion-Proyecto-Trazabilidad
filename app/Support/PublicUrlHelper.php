@@ -18,7 +18,7 @@ final class PublicUrlHelper
 
     /**
      * URL absoluta para QR / celular en la misma WiFi.
-     * Usa APP_PUBLIC_URL (IP LAN) aunque el usuario navegue en 127.0.0.1 en el PC.
+     * Usa APP_PUBLIC_URL o detecta la IP LAN aunque el PC use 127.0.0.1 en el navegador.
      */
     public static function absoluteForQr(string $path = ''): string
     {
@@ -37,14 +37,38 @@ final class PublicUrlHelper
     {
         $publicUrl = trim((string) config('app.public_url', ''));
 
-        if ($preferPublic && $publicUrl !== '') {
-            return rtrim($publicUrl, '/');
-        }
-
         if ($publicUrl !== '') {
             return rtrim($publicUrl, '/');
         }
 
+        if ($preferPublic && ! app()->runningInConsole() && request()) {
+            $host = strtolower(request()->getHost());
+            $port = (int) request()->getPort();
+
+            if (self::esLoopback($host)) {
+                $lanUrl = LanNetworkResolver::resolvePublicUrl($port > 0 ? $port : null);
+                if ($lanUrl !== null) {
+                    return rtrim($lanUrl, '/');
+                }
+            }
+        }
+
+        if (! app()->runningInConsole() && request()) {
+            return rtrim(request()->getSchemeAndHttpHost(), '/');
+        }
+
+        $lanUrl = LanNetworkResolver::resolvePublicUrl(
+            (int) (env('SERVER_PORT') ?: 8001) ?: null
+        );
+        if ($preferPublic && $lanUrl !== null) {
+            return rtrim($lanUrl, '/');
+        }
+
         return rtrim((string) config('app.url', 'http://localhost'), '/');
+    }
+
+    private static function esLoopback(string $host): bool
+    {
+        return in_array($host, ['127.0.0.1', 'localhost', '::1'], true);
     }
 }

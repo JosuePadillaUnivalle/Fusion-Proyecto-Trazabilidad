@@ -13,6 +13,15 @@
 }
 .trz-public-header .brand-logo i { color: #fff; font-size: 1.2rem; }
 .trz-public-header h1 { font-size: clamp(1.25rem, 4vw, 1.55rem); font-weight: 700; color: #0f172a; margin: 0 0 .35rem; }
+.trz-cert-badge {
+    display: inline-flex; align-items: center; gap: .4rem;
+    margin: .5rem auto .65rem; padding: .4rem 1rem;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 45%, #0f766e 100%);
+    color: #f8fafc; border-radius: 999px; font-size: .72rem; font-weight: 800;
+    letter-spacing: .06em; text-transform: uppercase;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, .22);
+}
+.trz-cert-badge i { color: #fde68a; font-size: .78rem; }
 .trz-public-header .codigo {
     display: inline-block; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;
     border-radius: 999px; padding: .3rem .9rem; font-size: .75rem; font-weight: 700;
@@ -256,6 +265,7 @@
         <div class="brand-logo"><i class="fas fa-seedling"></i></div>
         <div class="font-weight-bold text-success mb-1">AgroFusion</div>
         <h1>{{ $reporte['producto'] }}</h1>
+        <div class="trz-cert-badge"><i class="fas fa-certificate"></i> Producto Certificado</div>
         <span class="codigo">{{ $reporte['codigo'] }}</span>
         <p class="text-muted small mt-2 mb-0">Trazabilidad desde campo hasta punto de venta</p>
     </header>
