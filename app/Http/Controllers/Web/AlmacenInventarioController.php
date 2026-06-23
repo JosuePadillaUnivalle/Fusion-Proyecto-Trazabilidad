@@ -59,6 +59,7 @@ class AlmacenInventarioController extends Controller
             'producto' => $insumo,
             'estadoStock' => $estadoStock,
             'empaquetajes' => $empaquetajes,
+            'loteProduccionPedidoId' => $request->integer('lote') ?: null,
             'redirectAfter' => $this->redirectInterno($request->query('redirect')),
         ]));
     }

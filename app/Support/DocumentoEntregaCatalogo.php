@@ -124,6 +124,10 @@ final class DocumentoEntregaCatalogo
             return false;
         }
 
+        if (UsuarioRol::esTransportista($user)) {
+            return false;
+        }
+
         if (UsuarioRol::esAdminGlobal($user)) {
             return true;
         }
@@ -138,6 +142,10 @@ final class DocumentoEntregaCatalogo
     public static function puedeEliminar(DocumentoEntrega $documento, ?Usuario $user): bool
     {
         if ($user === null) {
+            return false;
+        }
+
+        if (UsuarioRol::esTransportista($user)) {
             return false;
         }
 

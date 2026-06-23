@@ -110,20 +110,20 @@
                             @endif
                         </td>
                         <td class="btn-actions">
-                            <a href="{{ route('procesos-planta.show', $proceso) }}" class="btn btn-sm btn-outline-info" title="Ver detalle">
-                                <i class="fas fa-eye"></i>
-                            </a>
                             @can('lote_produccion.update')
                             <a href="{{ route('procesos-planta.edit', $proceso) }}" class="btn btn-sm btn-outline-primary" title="Editar">
                                 <i class="fas fa-edit"></i>
                             </a>
                             @endcan
                             @can('lote_produccion.delete')
-                            <form method="POST" action="{{ route('procesos-planta.destroy', $proceso) }}" class="d-inline"
-                                onsubmit="return confirm('¿Eliminar este proceso?')">
+                            <form method="POST" action="{{ route('procesos-planta.destroy', $proceso) }}" class="d-inline">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar"
+                                    data-confirm-modal
+                                    data-confirm-title="Eliminar proceso"
+                                    data-confirm-message="¿Eliminar «{{ $proceso->nombre }}»? Esta acción no se puede deshacer."
+                                    data-confirm-tone="danger">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </form>

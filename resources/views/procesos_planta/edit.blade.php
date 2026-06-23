@@ -6,8 +6,7 @@
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Inicio</a></li>
     <li class="breadcrumb-item"><a href="{{ route('procesos-planta.index') }}">Procesos de planta</a></li>
-    <li class="breadcrumb-item"><a href="{{ route('procesos-planta.show', $proceso) }}">{{ $proceso->nombre }}</a></li>
-    <li class="breadcrumb-item active">Editar</li>
+    <li class="breadcrumb-item active">Editar: {{ $proceso->nombre }}</li>
 @endsection
 
 @push('styles')
@@ -47,7 +46,9 @@
                 </div>
             </div>
             <div class="card-footer d-flex justify-content-between">
-                <a href="{{ route('procesos-planta.show', $proceso) }}" class="btn btn-outline-secondary">Cancelar</a>
+                <a href="{{ route('procesos-planta.index') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left mr-1"></i> Cancelar
+                </a>
                 <button type="submit" class="btn btn-success"><i class="fas fa-save mr-1"></i> Guardar cambios</button>
             </div>
         </form>

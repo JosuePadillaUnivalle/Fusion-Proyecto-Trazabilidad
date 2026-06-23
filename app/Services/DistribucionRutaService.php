@@ -111,7 +111,8 @@ class DistribucionRutaService
             $ruta = RutaDistribucion::create([
                 'codigo' => RutaDistribucionCatalogo::generarCodigo(),
                 'nombre' => $nombre ?: 'Distribución '.$almacenOrigen->nombre,
-                'almacen_planta_origenid' => $almacenOrigen->almacenid,
+                'tipo_ruta' => RutaDistribucionCatalogo::TIPO_RUTA_MAYORISTA_PDV,
+                'almacen_mayorista_origenid' => $almacenOrigen->almacenid,
                 'transportista_usuarioid' => $transportistaId,
                 'vehiculoid' => $vehiculoId,
                 'costo_bs' => $costoBs !== null ? round($costoBs, 2) : null,
@@ -123,7 +124,7 @@ class DistribucionRutaService
             RutaDistribucionParada::create([
                 'rutadistribucionid' => $ruta->rutadistribucionid,
                 'orden' => 1,
-                'tipo' => RutaDistribucionCatalogo::PARADA_CARGA_PLANTA,
+                'tipo' => RutaDistribucionCatalogo::PARADA_CARGA_MAYORISTA,
                 'almacenid' => $almacenOrigen->almacenid,
                 'destino' => 'Carga: '.$almacenOrigen->nombre,
                 'latitud' => $coordsOrigen['lat'],

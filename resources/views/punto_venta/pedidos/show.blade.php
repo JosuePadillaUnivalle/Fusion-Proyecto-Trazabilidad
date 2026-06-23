@@ -400,6 +400,10 @@
         $puedeReabrirRevision = $puedeReabrirRevision ?? false;
         $pasoInicial = $pasoInicial ?? 3;
         $pasoActualFlujo = $pasoActualFlujo ?? 3;
+        $pendienteConfirmacionMinorista = $pendienteConfirmacionMinorista ?? false;
+        $puedeConfirmarEnvioMayorista = $puedeConfirmarEnvioMayorista ?? false;
+        $esMinoristaDueño = $esMinoristaDueño ?? false;
+        $esperaConfirmacionMinorista = $puedeConfirmarEnvioMayorista;
         $esAdmin = $esAdmin ?? false;
         $puedeVerRutaTiempoReal = $puedeVerRutaTiempoReal ?? false;
         $urlTiempoRealPedido = $urlTiempoRealPedido ?? null;
@@ -414,8 +418,8 @@
         $pasos = [
             ['num' => 1, 'icon' => 'fa-paper-plane', 'label' => 'Solicitud minorista', 'hecho' => true, 'activo' => false, 'navegable' => $puedeEditarFlujo],
             ['num' => 2, 'icon' => 'fa-warehouse', 'label' => 'Revisión mayorista', 'hecho' => in_array($pedido->estado, ['confirmado', 'en_transito', 'recibido'], true), 'activo' => $pendienteMayorista, 'navegable' => $puedeEditarFlujo],
-            ['num' => 3, 'icon' => 'fa-user-tie', 'label' => 'Designar transportista', 'hecho' => $transportistaDesignado || in_array($pedido->estado, ['en_transito', 'recibido'], true), 'activo' => $pedido->estado === 'confirmado' && ! $transportistaDesignado, 'navegable' => $puedeEditarFlujo],
-            ['num' => 4, 'icon' => 'fa-shipping-fast', 'label' => 'En ruta', 'hecho' => in_array($pedido->estado, ['en_transito', 'recibido'], true), 'activo' => $transportistaDesignado && $pedido->estado === 'confirmado', 'navegable' => $transportistaDesignado && in_array($pedido->estado, ['confirmado', 'en_transito'], true)],
+            ['num' => 3, 'icon' => $esperaConfirmacionMinorista ? 'fa-check-circle' : 'fa-user-tie', 'label' => $esperaConfirmacionMinorista ? 'Confirmar envío' : 'Designar transportista', 'hecho' => ($transportistaDesignado && ! $esperaConfirmacionMinorista) || in_array($pedido->estado, ['en_transito', 'recibido'], true), 'activo' => $esperaConfirmacionMinorista || ($pedido->estado === 'confirmado' && ! $transportistaDesignado), 'navegable' => $puedeEditarFlujo || $esperaConfirmacionMinorista],
+            ['num' => 4, 'icon' => 'fa-shipping-fast', 'label' => 'En ruta', 'hecho' => in_array($pedido->estado, ['en_transito', 'recibido'], true), 'activo' => $transportistaDesignado && $pedido->estado === 'confirmado' && ! $esperaConfirmacionMinorista, 'navegable' => $transportistaDesignado && in_array($pedido->estado, ['confirmado', 'en_transito'], true) && ! $esperaConfirmacionMinorista],
             ['num' => 5, 'icon' => 'fa-dolly', 'label' => 'Recepción PDV', 'hecho' => $pedido->estado === 'recibido', 'activo' => $pedido->estado === 'en_transito', 'navegable' => $pedido->estado === 'en_transito'],
         ];
     @endphp
@@ -796,6 +800,8 @@
                     </form>
                 </div>
             </div>
+            @elseif($puedeConfirmarEnvioMayorista ?? false)
+            @include('punto_venta.pedidos.partials.confirmar-envio-mayorista-minorista', ['pedido' => $pedido])
             @elseif($pendienteMayorista && ($esMinoristaDueño ?? false))
             <div class="card pdv-card card-outline card-warning mb-3">
                 <div class="card-body py-3">
@@ -833,7 +839,9 @@
             </div>
 
             <div class="pdv-sidebar-paso" data-sidebar-paso="3">
-            @if($puedeDesignarTransportista)
+            @if($puedeConfirmarEnvioMayorista ?? false)
+            @include('punto_venta.pedidos.partials.confirmar-envio-mayorista-minorista', ['pedido' => $pedido])
+            @elseif($puedeDesignarTransportista)
             <div class="card pdv-card card-outline card-success mb-3">
                 <div class="card-header bg-white py-2"><h3 class="card-title mb-0 font-weight-bold"><i class="fas fa-user-tie text-success mr-1"></i> Designar transportista</h3></div>
                 <div class="card-body">
@@ -896,9 +904,12 @@
                         'puedeGestionarMayorista', 'transportistaEfectivo', 'urlTiempoRealPedido', 'esAdmin'
                     ))
                 @else
-                <div class="card pdv-card card-outline card-secondary mb-3">
-                    <div class="card-body small text-muted mb-0">
-                        @if($transportistaDesignado && ($puedeGestionarMayorista ?? false) && $ruta && $pedido->estado === 'confirmado')
+            <div class="card pdv-card card-outline card-secondary mb-3">
+                <div class="card-body small text-muted mb-0">
+                    @if($pendienteConfirmacionMinorista ?? false)
+                        <i class="fas fa-hourglass-half mr-1 text-warning"></i>
+                        Confirme el envío en el paso anterior para habilitar la salida en ruta del transportista.
+                    @elseif($transportistaDesignado && ($puedeGestionarMayorista ?? false) && $ruta && $pedido->estado === 'confirmado')
                             <i class="fas fa-user-clock mr-1 text-warning"></i>
                             Transportista asignado, esperando confirmación del transportista.
                         @else
@@ -912,7 +923,9 @@
             </div>
 
             <div class="pdv-sidebar-paso" data-sidebar-paso="4">
-            @if($simulacionActiva && !empty($urlTiempoRealPedido))
+            @if($puedeConfirmarEnvioMayorista ?? false)
+            @include('punto_venta.pedidos.partials.confirmar-envio-mayorista-minorista', ['pedido' => $pedido])
+            @elseif($simulacionActiva && !empty($urlTiempoRealPedido))
             <div class="card pdv-card card-outline card-info mb-3">
                 <div class="card-body">
                     <p class="small text-muted mb-2">Siga el vehículo en vivo hasta su punto de venta.</p>
@@ -922,7 +935,10 @@
             @else
             <div class="card pdv-card card-outline card-secondary mb-3">
                 <div class="card-body small text-muted mb-0">
-                    @if($transportistaDesignado && ($puedeGestionarMayorista ?? false) && $pedido->estado === 'confirmado')
+                    @if($pendienteConfirmacionMinorista ?? false)
+                        <i class="fas fa-hourglass-half mr-1 text-warning"></i>
+                        Confirme el envío en el paso «Confirmar envío» para habilitar la salida en ruta del transportista.
+                    @elseif($transportistaDesignado && ($puedeGestionarMayorista ?? false) && $pedido->estado === 'confirmado')
                         <i class="fas fa-user-clock mr-1 text-warning"></i>
                         Transportista asignado, esperando confirmación del transportista.
                     @else

@@ -61,8 +61,9 @@ return [
     |
     | Solo se usa cuando no hay petición HTTP (artisan, colas). En el navegador
     | el QR toma automáticamente el host actual (ej. http://127.0.0.1:8001).
-    | Para probar desde el celular, abra la app con la IP LAN en el PC o defina
-    | APP_PUBLIC_URL con esa IP y el puerto (ej. http://192.168.1.10:8001).
+    | Para probar desde el celular, defina APP_PUBLIC_URL con la IP LAN y el puerto
+    | (ej. http://192.168.1.10:8001). En el PC puede usar http://127.0.0.1:8001;
+    | los QR de trazabilidad usarán APP_PUBLIC_URL para que el celular pueda abrirlos.
     |
     */
 

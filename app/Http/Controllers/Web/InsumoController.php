@@ -116,7 +116,7 @@ class InsumoController extends Controller
             'nombre' => 'required|string|max:100',
             'tipoinsumoid' => ['required', Rule::in($tiposIds)],
             'unidadmedidaid' => 'required|exists:unidadmedida,unidadmedidaid',
-            'stock' => 'required|numeric|min:0',
+            'stock' => ['required', 'numeric', 'min:0', 'max:999999999'],
             'descripcion' => 'nullable|string',
             'dosis_por_ha' => 'nullable|numeric|min:0',
             'dosis_unidad' => 'nullable|string|max:20',
@@ -145,6 +145,8 @@ class InsumoController extends Controller
             : null;
 
         unset($data['imagen'], $data['quitar_imagen']);
+
+        $data['stock'] = max(0.0, (float) $data['stock']);
 
         return $data;
     }

@@ -86,14 +86,33 @@
             </div>
         </div>
         <div class="alert alert-warning small py-2 mt-2 mb-0" id="capacidad-vehiculo-alerta" style="display:none"></div>
-        <div class="small mt-2 d-none" id="capacidad-vehiculo-resumen-wrap">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="text-muted" id="capacidad-vehiculo-resumen"></span>
-                <span class="font-weight-bold" id="capacidad-vehiculo-pct"></span>
+        <div class="d-none mt-3" id="capacidad-vehiculo-resumen-wrap">
+            <div class="veh-carga-preview-stats env-asignacion-capacidad-stats">
+                <div class="veh-carga-preview-stat">
+                    <div class="veh-carga-preview-stat__head">
+                        <span><i class="fas fa-weight-hanging mr-1"></i> Peso de la carga</span>
+                        <strong id="capacidad-vehiculo-pct-peso">—</strong>
+                    </div>
+                    <div class="veh-carga-preview-bar">
+                        <div class="veh-carga-preview-bar__fill veh-carga-preview-bar__fill--peso" id="capacidad-vehiculo-barra-peso" style="width:0%"></div>
+                    </div>
+                    <div class="veh-carga-preview-stat__foot" id="capacidad-vehiculo-txt-peso">—</div>
+                </div>
+                <div class="veh-carga-preview-stat">
+                    <div class="veh-carga-preview-stat__head">
+                        <span><i class="fas fa-cube mr-1"></i> Volumen de la carga</span>
+                        <strong id="capacidad-vehiculo-pct-vol">—</strong>
+                    </div>
+                    <div class="veh-carga-preview-bar">
+                        <div class="veh-carga-preview-bar__fill veh-carga-preview-bar__fill--vol" id="capacidad-vehiculo-barra-vol" style="width:0%"></div>
+                    </div>
+                    <div class="veh-carga-preview-stat__foot" id="capacidad-vehiculo-txt-vol">—</div>
+                </div>
             </div>
-            <div class="progress" style="height:8px;border-radius:4px;">
-                <div class="progress-bar" id="capacidad-vehiculo-barra" role="progressbar" style="width:0%"></div>
-            </div>
+            <p class="text-muted small mb-2 mt-2" id="capacidad-vehiculo-resumen"></p>
+            <button type="button" class="btn btn-sm btn-outline-primary d-none" id="btnVerPreviewVehiculoAsignacion">
+                <i class="fas fa-cube mr-1"></i> Ver modelado 3D y ocupación
+            </button>
         </div>
     </div>
 </div>

@@ -6,6 +6,7 @@
 @push('styles')
 @include('logistica.partials.mapa-ruta-styles')
 @include('pedidos.partials.wizard-envio-estilos')
+@include('pedidos.partials.pdv-envio-carga-styles')
 <style>
 #mapaPedidoEntrega { height: 380px; min-height: 380px; width: 100%; border-radius: 10px; border: 1px solid #d1e7d4; background: #e8eef4; }
 #mapaTrasladoMayorista { height: 380px; min-height: 380px; width: 100%; border-radius: 10px; border: 1px solid #e9e5ff; background: #e8eef4; }
@@ -416,6 +417,7 @@
 @include('pedidos.partials.fase2-envio-scripts')
 @include('pedidos.partials.wizard-envio-scripts')
 @include('logistica.partials.mapa-ruta-libs')
+@include('pedidos.partials.pdv-envio-carga-scripts')
 <script>
 (function () {
     const hub = { lat: {{ $hubLat }}, lng: {{ $hubLng }} };
@@ -443,7 +445,9 @@
                 ensureMapaTraslado();
             });
         } else if (esPdv) {
-            ensureMapaPdv();
+            requestAnimationFrame(function () {
+                ensureMapaPdv();
+            });
         }
     }
 
@@ -484,7 +488,7 @@
     const ALMACENES_MAPA = @json($almacenesMapa ?? []);
     const ALMACENES_MAPA_TRASLADO = @json($almacenesMapaTraslado ?? []);
     const PUNTOS_MAPA_PDV = @json($puntosMapaPdv ?? []);
-    const PDV_MAPA_ES_ADMIN = @json($esAdminPdv ?? false);
+    const PDV_MAPA_ES_ADMIN = @json($esOrigenMayoristaPdv ?? $esAdminPdv ?? false);
 
     const state = {
         map: null,
@@ -1747,6 +1751,8 @@
     let mapaTrasladoListo = false;
     let costoTrasladoEditadoManual = false;
     let costoTrasladoToken = 0;
+    let costoPdvEditadoManual = false;
+    let costoPdvToken = 0;
     let trasladoProductoIdx = 0;
     const trasladoProductosPreseleccionados = [];
     let ultimoOrigenTrasladoId = '';
@@ -1912,6 +1918,8 @@
         CatalogoSelector.setValue('traslado_planta_origen', item.id, item.label);
         actualizarPickerOrigenTraslado(item);
         syncEstadoRutaTraslado();
+        actualizarParamsProductosTraslado();
+        recargarPresentacionesFilasTraslado();
         if (opts.abrirInventario !== false && item.id) {
             abrirInventarioOrigenTraslado(item);
         }
@@ -2190,6 +2198,64 @@
         }
     }
 
+    function resetCostoPdv() {
+        costoPdvEditadoManual = false;
+        const input = document.getElementById('costo_bs');
+        if (input) input.value = '0';
+        const detalle = document.getElementById('wizard-costo-detalle');
+        if (detalle) {
+            detalle.textContent = 'Fórmula: Bs 10 base + Bs 2,40/km + Bs 5 por parada extra (mín. Bs 15). Recargo +25% si hay lluvia. Puede editarlo.';
+        }
+    }
+
+    async function actualizarCostoPdv(distanciaMetros) {
+        if (costoPdvEditadoManual) return;
+
+        const puntos = waypointsPdv();
+        const token = ++costoPdvToken;
+        const detalle = document.getElementById('wizard-costo-detalle');
+
+        if (puntos.length < 2) {
+            resetCostoPdv();
+            return;
+        }
+
+        if (detalle) detalle.textContent = 'Calculando costo de envío…';
+
+        try {
+            const resp = await fetch(COSTO_ENVIO_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': CSRF_TOKEN,
+                },
+                body: JSON.stringify({
+                    paradas: puntos.map(function (p) { return { lat: p.lat, lng: p.lng }; }),
+                    distancia_m: distanciaMetros,
+                }),
+            });
+            if (token !== costoPdvToken) return;
+            if (!resp.ok) throw new Error('No se pudo calcular el costo');
+            const data = await resp.json();
+            const input = document.getElementById('costo_bs');
+            if (input && !costoPdvEditadoManual) {
+                input.value = String(Math.round(Number(data.costo_bs || 0)));
+            }
+            if (detalle) {
+                let texto = data.detalle || 'Costo estimado según la ruta.';
+                if (data.lluvia && data.descripcion_clima) {
+                    texto += ' Clima: ' + data.descripcion_clima + '.';
+                }
+                detalle.textContent = texto;
+            }
+        } catch (e) {
+            if (detalle) {
+                detalle.textContent = 'No se pudo calcular automáticamente. Ingrese el costo manualmente.';
+            }
+        }
+    }
+
     function almacenPlantaTrasladoId() {
         return valorSelectorTraslado('traslado_planta_origen');
     }
@@ -2362,33 +2428,35 @@
         fila.dataset.modoCantidad = '';
     }
 
-    function activarModoKgFilaTraslado(fila) {
+    function mostrarPresentacionesVaciasFilaTraslado(fila) {
+        const selPres = fila.querySelector('[data-field="presentacion"]');
         const bloquePres = fila.querySelector('.js-bloque-presentacion');
         const bloqueUnidades = fila.querySelector('.js-bloque-cantidad-unidades');
         const bloqueKg = fila.querySelector('.js-bloque-cantidad-kg');
-        const inputKgVisible = fila.querySelector('[data-field="cantidad_kg_input"]');
-        const inputKgHidden = fila.querySelector('[data-field="cantidad"]');
+        const bloqueLote = fila.querySelector('.js-bloque-lote');
         const inputUnidades = fila.querySelector('[data-field="cantidad_unidades"]');
         const hint = fila.querySelector('.lbl-equiv-traslado');
-        bloquePres?.classList.add('d-none');
+        bloquePres?.classList.remove('d-none');
         bloqueUnidades?.classList.add('d-none');
-        bloqueKg?.classList.remove('d-none');
+        bloqueKg?.classList.add('d-none');
+        bloqueLote?.classList.add('d-none');
+        if (selPres) {
+            selPres.innerHTML = '<option value="">Sin empaques configurados</option>';
+            selPres.disabled = true;
+            selPres.value = '';
+        }
         if (inputUnidades) {
             inputUnidades.value = '';
             inputUnidades.disabled = true;
             inputUnidades.required = false;
         }
-        if (inputKgVisible) {
-            inputKgVisible.disabled = false;
-            inputKgVisible.required = true;
+        if (hint) {
+            hint.textContent = 'Configure presentaciones comerciales (empaque) en el catálogo de productos terminados.';
+            hint.classList.remove('d-none');
+            hint.classList.add('is-error');
         }
-        if (hint) hint.classList.add('d-none');
-        fila.dataset.modoCantidad = 'kg';
-        const stock = parseFloat(fila.dataset.stockKg || '');
-        if (inputKgVisible && Number.isFinite(stock)) inputKgVisible.max = String(stock);
-        if (inputKgVisible && inputKgHidden) {
-            inputKgVisible.value = inputKgHidden.value || '';
-        }
+        fila.dataset.modoCantidad = 'sin_presentacion';
+        fila.classList.add('is-stock-error');
     }
 
     function poblarPresentacionesFilaTraslado(fila, presentaciones, seleccionId) {
@@ -2400,9 +2468,11 @@
         const lblCantidad = fila.querySelector('.js-lbl-cantidad-unidades');
 
         if (!presentaciones.length) {
-            activarModoKgFilaTraslado(fila);
+            mostrarPresentacionesVaciasFilaTraslado(fila);
             return;
         }
+
+        fila.classList.remove('is-stock-error');
 
         fila.dataset.modoCantidad = 'unidades';
         bloqueKg?.classList.add('d-none');
@@ -2605,8 +2675,35 @@
     async function cargarPresentacionesParaFilaTraslado(fila, insumoId, seleccionId) {
         resetPresentacionFilaTraslado(fila);
         if (!insumoId) return;
+        if (!almacenPlantaTrasladoId()) {
+            const hint = fila.querySelector('.lbl-equiv-traslado');
+            if (hint) {
+                hint.textContent = 'Primero elija el almacén de planta (origen) en el paso Ruta.';
+                hint.classList.remove('d-none');
+                hint.classList.add('is-error');
+            }
+            return;
+        }
         const presentaciones = await fetchPresentacionesInsumo(insumoId);
         poblarPresentacionesFilaTraslado(fila, presentaciones, seleccionId || null);
+    }
+
+    async function recargarPresentacionesFilasTraslado() {
+        const filas = document.querySelectorAll('.traslado-producto-row');
+        for (const fila of filas) {
+            const insumoId = fila.querySelector('[data-field="insumoid"]')?.value;
+            if (!insumoId) continue;
+            const presId = fila.querySelector('[data-field="presentacion"]')?.value || null;
+            const loteId = fila.querySelector('[data-field="inventario_lote"]')?.value || null;
+            const unidades = fila.querySelector('[data-field="cantidad_unidades"]')?.value || '';
+            await cargarPresentacionesParaFilaTraslado(fila, insumoId, presId);
+            if (presId && loteId && (fila.dataset.modoCantidad || '') === 'unidades') {
+                await cargarLotesParaFilaTraslado(fila, presId, loteId);
+                const inputUnidades = fila.querySelector('[data-field="cantidad_unidades"]');
+                if (inputUnidades && unidades) inputUnidades.value = unidades;
+            }
+            recalcularKgFilaTraslado(fila);
+        }
     }
 
     function initEventosPresentacionFilaTraslado(fila) {
@@ -2747,6 +2844,7 @@
                     ambito_planta: '1',
                     solo_con_stock: '1',
                     solo_producto_terminado: '1',
+                    solo_con_presentacion: '1',
                     almacenid: almacenId || '',
                 };
                 cfg.title = 'Productos terminados en planta';
@@ -2758,6 +2856,7 @@
         document.querySelectorAll('.traslado-producto-row').forEach(function (fila, idx) {
             fila.querySelector('[data-field="insumoid"]')?.setAttribute('name', 'detalles[' + idx + '][insumoid]');
             fila.querySelector('[data-field="presentacion"]')?.setAttribute('name', 'detalles[' + idx + '][insumo_presentacionid]');
+            fila.querySelector('[data-field="inventario_lote"]')?.setAttribute('name', 'detalles[' + idx + '][inventario_presentacion_loteid]');
             fila.querySelector('[data-field="cantidad_unidades"]')?.setAttribute('name', 'detalles[' + idx + '][cantidad_unidades]');
             fila.querySelector('[data-field="cantidad"]')?.setAttribute('name', 'detalles[' + idx + '][cantidad]');
             fila.querySelector('[data-field="observaciones"]')?.setAttribute('name', 'detalles[' + idx + '][observaciones]');
@@ -2774,6 +2873,7 @@
                 ambito_planta: '1',
                 solo_con_stock: '1',
                 solo_producto_terminado: '1',
+                solo_con_presentacion: '1',
                 almacenid: almacenPlantaTrasladoId() || '',
             },
             rowIcon: 'fa-box',
@@ -3518,6 +3618,7 @@
             }
             if (window.PedidoFase2) window.PedidoFase2.setRouteDuration(null);
             syncEstadoRutaPdv();
+            resetCostoPdv();
             return;
         }
 
@@ -3549,6 +3650,7 @@
             window.PedidoFase2.setRouteDuration(routeResult?.duration_s ?? null);
         }
         syncEstadoRutaPdv();
+        actualizarCostoPdv(routeResult?.distance_m ?? null);
     }
 
     function ejecutarReinicioRutaPdv() {
@@ -3586,9 +3688,30 @@
         }
     }
 
+    function mapaPdvContainerListo() {
+        const el = document.getElementById('mapaPdvDistribucion');
+        if (!el) return false;
+        const flujo = document.getElementById('flujo-punto-venta');
+        if (flujo?.classList.contains('d-none')) return false;
+        const pasoRuta = flujo?.querySelector('.wizard-step[data-wizard-step="1"]');
+        if (pasoRuta && !pasoRuta.classList.contains('active')) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 20 && rect.height > 20;
+    }
+
+    function refrescarTamanoMapaPdv() {
+        if (!statePdv.map) return;
+        statePdv.map.invalidateSize();
+        redrawRutaPdv();
+        if (statePdv.puntosVisibles) {
+            mostrarPuntosEnMapaPdv();
+        }
+    }
+
     function initMapaPdv() {
         const el = document.getElementById('mapaPdvDistribucion');
-        if (!el || !window.L || mapaPdvListo) return;
+        if (!el || !window.L || mapaPdvListo) return false;
+        if (!mapaPdvContainerListo()) return false;
 
         statePdv.map = L.map(el, { scrollWheelZoom: true }).setView([hub.lat, hub.lng], 11);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -3605,49 +3728,52 @@
         syncEstadoRutaPdv();
 
         setTimeout(function () {
+            if (!statePdv.map) return;
             statePdv.map.invalidateSize();
             redrawRutaPdv();
             if (PUNTOS_MAPA_PDV.length) {
                 togglePuntosEnMapaPdv();
             }
         }, 250);
+
+        return true;
     }
 
     function ensureMapaPdv() {
         if (!document.getElementById('mapaPdvDistribucion')) return;
 
         function intentarInit() {
-            if (!window.L || mapaPdvListo) {
-                return mapaPdvListo;
+            if (!window.L) return false;
+            if (mapaPdvListo) {
+                refrescarTamanoMapaPdv();
+                return true;
             }
-            initMapaPdv();
-            return mapaPdvListo;
+            return initMapaPdv() === true;
         }
 
-        if (!intentarInit()) {
-            let intentos = 0;
-            const reintentar = setInterval(function () {
-                intentos += 1;
-                if (intentarInit() || intentos >= 50) {
-                    clearInterval(reintentar);
-                }
-            }, 100);
+        if (intentarInit()) {
+            setTimeout(refrescarTamanoMapaPdv, 80);
+            setTimeout(refrescarTamanoMapaPdv, 350);
+            setTimeout(refrescarTamanoMapaPdv, 800);
             return;
         }
 
-        if (statePdv.map) {
-            setTimeout(function () {
-                statePdv.map.invalidateSize();
-                redrawRutaPdv();
-            }, 80);
-            setTimeout(function () {
-                statePdv.map.invalidateSize();
-                redrawRutaPdv();
-            }, 350);
-        }
+        let intentos = 0;
+        const reintentar = setInterval(function () {
+            intentos += 1;
+            if (intentarInit() || intentos >= 80) {
+                clearInterval(reintentar);
+                if (mapaPdvListo) {
+                    setTimeout(refrescarTamanoMapaPdv, 80);
+                    setTimeout(refrescarTamanoMapaPdv, 350);
+                    setTimeout(refrescarTamanoMapaPdv, 800);
+                }
+            }
+        }, 100);
     }
 
     window.ensureMapaPdv = ensureMapaPdv;
+    window.refrescarTamanoMapaPdv = refrescarTamanoMapaPdv;
 
     function iniciarMapasSegunTrayecto() {
         if (!window.L) return;
@@ -3779,6 +3905,9 @@
                 }
                 syncEstadoRutaTraslado();
                 syncBloqueProductosTraslado();
+                if (selId === 'traslado_planta_origen') {
+                    recargarPresentacionesFilasTraslado();
+                }
                 if (mapaTrasladoListo) {
                     redrawRutaTraslado();
                 }
@@ -3840,7 +3969,10 @@
         });
 
         window.EnvioTrasladoProductos = {
-            syncAlPaso2: sincronizarFilasTrasladoDesdePreseleccion,
+            syncAlPaso2: function () {
+                sincronizarFilasTrasladoDesdePreseleccion();
+                recargarPresentacionesFilasTraslado();
+            },
         };
 
         syncEstadoRutaTraslado();
@@ -3883,7 +4015,12 @@
                 colNombre: 'Chofer',
                 params: {
                     roles: 'transportista',
-                    ambito_flota: window.EnvioWizard?.flujoActivo?.() === 'mayorista' ? 'planta' : 'agricola',
+                    ambito_flota: (function () {
+                        const f = window.EnvioWizard?.flujoActivo?.();
+                        if (f === 'mayorista') return 'planta';
+                        if (f === 'punto-venta') return 'mayorista';
+                        return 'agricola';
+                    })(),
                 },
                 onSelect(item) {
                     inputTransportista.value = item.id;
@@ -3921,12 +4058,15 @@
                 rowIconFn: iconoVehiculoFila,
                 theme: 'vehiculo',
                 colNombre: 'Placa',
-                params: window.EnvioWizard?.flujoActivo?.() === 'mayorista'
-                    ? { ambito_flota: 'planta' }
-                    : {
+                params: (function () {
+                    const f = window.EnvioWizard?.flujoActivo?.();
+                    if (f === 'mayorista') return { ambito_flota: 'planta' };
+                    if (f === 'punto-venta') return { ambito_flota: 'mayorista' };
+                    return {
                         transportista_usuarioid: inputTransportista.value || '',
                         solo_transportista: '1',
-                    },
+                    };
+                })(),
                 beforeOpen(cfg) {
                     if (window.EnvioWizard?.actualizarParamsVehiculoCatalogo) {
                         window.EnvioWizard.actualizarParamsVehiculoCatalogo();
@@ -3964,6 +4104,9 @@
             function limpiarSelector(id) {
                 if (CatalogoSelector.instances[id]) {
                     CatalogoSelector.clear(id);
+                }
+                if (id === 'pdv_unificado_producto') {
+                    window.PdvEnvioCarga?.limpiar();
                 }
             }
 
@@ -4053,8 +4196,16 @@
                 inventario: inventarioOrigenPdvConfig(),
             });
 
-            window.EnvioPdvProductos = {
-                syncAlPaso2: function () {
+            document.getElementById('costo_bs')?.addEventListener('input', function () {
+                if (document.getElementById('flujo-punto-venta') && !document.getElementById('flujo-punto-venta').classList.contains('d-none')) {
+                    costoPdvEditadoManual = true;
+                }
+            });
+
+            if (window.PdvEnvioCarga) {
+                const syncPdvPaso2Base = window.PdvEnvioCarga.syncAlPaso2;
+                window.PdvEnvioCarga.syncAlPaso2 = function () {
+                    if (typeof syncPdvPaso2Base === 'function') syncPdvPaso2Base();
                     if (pdvProductoPreseleccionado && document.getElementById('selector_wrap_pdv_unificado_producto')) {
                         CatalogoSelector.setValue(
                             'pdv_unificado_producto',
@@ -4062,8 +4213,9 @@
                             pdvProductoPreseleccionado.label
                         );
                     }
-                },
-            };
+                };
+                window.EnvioPdvProductos = window.PdvEnvioCarga;
+            }
 
             syncEstadoRutaPdv();
         })();

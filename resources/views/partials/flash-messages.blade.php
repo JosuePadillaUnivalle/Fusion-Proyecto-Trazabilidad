@@ -1,13 +1,6 @@
-@if (session('success'))
-    <div class="ag-flash ag-flash--success" role="status">
-        <span class="ag-flash__icon"><i class="fas fa-check"></i></span>
-        <span class="ag-flash__text">{{ session('success') }}</span>
-        <button type="button" class="ag-flash__close" aria-label="Cerrar"><i class="fas fa-times"></i></button>
-    </div>
-@endif
+{{-- Los avisos verdes de éxito operativo se omiten: la pantalla de destino ya muestra el resultado. --}}
 
-@if (session('warning'))
-    <div class="ag-flash ag-flash--warning" role="status">
+@if (session('warning'))    <div class="ag-flash ag-flash--warning" role="status">
         <span class="ag-flash__icon"><i class="fas fa-exclamation"></i></span>
         <span class="ag-flash__text">{{ session('warning') }}</span>
         <button type="button" class="ag-flash__close" aria-label="Cerrar"><i class="fas fa-times"></i></button>

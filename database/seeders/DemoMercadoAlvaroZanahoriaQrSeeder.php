@@ -27,8 +27,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Inventario PDV «Mercado Alvaro» — Zanahoria del lote real «Lote de Zanahoria» (Almacén Norte).
- * Elimina el ejemplo demo anterior y enlaza el QR al lote con fotos reales cargadas en campo.
+ * Inventario PDV «Mercado Alvaro» — producto procesado del lote real «Lote de Zanahoria».
+ * El minorista solo recibe producto terminado (envasado), no cosecha en bruto.
  *
  * php artisan db:seed --class=DemoMercadoAlvaroZanahoriaQrSeeder
  */
@@ -40,7 +40,7 @@ class DemoMercadoAlvaroZanahoriaQrSeeder extends Seeder
 
     private const LOTE_NOMBRE = 'Lote de Zanahoria';
 
-    private const PRODUCTO = 'Zanahoria';
+    private const PRODUCTO = 'Zanahoria Imperator envasada';
 
     private const PEDIDO = 'PDV-20260612-ZAN';
 
@@ -75,32 +75,41 @@ class DemoMercadoAlvaroZanahoriaQrSeeder extends Seeder
                 ?? Usuario::query()->where('activo', true)->first();
             $kgId = $this->unidadKgId();
 
-            $almacenPlanta = Almacen::query()
-                ->where('nombre', 'Almacén Planta Procesadora')
+            $almacenMayorista = Almacen::query()
                 ->where('activo', true)
-                ->first()
-                ?? AlmacenAmbito::scope(Almacen::query()->where('activo', true), AlmacenAmbito::PLANTA)->first();
+                ->where(function ($q) {
+                    $q->where('ambito', AlmacenAmbito::MAYORISTA)
+                        ->orWhereRaw('LOWER(nombre) LIKE ?', ['%mayorista%']);
+                })
+                ->first();
 
             $tipoProd = TipoInsumo::query()
                 ->whereRaw('LOWER(nombre) LIKE ?', ['%producto%'])
                 ->first()
                 ?? TipoInsumo::query()->first();
 
-            $insumoPlanta = null;
-            if ($almacenPlanta) {
-                $insumoPlanta = Insumo::updateOrCreate(
-                    ['nombre' => self::PRODUCTO, 'almacenid' => $almacenPlanta->almacenid],
-                    [
-                        'tipoinsumoid' => $tipoProd?->tipoinsumoid,
-                        'unidadmedidaid' => $kgId,
-                        'stock' => 180,
-                        'stockminimo' => 20,
-                        'descripcion' => 'Cosecha de '.self::LOTE_NOMBRE.' ('.self::LOTE_CODIGO.') — Almacén Norte.',
-                    ]
-                );
+            $insumoMayorista = null;
+            if ($almacenMayorista) {
+                $insumoMayorista = Insumo::query()
+                    ->where('almacenid', $almacenMayorista->almacenid)
+                    ->whereRaw('LOWER(TRIM(nombre)) = ?', [mb_strtolower(self::PRODUCTO)])
+                    ->first();
+
+                if ($insumoMayorista === null) {
+                    $insumoMayorista = Insumo::updateOrCreate(
+                        ['nombre' => self::PRODUCTO, 'almacenid' => $almacenMayorista->almacenid],
+                        [
+                            'tipoinsumoid' => $tipoProd?->tipoinsumoid,
+                            'unidadmedidaid' => $kgId,
+                            'stock' => 180,
+                            'stockminimo' => 20,
+                            'descripcion' => 'Producto procesado y envasado — origen lote '.self::LOTE_CODIGO.'.',
+                        ]
+                    );
+                }
             }
 
-            $this->seedPedidoDistribucion($punto, $almacenPlanta, $insumoPlanta, $admin);
+            $this->seedPedidoDistribucion($punto, $almacenMayorista, $insumoMayorista, $admin);
 
             $insumoPdv = Insumo::updateOrCreate(
                 [
@@ -112,7 +121,7 @@ class DemoMercadoAlvaroZanahoriaQrSeeder extends Seeder
                     'unidadmedidaid' => $kgId,
                     'stock' => self::STOCK_PDV,
                     'stockminimo' => 5,
-                    'descripcion' => 'Lote agrícola '.self::LOTE_CODIGO.' — ingreso desde Almacén Norte — '.self::PEDIDO,
+                    'descripcion' => 'Producto procesado recibido del mayorista — trazabilidad lote '.self::LOTE_CODIGO.' — '.self::PEDIDO,
                 ]
             );
 
@@ -122,7 +131,7 @@ class DemoMercadoAlvaroZanahoriaQrSeeder extends Seeder
             $this->command?->info('  Punto de venta: '.$punto->nombre);
             $this->command?->info('  Producto PDV: '.self::PRODUCTO.' (stock '.self::STOCK_PDV.' kg)');
             $this->command?->info('  Lote agrícola: '.self::LOTE_NOMBRE.' ('.self::LOTE_CODIGO.')');
-            $this->command?->info('  Almacén origen cosecha: Almacén Norte');
+            $this->command?->info('  Almacén origen: '.($almacenMayorista?->nombre ?? 'Centro mayorista'));
             $this->command?->info('  QR público: '.$urlQr);
         });
     }
@@ -146,9 +155,17 @@ class DemoMercadoAlvaroZanahoriaQrSeeder extends Seeder
             $pedidoDemo->delete();
         }
 
+        $almacenesPdv = PuntoVenta::query()
+            ->whereNotNull('almacenid')
+            ->pluck('almacenid');
+
         Insumo::query()
             ->where('codigo_trazabilidad', 'TRZ-PDV-20260609-ZAN001')
             ->orWhere('nombre', 'Zanahoria fresca Valle')
+            ->orWhere(function ($q) use ($almacenesPdv) {
+                $q->where('nombre', 'Zanahoria')
+                    ->whereIn('almacenid', $almacenesPdv);
+            })
             ->orWhere('descripcion', 'like', '%'.self::MARK_DEMO.'%')
             ->delete();
 
@@ -221,11 +238,11 @@ class DemoMercadoAlvaroZanahoriaQrSeeder extends Seeder
 
     private function seedPedidoDistribucion(
         PuntoVenta $punto,
-        ?Almacen $almacenPlanta,
-        ?Insumo $insumoPlanta,
+        ?Almacen $almacenMayorista,
+        ?Insumo $insumoMayorista,
         ?Usuario $admin
     ): void {
-        if (! Schema::hasTable('pedido_distribucion') || ! $almacenPlanta || ! $insumoPlanta || ! $admin) {
+        if (! Schema::hasTable('pedido_distribucion') || ! $almacenMayorista || ! $insumoMayorista || ! $admin) {
             return;
         }
 
@@ -233,7 +250,7 @@ class DemoMercadoAlvaroZanahoriaQrSeeder extends Seeder
             ['numero_solicitud' => self::PEDIDO],
             [
                 'puntoventaid' => $punto->puntoventaid,
-                'almacen_planta_origenid' => $almacenPlanta->almacenid,
+                'almacen_mayorista_origenid' => $almacenMayorista->almacenid,
                 'estado' => PedidoDistribucionCatalogo::ESTADO_RECIBIDO,
                 'fechapedido' => now()->subDays(4),
                 'fecha_aceptacion' => now()->subDays(3),
@@ -241,7 +258,7 @@ class DemoMercadoAlvaroZanahoriaQrSeeder extends Seeder
                 'fecha_recepcion' => now()->subDay(),
                 'creado_por_usuarioid' => $admin->usuarioid,
                 'aceptado_por_usuarioid' => $admin->usuarioid,
-                'observaciones' => 'Distribución zanahoria desde Almacén Norte ('.self::LOTE_CODIGO.')',
+                'observaciones' => 'Distribución producto procesado desde mayorista — trazabilidad '.self::LOTE_CODIGO,
             ]
         );
 
@@ -251,9 +268,9 @@ class DemoMercadoAlvaroZanahoriaQrSeeder extends Seeder
                 'producto_nombre' => self::PRODUCTO,
             ],
             [
-                'insumoid' => $insumoPlanta->insumoid,
+                'insumoid' => $insumoMayorista->insumoid,
                 'cantidad' => self::STOCK_PDV,
-                'observaciones' => 'Lote '.self::LOTE_NOMBRE,
+                'observaciones' => 'Producto envasado — lote agrícola '.self::LOTE_NOMBRE,
             ]
         );
 

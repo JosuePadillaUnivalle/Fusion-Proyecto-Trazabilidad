@@ -641,6 +641,14 @@
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.body.classList.remove('login-notif-modal-open', 'modal-open');
+    document.querySelectorAll('.login-notif-scrim').forEach(function (el) {
+        el.classList.remove('is-visible');
+    });
+});
+</script>
 @stack('scripts')
 </body>
 </html>

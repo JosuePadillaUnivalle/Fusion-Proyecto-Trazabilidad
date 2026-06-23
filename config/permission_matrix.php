@@ -516,10 +516,6 @@ return [
 
             'documentos.create',
 
-            'documentos.update',
-
-            'documentos.delete',
-
             'incidentes.view',
 
             'incidentes.create',

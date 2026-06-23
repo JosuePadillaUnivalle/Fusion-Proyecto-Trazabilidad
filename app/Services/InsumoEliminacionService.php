@@ -62,6 +62,17 @@ class InsumoEliminacionService
             return;
         }
 
+        $desde = Insumo::query()->find($desdeId);
+        $hacia = Insumo::query()->find($haciaId);
+        if (! $desde || ! $hacia) {
+            return;
+        }
+
+        // Nunca fusionar insumos de almacenes distintos (p. ej. PDV vs planta).
+        if ((int) ($desde->almacenid ?? 0) !== (int) ($hacia->almacenid ?? 0)) {
+            return;
+        }
+
         DB::transaction(function () use ($desdeId, $haciaId): void {
             if (Schema::hasTable('lote') && Schema::hasColumn('lote', 'insumosemillaid')) {
                 DB::table('lote')->where('insumosemillaid', $desdeId)->update(['insumosemillaid' => $haciaId]);

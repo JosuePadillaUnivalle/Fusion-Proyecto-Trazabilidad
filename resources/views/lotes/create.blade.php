@@ -241,6 +241,12 @@
                 if (!latInput.value || !lngInput.value) {
                     e.preventDefault();
                     alert('Marca la ubicación del lote haciendo clic en el mapa.');
+                    return;
+                }
+                const validacionPlan = window.AgroFusionPlanificacionCosecha?.validarEnvio?.();
+                if (validacionPlan && !validacionPlan.ok) {
+                    e.preventDefault();
+                    alert(validacionPlan.mensaje);
                 }
             });
 

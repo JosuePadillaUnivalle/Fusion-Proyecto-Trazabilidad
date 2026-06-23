@@ -92,7 +92,18 @@ final class EnvioListadoService
         }
 
         if ($request->filled('estado')) {
-            $query->where('estado', $request->string('estado')->toString());
+            $estado = $request->string('estado')->toString();
+            $query->where('estado', $estado);
+
+            if ($estado === PedidoCatalogo::ESTADO_CONFIRMADO) {
+                $query->where(function (Builder $q) {
+                    $q->whereDoesntHave('envioAsignacion')
+                        ->orWhereHas('envioAsignacion', function (Builder $envio) {
+                            $envio->whereNull('fecha_recepcion_planta')
+                                ->whereNotIn('estado', ['recibido_planta', 'entregado', 'entregada']);
+                        });
+                });
+            }
         }
 
         if ($request->filled('desde')) {

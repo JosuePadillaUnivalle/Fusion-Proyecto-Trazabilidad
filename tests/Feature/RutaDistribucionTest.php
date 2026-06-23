@@ -164,6 +164,8 @@ class RutaDistribucionTest extends TestCase
         $response->assertRedirect();
         $pedido->refresh();
         $this->assertNotNull($pedido->rutadistribucionid);
+        $ruta = \App\Models\RutaDistribucion::query()->find($pedido->rutadistribucionid);
+        $this->assertSame($almacenMayorista->almacenid, $ruta?->almacen_mayorista_origenid);
         $this->assertSame(PedidoDistribucionCatalogo::ESTADO_CONFIRMADO, $pedido->estado);
     }
 }

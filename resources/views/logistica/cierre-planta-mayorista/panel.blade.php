@@ -264,6 +264,7 @@
     $ui = $uiCierre ?? \App\Support\EnvioCierreRutaUiCatalogo::plantaMayorista();
     $esCierrePdv = ($ui['tipo_tiempo_real'] ?? '') === 'distribucion';
     $recibidoEnDestino = (bool) ($resumen[$ui['recibido_key']] ?? false);
+    $esperaConfirmacionMinorista = ($pasoVista ?? $paso) === '__espera_confirmacion_minorista__';
     $estadoRecepcion = $estadoRecepcion ?? [];
     $etiquetaPaso = static function (string $p) use ($esTransportista): string {
         if ($esTransportista && $p === CierreCat::PASO_EN_RUTA) {
@@ -298,6 +299,30 @@
                     <p class="small text-muted mb-0 mt-2">
                         <i class="fas fa-info-circle mr-1"></i>
                         {{ $ui['recepcion_espera_info'] }}
+                    </p>
+                </div>
+            </div>
+            <a href="{{ $volverUrl }}" class="btn btn-outline-secondary btn-sm mt-3">
+                <i class="fas fa-arrow-left mr-1"></i> Volver al detalle
+            </a>
+        </div>
+    </div>
+    @elseif($esperaConfirmacionMinorista)
+    <div class="cierre-ag-card mb-3">
+        <div class="cierre-ag-card__head">
+            <i class="fas fa-store text-warning"></i> Confirmación del punto de venta
+        </div>
+        <div class="cierre-ag-card__body">
+            <div class="cierre-ag-status cierre-ag-status--llegada">
+                <span class="cierre-ag-status__icon"><i class="fas fa-hourglass-half"></i></span>
+                <div class="w-100">
+                    <strong class="d-block">Esperando confirmación del minorista</strong>
+                    <span class="small text-muted d-block mt-1">
+                        {{ $ui['espera_confirmacion_minorista_info'] ?? 'El minorista del punto de venta debe confirmar el envío antes de continuar.' }}
+                    </span>
+                    <p class="small text-muted mb-0 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Le avisaremos cuando pueda continuar con el cierre operativo.
                     </p>
                 </div>
             </div>
@@ -382,7 +407,7 @@
         </div>
         <div class="cierre-ag-card__body">
             @if($soloLecturaPaso())<div class="cierre-ag-readonly-tag"><i class="fas fa-lock"></i> Solo lectura</div>@endif
-            @if($resumen['tiene_condiciones'] ?? false)
+            @if($resumen['condiciones_vigentes'] ?? $resumen['tiene_condiciones'] ?? false)
                 <div class="cierre-ag-status cierre-ag-status--ok">
                     <span class="cierre-ag-status__icon"><i class="fas fa-clipboard-check"></i></span>
                     <div class="w-100">
@@ -547,6 +572,11 @@
                         </div>
                     </div>
                 </div>
+            @elseif($esCierrePdv && ($resumen['pendiente_confirmacion_minorista'] ?? false))
+                <div class="cierre-ag-llegada-hint">
+                    <i class="fas fa-hourglass-half mt-1"></i>
+                    <span><strong>Esperando confirmación del minorista.</strong> El punto de venta debe confirmar el envío antes de salir en ruta.</span>
+                </div>
             @else
                 <p class="text-muted mb-0 small">Complete las condiciones del vehículo para continuar.</p>
             @endif
@@ -619,7 +649,7 @@
                 </div>
                 <div class="cierre-ag-progress-wrap">
                     @include('logistica.partials.progreso-simulacion-transportista', [
-                        'tipo' => 'planta_mayorista',
+                        'tipo' => $ui['tipo_tiempo_real'] ?? 'distribucion',
                         'id' => $ruta->rutadistribucionid,
                     ])
                 </div>

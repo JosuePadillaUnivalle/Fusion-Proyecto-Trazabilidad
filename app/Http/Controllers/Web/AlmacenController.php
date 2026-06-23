@@ -26,6 +26,8 @@ use App\Services\AlmacenCapacidadService;
 
 use App\Services\InventarioPresentacionService;
 
+use App\Services\ProductoPlantaInventarioService;
+
 use App\Services\UbicacionesAlmacenService;
 
 use App\Support\AlmacenAmbito;
@@ -51,11 +53,9 @@ class AlmacenController extends Controller
 {
 
     public function __construct(
-
         private readonly AlmacenCapacidadService $capacidadService,
-
         private readonly InventarioPresentacionService $inventarioPresentacion,
-
+        private readonly ProductoPlantaInventarioService $inventarioPlanta,
     ) {}
 
 
@@ -500,6 +500,7 @@ class AlmacenController extends Controller
         $items = collect();
         $esPlanta = ($almacen->ambito ?? '') === AlmacenAmbito::PLANTA;
         $esMayorista = ($almacen->ambito ?? '') === AlmacenAmbito::MAYORISTA;
+        $esAgricola = ($almacen->ambito ?? '') === AlmacenAmbito::AGRICOLA;
 
         $insumosQuery = Insumo::query()->with(['tipo', 'unidadMedida'])
             ->where('almacenid', $almacen->almacenid);
@@ -519,6 +520,8 @@ class AlmacenController extends Controller
         } elseif ($esMayorista) {
             $insumosQuery = InsumoCatalogo::aplicarFiltroProductoTerminado($insumosQuery)
                 ->with(['presentaciones.tipoEmpaque']);
+        } elseif ($esAgricola) {
+            $insumosQuery->where('descripcion', 'like', 'Recepción pedido%');
         } else {
             $insumosQuery = InsumoCatalogo::aplicarFiltroOperativo($insumosQuery);
         }
@@ -601,6 +604,10 @@ class AlmacenController extends Controller
             ]);
         }
 
+        if ($esPlanta) {
+            $this->inventarioPlanta->sincronizarDesdeAlmacenajes((int) $almacen->almacenid);
+        }
+
         $productosPlanta = AlmacenajeLoteProduccion::query()
             ->with(['loteProduccionPedido.unidadMedida', 'loteProduccionPedido.materiasPrimas.insumo.unidadMedida'])
             ->whereNull('fecha_retiro')
@@ -639,10 +646,15 @@ class AlmacenController extends Controller
                 ? $detalleEmpaque
                 : trim(($ingreso->condicion ? $ingreso->condicion.' · ' : '').($fechaAlm ? $fechaAlm->format('d/m/Y H:i') : ''));
 
+            $insumoId = Insumo::query()
+                ->where('almacenid', $almacen->almacenid)
+                ->whereRaw('LOWER(TRIM(nombre)) = ?', [\Illuminate\Support\Str::lower(trim($producto))])
+                ->value('insumoid');
+
             $items->push((object) [
                 'categoria' => 'producto_planta',
-                'tipo_label' => 'Producto terminado',
-                'tipo_filtro' => 'producto terminado',
+                'tipo_label' => 'Producto procesado',
+                'tipo_filtro' => 'producto procesado',
                 'nombre' => $nombre,
                 'detalle' => $detalle !== '' ? \Illuminate\Support\Str::limit($detalle, 120) : ($lote->codigo_lote ?? '—'),
                 'cantidad' => $cantidad,
@@ -652,6 +664,7 @@ class AlmacenController extends Controller
                 'fecha_orden' => $fechaAlm?->timestamp ?? 0,
                 'search' => strtolower(trim($nombre.' producto planta '.$producto.' '.$lote->codigo_lote.' '.($empaqueLabel ?? ''))),
                 'lote_produccion_pedido_id' => $lote->loteproduccionpedidoid,
+                'insumoid' => $insumoId ? (int) $insumoId : null,
             ]);
         }
 
@@ -729,8 +742,8 @@ class AlmacenController extends Controller
 
         return (object) [
             'categoria' => 'producto_terminado',
-            'tipo_label' => 'Producto terminado',
-            'tipo_filtro' => 'producto_terminado',
+            'tipo_label' => 'Producto procesado',
+            'tipo_filtro' => 'producto procesado',
             'nombre' => $insumo->nombre,
             'detalle' => $insumo->descripcion ? \Illuminate\Support\Str::limit($insumo->descripcion, 60) : '—',
             'cantidad' => $totalUnidades > 0 ? $totalUnidades : (float) $insumo->stock,
@@ -738,7 +751,7 @@ class AlmacenController extends Controller
             'kg' => $totalKg,
             'empaque' => $empaque,
             'fecha_orden' => 0,
-            'search' => strtolower(trim($insumo->nombre.' '.implode(' ', $nombresEmpaque).' producto terminado')),
+            'search' => strtolower(trim($insumo->nombre.' '.implode(' ', $nombresEmpaque).' producto procesado')),
             'insumoid' => $insumo->insumoid,
             'origen_tipo' => 'insumo',
         ];

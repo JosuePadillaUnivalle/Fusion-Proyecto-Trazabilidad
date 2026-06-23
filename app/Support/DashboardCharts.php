@@ -408,7 +408,9 @@ final class DashboardCharts
         if ($usuario && ! $todos) {
             $almacenIds = MayoristaAccess::idsAlmacenesMayorista($usuario);
             if ($almacenIds !== []) {
-                $base->whereHas('puntoVenta', fn ($q) => $q->whereIn('almacenid', $almacenIds));
+                $base->whereIn('almacen_mayorista_origenid', $almacenIds);
+            } else {
+                $base->whereRaw('1 = 0');
             }
         }
         $seriePedidos = self::serieTemporalConteo($base, 'fechapedido', $filtros);

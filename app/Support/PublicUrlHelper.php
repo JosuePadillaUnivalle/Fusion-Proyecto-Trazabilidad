@@ -9,22 +9,42 @@ final class PublicUrlHelper
         $path = '/'.ltrim($path, '/');
         $suffix = $path === '/' ? '' : $path;
 
-        // En peticiones web, el QR debe usar el mismo host/puerto que el usuario ya tiene abierto
-        // (127.0.0.1, localhost o la IP LAN actual). Evita enlaces a APP_PUBLIC_URL obsoletos.
         if (! app()->runningInConsole() && request()) {
             return rtrim(request()->getSchemeAndHttpHost(), '/').$suffix;
         }
 
-        $publicUrl = trim((string) config('app.public_url', ''));
-        if ($publicUrl !== '') {
-            return rtrim($publicUrl, '/').$suffix;
-        }
+        return self::resolveBaseUrl().$suffix;
+    }
 
-        return rtrim((string) config('app.url', 'http://localhost'), '/').$suffix;
+    /**
+     * URL absoluta para QR / celular en la misma WiFi.
+     * Usa APP_PUBLIC_URL (IP LAN) aunque el usuario navegue en 127.0.0.1 en el PC.
+     */
+    public static function absoluteForQr(string $path = ''): string
+    {
+        $path = '/'.ltrim($path, '/');
+        $suffix = $path === '/' ? '' : $path;
+
+        return self::resolveBaseUrl(preferPublic: true).$suffix;
     }
 
     public static function baseUrl(): string
     {
         return self::absolute('/');
+    }
+
+    private static function resolveBaseUrl(bool $preferPublic = false): string
+    {
+        $publicUrl = trim((string) config('app.public_url', ''));
+
+        if ($preferPublic && $publicUrl !== '') {
+            return rtrim($publicUrl, '/');
+        }
+
+        if ($publicUrl !== '') {
+            return rtrim($publicUrl, '/');
+        }
+
+        return rtrim((string) config('app.url', 'http://localhost'), '/');
     }
 }

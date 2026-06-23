@@ -266,6 +266,55 @@
             cosechaPreview?.classList.add('d-none');
         }
 
+        function valorNumericoPositivo(input) {
+            if (!input) {
+                return null;
+            }
+            const raw = String(input.value ?? '').trim();
+            if (raw === '') {
+                return null;
+            }
+            const n = parseFloat(raw);
+            return Number.isFinite(n) && n > 0 ? n : null;
+        }
+
+        function validarPlanificacionParaEnvio() {
+            const panelVisible = panel && !panel.classList.contains('d-none');
+            if (!panelVisible || !insumoId) {
+                return { ok: true };
+            }
+
+            if (modo === 'empaques') {
+                const empaques = valorNumericoPositivo(objetivoEmpaques);
+                if (empaques === null) {
+                    return { ok: false, mensaje: 'Indique cuántas cajas desea obtener (debe ser mayor a 0).' };
+                }
+            } else if (modo === 'unidades') {
+                const unidades = valorNumericoPositivo(objetivoUnidades);
+                if (unidades === null) {
+                    return { ok: false, mensaje: 'Indique cuántas unidades desea cosechar (debe ser mayor a 0).' };
+                }
+            } else {
+                const ha = valorNumericoPositivo(supInput);
+                if (ha === null) {
+                    return { ok: false, mensaje: 'Indique la superficie en hectáreas (debe ser mayor a 0).' };
+                }
+            }
+
+            const haFinal = parseFloat(supInput?.value || '0');
+            if (!haFinal || haFinal <= 0) {
+                return { ok: false, mensaje: 'Complete la planificación: la superficie calculada debe ser mayor a 0.' };
+            }
+
+            if (modoAvanzadoDisponible(ultimoContexto || {}) && !calibreSelect?.value) {
+                return { ok: false, mensaje: 'Seleccione el calibre al cosechar.' };
+            }
+
+            return { ok: true };
+        }
+
+        window.AgroFusionPlanificacionCosecha.validarEnvio = validarPlanificacionParaEnvio;
+
         function recalcular() {
             clearTimeout(timer);
             timer = setTimeout(function () {
@@ -285,11 +334,33 @@
                     modo: modo,
                 });
                 if (modo === 'unidades') {
-                    params.set('objetivo_unidades', objetivoUnidades?.value || '0');
+                    const unidades = valorNumericoPositivo(objetivoUnidades);
+                    if (unidades === null) {
+                        mostrarError('Indique cuántas unidades desea cosechar.');
+                        cosechaPreview?.classList.add('d-none');
+                        if (modo !== 'hectareas') {
+                            supInput.value = '';
+                        }
+                        return;
+                    }
+                    params.set('objetivo_unidades', String(unidades));
                 } else if (modo === 'empaques') {
-                    params.set('objetivo_empaques', objetivoEmpaques?.value || '0');
+                    const empaques = valorNumericoPositivo(objetivoEmpaques);
+                    if (empaques === null) {
+                        mostrarError('Indique cuántos empaques (cajas/sacas) desea obtener.');
+                        cosechaPreview?.classList.add('d-none');
+                        supInput.value = '';
+                        return;
+                    }
+                    params.set('objetivo_empaques', String(Math.floor(empaques)));
                 } else {
-                    params.set('hectareas', supInput.value || '0');
+                    const ha = valorNumericoPositivo(supInput);
+                    if (ha === null) {
+                        mostrarError('Indique la superficie en hectáreas.');
+                        cosechaPreview?.classList.add('d-none');
+                        return;
+                    }
+                    params.set('hectareas', String(ha));
                 }
 
                 fetch(urlPlanificar + '?' + params.toString(), {

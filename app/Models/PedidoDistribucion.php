@@ -36,6 +36,8 @@ class PedidoDistribucion extends Model
         'fecha_envio',
         'fecha_recepcion',
         'creado_por_usuarioid',
+        'envio_iniciado_mayorista',
+        'fecha_confirmacion_minorista',
     ];
 
     protected $casts = [
@@ -56,6 +58,8 @@ class PedidoDistribucion extends Model
         'fecha_recepcion' => 'datetime',
         'aceptado_por_usuarioid' => 'integer',
         'creado_por_usuarioid' => 'integer',
+        'envio_iniciado_mayorista' => 'boolean',
+        'fecha_confirmacion_minorista' => 'datetime',
     ];
 
     public function puntoVenta(): BelongsTo

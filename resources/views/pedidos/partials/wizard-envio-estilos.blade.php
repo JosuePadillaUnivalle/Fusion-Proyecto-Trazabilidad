@@ -146,6 +146,11 @@
 #flujo-mayorista .pedido-picker-field .btn-picker-accion:hover { background: #f5f3ff; }
 #flujo-mayorista .btn-agregar-producto-traslado { border-color: #6d28d9; color: #6d28d9; }
 #flujo-mayorista .btn-agregar-producto-traslado:hover { background: #f5f3ff; }
+#flujo-punto-venta .btn-agregar-producto-pdv { border-color: #d97706; color: #d97706; font-weight: 600; }
+#flujo-punto-venta .btn-agregar-producto-pdv:hover { background: #fff7ed; border-color: #d97706; color: #d97706; }
+#flujo-punto-venta .traslado-producto-row { border-color: #e2e8f0; }
+#flujo-punto-venta .traslado-producto-row__head { border-bottom-color: #f1f5f9; }
+#flujo-punto-venta .traslado-producto-row .lbl-equiv-traslado { color: #1d4ed8; }
 #flujo-punto-venta .pedido-picker-field .btn-picker-accion { color: #d97706; background: #f8fafc; }
 #flujo-punto-venta .pedido-picker-field .btn-picker-accion:hover { background: #fff7ed; }
 

@@ -74,10 +74,14 @@ class CierreEnvioDistribucionPdvService
         $tieneIncidentes = $ruta->checklistIncidente !== null;
         $firmaTransportista = $ruta->firmaTransportista !== null;
         $firmaRecepcion = $ruta->firmaRecepcion !== null;
+        $pendienteConfirmacionMinorista = ! SimulacionRutaCatalogo::pedidosListosParaSalida($ruta);
+        $condicionesVigentes = $tieneCondiciones && ! $pendienteConfirmacionMinorista;
 
         $pasoActual = EnvioCierreAgricolaCatalogo::PASO_CONDICIONES;
         if ($recibido) {
             $pasoActual = EnvioCierreAgricolaCatalogo::PASO_COMPLETADO;
+        } elseif ($pendienteConfirmacionMinorista) {
+            $pasoActual = '__espera_confirmacion_minorista__';
         } elseif ($firmaTransportista && $firmaRecepcion) {
             $pasoActual = EnvioCierreAgricolaCatalogo::PASO_FIRMA_RECEPCION;
         } elseif ($firmaTransportista) {
@@ -88,13 +92,14 @@ class CierreEnvioDistribucionPdvService
             $pasoActual = EnvioCierreAgricolaCatalogo::PASO_INCIDENTES;
         } elseif ($enRuta) {
             $pasoActual = EnvioCierreAgricolaCatalogo::PASO_ESPERA_LLEGADA;
-        } elseif ($tieneCondiciones) {
+        } elseif ($condicionesVigentes) {
             $pasoActual = EnvioCierreAgricolaCatalogo::PASO_EN_RUTA;
         }
 
         return [
             'paso_actual' => $pasoActual,
             'tiene_condiciones' => $tieneCondiciones,
+            'condiciones_vigentes' => $condicionesVigentes,
             'en_ruta' => $enRuta,
             'progreso' => $progreso,
             'esperando_confirmacion' => ! $recibido && ! $llegadaConfirmada && $progreso >= 100,
@@ -103,8 +108,12 @@ class CierreEnvioDistribucionPdvService
             'firma_transportista' => $firmaTransportista,
             'firma_recepcion' => $firmaRecepcion,
             'recibido_pdv' => $recibido,
-            'puede_registrar_condiciones' => ! $tieneCondiciones && ! $enRuta && ! $recibido
-                && $ruta->estado === RutaDistribucionCatalogo::ESTADO_PLANIFICADA,
+            'recibido_planta' => $recibido,
+            'pendiente_confirmacion_minorista' => $pendienteConfirmacionMinorista,
+            'puede_registrar_condiciones' => ! $pendienteConfirmacionMinorista
+                && ! $tieneCondiciones && ! $enRuta && ! $recibido
+                && $ruta->estado === RutaDistribucionCatalogo::ESTADO_PLANIFICADA
+                && $ruta->transportista_usuarioid !== null,
             'puede_empezar_ruta' => SimulacionRutaCatalogo::puedeEmpezarDistribucion($ruta) && $tieneCondiciones,
             'puede_confirmar_llegada' => $enRuta && ! $llegadaConfirmada && ! $recibido && $progreso >= 100,
             'puede_registrar_incidentes' => $llegadaConfirmada && ! $tieneIncidentes && ! $recibido,
@@ -137,6 +146,10 @@ class CierreEnvioDistribucionPdvService
 
         if ($ruta->estado === RutaDistribucionCatalogo::ESTADO_COMPLETADA) {
             throw new InvalidArgumentException('Esta entrega ya fue completada.');
+        }
+
+        if (! SimulacionRutaCatalogo::pedidosListosParaSalida($ruta)) {
+            throw new InvalidArgumentException('El minorista del punto de venta debe confirmar el envío antes de registrar las condiciones del vehículo.');
         }
 
         $catalogo = CondicionTransporte::query()->orderBy('condiciontransporteid')->get();

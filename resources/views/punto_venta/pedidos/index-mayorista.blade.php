@@ -80,7 +80,7 @@
 
             <h2><i class="fas fa-inbox text-teal mr-1"></i> Bandeja operativa mayorista</h2>
 
-            <p>Solicitudes entrantes de minoristas. El mayorista no inicia envíos al PDV por iniciativa propia: revise stock, confirme y despache solo cuando el minorista haya solicitado producto.</p>
+            <p>Solicitudes entrantes de minoristas y envíos que usted inicia hacia puntos de venta. Revise stock, confirme solicitudes o registre nuevos envíos desde Envíos → Nuevo envío.</p>
 
         </div>
 

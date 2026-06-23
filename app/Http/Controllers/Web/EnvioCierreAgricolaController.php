@@ -208,8 +208,7 @@ class EnvioCierreAgricolaController extends Controller
         }
 
         return redirect()
-            ->route('logistica.documentos.show', $documento)
-            ->with('success', 'Entrega finalizada. Se generó el documento de transporte.');
+            ->route('logistica.documentos.show', $documento);
     }
 
     private function autorizarVer(EnvioAsignacionMultiple $asignacion): void
@@ -246,7 +245,7 @@ class EnvioCierreAgricolaController extends Controller
             return response()->json(['mensaje' => $mensaje]);
         }
 
-        return back()->with('success', $mensaje);
+        return back();
     }
 
     private function respuestaError(string $mensaje): RedirectResponse|JsonResponse

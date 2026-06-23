@@ -71,7 +71,7 @@ class ProcesoPlantaController extends Controller
         $proceso = ProcesoPlanta::create($data);
 
         return redirect()
-            ->route('procesos-planta.show', $proceso)
+            ->route('procesos-planta.index')
             ->with('success', 'Proceso registrado correctamente.');
     }
 
@@ -86,7 +86,7 @@ class ProcesoPlantaController extends Controller
         $procesos_plantum->update($data);
 
         return redirect()
-            ->route('procesos-planta.show', $procesos_plantum)
+            ->route('procesos-planta.index')
             ->with('success', 'Proceso actualizado.');
     }
 
@@ -99,7 +99,7 @@ class ProcesoPlantaController extends Controller
 
     private function filteredQuery(Request $request)
     {
-        $query = \App\Support\ProcesoPlantaCatalogo::queryActivos();
+        $query = ProcesoPlanta::query();
 
         if ($request->filled('estado')) {
             if ($request->estado === 'activo') {

@@ -8,20 +8,6 @@
     <p>Ingresa tus credenciales para acceder</p>
 </div>
 
-@if(session('success'))
-    <div class="alert alert-success">
-        <i class="fas fa-check-circle"></i>
-        <span>{{ session('success') }}</span>
-    </div>
-@endif
-
-@if(session('info'))
-    <div class="alert alert-success">
-        <i class="fas fa-info-circle"></i>
-        <span>{{ session('info') }}</span>
-    </div>
-@endif
-
 @if($errors->any())
     <div class="alert alert-danger">
         <i class="fas fa-exclamation-circle"></i>

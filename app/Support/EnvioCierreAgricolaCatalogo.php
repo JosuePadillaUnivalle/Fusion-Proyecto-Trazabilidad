@@ -77,7 +77,9 @@ final class EnvioCierreAgricolaCatalogo
     public static function pasoEstaCompletado(string $paso, array $resumen): bool
     {
         return match ($paso) {
-            self::PASO_CONDICIONES => (bool) ($resumen['tiene_condiciones'] ?? false),
+            self::PASO_CONDICIONES => array_key_exists('condiciones_vigentes', $resumen)
+                ? (bool) $resumen['condiciones_vigentes']
+                : (bool) ($resumen['tiene_condiciones'] ?? false),
             self::PASO_EN_RUTA => (bool) ($resumen['en_ruta'] ?? false)
                 || (bool) ($resumen['llegada_confirmada'] ?? false)
                 || (bool) ($resumen['tiene_incidentes'] ?? false)
@@ -94,7 +96,8 @@ final class EnvioCierreAgricolaCatalogo
                 || (bool) ($resumen['recibido_planta'] ?? false),
             self::PASO_FIRMA_RECEPCION => (bool) ($resumen['firma_recepcion'] ?? false)
                 || (bool) ($resumen['recibido_planta'] ?? false),
-            self::PASO_COMPLETADO => (bool) ($resumen['recibido_planta'] ?? false),
+            self::PASO_COMPLETADO => (bool) ($resumen['recibido_planta'] ?? false)
+                || (bool) ($resumen['recibido_pdv'] ?? false),
             default => false,
         };
     }

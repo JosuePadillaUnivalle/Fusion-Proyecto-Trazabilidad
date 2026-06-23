@@ -16,7 +16,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->extend(\Illuminate\Foundation\Console\ServeCommand::class, function ($command, $app) {
+            return new \App\Console\Commands\ServeWithLanCommand;
+        });
     }
 
     /**

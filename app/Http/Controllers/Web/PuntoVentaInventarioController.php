@@ -57,6 +57,7 @@ class PuntoVentaInventarioController extends Controller
         return view('punto_venta.inventario.index', [
             'puntos' => $puntos,
             'insumos' => $insumos,
+            'esAdmin' => $user && \App\Support\UsuarioRol::esAdminGlobal($user),
             'filtroPdv' => $request->integer('puntoventaid') ?: null,
             'filtroPdvNombre' => $request->filled('puntoventaid')
                 ? ($puntos->firstWhere('puntoventaid', (int) $request->puntoventaid)?->nombre ?? '')

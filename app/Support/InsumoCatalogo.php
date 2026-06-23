@@ -391,7 +391,7 @@ class InsumoCatalogo
             ->where('tipoinsumoid', $tipoId)
             ->orderBy('insumoid')
             ->get()
-            ->groupBy(fn (Insumo $insumo) => mb_strtolower(trim($insumo->nombre)));
+            ->groupBy(fn (Insumo $insumo) => mb_strtolower(trim($insumo->nombre)).'|'.(int) ($insumo->almacenid ?? 0));
 
         foreach ($grupos as $insumos) {
             if ($insumos->count() <= 1) {
@@ -511,11 +511,6 @@ class InsumoCatalogo
                 (string) self::slugFromNombreTipo($t->nombre) => (int) $t->tipoinsumoid,
             ]);
 
-        $almacenId = \App\Support\AlmacenAmbito::scope(
-            \App\Models\Almacen::query()->where('activo', true),
-            \App\Support\AlmacenAmbito::AGRICOLA
-        )->orderBy('almacenid')->value('almacenid');
-
         $kgId = \App\Models\UnidadMedida::query()->whereRaw('LOWER(nombre) LIKE ?', ['%kilogramo%'])->value('unidadmedidaid')
             ?? \App\Models\UnidadMedida::query()->value('unidadmedidaid');
         $gId = \App\Models\UnidadMedida::query()->whereRaw('LOWER(nombre) LIKE ?', ['%gramo%'])->value('unidadmedidaid')
@@ -538,24 +533,14 @@ class InsumoCatalogo
                 continue;
             }
 
-            $match = ['nombre' => $def['nombre']];
-            if ($almacenId) {
-                $match['almacenid'] = $almacenId;
-            }
-
-            $insumo = \App\Models\Insumo::query()->firstOrNew($match);
+            $insumo = \App\Models\Insumo::query()->firstOrNew(['nombre' => $def['nombre']]);
             if (! $insumo->exists) {
                 $insumo->stock = $def['stock'];
                 $insumo->stockminimo = self::UMBRAL_ALERTA_STOCK;
-            } elseif ((float) $insumo->stock <= 0) {
-                $insumo->stock = $def['stock'];
             }
 
             $insumo->tipoinsumoid = $tipoId;
             $insumo->unidadmedidaid = (int) $def['um'];
-            if ($almacenId) {
-                $insumo->almacenid = (int) $almacenId;
-            }
             if (! InsumoImagenCatalogo::esImagenPersonalizada((string) ($insumo->imagenurl ?? ''))) {
                 $insumo->imagenurl = InsumoImagenCatalogo::urlPorNombreYTipo($def['nombre'], $def['slug']);
             }

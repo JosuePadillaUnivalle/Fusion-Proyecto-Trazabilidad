@@ -510,6 +510,85 @@ class PedidoDistribucionFase2Test extends TestCase
 
     }
 
+    public function test_minorista_ve_confirmacion_envio_mayorista_en_pedido(): void
+    {
+        [$admin, $chofer, $vehiculo, , , , $pedido] = $this->escenarioPedidoConfirmado();
+
+        $minorista = Usuario::query()->where('email', 'minorista.fase2@test.local')->firstOrFail();
+        Role::findOrCreate('minorista', 'web');
+        $minorista->syncRoles(['minorista']);
+        $pedido->update([
+            'envio_iniciado_mayorista' => true,
+            'fecha_confirmacion_minorista' => null,
+            'creado_por_usuarioid' => $admin->usuarioid,
+        ]);
+
+        $this->actingAs($admin);
+        $this->post(route('punto-venta.pedidos.designar-transportista', $pedido), [
+            'transportista_usuarioid' => $chofer->usuarioid,
+            'vehiculoid' => $vehiculo->vehiculoid,
+        ]);
+
+        $this->actingAs($minorista);
+        $response = $this->get(route('punto-venta.pedidos.show', $pedido));
+
+        $response->assertOk();
+        $response->assertSee('Confirmar envío', false);
+        $response->assertSee('Confirme el envío entrante', false);
+    }
+
+    public function test_transportista_no_puede_registrar_condiciones_sin_confirmacion_minorista(): void
+    {
+        [$admin, $chofer, $vehiculo, , , , $pedido] = $this->escenarioPedidoConfirmado();
+
+        $pedido->update([
+            'envio_iniciado_mayorista' => true,
+            'fecha_confirmacion_minorista' => null,
+        ]);
+
+        $this->actingAs($admin);
+        $this->post(route('punto-venta.pedidos.designar-transportista', $pedido), [
+            'transportista_usuarioid' => $chofer->usuarioid,
+            'vehiculoid' => $vehiculo->vehiculoid,
+        ]);
+
+        $pedido->refresh();
+        $ruta = $pedido->rutaDistribucion;
+        $this->assertNotNull($ruta);
+
+        $cierre = app(CierreEnvioDistribucionPdvService::class);
+        $resumen = $cierre->resumenPasos($ruta);
+
+        $this->assertTrue($resumen['pendiente_confirmacion_minorista']);
+        $this->assertFalse($resumen['puede_registrar_condiciones']);
+        $this->assertFalse($resumen['puede_empezar_ruta']);
+        $this->assertSame('__espera_confirmacion_minorista__', $resumen['paso_actual']);
+
+        CondicionTransporte::query()->firstOrCreate(
+            ['codigo' => 'COND_PDV_MINORISTA_TEST'],
+            ['titulo' => 'Luces', 'descripcion' => 'Test']
+        );
+
+        $this->actingAs($chofer);
+        $this->post(route('punto-venta.rutas.cierre.condiciones', $ruta), [
+            'perfectas_condiciones' => 1,
+        ])->assertSessionHas('error');
+
+        $pedido->update(['fecha_confirmacion_minorista' => now()]);
+        $resumen = $cierre->resumenPasos($ruta->fresh());
+
+        $this->assertFalse($resumen['pendiente_confirmacion_minorista']);
+        $this->assertTrue($resumen['puede_registrar_condiciones']);
+
+        $this->post(route('punto-venta.rutas.cierre.condiciones', $ruta), [
+            'perfectas_condiciones' => 1,
+        ])->assertRedirect();
+
+        $resumen = $cierre->resumenPasos($ruta->fresh());
+        $this->assertTrue($resumen['condiciones_vigentes']);
+        $this->assertTrue($resumen['puede_empezar_ruta']);
+    }
+
     private function registrarCondicionesRutaPdv(?\App\Models\RutaDistribucion $ruta, Usuario $usuario): void
     {
         if ($ruta === null) {

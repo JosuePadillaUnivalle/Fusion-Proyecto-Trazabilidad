@@ -227,7 +227,13 @@
                     <a href="{{ route($rutaPrefijo.'.show', $almacen) }}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left mr-1"></i> Volver al almacén
                     </a>
-                    @can('inventario.delete')
+                    <div class="d-flex flex-wrap gap-2">
+                        @if(! empty($loteProduccionPedidoId))
+                        <a href="{{ route('procesamiento.show', $loteProduccionPedidoId) }}" class="btn btn-outline-success">
+                            <i class="fas fa-route mr-1"></i> Ver trazabilidad
+                        </a>
+                        @endif
+                        @can('inventario.delete')
                     <form action="{{ route($rutaPrefijo.'.inventario.destroy', [$almacen, $producto]) }}" method="POST"
                           class="d-inline on-submit-confirm m-0"
                           data-confirm-title="¿Eliminar producto?"
@@ -239,6 +245,7 @@
                         </button>
                     </form>
                     @endcan
+                    </div>
                 </div>
             </div>
         </div>

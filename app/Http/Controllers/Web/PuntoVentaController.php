@@ -182,8 +182,8 @@ class PuntoVentaController extends Controller
         ]);
 
         if ($punto->almacen) {
+            app(PuntoVentaAlmacenService::class)->sincronizarNombreAlmacen($punto, $punto->almacen);
             $punto->almacen->update([
-                'nombre' => 'Almacén — '.$punto->nombre,
                 'ubicacion' => $punto->direccion,
             ]);
         }

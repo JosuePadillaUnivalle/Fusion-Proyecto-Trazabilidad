@@ -44,7 +44,20 @@ final class PedidoDistribucionCatalogo
 
     public static function pendienteAprobacionMayorista(PedidoDistribucion $pedido): bool
     {
-        return $pedido->estado === self::ESTADO_PENDIENTE;
+        return $pedido->estado === self::ESTADO_PENDIENTE
+            && ! (bool) $pedido->envio_iniciado_mayorista;
+    }
+
+    public static function envioIniciadoPorMayorista(PedidoDistribucion $pedido): bool
+    {
+        return (bool) $pedido->envio_iniciado_mayorista;
+    }
+
+    public static function pendienteConfirmacionMinorista(PedidoDistribucion $pedido): bool
+    {
+        return self::envioIniciadoPorMayorista($pedido)
+            && $pedido->fecha_confirmacion_minorista === null
+            && in_array($pedido->estado, [self::ESTADO_CONFIRMADO, self::ESTADO_EN_TRANSITO], true);
     }
 
     public static function pendienteAprobacionPlanta(PedidoDistribucion $pedido): bool

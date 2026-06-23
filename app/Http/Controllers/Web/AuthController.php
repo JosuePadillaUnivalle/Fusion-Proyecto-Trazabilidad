@@ -8,6 +8,8 @@ use App\Services\UsuarioUsernameService;
 use App\Support\CuentaEstado;
 use App\Support\RegistroValidacion;
 use App\Support\TiposLicenciaBolivia;
+use App\Support\JefePlantaLoginNotificacion;
+use App\Support\JefePlantaTrasladoNotificacionVista;
 use App\Support\MayoristaLoginNotificacion;
 use App\Support\MayoristaPedidoNotificacionVista;
 use App\Support\OperarioPlantaLoginNotificacion;
@@ -28,19 +30,14 @@ class AuthController extends Controller
 {
     public function showLoginForm(Request $request)
     {
-        if (Auth::check() && ! $request->boolean('_sesion_limpia')) {
+        if (Auth::check()) {
             $this->cerrarSesionActiva($request);
-
-            return redirect()
-                ->route('login', ['_sesion_limpia' => 1])
-                ->with('info', 'Sesión anterior cerrada. Ingrese con la cuenta deseada.')
-                ->withCookie($this->cookieOlvidarRecordarme())
-                ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-                ->header('Pragma', 'no-cache');
+            Cookie::queue($this->cookieOlvidarRecordarme());
         }
 
         return response()
             ->view('auth.login')
+            ->withCookie($this->cookieOlvidarRecordarme())
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->header('Pragma', 'no-cache');
     }
@@ -53,8 +50,7 @@ class AuthController extends Controller
         ]);
 
         if (Auth::check()) {
-            Auth::logout();
-            $request->session()->regenerateToken();
+            $this->cerrarSesionActiva($request);
         }
 
         Cookie::queue($this->cookieOlvidarRecordarme());
@@ -100,8 +96,7 @@ class AuthController extends Controller
 
             $envioTransportista = TransportistaLoginEnvio::envioPrioritario($user);
             if ($envioTransportista) {
-                return redirect($envioTransportista['url'])
-                    ->with('info', 'Tiene un envío asignado: '.$envioTransportista['codigo']);
+                return redirect($envioTransportista['url']);
             }
         }
 
@@ -110,6 +105,14 @@ class AuthController extends Controller
             if ($nuevasTareas !== []) {
                 OperarioPlantaTareaNotificacionVista::marcarVistas((int) $user->usuarioid, $nuevasTareas);
                 $request->session()->put('operario_planta_nuevas_tareas', $nuevasTareas);
+            }
+        }
+
+        if (UsuarioRol::esJefePlanta($user) || UsuarioRol::esAdminGlobal($user)) {
+            $trasladosPendientes = JefePlantaLoginNotificacion::trasladosPendientesDesdeLogin($user, $ultimoLoginPrevio);
+            if ($trasladosPendientes !== []) {
+                JefePlantaTrasladoNotificacionVista::marcarVistas((int) $user->usuarioid, $trasladosPendientes);
+                $request->session()->put('jefe_planta_traslados_pendientes', $trasladosPendientes);
             }
         }
 
@@ -123,8 +126,7 @@ class AuthController extends Controller
 
         $envioPlanta = PlantaLoginEnvio::envioPrioritario($user);
         if ($envioPlanta) {
-            return redirect($envioPlanta['url'])
-                ->with('info', 'Tiene un envío activo pendiente: '.$envioPlanta['codigo']);
+            return redirect($envioPlanta['url']);
         }
 
         return redirect()->route('dashboard');
@@ -215,8 +217,7 @@ class AuthController extends Controller
         $this->cerrarSesionActiva($request);
 
         return redirect()
-            ->route('login', ['_sesion_limpia' => 1])
-            ->with('success', 'Sesión cerrada correctamente.')
+            ->route('login')
             ->withCookie($this->cookieOlvidarRecordarme())
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->header('Pragma', 'no-cache');

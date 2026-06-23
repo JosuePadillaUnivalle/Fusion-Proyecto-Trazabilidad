@@ -1,6 +1,25 @@
 <script>
 (function () {
-    const TOTAL = 4;
+    const TOTAL_PLANTA_MAYORISTA = 4;
+    const PDV_CON_ASIGNACION = @json($pdvConAsignacion ?? false);
+
+    function totalPasos() {
+        if (flujoActivo() === 'punto-venta') {
+            return PDV_CON_ASIGNACION ? TOTAL_PLANTA_MAYORISTA : 3;
+        }
+        return TOTAL_PLANTA_MAYORISTA;
+    }
+
+    function pasoDomEnFormulario(n) {
+        if (flujoActivo() === 'punto-venta' && !PDV_CON_ASIGNACION && n === 3) return 4;
+        return n;
+    }
+
+    function pasoLogicoDesdeIndicador(stepDom) {
+        const n = parseInt(stepDom, 10);
+        if (flujoActivo() === 'punto-venta' && !PDV_CON_ASIGNACION && n === 4) return 3;
+        return n;
+    }
     const DRAFT_KEY = 'agrofusion_envio_borrador_v1';
     let paso = 1;
     let pasoMaximo = 1;
@@ -136,31 +155,43 @@
         } else if (draft.pdv?.fields) {
             restoreFormFields('form-pedido-dist-pdv', draft.pdv.fields);
         }
-        pasoMaximo = Math.min(TOTAL, Math.max(1, parseInt(draft.pasoMaximo, 10) || 1));
-        const pasoObjetivo = Math.min(TOTAL, Math.max(1, parseInt(draft.paso, 10) || 1));
+        pasoMaximo = Math.min(totalPasos(), Math.max(1, parseInt(draft.pasoMaximo, 10) || 1));
+        const pasoObjetivo = Math.min(totalPasos(), Math.max(1, parseInt(draft.paso, 10) || 1));
         irPaso(pasoObjetivo, { sinValidar: true, sinGuardar: true });
         restaurandoBorrador = false;
         return true;
     }
 
     function pintarProgreso() {
+        const esPdv = flujoActivo() === 'punto-venta';
         document.querySelectorAll('#env-wizard-progress .step-item').forEach((item) => {
-            const n = parseInt(item.dataset.step, 10);
+            const nDom = parseInt(item.dataset.step, 10);
+            if (esPdv && !PDV_CON_ASIGNACION && nDom === 3) {
+                item.classList.add('d-none');
+                return;
+            }
+            item.classList.remove('d-none');
+            const n = pasoLogicoDesdeIndicador(nDom);
             item.classList.remove('active', 'done', 'pending');
             if (n < paso) item.classList.add('done');
             else if (n === paso) item.classList.add('active');
             else item.classList.add('pending');
             item.classList.toggle('can-jump', n <= pasoMaximo && n !== paso);
+            const badge = item.querySelector('.step-badge');
+            if (badge) {
+                badge.textContent = (esPdv && !PDV_CON_ASIGNACION && nDom === 4) ? '3' : String(nDom);
+            }
         });
         const btnAnt = el('wizard-btn-anterior');
         const btnSig = el('wizard-btn-siguiente');
         const f = flujoActivo();
+        const max = totalPasos();
         if (btnAnt) btnAnt.disabled = paso <= 1;
-        if (btnSig) btnSig.classList.toggle('d-none', paso >= TOTAL);
+        if (btnSig) btnSig.classList.toggle('d-none', paso >= max);
         ['wizard-btn-guardar', 'wizard-btn-guardar-mayorista', 'wizard-btn-guardar-pdv'].forEach((id) => {
             const b = el(id);
             if (!b) return;
-            const show = paso >= TOTAL && (
+            const show = paso >= max && (
                 (id === 'wizard-btn-guardar' && f === 'planta') ||
                 (id === 'wizard-btn-guardar-mayorista' && f === 'mayorista') ||
                 (id === 'wizard-btn-guardar-pdv' && f === 'punto-venta')
@@ -172,7 +203,9 @@
 
     function enlazarPasosProgreso() {
         document.querySelectorAll('#env-wizard-progress .step-item').forEach((item) => {
-            const n = parseInt(item.dataset.step, 10);
+            if (item.classList.contains('d-none')) return;
+            const nDom = parseInt(item.dataset.step, 10);
+            const n = pasoLogicoDesdeIndicador(nDom);
             const puede = n <= pasoMaximo && n !== paso;
             item.onclick = puede ? () => irPaso(n, { sinValidar: n < paso }) : null;
             item.style.cursor = puede ? 'pointer' : 'default';
@@ -181,14 +214,16 @@
 
     function irPaso(n, opts) {
         opts = opts || {};
-        if (n < 1 || n > TOTAL) return;
+        const max = totalPasos();
+        if (n < 1 || n > max) return;
         const f = flujoActivo();
-        const usaCompartidos = f === 'planta' || f === 'mayorista';
+        const usaCompartidos = f === 'planta' || f === 'mayorista' || (f === 'punto-venta' && PDV_CON_ASIGNACION);
         const root = flujoRoot();
         const compartidos = el('wizard-pasos-compartidos');
+        const domN = pasoDomEnFormulario(n);
 
         if (compartidos) {
-            compartidos.classList.toggle('d-none', f === 'punto-venta');
+            compartidos.classList.toggle('d-none', f === 'punto-venta' && !PDV_CON_ASIGNACION);
         }
 
         if (usaCompartidos && n >= 3) {
@@ -199,13 +234,13 @@
         } else if (root) {
             compartidos?.querySelectorAll('.wizard-step').forEach((s) => s.classList.remove('active'));
             root.querySelectorAll('.wizard-step').forEach((s) => {
-                s.classList.toggle('active', parseInt(s.dataset.wizardStep, 10) === n);
+                s.classList.toggle('active', parseInt(s.dataset.wizardStep, 10) === domN);
             });
         }
         paso = n;
         if (n > pasoMaximo) pasoMaximo = n;
         pintarProgreso();
-        if (n === TOTAL) construirResumen();
+        if (n === max) construirResumen();
         if (n === 2) {
             if (f === 'planta' && typeof window.syncFilasProductoPlanta === 'function') {
                 window.syncFilasProductoPlanta();
@@ -219,6 +254,7 @@
         }
         if (n === 3 && window.PedidoFase2?.actualizarSugerenciaVehiculo) {
             window.PedidoFase2.actualizarSugerenciaVehiculo();
+            window.PedidoFase2.validarCapacidadVehiculo?.();
         }
         if (!opts.sinGuardar) programarGuardado();
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -229,6 +265,9 @@
             }, 400);
         } else if (n === 1 && f === 'punto-venta' && window.ensureMapaPdv) {
             window.ensureMapaPdv();
+            setTimeout(function () {
+                if (window.refrescarTamanoMapaPdv) window.refrescarTamanoMapaPdv();
+            }, 400);
         }
     }
 
@@ -341,8 +380,8 @@
                 const loteRequerido = loteSel && !loteSel.disabled && loteSel.options.length > 1;
                 if (modo === 'unidades') {
                     if (pres && unidades > 0 && cantKg > 0 && (!loteRequerido || loteSel.value)) ok = true;
-                } else if (cantKg > 0) {
-                    ok = true;
+                } else if (modo === 'sin_presentacion') {
+                    msgStock = msgStock || 'Hay productos sin empaques configurados. Configure presentaciones comerciales o elija otro producto.';
                 }
             });
             if (msgStock) {
@@ -403,13 +442,33 @@
             return true;
         }
         if (n === 2) {
-            if (!valorSelector('pdv_unificado_producto')) {
-                avisoWizard('Seleccione el producto a distribuir.');
+            if (window.PdvEnvioCarga) {
+                const v = window.PdvEnvioCarga.validar({ mostrarModal: true });
+                if (!v.ok) {
+                    if (!v.modalMostrado) avisoWizard(v.mensaje);
+                    return false;
+                }
+                return true;
+            }
+            return false;
+        }
+        if (n === 3 && PDV_CON_ASIGNACION) {
+            if (!el('transportista_usuarioid_create')?.value) {
+                avisoWizard('Seleccione un chofer de flota mayorista.');
                 return false;
             }
-            const cant = parseFloat(el('pdv_cantidad')?.value);
-            if (!Number.isFinite(cant) || cant <= 0) {
-                avisoWizard('Indique una cantidad válida.');
+            if (!el('vehiculoid_create')?.value) {
+                avisoWizard('Seleccione un vehículo de flota mayorista.');
+                return false;
+            }
+            const costo = parseFloat(el('costo_bs')?.value);
+            if (!Number.isFinite(costo) || costo < 1) {
+                avisoWizard('Indique el costo del servicio.');
+                return false;
+            }
+            const alertaCap = el('capacidad-vehiculo-alerta');
+            if (alertaCap && alertaCap.style.display !== 'none') {
+                avisoWizard('La carga supera la capacidad del camión. Reduzca cantidades o elija otro vehículo.');
                 return false;
             }
             return true;
@@ -560,15 +619,49 @@
     }
 
     function construirResumenPdv() {
+        if (PDV_CON_ASIGNACION) {
+            const set = (id, val) => { const e = el(id); if (e) e.textContent = val || '—'; };
+            const origen = valorSelector('pdv_unificado_almacen')
+                ? labelSelector('pdv_unificado_almacen')
+                : 'Almacén mayorista asignado';
+            const carga = window.PdvEnvioCarga?.resumenItems?.() || { items: [], kg: 0 };
+            set('conf-trayecto-tipo', 'Mayorista → Punto de Venta');
+            set('conf-origen', origen);
+            set('conf-destino', labelSelector('pdv_unificado_punto'));
+            set('conf-chofer', el('txtTransportistaCreate')?.value || '—');
+            set('conf-vehiculo', el('txtVehiculoCreate')?.value || '—');
+            set('conf-costo', el('costo_bs')?.value ? 'Bs ' + Number(el('costo_bs').value).toLocaleString('es-BO') : '—');
+            set('conf-carga-kg', carga.kg > 0 ? carga.kg.toLocaleString('es-BO', { maximumFractionDigits: 1 }) + ' kg' : '—');
+            set('conf-ruta', textoRutaAmigable(document.getElementById('rutaResumenPdv')?.textContent || '—'));
+            set('conf-fecha', formatFechaInput(document.querySelector('#form-pedido-dist-pdv [name="fecha_entrega_deseada"]')?.value));
+            set('conf-hora-rec', el('hora_recogida_pdv')?.value || '—');
+            set('conf-hora-ent', el('hora_entrega_estimada_pdv')?.value || '—');
+            const lista = el('conf-carga-lista');
+            if (lista) {
+                lista.innerHTML = carga.items.length
+                    ? carga.items.map((t) =>
+                        '<li class="env-confirm-producto-item"><i class="fas fa-box-open env-confirm-producto-item__icon"></i><span>' + t + '</span></li>'
+                    ).join('')
+                    : '<li class="env-confirm-producto-item text-muted"><span>Sin productos indicados</span></li>';
+            }
+            const tituloLista = el('conf-carga-lista-titulo');
+            if (tituloLista) tituloLista.innerHTML = '<i class="fas fa-box-open mr-1"></i> Productos del envío';
+            el('wizard-confirm-observaciones-wrap')?.classList.add('d-none');
+            return;
+        }
+
         const set = (id, val) => { const e = el(id); if (e) e.textContent = val || '—'; };
         const origen = valorSelector('pdv_unificado_almacen')
             ? labelSelector('pdv_unificado_almacen')
             : 'Almacén mayorista asignado';
         set('conf-pdv-origen', origen);
         set('conf-pdv-destino', labelSelector('pdv_unificado_punto'));
-        const prod = labelSelector('pdv_unificado_producto');
-        const cant = el('pdv_cantidad')?.value;
-        set('conf-pdv-producto', prod !== '—' && cant ? prod.split('—')[0].trim() + ' · ' + cant : '—');
+        const resumenCarga = window.PdvEnvioCarga?.textoResumen?.() || (function () {
+            const prod = labelSelector('pdv_unificado_producto');
+            const cant = el('pdv_cantidad')?.value;
+            return prod !== '—' && cant ? prod.split('—')[0].trim() + ' · ' + cant : '—';
+        })();
+        set('conf-pdv-producto', resumenCarga);
         set('conf-pdv-fecha', formatFechaInput(document.querySelector('#form-pedido-dist-pdv [name="fecha_entrega_deseada"]')?.value));
         const horaRec = el('hora_recogida_pdv')?.value;
         const horaEnt = el('hora_entrega_estimada_pdv')?.value;
@@ -700,14 +793,19 @@
     }
 
     function syncFormularioCompartido(trayecto) {
-        const formId = trayecto === 'mayorista' ? 'form-traslado-mayorista' : 'form-pedido';
+        let formId = 'form-pedido';
+        if (trayecto === 'mayorista') {
+            formId = 'form-traslado-mayorista';
+        } else if (trayecto === 'punto-venta' && PDV_CON_ASIGNACION) {
+            formId = 'form-pedido-dist-pdv';
+        }
         ['transportista_usuarioid_create', 'vehiculoid_create', 'costo_bs'].forEach((id) => {
             const field = el(id);
             if (field) field.setAttribute('form', formId);
         });
         const obs = el('wizard-paso-confirmacion-observaciones');
         if (obs) {
-            if (trayecto === 'mayorista') {
+            if (trayecto === 'mayorista' || (trayecto === 'punto-venta' && PDV_CON_ASIGNACION)) {
                 obs.removeAttribute('form');
             } else {
                 obs.setAttribute('form', 'form-pedido');
@@ -715,18 +813,23 @@
         }
         const subtitulo = el('wizard-asignacion-subtitulo');
         if (subtitulo) {
-            subtitulo.textContent = trayecto === 'mayorista'
-                ? 'Solo choferes y vehículos de flota planta. Si la carga supera la capacidad, elija otro vehículo.'
-                : 'Elija chofer y vehículo. Si la carga supera la capacidad, puede planificar un segundo camión.';
+            if (trayecto === 'mayorista') {
+                subtitulo.textContent = 'Solo choferes y vehículos de flota planta. Si la carga supera la capacidad, elija otro vehículo.';
+            } else if (trayecto === 'punto-venta') {
+                subtitulo.textContent = 'Solo choferes y vehículos de flota mayorista. Si la carga supera la capacidad, elija otro vehículo.';
+            } else {
+                subtitulo.textContent = 'Elija chofer y vehículo. Si la carga supera la capacidad, puede planificar un segundo camión.';
+            }
         }
         const compartidos = el('wizard-pasos-compartidos');
         if (compartidos) {
-            compartidos.classList.toggle('d-none', trayecto === 'punto-venta');
+            compartidos.classList.toggle('d-none', trayecto === 'punto-venta' && !PDV_CON_ASIGNACION);
         }
+        pintarProgreso();
         if (window.CatalogoSelector?.instances?.create_envio_transportista) {
             CatalogoSelector.instances.create_envio_transportista.params = {
                 roles: 'transportista',
-                ambito_flota: trayecto === 'mayorista' ? 'planta' : 'agricola',
+                ambito_flota: (trayecto === 'mayorista') ? 'planta' : ((trayecto === 'punto-venta') ? 'mayorista' : 'agricola'),
             };
         }
         actualizarParamsVehiculoCatalogo(trayecto);
@@ -739,6 +842,10 @@
         if (t === 'mayorista') {
             CatalogoSelector.instances.create_envio_vehiculo.params = {
                 ambito_flota: 'planta',
+            };
+        } else if (t === 'punto-venta') {
+            CatalogoSelector.instances.create_envio_vehiculo.params = {
+                ambito_flota: 'mayorista',
             };
         } else {
             CatalogoSelector.instances.create_envio_vehiculo.params = {

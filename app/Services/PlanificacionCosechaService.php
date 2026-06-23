@@ -2,10 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\CatalogoTamanoConteo;
 use App\Models\Insumo;
 use App\Support\CultivoSiembraCatalogo;
-use Illuminate\Support\Facades\Schema;
+use App\Support\PedidoCatalogo;
 
 /**
  * Planificación bidireccional: hectáreas ↔ cosecha estimada ↔ semilla.
@@ -140,54 +139,17 @@ class PlanificacionCosechaService
     /** @return list<array<string, mixed>> */
     private function calibresParaInsumo(int $insumoId): array
     {
-        if (! Schema::hasTable('catalogo_tamano_conteo')) {
-            return [];
-        }
-
-        $insumoIds = $this->insumoIdsRelacionadosCalibres($insumoId);
-        if ($insumoIds === []) {
-            return [];
-        }
-
-        return CatalogoTamanoConteo::query()
-            ->with('tipoEmpaque')
-            ->whereIn('insumoid', $insumoIds)
-            ->where('activo', true)
-            ->orderBy('peso_promedio_kg')
-            ->get()
-            ->map(fn (CatalogoTamanoConteo $c) => [
-                'id' => $c->catalogotamanoconteoid,
-                'nombre' => $c->nombre,
-                'peso_promedio_kg' => (float) $c->peso_promedio_kg,
-                'conteo_por_empaque' => (int) $c->conteo_por_empaque,
-                'empaque' => $c->tipoEmpaque?->nombre ?? 'Empaque',
-                'empaque_label' => CosechaPresentacionService::etiquetaEmpaquePlural($c->tipoEmpaque?->nombre),
-            ])
-            ->values()
-            ->all();
-    }
-
-    /** @return list<int> */
-    private function insumoIdsRelacionadosCalibres(int $semillaInsumoId): array
-    {
-        $insumo = Insumo::query()->find($semillaInsumoId);
-        if (! $insumo) {
-            return [];
-        }
-
-        $ids = [$semillaInsumoId];
-        $cultivo = mb_strtolower(trim(\App\Support\PedidoCatalogo::cultivoDesdeInsumo($insumo)));
-
-        if ($cultivo !== '') {
-            $relacionados = Insumo::query()
-                ->whereRaw('LOWER(nombre) LIKE ?', ['%'.$cultivo.'%'])
-                ->pluck('insumoid')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-            $ids = array_values(array_unique(array_merge($ids, $relacionados)));
-        }
-
-        return $ids;
+        return array_map(
+            fn (array $c) => [
+                'id' => $c['id'],
+                'nombre' => $c['nombre'],
+                'peso_promedio_kg' => $c['peso_promedio_kg'],
+                'conteo_por_empaque' => $c['conteo_por_empaque'],
+                'empaque' => $c['tipo_empaque'] ?? 'Empaque',
+                'empaque_label' => CosechaPresentacionService::etiquetaEmpaquePlural($c['tipo_empaque'] ?? null),
+            ],
+            PedidoCatalogo::listarCalibresParaProducto('insumo:'.$insumoId)
+        );
     }
 
     /** @return array<string, mixed>|null */

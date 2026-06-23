@@ -550,6 +550,7 @@ class CatalogoSelectorController extends Controller
     public function insumos(Request $request): JsonResponse
     {
         AlmacenAmbito::asegurarAmbitosEnRegistros();
+        $inventarioPresentacion = app(InventarioPresentacionService::class);
 
         $esPlanta = $request->boolean('ambito_planta');
 
@@ -616,6 +617,12 @@ class CatalogoSelectorController extends Controller
             } elseif ($request->boolean('solo_producto_terminado')) {
                 $query = InsumoCatalogo::aplicarFiltroProductoTerminado($query);
             }
+
+            if ($request->boolean('solo_con_presentacion') && Schema::hasTable('insumo_presentacion')) {
+                $query->whereHas('presentaciones', function ($q) {
+                    $q->where('activo', true);
+                });
+            }
         }
 
         if ($request->filled('almacenid')) {
@@ -624,12 +631,30 @@ class CatalogoSelectorController extends Controller
 
         $this->aplicarBusqueda($query, (string) $request->q, ['nombre', 'descripcion']);
 
-        return $this->respuestaPaginada($request, $query->orderBy('nombre'), function (Insumo $i) use ($request) {
+        return $this->respuestaPaginada($request, $query->orderBy('nombre'), function (Insumo $i) use ($request, $inventarioPresentacion) {
             $unidad = $i->unidadMedida?->abreviatura ?? $i->unidadMedida?->nombre ?? 'ud';
             $alm = $i->almacen?->nombre;
             $stock = (float) ($i->stock ?? 0);
             $esSemilla = InsumoCatalogo::slugFromNombreTipo($i->tipo?->nombre) === 'material_siembra';
             $esProductoTerminado = mb_strtolower(trim($i->tipo?->nombre ?? '')) === 'producto terminado';
+            if ($request->boolean('ambito_planta') && $esProductoTerminado) {
+                $almacenId = $request->filled('almacenid') ? (int) $request->almacenid : (int) $i->almacenid;
+                if ($almacenId > 0) {
+                    $inventarioPresentacion->asegurarInventarioDesdeStock($almacenId, (int) $i->insumoid);
+                    $presentaciones = InsumoPresentacion::query()
+                        ->where('insumoid', $i->insumoid)
+                        ->where('activo', true)
+                        ->pluck('insumo_presentacionid');
+                    $stockKg = 0.0;
+                    foreach ($presentaciones as $presId) {
+                        $stockKg += $inventarioPresentacion->stockTotalKg($almacenId, (int) $presId);
+                    }
+                    if ($stockKg > 0) {
+                        $stock = $stockKg;
+                    }
+                }
+                $unidad = 'kg';
+            }
             $tipoEtiqueta = $request->boolean('solo_materia_prima_cosecha') && $esSemilla
                 ? 'Cosecha'
                 : ($esProductoTerminado ? 'Producto terminado' : ($i->tipo?->nombre ?? 'Insumo'));

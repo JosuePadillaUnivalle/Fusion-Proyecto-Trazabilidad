@@ -54,6 +54,7 @@ final class EnvioCierreRutaUiCatalogo
             'documento_mensaje' => 'La entrega fue recibida en el punto de venta y el comprobante quedó registrado.',
             'llegada_titulo' => 'Confirmar llegada al punto de venta',
             'mensaje_espera_transportista' => 'No puede confirmar la llegada hasta estar físicamente en el punto de venta.',
+            'espera_confirmacion_minorista_info' => 'El minorista del punto de venta debe confirmar que desea recibir este envío. Cuando lo haga, podrá registrar las condiciones del vehículo y continuar con el cierre operativo.',
         ];
     }
 }

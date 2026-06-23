@@ -138,6 +138,23 @@
             return window.EnvioWizard?.flujoActivo?.() === 'mayorista';
         },
 
+        flujoEsPdv() {
+            return window.EnvioWizard?.flujoActivo?.() === 'punto-venta';
+        },
+
+        pesoTotalKgPdv() {
+            let total = 0;
+            document.querySelectorAll('#flujo-punto-venta .pdv-producto-row').forEach((fila) => {
+                const presId = fila.querySelector('[data-field="presentacion"]')?.value;
+                const qty = parseFloat(fila.querySelector('[data-field="cantidad"]')?.value || '0');
+                if (!presId || !Number.isFinite(qty) || qty <= 0) return;
+                const extra = fila.presentacionesExtra?.[String(presId)] || null;
+                const peso = parseFloat(extra?.peso_neto_kg || 0);
+                if (peso > 0) total += qty * peso;
+            });
+            return total;
+        },
+
         transportistaIdSeleccionado() {
             return document.getElementById('transportista_usuarioid_create')?.value || '';
         },
@@ -167,10 +184,25 @@
                 alerta: document.getElementById('capacidad-vehiculo-alerta'),
                 resumen: document.getElementById('capacidad-vehiculo-resumen'),
                 wrap: document.getElementById('capacidad-vehiculo-resumen-wrap'),
-                pct: document.getElementById('capacidad-vehiculo-pct'),
-                barra: document.getElementById('capacidad-vehiculo-barra'),
+                barraPeso: document.getElementById('capacidad-vehiculo-barra-peso'),
+                barraVol: document.getElementById('capacidad-vehiculo-barra-vol'),
+                pctPeso: document.getElementById('capacidad-vehiculo-pct-peso'),
+                pctVol: document.getElementById('capacidad-vehiculo-pct-vol'),
+                txtPeso: document.getElementById('capacidad-vehiculo-txt-peso'),
+                txtVol: document.getElementById('capacidad-vehiculo-txt-vol'),
+                btnPreview: document.getElementById('btnVerPreviewVehiculoAsignacion'),
                 particion: document.getElementById('bloque-particion-envio'),
             };
+        },
+
+        abrirPreviewVehiculoAsignacion() {
+            const vehiculoId = this.vehiculoIdSeleccionado();
+            if (!vehiculoId || !window.VehiculoCargaPreview) return;
+            const label = document.getElementById('txtVehiculoCreate')?.value || '';
+            window.VehiculoCargaPreview.open(vehiculoId, label, {
+                peso_kg: this.pesoTotalKg(),
+                volumen_m3: this.volumenTotalM3(),
+            });
         },
 
         async actualizarSugerenciaVehiculo() {
@@ -206,7 +238,10 @@
                     const json = await res.json();
                     return json.data || [];
                 };
-                const ambitoFlota = this.flujoEsMayorista() ? 'planta' : 'agricola';
+                const trayecto = window.EnvioWizard?.flujoActivo?.() || 'planta';
+                const ambitoFlota = trayecto === 'mayorista'
+                    ? 'planta'
+                    : (trayecto === 'punto-venta' ? 'mayorista' : 'agricola');
                 let items = await fetchVehiculos({
                     solo_transportista: '1',
                     transportista_usuarioid: tid,
@@ -367,6 +402,7 @@
                 ? fila.querySelector('[data-field="cantidad"]')
                 : fila.querySelector('.js-cantidad-pedido');
             const aviso = fila.querySelector('.js-aviso-limite');
+            const resumen = fila.querySelector('.js-resumen-carga');
             if (input) {
                 input.classList.toggle('is-invalid', !!mensaje);
             }
@@ -378,6 +414,10 @@
                     aviso.textContent = '';
                     aviso.classList.add('d-none');
                 }
+            }
+            if (resumen && mensaje) {
+                resumen.textContent = '';
+                resumen.classList.add('d-none');
             }
         },
 
@@ -395,7 +435,14 @@
             }
 
             if (forma === 'kg') {
-                const cant = parseFloat(fila.querySelector('[data-field="cantidad"]')?.value);
+                const inputKg = fila.querySelector('[data-field="cantidad"]');
+                const raw = inputKg?.value ?? '';
+                const cant = raw === '' ? NaN : parseFloat(raw);
+                if (raw !== '' && (!Number.isFinite(cant) || cant <= 0)) {
+                    const msg = 'Indique una cantidad mayor a 0 kg.';
+                    this.marcarErrorCantidad(fila, msg);
+                    return { ok: false, mensaje: msg };
+                }
                 if (Number.isFinite(cant) && cant > limites.maxKg) {
                     const msg = 'No puede pedir más de ' + fmtNum(limites.maxKg, 1) + ' kg de ' + nombre
                         + ' (todo lo disponible en este almacén).';
@@ -403,7 +450,14 @@
                     return { ok: false, mensaje: msg };
                 }
             } else if (forma === 'empaques') {
-                const cant = parseInt(fila.querySelector('.js-cantidad-pedido')?.value, 10);
+                const inputEmp = fila.querySelector('.js-cantidad-pedido');
+                const raw = inputEmp?.value ?? '';
+                const cant = raw === '' ? NaN : parseInt(raw, 10);
+                if (raw !== '' && (!Number.isFinite(cant) || cant <= 0)) {
+                    const msg = 'Debe pedir al menos 1 empaque.';
+                    this.marcarErrorCantidad(fila, msg);
+                    return { ok: false, mensaje: msg };
+                }
                 if (Number.isFinite(cant) && cant > limites.maxEmpaques) {
                     const msg = 'Solo puede armar hasta ' + fmtNum(limites.maxEmpaques) + ' '
                         + (limites.empaque?.nombre || 'empaques').toLowerCase()
@@ -412,7 +466,14 @@
                     return { ok: false, mensaje: msg };
                 }
             } else if (forma === 'unidades') {
-                const cant = parseInt(fila.querySelector('.js-cantidad-pedido')?.value, 10);
+                const inputUni = fila.querySelector('.js-cantidad-pedido');
+                const raw = inputUni?.value ?? '';
+                const cant = raw === '' ? NaN : parseInt(raw, 10);
+                if (raw !== '' && (!Number.isFinite(cant) || cant <= 0)) {
+                    const msg = 'Debe pedir al menos 1 unidad.';
+                    this.marcarErrorCantidad(fila, msg);
+                    return { ok: false, mensaje: msg };
+                }
                 if (Number.isFinite(cant) && cant > limites.maxUnidades) {
                     const msg = 'Solo puede pedir hasta ' + fmtNum(limites.maxUnidades) + ' unidades de '
                         + nombre + ' (todo lo disponible).';
@@ -454,15 +515,31 @@
                     cant = parseFloat(fila.querySelector('[data-field="cantidad"]')?.value);
                 } else {
                     cant = parseFloat(fila.querySelector('.js-cantidad-pedido')?.value);
-                    const kgHidden = parseFloat(fila.querySelector('[data-field="cantidad"]')?.value);
-                    if ((!cant || cant <= 0) && kgHidden > 0) cant = 1;
                 }
-                if (ref && cant > 0) tieneProducto = true;
-                const v = this.validarLimitesFila(fila);
-                if (!v.ok && !primerError) primerError = v.mensaje;
+                if (ref && Number.isFinite(cant) && cant > 0) {
+                    const v = this.validarLimitesFila(fila);
+                    if (v.ok) {
+                        tieneProducto = true;
+                    } else if (!primerError) {
+                        primerError = v.mensaje;
+                    }
+                } else if (ref && forma !== 'kg') {
+                    const rawCant = fila.querySelector('.js-cantidad-pedido')?.value ?? '';
+                    if (rawCant !== '') {
+                        const v = this.validarLimitesFila(fila);
+                        if (!v.ok && !primerError) {
+                            primerError = v.mensaje;
+                        }
+                    }
+                } else if (ref && forma === 'kg') {
+                    const v = this.validarLimitesFila(fila);
+                    if (!v.ok && !primerError) {
+                        primerError = v.mensaje;
+                    }
+                }
             });
             if (!tieneProducto) {
-                return { ok: false, mensaje: 'Indique producto y cantidad en cada recogida.' };
+                return { ok: false, mensaje: primerError || 'Indique producto y cantidad en cada recogida.' };
             }
             if (primerError) {
                 return { ok: false, mensaje: primerError };
@@ -833,11 +910,10 @@
                 if (val === 'kg') {
                     campoTipo?.classList.remove('d-none');
                     campoCalibre?.classList.remove('d-none');
-                    campoCant?.classList.remove('d-none');
+                    campoCant?.classList.add('d-none');
+                    if (cantPedido) cantPedido.value = '';
                     const lblCal = campoCalibre?.querySelector('label');
                     if (lblCal) lblCal.textContent = 'Calibre';
-                    const lblCant = campoCant?.querySelector('.js-lbl-cantidad-pedido');
-                    if (lblCant) lblCant.textContent = '¿Cuántos kg?';
                     sugerenciaEmp?.classList.add('d-none');
                     if (sugerenciaEmp) sugerenciaEmp.textContent = '';
                     this.limpiarResumenCarga(fila);
@@ -907,7 +983,10 @@
                 this.actualizarSugerenciasEmpaque(fila);
 
                 if (!calibreId || !formaVal || formaVal === 'kg' || !cant || cant <= 0) {
-                    if (formaVal !== 'kg') this.limpiarResumenCarga(fila);
+                    if (formaVal !== 'kg') {
+                        this.limpiarResumenCarga(fila);
+                        this.validarLimitesFila(fila);
+                    }
                     return;
                 }
 
@@ -924,13 +1003,17 @@
                     });
                     const json = await res.json();
                     const d = json.data || {};
-                    this.mostrarResumenCarga(fila, d, formaVal);
                     const cantKg = fila.querySelector('[data-field="cantidad"]');
                     if (cantKg && d.peso_neto_kg) {
                         cantKg.value = d.peso_neto_kg;
                     }
+                    const v = this.validarLimitesFila(fila);
+                    if (v.ok) {
+                        this.mostrarResumenCarga(fila, d, formaVal);
+                    } else {
+                        this.limpiarResumenCarga(fila);
+                    }
                     this.validarCapacidadVehiculo();
-                    this.validarLimitesFila(fila);
                     this.actualizarSugerenciaVehiculo();
                 } catch (e) {
                     console.warn('Cálculo carga', e);
@@ -958,9 +1041,12 @@
         },
 
         pesoTotalKg() {
+            if (this.flujoEsPdv()) {
+                return this.pesoTotalKgPdv();
+            }
             let total = 0;
             if (this.flujoEsMayorista()) {
-                document.querySelectorAll('.traslado-producto-row').forEach((fila) => {
+                document.querySelectorAll('#flujo-mayorista .traslado-producto-row').forEach((fila) => {
                     const cantKg = fila.querySelector('[data-field="cantidad"]');
                     total += parseFloat(cantKg?.value) || 0;
                 });
@@ -1003,8 +1089,6 @@
             const alerta = ui.alerta;
             const resumen = ui.resumen;
             const wrap = ui.wrap;
-            const pctEl = ui.pct;
-            const barra = ui.barra;
             if (!vehiculoId || !alerta) return;
 
             const peso = this.pesoTotalKg();
@@ -1012,32 +1096,62 @@
                 alerta.style.display = 'none';
                 if (wrap) wrap.classList.add('d-none');
                 if (resumen) resumen.textContent = '';
+                ui.btnPreview?.classList.add('d-none');
                 return;
             }
 
+            const volumen = this.volumenTotalM3();
+            const params = new URLSearchParams();
+            params.set('peso_kg', String(peso));
+            if (volumen != null && volumen > 0) {
+                params.set('volumen_m3', String(volumen));
+            }
+
             try {
-                const res = await fetch(ENVIO_API + '/capacidad/validar', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
-                    body: JSON.stringify({ vehiculo_id: parseInt(vehiculoId, 10), peso_kg: peso }),
+                const url = VEHICULOS_CATALOGO_URL + '/' + encodeURIComponent(vehiculoId)
+                    + '/preview-carga?' + params.toString();
+                const res = await fetch(url, {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 });
                 const data = await res.json();
-                const pct = data.porcentaje_uso ?? 0;
-                const cap = data.capacidad_kg ?? 0;
+                const pctPeso = data.porcentaje_peso ?? 0;
+                const pctVol = data.porcentaje_volumen ?? 0;
+                const pct = data.porcentaje_uso ?? Math.max(pctPeso, pctVol);
+                const capKg = data.capacidad_kg ?? 0;
+                const capM3 = data.m3_util ?? data.capacidad_m3 ?? 0;
 
                 if (wrap) wrap.classList.remove('d-none');
                 if (resumen) {
-                    resumen.textContent = this.textoCapacidadAmigable(peso, cap, pct);
+                    resumen.textContent = data.recomendacion || this.textoCapacidadAmigable(peso, capKg, pctPeso);
                 }
-                if (pctEl) {
-                    pctEl.textContent = fmtNum(pct, 1) + '% usado';
-                    pctEl.className = 'font-weight-bold ' + (pct >= 100 ? 'text-danger' : pct >= 85 ? 'text-warning' : 'text-success');
+                if (ui.pctPeso) {
+                    ui.pctPeso.textContent = fmtNum(pctPeso, 1) + '%';
+                    ui.pctPeso.className = pctPeso >= 100 ? 'text-danger' : pctPeso >= 85 ? 'text-warning' : 'text-success';
                 }
-                if (barra) {
-                    const w = Math.min(100, Math.max(0, pct));
-                    barra.style.width = w + '%';
-                    barra.className = 'progress-bar ' + (pct >= 100 ? 'bg-danger' : pct >= 85 ? 'bg-warning' : 'bg-success');
+                if (ui.pctVol) {
+                    ui.pctVol.textContent = pctVol > 0 ? fmtNum(pctVol, 1) + '%' : '—';
+                    ui.pctVol.className = pctVol >= 100 ? 'text-danger' : pctVol >= 85 ? 'text-warning' : 'text-success';
                 }
+                if (ui.barraPeso) {
+                    ui.barraPeso.style.width = Math.min(100, Math.max(0, pctPeso)) + '%';
+                    ui.barraPeso.className = 'veh-carga-preview-bar__fill veh-carga-preview-bar__fill--peso'
+                        + (pctPeso >= 100 ? ' is-danger' : pctPeso >= 85 ? ' is-warning' : '');
+                }
+                if (ui.barraVol) {
+                    ui.barraVol.style.width = Math.min(100, Math.max(0, pctVol)) + '%';
+                    ui.barraVol.className = 'veh-carga-preview-bar__fill veh-carga-preview-bar__fill--vol'
+                        + (pctVol >= 100 ? ' is-danger' : pctVol >= 85 ? ' is-warning' : '');
+                }
+                if (ui.txtPeso) {
+                    ui.txtPeso.textContent = fmtNum(peso, 1) + ' kg de ' + fmtNum(capKg, 0) + ' kg máx.';
+                }
+                if (ui.txtVol && data.carga_volumen_m3 != null && capM3 > 0) {
+                    ui.txtVol.textContent = fmtNum(data.carga_volumen_m3, 2) + ' m³ de ' + fmtNum(capM3, 1) + ' m³ útiles';
+                } else if (ui.txtVol) {
+                    ui.txtVol.textContent = 'Volumen no estimado';
+                }
+                ui.btnPreview?.classList.remove('d-none');
+
                 if (!data.ok || pct > 100) {
                     alerta.textContent = data.mensaje || 'La carga supera lo que puede llevar este camión. Reduzca cantidad o planifique otro camión.';
                     alerta.style.display = 'block';
@@ -1058,6 +1172,9 @@
     document.getElementById('vehiculoid_create')?.addEventListener('change', () => {
         window.PedidoFase2.validarCapacidadVehiculo();
         window.PedidoFase2.actualizarSugerenciaVehiculo();
+    });
+    document.getElementById('btnVerPreviewVehiculoAsignacion')?.addEventListener('click', () => {
+        window.PedidoFase2.abrirPreviewVehiculoAsignacion();
     });
     document.getElementById('transportista_usuarioid_create')?.addEventListener('change', () => {
         window.PedidoFase2.actualizarSugerenciaVehiculo();

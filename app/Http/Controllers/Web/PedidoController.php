@@ -12,6 +12,7 @@ use App\Models\Usuario;
 use App\Models\Vehiculo;
 use App\Services\TransporteCapacidadService;
 use App\Support\LocalOrgTrackFallback;
+use App\Support\MayoristaAccess;
 use App\Support\PedidoDistribucionCatalogo;
 use App\Support\PuntoVentaAccess;
 use App\Services\CostoEnvioRutaService;
@@ -102,6 +103,8 @@ class PedidoController extends Controller
         $user = $user ?? auth()->user();
         $esMinorista = $user && UsuarioRol::esMinorista($user);
         $esAdmin = $user && UsuarioRol::esAdminGlobal($user);
+        $esMayorista = $user && UsuarioRol::esMayorista($user) && ! $esMinorista && ! $esAdmin;
+        $esOrigenMayoristaPdv = $esAdmin || $esMayorista;
 
         $puntosMinorista = $user
             ? PuntoVentaAccess::scopePuntosDelUsuario(
@@ -115,6 +118,9 @@ class PedidoController extends Controller
             'puntosMinorista' => $puntosMinorista,
             'esMinoristaPdv' => $esMinorista,
             'esAdminPdv' => $esAdmin,
+            'esMayoristaPdv' => $esMayorista,
+            'esOrigenMayoristaPdv' => $esOrigenMayoristaPdv,
+            'pdvConAsignacion' => $esOrigenMayoristaPdv,
             'oldMinoristaId' => old('minorista_usuarioid'),
             'oldMinoristaLabel' => '',
             'oldPuntoLabel' => '',
@@ -200,9 +206,13 @@ class PedidoController extends Controller
         $mayoristas = AlmacenAmbito::scope(
             Almacen::query()->where('activo', true),
             AlmacenAmbito::MAYORISTA
-        )->orderBy('nombre')->get();
+        )->orderBy('nombre');
 
-        foreach ($mayoristas as $almacen) {
+        if ($user && UsuarioRol::esMayorista($user) && ! UsuarioRol::esAdminGlobal($user)) {
+            $mayoristas = MayoristaAccess::scopeAlmacenesMayorista($mayoristas, $user);
+        }
+
+        foreach ($mayoristas->get() as $almacen) {
             $resuelto = UbicacionGpsParser::resolverAlmacen(
                 (int) $almacen->almacenid,
                 $almacen->nombre,
@@ -222,7 +232,7 @@ class PedidoController extends Controller
         }
 
         $puntosQuery = PuntoVenta::query()->where('activo', true)->with('minorista')->orderBy('nombre');
-        if ($user) {
+        if ($user && UsuarioRol::esMinorista($user) && ! UsuarioRol::esAdminGlobal($user)) {
             $puntosQuery = PuntoVentaAccess::scopePuntosDelUsuario($puntosQuery, $user);
         }
 

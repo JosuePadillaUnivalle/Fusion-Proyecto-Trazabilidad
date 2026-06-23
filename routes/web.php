@@ -459,6 +459,7 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         Route::put('pedidos/{pedido}', [PedidoDistribucionController::class, 'update'])->name('pedidos.update')->middleware('action.permission:pedidos_distribucion,update');
         Route::post('pedidos/{pedido}/reabrir-revision', [PedidoDistribucionController::class, 'reabrirRevision'])->name('pedidos.reabrir-revision')->middleware('action.permission:pedidos_distribucion,update');
         Route::post('pedidos/{pedido}/confirmar-recepcion', [PedidoDistribucionController::class, 'confirmarRecepcion'])->name('pedidos.confirmar-recepcion')->middleware('action.permission:pedidos_distribucion,update');
+        Route::post('pedidos/{pedido}/confirmar-envio-mayorista', [PedidoDistribucionController::class, 'confirmarEnvioIniciadoMayorista'])->name('pedidos.confirmar-envio-mayorista')->middleware('action.permission:pedidos_distribucion,update');
         Route::delete('pedidos/{pedido}', [PedidoDistribucionController::class, 'destroy'])->name('pedidos.destroy')->middleware('action.permission:pedidos_distribucion,update');
 
         Route::get('rutas-distribucion', [\App\Http\Controllers\Web\RutaDistribucionController::class, 'index'])->name('rutas.index')->middleware('action.permission:pedidos_distribucion,update');

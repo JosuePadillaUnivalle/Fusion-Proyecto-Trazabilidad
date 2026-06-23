@@ -193,8 +193,8 @@
                                     <span class="text-success small">Normal</span>
                                 @endif
                             </td>
-                            <td class="text-center">
-                                <div class="btn-group btn-group-sm btn-actions">
+                            <td class="text-center btn-actions-cell">
+                                <div class="btn-actions" role="group">
                                     <a href="{{ route('insumos.show', $i) }}" class="btn btn-outline-info btn-sm" title="Ver"><i class="fas fa-eye"></i></a>
                                     @can('inventario.update')
                                     <a href="{{ route('insumos.edit', $i) }}" class="btn btn-outline-warning btn-sm" title="Editar"><i class="fas fa-edit"></i></a>

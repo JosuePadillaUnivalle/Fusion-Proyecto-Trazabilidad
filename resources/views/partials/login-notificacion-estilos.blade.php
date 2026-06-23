@@ -27,13 +27,21 @@
     transform: scale(1) translateY(0);
 }
 
-body.login-notif-modal-open .ag-main,
-body.login-notif-modal-open .ag-sidebar,
-body.login-notif-modal-open .ag-topbar {
+body.login-notif-modal-open .ag-layout {
     filter: blur(5px) brightness(0.78);
     pointer-events: none;
     user-select: none;
     transition: filter .25s ease;
+}
+
+.login-notif-scrim,
+.login-notif-modal-root {
+    filter: none !important;
+    pointer-events: auto;
+}
+.login-notif-modal-root .modal-dialog,
+.login-notif-modal-root .modal-content {
+    filter: none !important;
 }
 
 .login-notif-modal {

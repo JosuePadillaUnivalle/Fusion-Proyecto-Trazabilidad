@@ -234,7 +234,7 @@ final class PedidoCatalogo
         return match ($estado) {
             'sin asignacion' => 'Pendiente agrícola',
             'pendiente' => 'Pendiente logística',
-            'confirmado' => 'Aceptado — listo para envío',
+            'confirmado' => 'Aceptado, listo para envío',
             'en produccion' => 'En producción',
             'rechazado' => 'Rechazado',
             default => ucfirst($estado),

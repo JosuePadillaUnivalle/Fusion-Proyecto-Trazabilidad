@@ -6,6 +6,7 @@ use App\Models\Almacen;
 use App\Models\AlmacenMovimiento;
 use App\Models\Insumo;
 use App\Models\InsumoPresentacion;
+use App\Models\InventarioPresentacionLote;
 use App\Models\TipoAlmacen;
 use App\Models\TipoEmpaque;
 use App\Models\TipoMovimientoAlmacen;
@@ -201,8 +202,8 @@ class ProductosTerminadosPlantaMayoristaSeeder extends Seeder
                             $distribucion[] = [
                                 'presentacion' => $presentacion,
                                 'unidades' => (float) $unidades,
-                                'referencia_lote' => 'DEMO-'.str_pad((string) ($idx + 1), 2, '0', STR_PAD_LEFT),
-                                'partes' => 2,
+                                'referencia_lote' => $this->referenciaLotePlanta((int) $insumo->insumoid, $idx + 1),
+                                'partes' => 1,
                             ];
                         }
                         if ($distribucion !== []) {
@@ -216,7 +217,7 @@ class ProductosTerminadosPlantaMayoristaSeeder extends Seeder
                 }
 
                 if ($tipoIngreso && $usuarioId && Schema::hasTable('almacen_movimiento')) {
-                    $ref = 'DEMO-PT-PLANTA-'.$insumo->insumoid;
+                    $ref = 'PT-ING-'.$insumo->insumoid;
                     if (! AlmacenMovimiento::query()->where('referencia', $ref)->exists()) {
                         AlmacenMovimiento::create([
                             'almacenid' => $almacen->almacenid,
@@ -227,7 +228,7 @@ class ProductosTerminadosPlantaMayoristaSeeder extends Seeder
                             'cantidad' => $def['stock'],
                             'referencia' => $ref,
                             'destino_motivo' => $almacen->nombre,
-                            'observaciones' => 'Stock demo — producto terminado planta → mayorista',
+                            'observaciones' => 'Ingreso producto terminado — planta',
                         ]);
                     }
                 }
@@ -236,9 +237,152 @@ class ProductosTerminadosPlantaMayoristaSeeder extends Seeder
             }
         });
 
+        $reparados = $this->repararProductosTerminadosSinPresentacion($almacen, $tiposEmpaque, app(InventarioPresentacionService::class));
+        $lotesRenombrados = $this->sanitizarReferenciasLoteOperativas();
+
         $this->command?->info(
             "Listo: {$creados} productos terminados y {$presentacionesCreadas} presentaciones en «{$almacen->nombre}» (almacenid {$almacen->almacenid})."
+            .($reparados > 0 ? " Reparados {$reparados} productos sin empaque." : '')
+            .($lotesRenombrados > 0 ? " Renombrados {$lotesRenombrados} lotes operativos." : '')
         );
+    }
+
+    private function referenciaLotePlanta(int $insumoId, int $orden): string
+    {
+        return 'LPT-'.now()->format('Ymd').'-'.str_pad((string) $insumoId, 4, '0', STR_PAD_LEFT)
+            .'-'.str_pad((string) $orden, 2, '0', STR_PAD_LEFT);
+    }
+
+    private function sanitizarReferenciasLoteOperativas(): int
+    {
+        if (! Schema::hasTable('inventario_presentacion_lote')) {
+            return 0;
+        }
+
+        $renombrados = 0;
+        $lotes = InventarioPresentacionLote::query()
+            ->where(function ($q) {
+                $q->where('referencia_lote', 'like', 'DEMO-%')
+                    ->orWhere('referencia_lote', 'like', 'AUTO-%');
+            })
+            ->orderBy('inventario_presentacion_loteid')
+            ->get();
+
+        foreach ($lotes as $idx => $lote) {
+            $nueva = 'LPT-'.now()->format('Ymd').'-'.str_pad((string) $lote->insumoid, 4, '0', STR_PAD_LEFT)
+                .'-'.str_pad((string) ($idx + 1), 3, '0', STR_PAD_LEFT);
+            $lote->update(['referencia_lote' => $nueva]);
+            $renombrados++;
+        }
+
+        $kgId = $this->unidadId('kg');
+        if ($kgId) {
+            $tipoProductoId = InsumoCatalogo::tipoProductoTerminadoId();
+            if ($tipoProductoId) {
+                Insumo::query()
+                    ->where('tipoinsumoid', $tipoProductoId)
+                    ->where('unidadmedidaid', '!=', $kgId)
+                    ->update(['unidadmedidaid' => $kgId]);
+            }
+        }
+
+        return $renombrados;
+    }
+
+    private function repararProductosTerminadosSinPresentacion(Almacen $almacen, array $tiposEmpaque, InventarioPresentacionService $inventarioService): int
+    {
+        if (! Schema::hasTable('insumo_presentacion')) {
+            return 0;
+        }
+
+        $tipoProductoId = InsumoCatalogo::tipoProductoTerminadoId();
+        if ($tipoProductoId === null) {
+            return 0;
+        }
+
+        $almacenIds = AlmacenAmbito::scope(Almacen::query()->where('activo', true), AlmacenAmbito::PLANTA)
+            ->pluck('almacenid');
+
+        $insumos = Insumo::query()
+            ->where('tipoinsumoid', $tipoProductoId)
+            ->whereIn('almacenid', $almacenIds)
+            ->where('stock', '>', 0)
+            ->whereDoesntHave('presentaciones', fn ($q) => $q->where('activo', true))
+            ->get();
+
+        $reparados = 0;
+
+        foreach ($insumos as $insumo) {
+            $kgId = $this->unidadId('kg');
+            if ($kgId && (int) $insumo->unidadmedidaid !== $kgId) {
+                $insumo->update(['unidadmedidaid' => $kgId]);
+            }
+
+            $presentacionesCreadas = [];
+            foreach ($this->presentacionesPorDefecto((string) $insumo->nombre) as $orden => $pres) {
+                $tipoEmpaqueId = $tiposEmpaque[$pres['tipo_empaque']] ?? null;
+                $sku = strtoupper(substr(preg_replace('/[^a-z0-9]/i', '', (string) $insumo->nombre), 0, 6))
+                    .'-R'.str_pad((string) ($orden + 1), 2, '0', STR_PAD_LEFT);
+                $presentacion = InsumoPresentacion::create([
+                    'insumoid' => $insumo->insumoid,
+                    'tipoempaqueid' => $tipoEmpaqueId,
+                    'nombre' => $pres['nombre'],
+                    'tipo_envase' => $pres['tipo_envase'],
+                    'peso_neto_kg' => $pres['peso_neto_kg'],
+                    'unidades_por_caja' => $pres['unidades_por_caja'] ?? null,
+                    'sku' => $sku,
+                    'orden' => $orden + 1,
+                    'activo' => true,
+                ]);
+                $presentacionesCreadas[] = $presentacion;
+            }
+
+            if ($presentacionesCreadas !== [] && Schema::hasTable('inventario_presentacion_lote')) {
+                $shareKg = (float) $insumo->stock / count($presentacionesCreadas);
+                $distribucion = [];
+                foreach ($presentacionesCreadas as $idx => $presentacion) {
+                    $unidades = (int) floor($shareKg / $presentacion->pesoNetoKg());
+                    if ($unidades <= 0) {
+                        continue;
+                    }
+                    $distribucion[] = [
+                        'presentacion' => $presentacion,
+                        'unidades' => (float) $unidades,
+                        'referencia_lote' => $this->referenciaLotePlanta((int) $insumo->insumoid, $idx + 1),
+                        'partes' => 1,
+                    ];
+                }
+                if ($distribucion !== []) {
+                    $inventarioService->bootstrapDesdeStockAgregado(
+                        (int) $insumo->almacenid,
+                        $insumo,
+                        $distribucion
+                    );
+                }
+            }
+
+            $reparados++;
+        }
+
+        return $reparados;
+    }
+
+    /**
+     * @return list<array{nombre: string, tipo_envase: string, tipo_empaque: string, peso_neto_kg: float, unidades_por_caja?: int}>
+     */
+    private function presentacionesPorDefecto(string $nombre): array
+    {
+        $n = mb_strtolower(trim($nombre));
+        if (str_contains($n, 'pur') || str_contains($n, 'pure') || str_contains($n, 'puré')) {
+            return [
+                ['nombre' => 'Pouch 1 kg', 'tipo_envase' => 'bolsa', 'tipo_empaque' => 'Pouch', 'peso_neto_kg' => 1.0],
+                ['nombre' => 'Bidón 5 kg', 'tipo_envase' => 'bidon', 'tipo_empaque' => 'Bidón', 'peso_neto_kg' => 5.0],
+            ];
+        }
+
+        return [
+            ['nombre' => 'Bolsa 1 kg', 'tipo_envase' => 'bolsa', 'tipo_empaque' => 'Bolsa plástica', 'peso_neto_kg' => 1.0],
+        ];
     }
 
     private function seedTiposEmpaquePlanta(): void

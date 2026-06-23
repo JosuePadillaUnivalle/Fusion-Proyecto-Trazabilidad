@@ -93,6 +93,7 @@ final class RutaDistribucionNavegacion
     public static function volverUrl(RutaDistribucion $ruta, ?Usuario $user = null, string $rutaPrefijo = 'logistica.traslados-planta'): string
     {
         $user ??= auth()->user();
+        $ruta->loadMissing('pedidos');
 
         if ($user !== null && UsuarioRol::esTransportista($user)) {
             return route('logistica.asignaciones.listado');
@@ -102,6 +103,28 @@ final class RutaDistribucionNavegacion
             return route($rutaPrefijo.'.show', $ruta);
         }
 
-        return route('punto-venta.rutas.index');
+        if ($user !== null && UsuarioRol::puedeGestionarDistribucionMayorista($user)) {
+            $pedido = $ruta->pedidos->first();
+            if ($pedido !== null) {
+                return route('punto-venta.pedidos.show', ['pedido' => $pedido, 'ctx' => 'mayorista']);
+            }
+
+            return route('logistica.rutas-tiempo-real.index');
+        }
+
+        if ($user !== null && UsuarioRol::esMinorista($user)) {
+            $pedido = $ruta->pedidos->first(
+                fn ($p) => PuntoVentaAccess::puedeVerPedido($user, $p)
+            );
+            if ($pedido !== null) {
+                return route('punto-venta.pedidos.show', ['pedido' => $pedido, 'paso' => 4]);
+            }
+        }
+
+        if (UsuarioRol::puedePlanificarDistribucion($user)) {
+            return route('punto-venta.rutas.index');
+        }
+
+        return route('logistica.rutas-tiempo-real.index');
     }
 }

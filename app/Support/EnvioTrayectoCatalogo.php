@@ -37,9 +37,8 @@ final class EnvioTrayectoCatalogo
             return [self::TRAYECTO_MAYORISTA];
         }
 
-        // El mayorista no inicia envíos al PDV: solo despacha solicitudes del minorista (bandeja pedidos).
         if (UsuarioRol::esMayorista($user)) {
-            return [];
+            return [self::TRAYECTO_PDV];
         }
 
         return [];
@@ -114,9 +113,8 @@ final class EnvioTrayectoCatalogo
             return $request->query('ctx') !== 'mayorista';
         }
 
-        // Solo el minorista (o admin fuera de bandeja mayorista) crea solicitudes al PDV.
         if (UsuarioRol::esMayorista($user) && ! UsuarioRol::esMinorista($user)) {
-            return false;
+            return EnvioTrayectoCatalogo::puedeUsarTrayecto($user, self::TRAYECTO_PDV);
         }
 
         return false;

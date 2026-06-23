@@ -106,7 +106,24 @@ final class SimulacionRutaCatalogo
             return false;
         }
 
-        return $ruta->transportista_usuarioid !== null;
+        if ($ruta->transportista_usuarioid === null) {
+            return false;
+        }
+
+        return self::pedidosListosParaSalida($ruta);
+    }
+
+    public static function pedidosListosParaSalida(RutaDistribucion $ruta): bool
+    {
+        $ruta->loadMissing('pedidos');
+
+        foreach ($ruta->pedidos as $pedido) {
+            if (PedidoDistribucionCatalogo::pendienteConfirmacionMinorista($pedido)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** Transportista asignado o supervisor con permiso de actualizar asignaciones. */

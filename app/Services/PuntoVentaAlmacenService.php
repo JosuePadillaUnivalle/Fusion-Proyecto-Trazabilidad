@@ -8,13 +8,17 @@ use App\Models\PuntoVenta;
 use App\Models\TipoAlmacen;
 use App\Models\UnidadMedida;
 use App\Support\AlmacenAmbito;
+use App\Support\AlmacenNombreCatalogo;
 
 class PuntoVentaAlmacenService
 {
     public function crearAlmacenParaPuntoVenta(PuntoVenta $puntoVenta): Almacen
     {
         if ($puntoVenta->almacenid) {
-            return Almacen::query()->findOrFail($puntoVenta->almacenid);
+            $almacen = Almacen::query()->findOrFail($puntoVenta->almacenid);
+            $this->sincronizarNombreAlmacen($puntoVenta, $almacen);
+
+            return $almacen;
         }
 
         $tipoAlmacenId = TipoAlmacen::query()->value('tipoalmacenid');
@@ -24,7 +28,7 @@ class PuntoVentaAlmacenService
             ?? UnidadMedida::query()->value('unidadmedidaid');
 
         $almacen = Almacen::create([
-            'nombre' => 'Almacén — '.$puntoVenta->nombre,
+            'nombre' => AlmacenNombreCatalogo::nombreParaPuntoVenta($puntoVenta),
             'descripcion' => 'Inventario del punto de venta '.$puntoVenta->nombre,
             'ubicacion' => $puntoVenta->direccion,
             'capacidad' => 500,
@@ -37,6 +41,45 @@ class PuntoVentaAlmacenService
         $puntoVenta->update(['almacenid' => $almacen->almacenid]);
 
         return $almacen;
+    }
+
+    public function sincronizarNombreAlmacen(PuntoVenta $puntoVenta, ?Almacen $almacen = null): void
+    {
+        $almacen ??= $puntoVenta->almacen;
+        if ($almacen === null) {
+            return;
+        }
+
+        $nombre = AlmacenNombreCatalogo::nombreParaPuntoVenta($puntoVenta);
+        if (trim((string) $almacen->nombre) !== $nombre) {
+            $almacen->update(['nombre' => $nombre]);
+        }
+    }
+
+    /** Normaliza nombres de almacén PDV ya existentes (p. ej. tras renombrado automático). */
+    public function normalizarNombresAlmacenesExistentes(): int
+    {
+        $actualizados = 0;
+
+        PuntoVenta::query()
+            ->with('almacen')
+            ->whereNotNull('almacenid')
+            ->orderBy('puntoventaid')
+            ->each(function (PuntoVenta $punto) use (&$actualizados): void {
+                if ($punto->almacen === null) {
+                    return;
+                }
+
+                $antes = trim((string) $punto->almacen->nombre);
+                $this->sincronizarNombreAlmacen($punto, $punto->almacen);
+                $punto->almacen->refresh();
+
+                if ($antes !== trim((string) $punto->almacen->nombre)) {
+                    $actualizados++;
+                }
+            });
+
+        return $actualizados;
     }
 
     /** @return \Illuminate\Support\Collection<int, Insumo> */

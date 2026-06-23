@@ -1596,6 +1596,8 @@
         @include('partials.transportista-asignacion-login-modal')
         @include('partials.operario-planta-tarea-login-modal')
         @include('partials.mayorista-pedido-login-modal')
+        @include('partials.jefe-planta-traslado-login-modal')
+        @include('partials.login-notificacion-mount')
         @once
             @include('partials.selector-catalogo-assets')
             @include('partials.selector-catalogo-modal')

@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Almacen;
+use App\Models\PuntoVenta;
 
 final class AlmacenNombreCatalogo
 {
@@ -41,8 +42,22 @@ final class AlmacenNombreCatalogo
         return mb_substr($nombre, 0, 100);
     }
 
+    public static function nombreParaPuntoVenta(PuntoVenta $punto): string
+    {
+        $nombre = trim($punto->nombre);
+
+        return 'Almacén — '.($nombre !== '' ? $nombre : 'Punto de venta');
+    }
+
     public static function nombreDesdeRegistro(Almacen $almacen): string
     {
+        if (self::ambitoEfectivo($almacen) === AlmacenAmbito::PUNTO_VENTA) {
+            $punto = PuntoVenta::query()->where('almacenid', $almacen->almacenid)->first();
+            if ($punto) {
+                return self::nombreParaPuntoVenta($punto);
+            }
+        }
+
         $ambito = self::ambitoEfectivo($almacen);
         $pref = self::prefijoAmbito($ambito);
         $coords = UbicacionGpsParser::coordsOrDefault($almacen->ubicacion);

@@ -249,8 +249,7 @@ class EnvioCierrePlantaMayoristaController extends Controller
             }
 
             return redirect()
-                ->route($rutaPrefijo.'.show', $ruta)
-                ->with('success', 'Recepción firmada. El inventario fue actualizado en su almacén.');
+                ->route($rutaPrefijo.'.show', $ruta);
         }
 
         return $this->respuestaExito('Firma de recepción mayorista registrada.');
@@ -279,13 +278,11 @@ class EnvioCierrePlantaMayoristaController extends Controller
 
         if ($this->recepcion->esVistaMayorista($request->user())) {
             return redirect()
-                ->route($rutaPrefijo.'.show', $ruta)
-                ->with('success', 'Recepción completada. El inventario fue actualizado en su almacén.');
+                ->route($rutaPrefijo.'.show', $ruta);
         }
 
         return redirect()
-            ->route('logistica.documentos.show', $documento)
-            ->with('success', 'Traslado finalizado. Se generó el documento de transporte.');
+            ->route('logistica.documentos.show', $documento);
     }
 
     private function autorizarVer(RutaDistribucion $ruta): void
@@ -315,7 +312,7 @@ class EnvioCierrePlantaMayoristaController extends Controller
             return response()->json(['mensaje' => $mensaje]);
         }
 
-        return back()->with('success', $mensaje);
+        return back();
     }
 
     private function respuestaError(string $mensaje): RedirectResponse|JsonResponse

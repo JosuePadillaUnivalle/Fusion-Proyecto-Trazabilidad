@@ -437,10 +437,10 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="ins-field-label" for="stock">Stock actual <span class="text-danger">*</span></label>
-                                <input type="number" step="0.01" name="stock" id="stock" class="form-control" min="0" required
-                                    value="{{ old('stock', $insumo->stock ?? '') }}"
-                                    placeholder="Ej. 120">
-                                <div class="ins-field-hint">Cantidad disponible hoy en la unidad elegida.</div>
+                                <input type="number" step="any" name="stock" id="stock" class="form-control" min="0"
+                                    value="{{ old('stock', isset($insumo) ? $insumo->stock : 0) }}"
+                                    placeholder="0">
+                                <div class="ins-field-hint">Cantidad disponible hoy (puede ser <strong>0</strong> si aún no hay existencias).</div>
                             </div>
                         </div>
                     </div>

@@ -113,8 +113,7 @@ class TrasladoPlantaMayoristaController extends Controller
         }
 
         return redirect()
-            ->route('logistica.traslados-planta.show', $ruta)
-            ->with('success', 'Traslado registrado. El jefe de planta debe aprobarlo antes de que el transportista pueda salir.');
+            ->route('logistica.traslados-planta.show', $ruta);
     }
 
     public function show(Request $request, RutaDistribucion $ruta): View|RedirectResponse

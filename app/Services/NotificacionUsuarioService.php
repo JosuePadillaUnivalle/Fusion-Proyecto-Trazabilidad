@@ -174,6 +174,55 @@ class NotificacionUsuarioService
         );
     }
 
+    public function envioMayoristaPendienteConfirmacionMinorista(PedidoDistribucion $pedido): void
+    {
+        if (! PedidoDistribucionCatalogo::pendienteConfirmacionMinorista($pedido)) {
+            return;
+        }
+
+        $pedido->loadMissing(['detalles.insumo', 'puntoVenta.minorista', 'transportista']);
+        $minoristaId = (int) $pedido->puntoVenta?->usuarioid;
+        if ($minoristaId <= 0) {
+            return;
+        }
+
+        $productos = $pedido->detalles->map(fn ($d) => $d->producto_nombre ?? $d->insumo?->nombre ?? 'producto')->take(2)->implode(', ');
+        $extra = $pedido->detalles->count() > 2 ? ' (+'.($pedido->detalles->count() - 2).' más)' : '';
+        $codigo = $pedido->numero_solicitud ?? '#'.$pedido->pedidodistribucionid;
+        $pdv = $pedido->puntoVenta?->nombre ?? 'su punto de venta';
+
+        $this->notificar(
+            $minoristaId,
+            'pedido_distribucion_confirmar',
+            'Confirme el envío entrante',
+            "El mayorista programó un envío ({$codigo}) hacia «{$pdv}»: {$productos}{$extra}. Confirme para habilitar la salida del transportista.",
+            route('punto-venta.pedidos.show', ['pedido' => $pedido, 'ctx' => 'pdv'], false),
+            'pedido_distribucion',
+            (int) $pedido->pedidodistribucionid,
+        );
+    }
+
+    public function envioMayoristaConfirmadoPorMinorista(PedidoDistribucion $pedido): void
+    {
+        $transportistaId = (int) ($pedido->transportista_usuarioid ?? $pedido->rutaDistribucion?->transportista_usuarioid);
+        if ($transportistaId <= 0) {
+            return;
+        }
+
+        $codigo = $pedido->numero_solicitud ?? '#'.$pedido->pedidodistribucionid;
+        $pdv = $pedido->puntoVenta?->nombre ?? 'punto de venta';
+
+        $this->notificar(
+            $transportistaId,
+            'envio_listo_recoger',
+            'Envío confirmado por el minorista',
+            "El minorista confirmó el envío {$codigo} hacia «{$pdv}». Complete el cierre operativo y pulse «Empezar ruta» cuando esté listo.",
+            route('punto-venta.pedidos.show', ['pedido' => $pedido, 'ctx' => 'mayorista'], false),
+            'pedido_distribucion',
+            (int) $pedido->pedidodistribucionid,
+        );
+    }
+
     public function pedidoPendienteAgricola(Pedido $pedido): void
     {
         if (! PedidoCatalogo::pendienteAprobacionAgricola($pedido)) {

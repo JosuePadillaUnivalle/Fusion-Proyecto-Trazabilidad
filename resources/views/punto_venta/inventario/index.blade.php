@@ -22,8 +22,43 @@
 .pdv-inv-tabla thead th { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }
 .pdv-inv-tabla td:nth-child(2) a { font-weight: 600; color: #047857; text-decoration: none; }
 .pdv-inv-tabla td:nth-child(2) a:hover { text-decoration: underline; }
-.pdv-inv-filtros-pdv .selector-catalogo-label,
-.pdv-inv-filtros-pdv label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #6c757d; margin-bottom: .35rem; }
+.pdv-inv-filtros-pdv .selector-catalogo-wrapper > label {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #6c757d;
+    margin-bottom: .35rem;
+}
+.pdv-inv-filtros-pdv .selector-filtros-field {
+    min-height: calc(1.8125rem + 2px);
+    border-radius: 8px;
+}
+.pdv-inv-filtros-pdv .selector-filtros-field__input {
+    font-size: .875rem;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    color: #1e293b;
+    padding: .3125rem .5rem .3125rem .75rem;
+}
+.pdv-inv-filtros-pdv .selector-filtros-field__open {
+    width: 28px;
+    height: 28px;
+    margin-right: 2px;
+    border-radius: 6px;
+    font-size: .7rem;
+    box-shadow: none;
+}
+.pdv-inv-filtros-pdv .selector-filtros-field__open:hover {
+    transform: none;
+    box-shadow: none;
+}
+.pdv-inv-filtros-pdv .form-control {
+    height: calc(1.8125rem + 2px);
+    font-size: .875rem;
+    padding: .3125rem .75rem;
+}
 </style>
 @endpush
 
@@ -51,8 +86,8 @@
                     'searchPlaceholder' => 'Nombre, dirección o minorista…',
                     'searchLabel' => 'Buscar punto de venta',
                     'allowEmpty' => true,
-                    'emptyLabel' => 'Todos mis puntos',
-                    'placeholderEmpty' => 'Todos mis puntos',
+                    'emptyLabel' => ($esAdmin ?? false) ? 'Todos los puntos' : 'Todos mis puntos',
+                    'placeholderEmpty' => ($esAdmin ?? false) ? 'Todos los puntos' : 'Todos mis puntos',
                     'modalIcon' => 'fa-store',
                     'rowIcon' => 'fa-store',
                     'colNombre' => 'Punto de venta',
@@ -96,6 +131,9 @@
                             <td>
                                 @if($punto)
                                     <a href="{{ route('punto-venta.puntos.show', $punto) }}">{{ $punto->nombre }}</a>
+                                    @if($esAdmin ?? false)
+                                        <br><small class="text-muted">{{ $punto->nombreMinorista() }}</small>
+                                    @endif
                                 @else — @endif
                             </td>
                             <td>{{ number_format($insumo->stock, 2) }}</td>

@@ -64,14 +64,18 @@ class EnvioTrayectoPermisosTest extends TestCase
         $this->actingAs($user)->get(route('pedidos.create', ['destino' => 'planta']))->assertForbidden();
     }
 
-    public function test_mayorista_no_inicia_envios_wizard_solo_gestiona_solicitudes_minorista(): void
+    public function test_mayorista_puede_crear_envio_pdv_en_wizard(): void
     {
         $user = $this->createUser('mayorista');
 
-        $this->assertSame([], EnvioTrayectoCatalogo::trayectosPermitidos($user));
-        $this->assertFalse(EnvioTrayectoCatalogo::puedeCrearAlguno($user));
-        $this->actingAs($user)->get(route('pedidos.create', ['destino' => 'punto-venta']))->assertForbidden();
-        $this->actingAs($user)->get(route('punto-venta.pedidos.create', ['ctx' => 'mayorista']))->assertForbidden();
+        $this->assertSame(['punto-venta'], EnvioTrayectoCatalogo::trayectosPermitidos($user));
+        $this->assertTrue(EnvioTrayectoCatalogo::puedeCrearAlguno($user));
+        $this->actingAs($user)->get(route('pedidos.create', ['destino' => 'punto-venta']))->assertOk();
+        $this->actingAs($user)->get(route('pedidos.create', ['destino' => 'mayorista']))->assertForbidden();
         $this->actingAs($user)->get(route('punto-venta.pedidos.index', ['ctx' => 'mayorista']))->assertOk();
+
+        $request = \Illuminate\Http\Request::create('/punto-venta/pedidos', 'POST');
+        $request->setUserResolver(fn () => $user);
+        $this->assertTrue(EnvioTrayectoCatalogo::puedeRegistrarStorePdv($request, $user));
     }
 }

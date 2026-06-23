@@ -2,11 +2,12 @@
 
     $ambitoActual = $ambito ?? \App\Support\AlmacenAmbito::AGRICOLA;
 
-    $tituloDetalle = $ambitoActual === \App\Support\AlmacenAmbito::PLANTA
-
-        ? 'Detalle de Almacén Planta'
-
-        : 'Detalle de Almacén Agrícola';
+    $tituloDetalle = match ($ambitoActual) {
+        \App\Support\AlmacenAmbito::PLANTA => 'Detalle de Almacén Planta',
+        \App\Support\AlmacenAmbito::MAYORISTA => 'Detalle de Almacén Mayorista',
+        \App\Support\AlmacenAmbito::PUNTO_VENTA => 'Detalle de Inventario PDV',
+        default => 'Detalle de Almacén Agrícola',
+    };
 
     $coords = \App\Support\UbicacionGpsParser::coordsOrDefault($almacen->ubicacion ?? null);
 
@@ -369,8 +370,7 @@
 
                         <option value="cosecha">Cosecha</option>
 
-                        <option value="producto_planta">Producto terminado (planta)</option>
-                        <option value="producto_terminado">Producto terminado</option>
+                        <option value="producto_procesado">Producto procesado</option>
 
                     </select>
 
@@ -438,7 +438,7 @@
 
                             <td><strong class="text-success">{{ $item->nombre }}</strong></td>
 
-                            <td><span class="badge badge-{{ match($item->categoria) { 'cosecha', 'cosecha_consolidada' => 'info', 'producto_planta', 'producto_terminado' => 'warning', default => 'secondary' } }}">{{ match($item->categoria) { 'cosecha', 'cosecha_consolidada' => 'Cosecha', 'producto_planta', 'producto_terminado' => 'Producto terminado', default => 'Insumo' } }}</span></td>
+                            <td><span class="badge badge-{{ match($item->categoria) { 'cosecha', 'cosecha_consolidada' => 'info', 'producto_planta', 'producto_terminado' => 'warning', default => 'secondary' } }}">{{ match($item->categoria) { 'cosecha', 'cosecha_consolidada' => 'Cosecha', 'producto_planta', 'producto_terminado' => 'Producto procesado', default => 'Insumo' } }}</span></td>
 
                             <td>{{ $item->tipo_label }}</td>
 
@@ -512,10 +512,18 @@
                                             <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
                                         </form>
                                         @endcan
+                                    @elseif($item->categoria === 'producto_planta' && ! empty($item->insumoid))
+                                        <a href="{{ route(($rutaPrefijo ?? 'almacen-planta').'.inventario.show', [$almacen, $item->insumoid, 'lote' => $item->lote_produccion_pedido_id]) }}" class="btn btn-sm btn-outline-info" title="Ver detalles"><i class="fas fa-eye"></i></a>
+                                        @can('inventario.delete')
+                                        <form action="{{ route(($rutaPrefijo ?? 'almacen-planta').'.inventario.destroy', [$almacen, $item->insumoid]) }}" method="POST" class="d-inline m-0 on-submit-confirm" data-confirm-title="¿Eliminar producto procesado?" data-confirm-text="Se quitará este producto del almacén de planta.">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
+                                        </form>
+                                        @endcan
                                     @elseif($item->categoria === 'producto_planta' && ! empty($item->lote_produccion_pedido_id))
                                         <a href="{{ route('procesamiento.show', $item->lote_produccion_pedido_id) }}" class="btn btn-sm btn-outline-info" title="Ver detalles"><i class="fas fa-eye"></i></a>
                                         @can('inventario.delete')
-                                        <form action="{{ route('procesamiento.destroy', $item->lote_produccion_pedido_id) }}" method="POST" class="d-inline m-0 on-submit-confirm" data-confirm-title="¿Eliminar producto terminado?" data-confirm-text="Se quitará este lote del almacén.">
+                                        <form action="{{ route('procesamiento.destroy', $item->lote_produccion_pedido_id) }}" method="POST" class="d-inline m-0 on-submit-confirm" data-confirm-title="¿Eliminar producto procesado?" data-confirm-text="Se quitará este lote del almacén.">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
                                         </form>
@@ -682,10 +690,12 @@
 
         rows.forEach(function (row) {
 
+            const categoria = row.dataset.categoria || '';
+            const catMatch = !cat
+                || categoria === cat
+                || (cat === 'producto_procesado' && (categoria === 'producto_planta' || categoria === 'producto_terminado'));
             const show = (!texto || (row.dataset.search || '').includes(texto))
-
-                && (!cat || (row.dataset.categoria || '') === cat)
-
+                && catMatch
                 && (!tipo || (row.dataset.tipo || '') === tipo);
 
             row.style.display = show ? '' : 'none';

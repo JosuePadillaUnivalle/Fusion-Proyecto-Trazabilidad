@@ -52,7 +52,7 @@ class TrazabilidadProductoPdvService
         $codigo = $this->asegurarCodigo($insumo);
         $path = route('trazabilidad.publica', ['codigo' => $codigo], false);
 
-        return PublicUrlHelper::absolute($path);
+        return PublicUrlHelper::absoluteForQr($path);
     }
 
     /**
@@ -1650,7 +1650,9 @@ class TrazabilidadProductoPdvService
                 implode("\n", $lineasTransito),
                 'shipping-fast',
                 'primary',
-                $pedido->almacenMayoristaOrigen?->nombre ?? $ruta->almacenOrigen?->nombre
+                $pedido->almacenMayoristaOrigen?->nombre
+                    ?? $ruta?->almacenOrigen?->nombre
+                    ?? $pedido->almacenPlantaOrigen?->nombre
             ));
         }
 

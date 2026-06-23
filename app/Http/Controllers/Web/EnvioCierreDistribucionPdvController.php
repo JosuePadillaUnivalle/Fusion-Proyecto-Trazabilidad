@@ -87,6 +87,14 @@ class EnvioCierreDistribucionPdvController extends Controller
                 $pasoVista = '__receptor_espera__';
                 $modoConsulta = true;
             }
+        } elseif (
+            UsuarioRol::esTransportista($user)
+            && ($resumen['pendiente_confirmacion_minorista'] ?? false)
+            && ! $vistaResumenCompleto
+            && $pasoSolicitado === ''
+        ) {
+            $pasoVista = '__espera_confirmacion_minorista__';
+            $modoConsulta = false;
         }
 
         return view('logistica.cierre-planta-mayorista.panel', [
@@ -248,8 +256,7 @@ class EnvioCierreDistribucionPdvController extends Controller
                 return response()->json(['mensaje' => 'Recepción firmada y entrega finalizada.', 'redirect' => $redirect]);
             }
 
-            return redirect()->to($redirect)
-                ->with('success', 'Recepción firmada. El inventario del punto de venta fue actualizado.');
+            return redirect()->to($redirect);
         }
 
         return $this->respuestaExito('Firma de recepción en punto de venta registrada.');
@@ -280,13 +287,11 @@ class EnvioCierreDistribucionPdvController extends Controller
             $pedido = $ruta->pedidos()->first();
 
             return redirect()
-                ->route('punto-venta.pedidos.show', ['pedido' => $pedido ?? $ruta->pedidos()->first(), 'paso' => 5])
-                ->with('success', 'Recepción completada. El inventario del punto de venta fue actualizado.');
+                ->route('punto-venta.pedidos.show', ['pedido' => $pedido ?? $ruta->pedidos()->first(), 'paso' => 5]);
         }
 
         return redirect()
-            ->route('logistica.documentos.show', $documento)
-            ->with('success', 'Entrega finalizada. Se generó el comprobante de entrega.');
+            ->route('logistica.documentos.show', $documento);
     }
 
     private function autorizarVer(RutaDistribucion $ruta): void
@@ -317,7 +322,7 @@ class EnvioCierreDistribucionPdvController extends Controller
             return response()->json(['mensaje' => $mensaje]);
         }
 
-        return back()->with('success', $mensaje);
+        return back();
     }
 
     private function respuestaError(string $mensaje): RedirectResponse|JsonResponse

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 
 final class DocumentoEntregaArchivo
 {
-    private const PDF_VERSION = 7;
+    private const PDF_VERSION = 8;
 
     /** @var array<string, string> */
     private const TIPOS_ETIQUETA = [
@@ -164,6 +164,10 @@ final class DocumentoEntregaArchivo
         if ($pedido === null && $rutaOperacion !== null) {
             $pedido = $rutaOperacion->pedidos->first();
         }
+        if ($esRutaPdv && $rutaOperacion !== null) {
+            $pedido = $rutaOperacion->pedidos->first() ?? $pedido;
+            $pedido?->loadMissing(['detalles.insumo.unidadMedida', 'detalles.presentacion.tipoEmpaque']);
+        }
         $pedidoReferencia = $pedido?->numero_solicitud
             ?? ($documento->pedidoid ? '#'.$documento->pedidoid : null)
             ?? $rutaOperacion?->codigo
@@ -228,36 +232,28 @@ final class DocumentoEntregaArchivo
             ?? '—';
 
         $lineasProducto = [];
-        foreach ($pedido?->detalles ?? [] as $detalle) {
-            $empaque = PedidoCatalogo::descripcionEmpaqueDetalle($detalle->observaciones);
-            $obsUsuario = PedidoCatalogo::observacionesUsuarioDetalle($detalle->observaciones);
-            $nombreProducto = $detalle->cultivo_personalizado
-                ?? $detalle->producto_nombre
-                ?? $detalle->insumo?->nombre
-                ?? 'Producto';
-            $unidad = $detalle->insumo?->unidadMedida?->abreviatura ?? 'kg';
-
-            $lineasProducto[] = [
-                'producto' => $nombreProducto,
-                'cantidad' => number_format((float) $detalle->cantidad, 2, '.', '').' '.$unidad,
-                'empaquetaje' => $empaque ?? ($detalle->presentacion?->nombre ?? '—'),
-                'observaciones' => $obsUsuario ?: '—',
-            ];
-        }
-
-        if ($lineasProducto === [] && $esRutaPdv && $rutaOperacion !== null) {
+        if ($esRutaPdv && $rutaOperacion !== null) {
             foreach ($rutaOperacion->pedidos as $pedidoRuta) {
                 foreach ($pedidoRuta->detalles as $detalle) {
-                    $empaque = PedidoCatalogo::descripcionEmpaqueDetalle($detalle->observaciones);
-                    $obsUsuario = PedidoCatalogo::observacionesUsuarioDetalle($detalle->observaciones);
-                    $lineasProducto[] = [
-                        'producto' => $detalle->producto_nombre ?? $detalle->insumo?->nombre ?? 'Producto',
-                        'cantidad' => number_format((float) $detalle->cantidad, 2, '.', '')
-                            .' '.($detalle->insumo?->unidadMedida?->abreviatura ?? 'kg'),
-                        'empaquetaje' => $empaque ?? ($detalle->presentacion?->nombre ?? '—'),
-                        'observaciones' => $obsUsuario ?: '—',
-                    ];
+                    $lineasProducto[] = self::lineaProductoDesdeDetallePdv($detalle);
                 }
+            }
+        } else {
+            foreach ($pedido?->detalles ?? [] as $detalle) {
+                $empaque = PedidoCatalogo::descripcionEmpaqueDetalle($detalle->observaciones);
+                $obsUsuario = PedidoCatalogo::observacionesUsuarioDetalle($detalle->observaciones);
+                $nombreProducto = $detalle->cultivo_personalizado
+                    ?? $detalle->producto_nombre
+                    ?? $detalle->insumo?->nombre
+                    ?? 'Producto';
+                $unidad = $detalle->insumo?->unidadMedida?->abreviatura ?? 'kg';
+
+                $lineasProducto[] = [
+                    'producto' => $nombreProducto,
+                    'cantidad' => number_format((float) $detalle->cantidad, 2, '.', '').' '.$unidad,
+                    'empaquetaje' => $empaque ?? ($detalle->presentacion?->nombre ?? '—'),
+                    'observaciones' => $obsUsuario ?: '—',
+                ];
             }
         }
 
@@ -425,5 +421,43 @@ final class DocumentoEntregaArchivo
 
         return strlen($contenido) < 2000
             && str_contains($contenido, 'Documento generado por AgroFusion');
+    }
+
+    /** @return array{producto: string, cantidad: string, empaquetaje: string, observaciones: string} */
+    private static function lineaProductoDesdeDetallePdv(\App\Models\DetallePedidoDistribucion $detalle): array
+    {
+        $empaque = PedidoCatalogo::descripcionEmpaqueDetalle($detalle->observaciones);
+        if ($empaque === null && $detalle->presentacion) {
+            $pres = $detalle->presentacion;
+            $partes = array_filter([
+                trim((string) ($pres->nombre ?? '')),
+                trim((string) ($pres->tipoEmpaque?->nombre ?? '')),
+            ]);
+            $empaque = $partes !== [] ? implode(' · ', $partes) : null;
+        }
+
+        $nombreProducto = $detalle->insumo?->nombre
+            ?? $detalle->producto_nombre
+            ?? 'Producto';
+        if (str_contains($nombreProducto, ' · ')) {
+            [$nombreProducto] = explode(' · ', $nombreProducto, 2);
+        }
+
+        $unidad = $detalle->insumo?->unidadMedida?->abreviatura
+            ?? $detalle->presentacion?->unidadMedida?->abreviatura
+            ?? 'un';
+
+        if ($empaque === null && str_contains((string) ($detalle->producto_nombre ?? ''), ' · ')) {
+            [, $empaque] = explode(' · ', (string) $detalle->producto_nombre, 2);
+        }
+
+        $obsUsuario = PedidoCatalogo::observacionesUsuarioDetalle($detalle->observaciones);
+
+        return [
+            'producto' => trim($nombreProducto),
+            'cantidad' => number_format((float) $detalle->cantidad, 2, '.', '').' '.$unidad,
+            'empaquetaje' => $empaque ?? '—',
+            'observaciones' => $obsUsuario ?: '—',
+        ];
     }
 }

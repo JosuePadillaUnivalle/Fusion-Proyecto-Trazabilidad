@@ -106,9 +106,27 @@
 .modulo-inv .table-modulo tbody tr:hover {
     background: #f8fbf8;
 }
+.modulo-inv .btn-actions {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    vertical-align: middle;
+}
 .modulo-inv .btn-actions .btn {
-    padding: 0.2rem 0.45rem;
-    line-height: 1.2;
+    padding: 0.35rem 0.55rem;
+    line-height: 1.25;
+    font-size: 0.85rem;
+}
+.modulo-inv .btn-actions form {
+    display: inline-flex;
+    margin: 0;
+    padding: 0;
+}
+.modulo-inv .table-modulo tbody td.btn-actions-cell {
+    padding: 0.55rem 0.4rem;
+    white-space: nowrap;
 }
 .modulo-inv .card-footer .pagination {
     margin-bottom: 0;
