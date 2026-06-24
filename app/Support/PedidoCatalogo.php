@@ -848,11 +848,13 @@ final class PedidoCatalogo
 
         $cultivo = Cultivo::query()
             ->get()
-            ->first(function (Cultivo $c) use ($nombreInsumo) {
+            ->filter(function (Cultivo $c) use ($nombreInsumo) {
                 $nombreCultivo = mb_strtolower(trim($c->nombre));
 
                 return $nombreCultivo !== '' && str_contains($nombreInsumo, $nombreCultivo);
-            });
+            })
+            ->sortByDesc(fn (Cultivo $c) => mb_strlen(trim($c->nombre)))
+            ->first();
 
         if ($cultivo) {
             return $cultivo->nombre;

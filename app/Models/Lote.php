@@ -157,8 +157,8 @@ class Lote extends Model
     {
         $this->loadMissing('insumoSemilla', 'cultivo');
 
-        if ($this->insumoSemilla) {
-            return PedidoCatalogo::cultivoDesdeInsumo($this->insumoSemilla);
+        if ($this->insumoSemilla && filled($this->insumoSemilla->nombre)) {
+            return trim($this->insumoSemilla->nombre);
         }
 
         return $this->cultivo?->nombre;

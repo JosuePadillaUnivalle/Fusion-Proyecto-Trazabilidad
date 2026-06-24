@@ -30,7 +30,7 @@
                             <dd class="col-sm-8 font-weight-bold mb-2">{{ $lote->nombre }}</dd>
 
                             @if($lote->cultivo_etiqueta ?? $lote->cultivo?->nombre)
-                                <dt class="col-sm-4 text-muted">Cultivo</dt>
+                                <dt class="col-sm-4 text-muted">Semilla / cultivo</dt>
                                 <dd class="col-sm-8 font-weight-bold mb-2">{{ $lote->cultivo_etiqueta ?? $lote->cultivo?->nombre }}</dd>
                             @endif
 

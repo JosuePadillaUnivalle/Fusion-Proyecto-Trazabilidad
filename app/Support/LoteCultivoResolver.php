@@ -31,7 +31,7 @@ final class LoteCultivoResolver
 
         $existente = Cultivo::query()
             ->get()
-            ->first(function (Cultivo $c) use ($clave, $insumo) {
+            ->filter(function (Cultivo $c) use ($clave, $insumo) {
                 $nombre = mb_strtolower(trim($c->nombre));
                 if ($nombre === '' || $clave === '') {
                     return false;
@@ -40,7 +40,9 @@ final class LoteCultivoResolver
                 return $nombre === $clave
                     || str_contains($clave, $nombre)
                     || str_contains(mb_strtolower($insumo->nombre), $nombre);
-            });
+            })
+            ->sortByDesc(fn (Cultivo $c) => mb_strlen(trim($c->nombre)))
+            ->first();
 
         if ($existente !== null) {
             return (int) $existente->cultivoid;
