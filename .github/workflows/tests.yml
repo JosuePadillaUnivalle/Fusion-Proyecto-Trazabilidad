@@ -41,6 +41,11 @@ jobs:
       - name: Copy environment file
         run: cp .env.example .env
 
+      - name: Configure CI environment
+        run: |
+          sed -i 's/^APP_ENV=.*/APP_ENV=testing/' .env
+          touch database/database.sqlite
+
       - name: Generate app key
         run: php artisan key:generate
 

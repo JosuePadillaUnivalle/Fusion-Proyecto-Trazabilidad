@@ -31,11 +31,24 @@ class LocalDatabaseGuard
             return false;
         }
 
+        if (env('CI') || env('GITHUB_ACTIONS')) {
+            return false;
+        }
+
         if (! app()->environment('local')) {
             return false;
         }
 
-        return config('database.default') === 'sqlite';
+        if (config('database.default') !== 'sqlite') {
+            return false;
+        }
+
+        $dbPath = (string) (config('database.connections.sqlite.database') ?? '');
+        if ($dbPath !== '' && $dbPath !== ':memory:' && ! is_file($dbPath)) {
+            return false;
+        }
+
+        return true;
     }
 
     /** Restaura snapshot si la base local no tiene usuarios. */
@@ -45,7 +58,11 @@ class LocalDatabaseGuard
             return false;
         }
 
-        if (! Schema::hasTable('usuario')) {
+        try {
+            if (! Schema::hasTable('usuario')) {
+                return false;
+            }
+        } catch (\Throwable) {
             return false;
         }
 
