@@ -95,19 +95,27 @@ class AlmacenAmbito
         }
 
         if ($ambito === self::AGRICOLA) {
-            return $user->hasAnyRole(['agricultor', 'jefe_agricultor', 'admin']);
+            return $user->hasAnyRole(['agricultor', 'jefe_agricultor', 'admin'])
+                || ($user->can('inventario.view') && $user->canany(['lotes.view', 'pedidos.view']));
         }
 
         if ($ambito === self::PLANTA) {
-            return $user->hasAnyRole(['planta', 'jefe_planta', 'admin']);
+            return $user->hasAnyRole(['planta', 'jefe_planta', 'admin'])
+                || ($user->can('inventario.view') && $user->canany([
+                    'panel_planta.view',
+                    'recepcion_planta.view',
+                    'lote_produccion.view',
+                ]));
         }
 
         if ($ambito === self::MAYORISTA) {
-            return $user->hasAnyRole(['mayorista', 'jefe_mayorista', 'admin']);
+            return $user->hasAnyRole(['mayorista', 'jefe_mayorista', 'admin'])
+                || ($user->can('inventario.view') && $user->can('pedidos_distribucion.view'));
         }
 
         if ($ambito === self::PUNTO_VENTA) {
-            return $user->hasAnyRole(['minorista', 'admin']);
+            return $user->hasAnyRole(['minorista', 'admin'])
+                || ($user->can('inventario.view') && $user->can('punto_venta.view'));
         }
 
         return false;

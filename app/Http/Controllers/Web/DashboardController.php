@@ -118,7 +118,9 @@ class DashboardController extends Controller
         }
 
         if ($notificacion->enlace) {
-            return redirect($notificacion->enlace);
+            $destino = $notificaciones->resolverEnlace($notificacion, $user) ?? $notificacion->enlace;
+
+            return redirect($destino);
         }
 
         return back();
