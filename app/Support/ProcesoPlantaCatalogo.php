@@ -106,6 +106,18 @@ class ProcesoPlantaCatalogo
             return 'Debe definir al menos un paso en la línea.';
         }
 
+        $cierreId = self::idProcesoCierreTransformacion();
+        $vecesEmpaquetado = 0;
+        foreach ($ids as $id) {
+            if ($cierreId !== null && $id === $cierreId) {
+                $vecesEmpaquetado++;
+            }
+        }
+
+        if ($vecesEmpaquetado > 1) {
+            return 'Solo puede incluir «'.self::PROCESO_CIERRE_TRANSFORMACION.'» una vez en la línea.';
+        }
+
         $ultimoId = $ids[array_key_last($ids)];
         $nombre = ProcesoPlanta::query()->find($ultimoId)?->nombre;
 

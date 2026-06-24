@@ -171,7 +171,14 @@ class DemoMercadoAlvaroZanahoriaQrSeeder extends Seeder
             ->first();
 
         if ($puntoAlvaro?->almacenid) {
-            Insumo::query()->where('almacenid', $puntoAlvaro->almacenid)->delete();
+            Insumo::query()
+                ->where('almacenid', $puntoAlvaro->almacenid)
+                ->where(function ($q) {
+                    $q->where('descripcion', 'like', '%'.self::MARK_DEMO.'%')
+                        ->orWhere('descripcion', 'like', '%'.self::PEDIDO.'%')
+                        ->orWhere('descripcion', 'like', '%Producto recibido desde mayorista%');
+                })
+                ->delete();
         }
 
         $almacenesPdv = PuntoVenta::query()
@@ -180,14 +187,15 @@ class DemoMercadoAlvaroZanahoriaQrSeeder extends Seeder
 
         Insumo::query()
             ->where('codigo_trazabilidad', 'TRZ-PDV-20260609-ZAN001')
-            ->orWhere('nombre', 'Zanahoria fresca Valle')
-            ->orWhere('nombre', self::PRODUCTO)
-            ->orWhere('nombre', 'like', self::PRODUCTO.' · %')
-            ->orWhere(function ($q) use ($almacenesPdv) {
-                $q->where('nombre', 'Zanahoria')
-                    ->whereIn('almacenid', $almacenesPdv);
+            ->whereIn('almacenid', $almacenesPdv)
+            ->delete();
+
+        Insumo::query()
+            ->whereIn('almacenid', $almacenesPdv)
+            ->where(function ($q) {
+                $q->where('nombre', 'Zanahoria fresca Valle')
+                    ->orWhere('descripcion', 'like', '%'.self::MARK_DEMO.'%');
             })
-            ->orWhere('descripcion', 'like', '%'.self::MARK_DEMO.'%')
             ->delete();
 
         Actividad::query()

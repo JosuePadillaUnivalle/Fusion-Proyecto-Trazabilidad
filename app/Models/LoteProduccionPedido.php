@@ -71,6 +71,17 @@ class LoteProduccionPedido extends Model
         return $this->hasMany(RegistroProcesoMaquinaPlanta::class, 'loteproduccionpedidoid', 'loteproduccionpedidoid');
     }
 
+    public function parametrosPaso(): HasMany
+    {
+        return $this->hasMany(LoteProduccionPasoVariable::class, 'loteproduccionpedidoid', 'loteproduccionpedidoid');
+    }
+
+    public function rutaPasos(): HasMany
+    {
+        return $this->hasMany(LoteProduccionRutaPaso::class, 'loteproduccionpedidoid', 'loteproduccionpedidoid')
+            ->orderBy('orden');
+    }
+
     public function materiasPrimas(): HasMany
     {
         return $this->hasMany(LoteProduccionMateriaPrima::class, 'loteproduccionpedidoid', 'loteproduccionpedidoid');

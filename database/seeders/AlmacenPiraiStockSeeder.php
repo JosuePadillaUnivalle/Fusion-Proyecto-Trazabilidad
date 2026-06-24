@@ -186,6 +186,17 @@ class AlmacenPiraiStockSeeder extends Seeder
                 $inventarioService = app(InventarioPresentacionService::class);
 
                 foreach (self::PRODUCTOS as $def) {
+                    $insumoExistente = Insumo::query()
+                        ->where('nombre', $def['nombre'])
+                        ->where('almacenid', $almacen->almacenid)
+                        ->first();
+
+                    if ($insumoExistente && (float) $insumoExistente->stock > 0) {
+                        $creados++;
+
+                        continue;
+                    }
+
                     $insumo = Insumo::updateOrCreate(
                         [
                             'nombre' => $def['nombre'],

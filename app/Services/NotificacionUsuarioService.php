@@ -58,7 +58,7 @@ class NotificacionUsuarioService
             'lote_asignado',
             'Nuevo lote asignado',
             "Se te asignó el lote «{$lote->nombre}».",
-            route('lotes.trazabilidad', $lote, false),
+            $this->enlaceLoteParaAgricultor($lote),
             'lote',
             (int) $lote->loteid,
         );
@@ -70,16 +70,72 @@ class NotificacionUsuarioService
             return;
         }
 
+        $actividad->loadMissing(['lote', 'tipoActividad']);
         $loteNombre = $actividad->lote?->nombre ?? 'lote';
         $this->notificar(
             (int) $actividad->usuarioid,
             'actividad_asignada',
             'Nueva actividad asignada',
             "Actividad «{$actividad->descripcion}» en {$loteNombre}.",
-            route('actividades.show', $actividad, false),
+            $this->enlaceActividadParaAgricultor($actividad),
             'actividad',
             (int) $actividad->actividadid,
         );
+    }
+
+    /** Reconstruye el destino correcto a partir de la referencia guardada (evita enlaces obsoletos). */
+    public function resolverEnlace(UsuarioNotificacion $notificacion, ?Usuario $usuario = null): ?string
+    {
+        if ($notificacion->referencia_tipo === 'lote' && $notificacion->referencia_id) {
+            $lote = Lote::query()->find($notificacion->referencia_id);
+            if ($lote) {
+                return $this->enlaceLoteParaAgricultor($lote, $usuario);
+            }
+        }
+
+        if ($notificacion->referencia_tipo === 'actividad' && $notificacion->referencia_id) {
+            $actividad = Actividad::with(['lote', 'tipoActividad'])->find($notificacion->referencia_id);
+            if ($actividad) {
+                return $this->enlaceActividadParaAgricultor($actividad, $usuario);
+            }
+        }
+
+        return $notificacion->enlace ? $this->enlaceInterno($notificacion->enlace) : null;
+    }
+
+    private function enlaceLoteParaAgricultor(Lote $lote, ?Usuario $usuario = null): string
+    {
+        $trazabilidad = app(\App\Support\LoteTrazabilidadService::class);
+        $fase = $trazabilidad->resolverFaseActual($lote);
+
+        if (
+            in_array($fase, ['preparacion', 'siembra'], true)
+            && ! $trazabilidad->siembraCompletada($lote)
+            && ($usuario === null || (int) $lote->usuarioid === (int) $usuario->usuarioid)
+        ) {
+            return route('lotes.siembra.completar', $lote, false);
+        }
+
+        return route('lotes.trazabilidad', $lote, false);
+    }
+
+    private function enlaceActividadParaAgricultor(Actividad $actividad, ?Usuario $usuario = null): string
+    {
+        $actividad->loadMissing(['lote', 'tipoActividad']);
+        $tipo = mb_strtolower(trim($actividad->tipoActividad->nombre ?? ''));
+        $esSiembra = str_contains($tipo, 'siembra');
+        $pendiente = $actividad->fechafin === null;
+        $esResponsable = $usuario === null || (int) $actividad->usuarioid === (int) $usuario->usuarioid;
+
+        if ($esSiembra && $pendiente && $esResponsable && $actividad->lote) {
+            return route('lotes.siembra.completar', $actividad->lote, false);
+        }
+
+        if ($actividad->lote) {
+            return route('lotes.trazabilidad', $actividad->lote, false);
+        }
+
+        return route('actividades.index', [], false);
     }
 
     public function llegadaDestinoReportada(EnvioAsignacionMultiple $asignacion, Usuario $transportista): void

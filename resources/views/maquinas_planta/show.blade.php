@@ -77,6 +77,30 @@
         </a>
     </div>
 
+    @if($maquina->variablesSugeridas->isNotEmpty())
+    <div class="card card-outline card-success mb-3 elevation-1">
+        <div class="card-header">
+            <h3 class="card-title mb-0"><i class="fas fa-sliders-h mr-1"></i> Variables sugeridas</h3>
+        </div>
+        <div class="card-body p-0 table-responsive">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Variable</th><th>Unidad</th><th>Mín.</th><th>Máx.</th><th>Req.</th></tr></thead>
+                <tbody>
+                    @foreach($maquina->variablesSugeridas as $v)
+                    <tr>
+                        <td>{{ $v->variableEstandar?->nombre }}</td>
+                        <td>{{ $v->variableEstandar?->unidad ?: '—' }}</td>
+                        <td>{{ number_format($v->valor_minimo, 2) }}</td>
+                        <td>{{ number_format($v->valor_maximo, 2) }}</td>
+                        <td>@if($v->obligatorio)<i class="fas fa-check text-success"></i>@else—@endif</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endif
+
     <div class="card card-outline card-success card-modulo-main elevation-1">
         <div class="card-header">
             <h3 class="card-title mb-0">

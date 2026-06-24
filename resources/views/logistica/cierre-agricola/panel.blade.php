@@ -251,6 +251,14 @@
         </div>
     </div>
 
+    <div id="cierre-panel-polling" class="d-none"
+         data-polling-url="{{ route('cierre.firmas-estado') }}"
+         data-polling-asignacion="{{ $asignacion->envioasignacionmultipleid }}"
+         data-inicial-llegada="{{ ($resumen['llegada_confirmada'] ?? false) ? '1' : '0' }}"
+         data-inicial-puede-llegada="{{ (($resumen['puede_confirmar_llegada'] ?? false) || ($resumen['esperando_confirmacion'] ?? false)) ? '1' : '0' }}"
+         data-inicial-firma-recepcion="{{ ($resumen['firma_recepcion'] ?? false) ? '1' : '0' }}"
+         data-inicial-completado="{{ ($resumen['recibido_planta'] ?? false) ? '1' : '0' }}"></div>
+
     <nav class="cierre-ag-stepper" aria-label="Pasos del cierre operativo">
         @foreach($pasos as $idx => $p)
             @php
@@ -630,18 +638,11 @@
                 </form>
                 </div>
                 @endif
-            @elseif(($resumen['puede_firmar_recepcion'] ?? false) && ! $modoConsulta)
-                <p class="small text-muted mb-1">Firma de quien recibe la carga en planta.</p>
-                <p class="small text-muted mb-3"><i class="fas fa-signature mr-1" style="color:#7c3aed;"></i> Firma del transportista completada.</p>
-                <canvas class="cierre-ag-firma-box" data-firma-canvas="recepcion" width="400" height="160"></canvas>
-                <div class="cierre-ag-firma-actions">
-                    <button type="button" class="btn btn-outline-secondary btn-sm btn-limpiar-firma" data-target="recepcion">Limpiar</button>
-                    <button type="button" class="btn btn-success btn-sm font-weight-bold btn-guardar-firma"
-                            data-target="recepcion"
-                            data-url="{{ route('logistica.asignaciones.cierre.firma-recepcion', $asignacion) }}">
-                        Guardar firma recepción
-                    </button>
-                </div>
+            @elseif(($resumen['esperando_firma_qr'] ?? false) && ! $modoConsulta)
+                @include('logistica.partials.cierre-firma-recepcion-qr', [
+                    'resumen' => $resumen,
+                    'pollingAsignacion' => $asignacion->envioasignacionmultipleid,
+                ])
             @else
                 <p class="text-muted small mb-0">Primero debe firmar el transportista asignado.</p>
             @endif
@@ -673,6 +674,7 @@
 
 @push('scripts')
 <script src="{{ asset('js/firma-canvas.js') }}?v=2"></script>
+<script src="{{ asset('js/cierre-panel-polling.js') }}?v=1"></script>
 <script>
 document.querySelectorAll('.cond-radio-si, .cond-radio-no').forEach(function (radio) {
     radio.addEventListener('change', function () {

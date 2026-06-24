@@ -9,6 +9,7 @@ use App\Models\UnidadMedida;
 use App\Support\AlmacenAmbito;
 use App\Support\InsumoCatalogo;
 use App\Models\InsumoPresentacion;
+use App\Services\InventarioAlmacenProductoService;
 use App\Services\InventarioPresentacionService;
 use App\Support\InsumoImagenCatalogo;
 use Illuminate\Http\RedirectResponse;
@@ -109,13 +110,16 @@ class AlmacenInventarioController extends Controller
         return $this->redirigirDespuesInventario($request, $ctx, $almacen, 'Producto actualizado en el almacén.');
     }
 
-    public function destroy(Request $request, Almacen $almacen, Insumo $insumo): RedirectResponse
-    {
+    public function destroy(
+        Request $request,
+        Almacen $almacen,
+        Insumo $insumo,
+        InventarioAlmacenProductoService $inventarioAlmacen
+    ): RedirectResponse {
         $ctx = AlmacenAmbito::contexto($request);
         $this->autorizarProducto($almacen, $insumo, $ctx['ambito']);
 
-        $this->eliminarImagenSubida($insumo->imagenurl);
-        $insumo->delete();
+        $inventarioAlmacen->eliminarProducto($almacen, $insumo);
 
         return $this->redirigirDespuesInventario($request, $ctx, $almacen, 'Producto eliminado del almacén.');
     }

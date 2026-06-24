@@ -14,7 +14,9 @@ use App\Models\AlmacenajeLoteProduccion;
 
 use App\Models\Insumo;
 
+use App\Models\AlmacenMovimiento;
 use App\Models\InsumoPresentacion;
+use App\Models\InventarioPresentacionLote;
 
 use App\Models\ProduccionAlmacenamiento;
 
@@ -676,11 +678,6 @@ class AlmacenController extends Controller
      */
     private function filaMayoristaConsolidada(Almacen $almacen, Insumo $insumo): ?object
     {
-        $this->inventarioPresentacion->asegurarInventarioDesdeStock(
-            (int) $almacen->almacenid,
-            (int) $insumo->insumoid
-        );
-
         $presentaciones = $insumo->relationLoaded('presentaciones')
             ? $insumo->presentaciones->where('activo', true)->sortBy('orden')->values()
             : InsumoPresentacion::query()
@@ -740,18 +737,52 @@ class AlmacenController extends Controller
             ? ($etiquetasUnidad[0] ?? 'empaques')
             : 'empaques';
 
+        $refTraslado = AlmacenMovimiento::query()
+            ->where('almacenid', $almacen->almacenid)
+            ->where('insumoid', $insumo->insumoid)
+            ->where('referencia', 'like', 'TPM-%')
+            ->orderByDesc('fecha')
+            ->value('referencia');
+
+        $descripcionVisible = trim((string) $insumo->descripcion);
+        if ($refTraslado && ! str_contains($descripcionVisible, (string) $refTraslado)) {
+            $marca = 'Producto recibido desde planta — '.$refTraslado;
+            $descripcionVisible = $descripcionVisible === ''
+                || str_contains(mb_strtolower($descripcionVisible), 'producto terminado de planta')
+                ? $marca
+                : $descripcionVisible.' | '.$marca;
+        }
+
+        $lotesRefs = InventarioPresentacionLote::query()
+            ->where('almacenid', $almacen->almacenid)
+            ->where('insumoid', $insumo->insumoid)
+            ->pluck('referencia_lote')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $fechaMovimiento = AlmacenMovimiento::query()
+            ->where('almacenid', $almacen->almacenid)
+            ->where('insumoid', $insumo->insumoid)
+            ->max('fecha');
+
+        $fechaOrden = $fechaMovimiento
+            ? strtotime((string) $fechaMovimiento)
+            : ($insumo->updated_at?->timestamp ?? 0);
+
         return (object) [
             'categoria' => 'producto_terminado',
             'tipo_label' => 'Producto procesado',
             'tipo_filtro' => 'producto procesado',
             'nombre' => $insumo->nombre,
-            'detalle' => $insumo->descripcion ? \Illuminate\Support\Str::limit($insumo->descripcion, 60) : '—',
+            'detalle' => $descripcionVisible !== '' ? \Illuminate\Support\Str::limit($descripcionVisible, 60) : '—',
             'cantidad' => $totalUnidades > 0 ? $totalUnidades : (float) $insumo->stock,
             'unidad' => $totalUnidades > 0 ? $unidadEtiqueta : ($insumo->unidadMedida?->abreviatura ?? 'kg'),
             'kg' => $totalKg,
             'empaque' => $empaque,
-            'fecha_orden' => 0,
-            'search' => strtolower(trim($insumo->nombre.' '.implode(' ', $nombresEmpaque).' producto procesado')),
+            'fecha_orden' => $fechaOrden,
+            'search' => strtolower(trim($insumo->nombre.' '.$descripcionVisible.' '.implode(' ', $nombresEmpaque).' '.implode(' ', $lotesRefs).' producto procesado')),
             'insumoid' => $insumo->insumoid,
             'origen_tipo' => 'insumo',
         ];

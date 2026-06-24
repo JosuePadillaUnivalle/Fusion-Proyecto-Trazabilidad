@@ -19,6 +19,12 @@ class EnsureCuentaAprobada
             return $next($request);
         }
 
+        $ultimaRevision = (int) $request->session()->get('_cuenta_revision', 0);
+        if (time() - $ultimaRevision >= 60) {
+            $user->refresh();
+            $request->session()->put('_cuenta_revision', time());
+        }
+
         $estado = $user->estado_cuenta ?? CuentaEstado::APROBADO;
 
         if (! CuentaEstado::puedeIniciarSesion($estado, (bool) $user->activo)) {

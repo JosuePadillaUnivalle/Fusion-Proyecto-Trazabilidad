@@ -273,6 +273,7 @@
                             </div>
                             <small class="text-muted d-block mt-1">Abre un buscador para filtrar, ver etapas y elegir el proceso manualmente.</small>
                         </div>
+                        @include('procesamiento.partials.parametros-lote-plantilla')
                         <div class="alert alert-light border mb-0 py-2 px-3 small">
                             <i class="fas fa-magic text-success mr-1"></i>
                             Se creará como: <strong id="nombreLotePreview" class="text-success">—</strong>
@@ -446,6 +447,7 @@
         'modoMateriaPrima' => \App\Support\EmpaquePlantaCatalogo::MODO_MATERIA_PRIMA,
         'slugPersonalizado' => \App\Support\EmpaquePlantaCatalogo::SLUG_PERSONALIZADO,
     ];
+    $urlParametrosPlantillaJs = url('/plantillas-transformacion/__ID__/parametros');
 @endphp
 <script src="{{ asset('js/selector-catalogo.js') }}"></script>
 <script src="{{ asset('js/selector-plantilla-transformacion.js') }}"></script>
@@ -772,6 +774,7 @@
                 plantillaInput.value = item.id;
                 plantillaDisplay.value = item.label;
                 plantillaDisplay.classList.remove('text-muted');
+                cargarParametrosPlantilla(item.id);
             },
         });
 
@@ -786,7 +789,117 @@
         plantillaDisplay.value = '';
         plantillaDisplay.classList.add('text-muted');
         plantillaDisplay.placeholder = 'Sin proceso asignado';
+        cargarParametrosPlantilla(null);
     });
+
+    const urlParametrosPlantilla = @json($urlParametrosPlantillaJs);
+    const panelParametros = document.getElementById('panelParametrosLote');
+    const listaParametros = document.getElementById('parametrosLoteLista');
+    const vacioParametros = document.getElementById('parametrosLoteVacio');
+    const chkPersonalizar = document.getElementById('chkPersonalizarParametros');
+    let datosParametrosPlantilla = null;
+
+    function combinarLimitesLote(maq, escala) {
+        if (!maq && !escala) return null;
+        if (!maq) return escala;
+        if (!escala) return maq;
+        const min = Math.max(maq.min, escala.min);
+        const max = Math.min(maq.max, escala.max);
+        return max < min ? maq : { min, max };
+    }
+
+    function limitesEscalaUnidad(unidad) {
+        if (!unidad) return null;
+        const m = String(unidad).toLowerCase().match(/escala\s*(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)/);
+        if (!m) return null;
+        return { min: parseFloat(m[1].replace(',', '.')), max: parseFloat(m[2].replace(',', '.')) };
+    }
+
+    function acotarValorLote(input, lim) {
+        if (!input || !lim) return;
+        let v = parseFloat(input.value);
+        if (!Number.isFinite(v)) return;
+        if (v < lim.min) input.value = String(lim.min);
+        if (v > lim.max) input.value = String(lim.max);
+    }
+
+    function renderParametrosLote() {
+        if (!listaParametros || !panelParametros) return;
+        listaParametros.innerHTML = '';
+        const personalizar = chkPersonalizar?.checked;
+        listaParametros.classList.toggle('d-none', !datosParametrosPlantilla || !datosParametrosPlantilla.pasos?.length);
+        vacioParametros?.classList.toggle('d-none', !!(datosParametrosPlantilla && datosParametrosPlantilla.pasos?.length));
+
+        if (!datosParametrosPlantilla?.pasos?.length) return;
+
+        let idx = 0;
+        datosParametrosPlantilla.pasos.forEach(function (paso) {
+            if (!paso.variables?.length) return;
+            const bloque = document.createElement('div');
+            bloque.className = 'lote-param-paso';
+            bloque.innerHTML = '<div class="lote-param-paso__head">Paso ' + paso.orden + ' · ' + esc(paso.proceso) + (paso.maquina ? ' · ' + esc(paso.maquina) : '') + '</div>';
+            paso.variables.forEach(function (v) {
+                const maq = (v.maq_minimo != null && v.maq_maximo != null) ? { min: v.maq_minimo, max: v.maq_maximo } : null;
+                const lim = combinarLimitesLote(maq, limitesEscalaUnidad(v.unidad));
+                const fila = document.createElement('div');
+                fila.className = 'lote-param-var' + (personalizar ? '' : ' is-readonly');
+                const limTxt = lim ? 'Límite máquina: ' + lim.min + '–' + lim.max : '';
+                fila.innerHTML =
+                    '<div><strong>' + esc(v.nombre) + '</strong>' + (v.unidad ? ' <span class="text-muted">(' + esc(v.unidad) + ')</span>' : '') +
+                    (limTxt ? '<div class="lote-param-limite">' + limTxt + '</div>' : '') + '</div>' +
+                    '<input type="number" step="0.01" class="form-control form-control-sm lote-param-min" value="' + v.valor_minimo + '" ' + (personalizar ? '' : 'readonly tabindex="-1"') + '>' +
+                    '<input type="number" step="0.01" class="form-control form-control-sm lote-param-max" value="' + v.valor_maximo + '" ' + (personalizar ? '' : 'readonly tabindex="-1"') + '>' +
+                    '<input type="hidden" name="parametros_lote[' + idx + '][plantillapasoid]" value="' + paso.plantillapasoid + '">' +
+                    '<input type="hidden" name="parametros_lote[' + idx + '][variableestandarid]" value="' + v.variableestandarid + '">';
+                const minIn = fila.querySelector('.lote-param-min');
+                const maxIn = fila.querySelector('.lote-param-max');
+                minIn.name = 'parametros_lote[' + idx + '][valor_minimo]';
+                maxIn.name = 'parametros_lote[' + idx + '][valor_maximo]';
+                if (lim) {
+                    [minIn, maxIn].forEach(function (inp) {
+                        inp.min = lim.min;
+                        inp.max = lim.max;
+                        inp.addEventListener('input', function () { acotarValorLote(inp, lim); });
+                    });
+                }
+                if (!personalizar) {
+                    fila.querySelectorAll('input').forEach(function (inp) { inp.disabled = true; });
+                }
+                bloque.appendChild(fila);
+                idx++;
+            });
+            listaParametros.appendChild(bloque);
+        });
+    }
+
+    async function cargarParametrosPlantilla(id) {
+        datosParametrosPlantilla = null;
+        if (!id) {
+            panelParametros?.classList.add('d-none');
+            renderParametrosLote();
+            return;
+        }
+        panelParametros?.classList.remove('d-none');
+        if (vacioParametros) vacioParametros.textContent = 'Cargando parámetros…';
+        try {
+            const res = await fetch(urlParametrosPlantilla.replace('__ID__', String(id)), {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (!res.ok) throw new Error();
+            datosParametrosPlantilla = await res.json();
+        } catch (e) {
+            if (vacioParametros) vacioParametros.textContent = 'No se pudieron cargar los parámetros.';
+            listaParametros?.classList.add('d-none');
+            return;
+        }
+        renderParametrosLote();
+    }
+
+    chkPersonalizar?.addEventListener('change', renderParametrosLote);
+
+    if (plantillaInput?.value) {
+        cargarParametrosPlantilla(plantillaInput.value);
+    }
 
     tbody.addEventListener('input', function (e) {
         if (e.target.classList.contains('mp-cantidad-input')) {

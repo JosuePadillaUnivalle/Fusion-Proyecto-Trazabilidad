@@ -201,6 +201,13 @@
                             <span class="role-acc-tile__sub">Equipos de producción</span>
                         </span>
                     </a>
+                    <a href="{{ route('variables-estandar.index') }}" class="role-acc-tile">
+                        <span class="role-acc-tile__icon role-acc-tile__icon--prod"><i class="fas fa-sliders-h"></i></span>
+                        <span>
+                            <span class="role-acc-tile__lbl">Variables estándar</span>
+                            <span class="role-acc-tile__sub">Temperatura, presión, etc.</span>
+                        </span>
+                    </a>
                     @endif
                     @if($userPanel && \App\Support\UsuarioRol::esOperarioPlanta($userPanel))
                     <a href="{{ route('tareas-planta.index') }}" class="role-acc-tile">

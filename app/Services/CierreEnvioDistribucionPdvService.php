@@ -96,7 +96,7 @@ class CierreEnvioDistribucionPdvService
             $pasoActual = EnvioCierreAgricolaCatalogo::PASO_EN_RUTA;
         }
 
-        return [
+        return app(RecepcionQrFirmaService::class)->enriquecerResumen([
             'paso_actual' => $pasoActual,
             'tiene_condiciones' => $tieneCondiciones,
             'condiciones_vigentes' => $condicionesVigentes,
@@ -121,7 +121,7 @@ class CierreEnvioDistribucionPdvService
             'puede_firmar_recepcion' => $llegadaConfirmada && $tieneIncidentes && ! $recibido
                 && $firmaTransportista && ! $firmaRecepcion,
             'puede_finalizar' => $llegadaConfirmada && $tieneIncidentes && $firmaTransportista && $firmaRecepcion && ! $recibido,
-        ];
+        ], $ruta);
     }
 
     /**
@@ -285,8 +285,11 @@ class CierreEnvioDistribucionPdvService
         $firma = FirmaTransportistaEnvio::create([
             'rutadistribucionid' => $ruta->rutadistribucionid,
             'imagenfirma' => $this->normalizarImagenFirma($imagenBase64),
+            'nombrefirmante' => RecepcionQrFirmaService::nombreDesdeUsuario($usuario),
             'fechafirma' => now(),
         ]);
+
+        app(RecepcionQrFirmaService::class)->ensureToken($ruta);
 
         app(NotificacionUsuarioService::class)->distribucionPdvPendienteFirmaMinorista(
             $ruta->fresh(['pedidos.puntoVenta', 'transportista'])

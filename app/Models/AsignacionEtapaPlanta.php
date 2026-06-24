@@ -9,6 +9,7 @@ class AsignacionEtapaPlanta extends Model
 {
     public const ESTADO_PENDIENTE = 'pendiente';
     public const ESTADO_COMPLETADA = 'completada';
+    public const ESTADO_CANCELADA = 'cancelada';
 
     protected $table = 'asignacion_etapa_planta';
     protected $primaryKey = 'asignacionetapaplantaid';

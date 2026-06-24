@@ -23,20 +23,6 @@
             @include('lotes.partials.datos-lote-panel')
         </div>
         <div class="col-lg-6">
-            @if($lote->imagenurl)
-            <div class="lote-op-panel mb-4">
-                <div class="lote-op-panel__head">
-                    <div class="lote-op-panel__head-icon lote-op-panel__head-icon--photo"><i class="fas fa-image"></i></div>
-                    <div>
-                        <h3 class="lote-op-panel__title">Imagen del lote</h3>
-                    </div>
-                </div>
-                <div class="lote-op-panel__photo">
-                    <img src="{{ $lote->imagenurl }}" alt="Lote {{ $lote->nombre }}" class="img-fluid">
-                </div>
-            </div>
-            @endif
-
             <div class="lote-op-panel">
                 <div class="lote-op-panel__head">
                     <div class="lote-op-panel__head-icon"><i class="fas fa-chart-pie"></i></div>

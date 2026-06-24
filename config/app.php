@@ -59,11 +59,9 @@ return [
     | URL pública en red local (QR desde consola, correos, jobs)
     |--------------------------------------------------------------------------
     |
-    | Solo se usa cuando no hay petición HTTP (artisan, colas). En el navegador
-    | el QR toma automáticamente el host actual (ej. http://127.0.0.1:8001).
-    | Para probar desde el celular, defina APP_PUBLIC_URL con la IP LAN y el puerto
-    | (ej. http://192.168.1.10:8001). En el PC puede usar http://127.0.0.1:8001;
-    | los QR de trazabilidad usarán APP_PUBLIC_URL para que el celular pueda abrirlos.
+    | Solo se usa cuando no hay petición HTTP (artisan, colas). Al ejecutar
+    | `php artisan serve`, se detecta y asigna automáticamente la IP WiFi.
+    | Los QR siempre usan esa URL aunque en el PC abra http://127.0.0.1:8001.
     |
     */
 

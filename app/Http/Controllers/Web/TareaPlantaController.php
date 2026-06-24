@@ -7,6 +7,7 @@ use App\Models\AsignacionEtapaPlanta;
 use App\Models\Usuario;
 use App\Services\NotificacionUsuarioService;
 use App\Support\AsignacionEtapaPlantaService;
+use App\Support\LoteProduccionParametrosService;
 use App\Support\LoteProduccionTrazabilidadService;
 use App\Support\ProcesoPlantaCatalogo;
 use App\Support\UsuarioRol;
@@ -19,6 +20,7 @@ class TareaPlantaController extends Controller
     public function __construct(
         private readonly AsignacionEtapaPlantaService $asignaciones,
         private readonly LoteProduccionTrazabilidadService $trazabilidad,
+        private readonly LoteProduccionParametrosService $parametros,
         private readonly NotificacionUsuarioService $notificaciones,
     ) {}
 
@@ -87,6 +89,10 @@ class TareaPlantaController extends Controller
             'puedeCompletar' => $this->asignaciones->puedeCompletar($asignacion),
             'empaquePlan' => $empaquePlan,
             'vistaEmpaquetado' => $vistaEmpaquetado,
+            'parametrosRequeridos' => $this->parametros->parametrosRequeridosParaAsignacion($asignacion),
+            'timelineLote' => $asignacion->loteProduccion
+                ? app(\App\Support\LoteProduccionTransformacionService::class)->timelineVisual($asignacion->loteProduccion)
+                : [],
         ]);
     }
 
@@ -105,13 +111,20 @@ class TareaPlantaController extends Controller
 
         $inicio = $asignacion->creado_en ?? now();
 
+        $data = $request->validate([
+            'parametros' => ['nullable', 'array'],
+            'parametros.*.variableestandarid' => ['required_with:parametros', 'integer'],
+            'parametros.*.valor' => ['required_with:parametros', 'numeric'],
+        ]);
+
         try {
             $this->asignaciones->completar($asignacion, [
                 'hora_inicio' => $inicio->toDateTimeString(),
                 'hora_fin' => now()->toDateTimeString(),
+                'parametros' => array_values($data['parametros'] ?? []),
             ], $user);
         } catch (\InvalidArgumentException $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->with('error', $e->getMessage())->withInput();
         }
 
         return redirect()->route('tareas-planta.index');

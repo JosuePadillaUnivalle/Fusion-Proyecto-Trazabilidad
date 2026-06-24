@@ -23,6 +23,7 @@ class MaquinaProcesoCompatibilidad
         'EV-700' => ['Envasado'],
         'ET-800' => ['Etiquetado'],
         'SE-10' => ['Empaquetado'],
+        'SE-11' => ['Empaquetado'],
         'BC-20' => ['Preparación de Materias Primas'],
         'BD-500' => [],
     ];
@@ -43,6 +44,10 @@ class MaquinaProcesoCompatibilidad
             return false;
         }
 
+        if (self::esProcesoTransformacion($proceso)) {
+            return self::coincidePorCodigo($proceso, $maquina);
+        }
+
         $vinculo = ProcesoMaquinaPlanta::query()
             ->where('procesoplantaid', $procesoplantaid)
             ->where('maquinaplantaid', $maquinaplantaid)
@@ -52,10 +57,7 @@ class MaquinaProcesoCompatibilidad
             return true;
         }
 
-        $codigo = strtoupper(trim((string) ($maquina->codigo ?? '')));
-        $permitidos = self::MAPA_CODIGO[$codigo] ?? [];
-
-        return in_array($proceso->nombre, $permitidos, true);
+        return self::coincidePorCodigo($proceso, $maquina);
     }
 
     /**
@@ -69,8 +71,6 @@ class MaquinaProcesoCompatibilidad
     }
 
     /**
-     * Todas las máquinas compatibles con el proceso (activas e inactivas).
-     *
      * @return Collection<int, MaquinaPlanta>
      */
     public static function todasMaquinasParaProceso(int $procesoplantaid): Collection
@@ -80,31 +80,14 @@ class MaquinaProcesoCompatibilidad
             return collect();
         }
 
-        $idsVinculados = ProcesoMaquinaPlanta::query()
-            ->where('procesoplantaid', $procesoplantaid)
-            ->pluck('maquinaplantaid');
-
         return MaquinaPlanta::query()
             ->orderBy('nombre')
             ->get()
-            ->filter(function (MaquinaPlanta $m) use ($proceso, $idsVinculados) {
-                if (in_array($m->codigo ?? '', self::EXCLUIDAS_TRANSFORMACION, true)) {
-                    return false;
-                }
-                if ($idsVinculados->contains($m->maquinaplantaid)) {
-                    return true;
-                }
-                $codigo = strtoupper(trim((string) ($m->codigo ?? '')));
-                $permitidos = self::MAPA_CODIGO[$codigo] ?? [];
-
-                return in_array($proceso->nombre, $permitidos, true);
-            })
+            ->filter(fn (MaquinaPlanta $m) => self::compatible($procesoplantaid, (int) $m->maquinaplantaid))
             ->values();
     }
 
-    /**
-     * @return array<int, list<array{id: int, nombre: string, codigo: ?string, activo: bool}>>
-     */
+    /** @return array<int, list<array{id: int, nombre: string, codigo: ?string, activo: bool, imagen_src: ?string, descripcion: string}>> */
     public static function mapaMaquinasFormulario(): array
     {
         $result = [];
@@ -115,6 +98,8 @@ class MaquinaProcesoCompatibilidad
                     'nombre' => $m->nombre,
                     'codigo' => $m->codigo,
                     'activo' => (bool) $m->activo,
+                    'imagen_src' => $m->imagenSrc(),
+                    'descripcion' => $m->descripcionMostrar(),
                 ])
                 ->values()
                 ->all();
@@ -123,9 +108,7 @@ class MaquinaProcesoCompatibilidad
         return $result;
     }
 
-    /**
-     * @return array{proceso_maquina: array<int, list<int>>, maquina_proceso: array<int, list<int>>}
-     */
+    /** @return array{proceso_maquina: array<int, list<int>>, maquina_proceso: array<int, list<int>>} */
     public static function mapaSelectores(): array
     {
         $procesoMaquina = [];
@@ -162,5 +145,21 @@ class MaquinaProcesoCompatibilidad
     public static function mapaCodigoProcesos(): array
     {
         return self::MAPA_CODIGO;
+    }
+
+    private static function esProcesoTransformacion(ProcesoPlanta $proceso): bool
+    {
+        return ProcesoPlantaCatalogo::paraTransformacion()
+            ->contains(fn (ProcesoPlanta $p) => (int) $p->procesoplantaid === (int) $proceso->procesoplantaid);
+    }
+
+    private static function coincidePorCodigo(ProcesoPlanta $proceso, MaquinaPlanta $maquina): bool
+    {
+        $codigo = strtoupper(trim((string) ($maquina->codigo ?? '')));
+        if ($codigo === '') {
+            return false;
+        }
+
+        return in_array($proceso->nombre, self::MAPA_CODIGO[$codigo] ?? [], true);
     }
 }

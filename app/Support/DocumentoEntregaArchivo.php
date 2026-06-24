@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 
 final class DocumentoEntregaArchivo
 {
-    private const PDF_VERSION = 8;
+    private const PDF_VERSION = 10;
 
     /** @var array<string, string> */
     private const TIPOS_ETIQUETA = [
@@ -180,7 +180,6 @@ final class DocumentoEntregaArchivo
                 ?? $rutaOperacion?->checklistCondicionVehiculo?->estado_general
         );
         $transportista = $envio?->transportista ?? $rutaOperacion?->transportista ?? $documento->usuario;
-        $transportistaNombre = DocumentoEntregaCatalogo::etiquetaUsuario($transportista);
 
         $destinoCliente = '—';
         $direccionEntrega = '—';
@@ -293,6 +292,13 @@ final class DocumentoEntregaArchivo
         $operacionFirmaRecepcion = $envio?->firmaRecepcion ?? $rutaOperacion?->firmaRecepcion;
         $operacionLlegadaAt = $envio?->llegada_confirmada_at ?? $rutaOperacion?->llegada_confirmada_at;
 
+        $transportistaNombre = trim((string) ($operacionFirmaTransportista?->nombrefirmante ?? ''));
+        if ($transportistaNombre === '') {
+            $transportistaNombre = DocumentoEntregaCatalogo::etiquetaUsuario($transportista);
+        }
+
+        $recepcionNombre = trim((string) ($operacionFirmaRecepcion?->nombrefirmante ?? ''));
+
         $condicionesLineas = [];
         foreach ($operacionChecklistCondicion?->detalles ?? [] as $det) {
             $condicionesLineas[] = [
@@ -353,6 +359,7 @@ final class DocumentoEntregaArchivo
             'estadoVehiculo' => $estadoVehiculo,
             'tipoEtiqueta' => $tipoEtiqueta,
             'transportistaNombre' => $transportistaNombre,
+            'recepcionNombre' => $recepcionNombre !== '' ? $recepcionNombre : ($destinoCliente !== '—' ? $destinoCliente : null),
             'destinoCliente' => $destinoCliente,
             'direccionEntrega' => $direccionEntrega,
             'cargadoPor' => $cargadoPor,
@@ -366,6 +373,8 @@ final class DocumentoEntregaArchivo
             'incidentesLineas' => $incidentesLineas,
             'observacionIncidentes' => $observacionIncidentes,
             'observacionesIncidentes' => $operacionChecklistIncidente?->observaciones,
+            'observacionPersonalCondiciones' => self::extraerObservacionManual($operacionChecklistCondicion?->observaciones),
+            'observacionPersonalIncidentes' => self::extraerObservacionManual($operacionChecklistIncidente?->observaciones),
             'firmaTransportistaImg' => $operacionFirmaTransportista?->imagenfirma,
             'firmaRecepcionImg' => $operacionFirmaRecepcion?->imagenfirma,
             'firmaRecepcionEtiqueta' => $firmaRecepcionEtiqueta,
@@ -409,6 +418,63 @@ final class DocumentoEntregaArchivo
         }
 
         return ['texto' => null, 'alerta' => false];
+    }
+
+    /** @return list<string> */
+    private static function textosObservacionSistema(): array
+    {
+        return [
+            'vehículo en perfectas condiciones.',
+            'vehiculo en perfectas condiciones.',
+            'vehículo en condiciones óptimas.',
+            'vehiculo en condiciones optimas.',
+            'transporte sin incidentes reportados.',
+        ];
+    }
+
+    private static function esObservacionManual(?string $texto): bool
+    {
+        $limpio = trim((string) $texto);
+        if ($limpio === '') {
+            return false;
+        }
+
+        $limpio = preg_replace('/\s*\(registro\s+r[aá]pido\)\.?/iu', '', $limpio) ?? $limpio;
+        $limpio = trim($limpio);
+        if ($limpio === '') {
+            return false;
+        }
+
+        $normalizado = mb_strtolower($limpio);
+
+        foreach (self::textosObservacionSistema() as $defecto) {
+            if ($normalizado === $defecto || str_starts_with($normalizado, $defecto)) {
+                return false;
+            }
+        }
+
+        if (str_starts_with($normalizado, 'deficiencias detectadas:')) {
+            return false;
+        }
+
+        if (str_starts_with($normalizado, 'incidentes reportados:')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function extraerObservacionManual(?string $texto): ?string
+    {
+        if (! self::esObservacionManual($texto)) {
+            return null;
+        }
+
+        $limpio = trim((string) $texto);
+        $limpio = preg_replace('/\s*\(registro\s+r[aá]pido\)\.?/iu', '', $limpio) ?? $limpio;
+        $limpio = trim($limpio);
+
+        return $limpio !== '' ? $limpio : null;
     }
 
     private static function esArchivoPlaceholder(string $path): bool

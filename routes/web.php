@@ -19,12 +19,15 @@ use App\Http\Controllers\Web\TipoActividadController;
 use App\Http\Controllers\Web\TipoInsumoController;
 use App\Http\Controllers\Web\UnidadMedidaController;
 use App\Http\Controllers\Web\GestionUsuariosController;
+use App\Http\Controllers\Web\ReporteCentroController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\PedidoController;
 use App\Http\Controllers\Web\PuntoVentaController;
 use App\Http\Controllers\Web\PuntoVentaInventarioController;
 use App\Http\Controllers\Web\PedidoDistribucionController;
 use App\Http\Controllers\Web\TrazabilidadPublicaController;
+use App\Http\Controllers\Web\RecepcionQrPublicaController;
+use App\Http\Controllers\Web\CierreFirmasEstadoController;
 use App\Http\Controllers\Web\UserProfileController;
 
 // 🔹 nuevos controladores web de almacenamiento
@@ -58,6 +61,7 @@ use App\Http\Controllers\Web\ActorAbastecimientoController;
 use App\Http\Controllers\Web\ProcesoPlantaController;
 use App\Http\Controllers\Web\PlantaCatalogoController;
 use App\Http\Controllers\Web\MaquinaPlantaController;
+use App\Http\Controllers\Web\VariableEstandarController;
 use App\Http\Controllers\Web\PlantillaTransformacionController;
 use App\Http\Controllers\Web\AsignacionMultipleController;
 use App\Http\Controllers\Web\TransportistaIngresoController;
@@ -91,10 +95,15 @@ Route::match(['get', 'post'], '/logout', [AuthController::class, 'logout'])->nam
 
 Route::get('/trazabilidad/{codigo}', [TrazabilidadPublicaController::class, 'show'])->name('trazabilidad.publica');
 
+Route::get('/recepcion/{token}', [RecepcionQrPublicaController::class, 'show'])->name('recepcion.publica');
+Route::post('/recepcion/{token}', [RecepcionQrPublicaController::class, 'firmar'])->name('recepcion.publica.firmar');
+
 
 // RUTAS PROTEGIDAS (REQUIEREN ESTAR LOGUEADO)
 
 Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
+
+    Route::get('/api/cierre/firmas-estado', [CierreFirmasEstadoController::class, 'show'])->name('cierre.firmas-estado');
 
     // Perfil de Usuario
     Route::get('/perfil', [UserProfileController::class, 'show'])->name('profile.show');
@@ -102,6 +111,7 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::post('/perfil/bienvenida-vista', [UserProfileController::class, 'marcarBienvenidaVista'])->name('profile.bienvenida.vista');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/login-notificaciones/descartar', [\App\Http\Controllers\Web\LoginNotificacionController::class, 'descartar'])->name('login-notificaciones.descartar');
     Route::post('/notificaciones/{notificacion}/leer', [DashboardController::class, 'marcarNotificacionLeida'])->name('notificaciones.leer');
     Route::post('/notificaciones/descartar-todas', [DashboardController::class, 'descartarTodasNotificaciones'])->name('notificaciones.descartar-todas');
     Route::post('/notificaciones/{notificacion}/descartar', [DashboardController::class, 'descartarNotificacion'])->name('notificaciones.descartar');
@@ -178,6 +188,8 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::get('lotes/validar-ubicacion', [LoteController::class, 'validarUbicacion'])->name('lotes.validar-ubicacion')->middleware('action.permission:lotes,read');
     Route::post('lotes', [LoteController::class, 'store'])->name('lotes.store')->middleware('action.permission:lotes,create');
     Route::get('lotes/{lote}/trazabilidad', [LoteController::class, 'trazabilidad'])->name('lotes.trazabilidad')->middleware('action.permission:lotes,read');
+    Route::get('lotes/{lote}/siembra/completar', [ActividadController::class, 'completarSiembra'])->name('lotes.siembra.completar')->middleware('action.permission:lotes,read');
+    Route::post('lotes/{lote}/siembra/completar', [ActividadController::class, 'storeCompletarSiembra'])->name('lotes.siembra.completar.store')->middleware('action.permission:lotes,read');
     Route::get('lotes/{lote}/siembra', [ActividadController::class, 'createSiembra'])->name('lotes.siembra.create')->middleware('action.permission:lotes,read');
     Route::post('lotes/{lote}/siembra', [ActividadController::class, 'storeSiembra'])->name('lotes.siembra.store')->middleware('action.permission:lotes,read');
     Route::post('lotes/{lote}/asignar-siembra', [ActividadController::class, 'asignarSiembra'])->name('lotes.siembra.asignar')->middleware('action.permission:lotes,read');
@@ -201,11 +213,17 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::resource('producciones', ProduccionController::class)
         ->parameters(['producciones' => 'produccion']);
     Route::resource('procesos-planta', ProcesoPlantaController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::get('plantillas-transformacion/{plantillas_transformacion}/parametros', [PlantillaTransformacionController::class, 'parametrosJson'])
+        ->name('plantillas-transformacion.parametros');
     Route::resource('plantillas-transformacion', PlantillaTransformacionController::class)
         ->parameters(['plantillas-transformacion' => 'plantillas_transformacion']);
     Route::resource('maquinas-planta', MaquinaPlantaController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::get('maquinas-planta/{maquinas_plantum}/variables-sugeridas', [MaquinaPlantaController::class, 'variablesSugeridas'])
+        ->name('maquinas-planta.variables-sugeridas');
     Route::patch('maquinas-planta/{maquinas_plantum}/toggle-activo', [MaquinaPlantaController::class, 'toggleActivo'])
         ->name('maquinas-planta.toggle-activo');
+    Route::resource('variables-estandar', VariableEstandarController::class)
+        ->parameters(['variables-estandar' => 'variables_estandar']);
 
     Route::prefix('produccion-planta/catalogos')->name('produccion-planta.catalogos.')->group(function () {
         Route::get('{tipo}', [PlantaCatalogoController::class, 'index'])->name('index');
@@ -245,6 +263,9 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
         ->middleware('action.permission:lote_produccion,create');
     Route::post('procesamiento/{loteProduccion}/asignar-etapa', [\App\Http\Controllers\Web\LoteProduccionController::class, 'asignarEtapa'])
         ->name('procesamiento.asignar-etapa')
+        ->middleware('action.permission:lote_produccion,create');
+    Route::put('procesamiento/{loteProduccion}/ruta', [\App\Http\Controllers\Web\LoteProduccionController::class, 'actualizarRuta'])
+        ->name('procesamiento.actualizar-ruta')
         ->middleware('action.permission:lote_produccion,create');
     Route::post('procesamiento/{loteProduccion}/asignaciones-etapa/{asignacion}/completar', [\App\Http\Controllers\Web\LoteProduccionController::class, 'completarEtapaAsignada'])
         ->name('procesamiento.completar-etapa-asignada')
@@ -517,6 +538,17 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::get('/gestion-usuarios/{usuario}', [GestionUsuariosController::class, 'show'])
         ->middleware('action.permission:usuarios,read')
         ->name('gestion.show');
+
+    // CENTRO DE REPORTES
+    Route::prefix('reportes')->name('reportes.')->group(function () {
+        Route::get('/', [ReporteCentroController::class, 'index'])->name('index');
+        Route::get('/envios-estado', [ReporteCentroController::class, 'enviosEstado'])->name('envios-estado');
+        Route::get('/stock-ambito', [ReporteCentroController::class, 'stockAmbito'])->name('stock-ambito');
+        Route::get('/transportistas', [ReporteCentroController::class, 'transportistas'])->name('transportistas');
+        Route::get('/traslados-planta-mayorista', [ReporteCentroController::class, 'trasladosPlantaMayorista'])->name('traslados-planta-mayorista');
+        Route::get('/pedidos-pdv', [ReporteCentroController::class, 'pedidosPdv'])->name('pedidos-pdv');
+        Route::get('/productos-terminados', [ReporteCentroController::class, 'productosTerminados'])->name('productos-terminados');
+    });
 
     // CRUD Usuarios
     Route::post('/gestion-usuarios/usuario', [GestionUsuariosController::class, 'storeUsuario'])

@@ -1,11 +1,12 @@
 @php
     $asignaciones = session('transportista_nuevas_asignaciones', []);
+    $clavesJson = json_encode(array_column($asignaciones, 'clave'));
 @endphp
 
 @if(! empty($asignaciones))
 <div class="login-notif-scrim" id="transpAsignScrim" aria-hidden="true"></div>
 
-<div class="modal fade login-notif-modal-root" id="modalTransportistaAsignacion" tabindex="-1" role="dialog" aria-labelledby="modalTransportistaAsignacionTitulo" aria-hidden="true" data-backdrop="false" data-keyboard="true">
+<div class="modal fade login-notif-modal-root" id="modalTransportistaAsignacion" tabindex="-1" role="dialog" aria-labelledby="modalTransportistaAsignacionTitulo" aria-hidden="true" data-backdrop="false" data-keyboard="true" data-login-notif-alcance="transportista" data-login-notif-claves="{{ $clavesJson }}">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content login-notif-modal login-notif-modal--transportista">
             <div class="login-notif-modal__accent" aria-hidden="true"></div>

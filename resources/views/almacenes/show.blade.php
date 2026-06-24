@@ -366,9 +366,13 @@
 
                         <option value="">Todas</option>
 
-                        <option value="insumo">Insumos</option>
+                        @if(! in_array($ambitoActual, [\App\Support\AlmacenAmbito::MAYORISTA, \App\Support\AlmacenAmbito::PUNTO_VENTA], true))
 
-                        <option value="cosecha">Cosecha</option>
+                            <option value="insumo">Insumos</option>
+
+                            <option value="cosecha">Cosecha</option>
+
+                        @endif
 
                         <option value="producto_procesado">Producto procesado</option>
 
@@ -408,6 +412,18 @@
 
                 </div>
 
+                <div class="col-md-2 d-flex align-items-end mb-2 mb-md-0">
+
+                    <div class="btn-group btn-group-sm w-100">
+
+                        <button type="button" id="contenidoBtnFiltrar" class="btn btn-success"><i class="fas fa-filter mr-1"></i> Filtrar</button>
+
+                        <button type="button" id="contenidoBtnLimpiar" class="btn btn-outline-secondary">Limpiar</button>
+
+                    </div>
+
+                </div>
+
             </div>
 
         </div>
@@ -434,7 +450,7 @@
 
                     @forelse($contenidos as $item)
 
-                        <tr class="contenido-row" data-search="{{ $item->search }}" data-categoria="{{ $item->categoria }}" data-tipo="{{ strtolower($item->tipo_label) }}" data-fecha="{{ (int) ($item->fecha_orden ?? 0) }}">
+                        <tr class="contenido-row" data-search="{{ $item->search }}" data-categoria="{{ $item->categoria }}" data-tipo="{{ strtolower($item->tipo_filtro ?? $item->tipo_label) }}" data-fecha="{{ (int) ($item->fecha_orden ?? 0) }}">
 
                             <td><strong class="text-success">{{ $item->nombre }}</strong></td>
 
@@ -642,15 +658,23 @@
 
     const tbody = document.getElementById('contenidoTableBody');
 
-    let rows = Array.from(document.querySelectorAll('.contenido-row'));
+    const btnFiltrar = document.getElementById('contenidoBtnFiltrar');
+
+    const btnLimpiar = document.getElementById('contenidoBtnLimpiar');
 
     const sinResultados = document.getElementById('contenidoSinResultados');
 
+    function normalizarTextoFiltro(texto) {
+        return (texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    }
 
+    function filasContenido() {
+        return tbody ? Array.from(tbody.querySelectorAll('.contenido-row')) : [];
+    }
 
-    function ordenarFilasPorFecha() {
+    function ordenarFilasPorFecha(rows) {
 
-        if (!tbody || !fFecha) return;
+        if (!tbody || !fFecha || rows.length === 0) return rows;
 
         const asc = fFecha.value === 'antiguo';
 
@@ -672,19 +696,19 @@
 
         rows.forEach(function (row) { tbody.appendChild(row); });
 
+        return rows;
+
     }
-
-
 
     function aplicarFiltroContenido() {
 
-        const texto = (q?.value || '').toLowerCase();
+        const texto = normalizarTextoFiltro(q?.value || '');
 
         const cat = (fCat?.value || '').toLowerCase();
 
-        const tipo = (fTipo?.value || '').toLowerCase();
+        const tipo = normalizarTextoFiltro(fTipo?.value || '');
 
-        ordenarFilasPorFecha();
+        let rows = ordenarFilasPorFecha(filasContenido());
 
         let visibles = 0;
 
@@ -694,9 +718,11 @@
             const catMatch = !cat
                 || categoria === cat
                 || (cat === 'producto_procesado' && (categoria === 'producto_planta' || categoria === 'producto_terminado'));
-            const show = (!texto || (row.dataset.search || '').includes(texto))
+            const busqueda = normalizarTextoFiltro(row.dataset.search || '');
+            const tipoFila = normalizarTextoFiltro(row.dataset.tipo || '');
+            const show = (!texto || busqueda.includes(texto))
                 && catMatch
-                && (!tipo || (row.dataset.tipo || '') === tipo);
+                && (!tipo || tipoFila === tipo);
 
             row.style.display = show ? '' : 'none';
 
@@ -708,15 +734,34 @@
 
     }
 
-    if (q) q.addEventListener('input', aplicarFiltroContenido);
+    function limpiarFiltroContenido() {
+        if (q) q.value = '';
+        if (fCat) fCat.value = '';
+        if (fTipo) fTipo.value = '';
+        if (fFecha) fFecha.value = 'reciente';
+        aplicarFiltroContenido();
+    }
 
-    if (fCat) fCat.addEventListener('change', aplicarFiltroContenido);
+    function initFiltrosContenido() {
+        if (!tbody) return;
+        if (btnFiltrar) btnFiltrar.addEventListener('click', aplicarFiltroContenido);
+        if (btnLimpiar) btnLimpiar.addEventListener('click', limpiarFiltroContenido);
+        if (q) {
+            q.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    aplicarFiltroContenido();
+                }
+            });
+        }
+        aplicarFiltroContenido();
+    }
 
-    if (fTipo) fTipo.addEventListener('change', aplicarFiltroContenido);
-
-    if (fFecha) fFecha.addEventListener('change', aplicarFiltroContenido);
-
-    aplicarFiltroContenido();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initFiltrosContenido);
+    } else {
+        initFiltrosContenido();
+    }
 
     document.querySelectorAll('.on-submit-confirm').forEach(function (form) {
         form.addEventListener('submit', function (e) {

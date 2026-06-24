@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Insumo;
 use App\Models\PuntoVenta;
+use App\Services\InventarioAlmacenProductoService;
 use App\Services\PuntoVentaInventarioPresentacionService;
+use App\Support\EliminacionSegura;
 use App\Support\PuntoVentaAccess;
 use App\Support\TrazabilidadProductoPdvService;
 use Illuminate\Http\JsonResponse;
@@ -78,11 +80,25 @@ class PuntoVentaInventarioController extends Controller
             ->with('success', 'Producto del inventario actualizado.');
     }
 
-    public function destroy(PuntoVenta $punto, Insumo $insumo): RedirectResponse
-    {
+    public function destroy(
+        PuntoVenta $punto,
+        Insumo $insumo,
+        InventarioAlmacenProductoService $inventarioAlmacen
+    ): RedirectResponse {
         $this->autorizarInsumo($punto, $insumo);
 
-        $insumo->delete();
+        $almacen = $punto->almacen;
+        abort_unless($almacen !== null, 404);
+
+        $insumoObjetivo = Insumo::query()
+            ->whereKey((int) $insumo->insumoid)
+            ->where('almacenid', (int) $almacen->almacenid)
+            ->firstOrFail();
+
+        EliminacionSegura::ejecutar(
+            fn () => $inventarioAlmacen->eliminarProducto($almacen, $insumoObjetivo),
+            'No se pudo eliminar el producto. Revise movimientos o referencias vinculadas.'
+        );
 
         $destino = request()->input('return') === 'inventario'
             ? route('punto-venta.inventario.index', ['puntoventaid' => $punto->puntoventaid])

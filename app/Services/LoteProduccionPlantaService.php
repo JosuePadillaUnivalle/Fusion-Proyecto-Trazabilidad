@@ -39,6 +39,7 @@ class LoteProduccionPlantaService
         ?string $empaqueNombrePersonalizado = null,
         ?float $empaquePesoNetoKg = null,
         ?string $empaqueTipoEnvase = null,
+        ?array $parametrosLote = null,
     ): LoteProduccionPedido {
         if ($lineas === []) {
             throw new \InvalidArgumentException('Debe indicar al menos una materia prima del almacén.');
@@ -71,7 +72,7 @@ class LoteProduccionPlantaService
             $usuario, $producto, $nombre, $pedidoid, $cantidadObjetivo, $unidadmedidaid, $lineas,
             $observaciones, $tipoSalida, $plantillatransformacionid, $empaqueCatalogoSlug,
             $modoPlanificacion, $cantidadEmpaquesObjetivo, $empaqueNombrePersonalizado,
-            $empaquePesoNetoKg, $empaqueTipoEnvase
+            $empaquePesoNetoKg, $empaqueTipoEnvase, $parametrosLote
         ) {
             $pedidoIdFinal = $pedidoid ?? $this->crearPedidoInterno($nombre);
 
@@ -117,6 +118,18 @@ class LoteProduccionPlantaService
                     (int) $linea['insumoid'],
                     (float) $linea['cantidad'],
                     $tipoSalida
+                );
+            }
+
+            if ($plantillatransformacionid !== null) {
+                app(\App\Support\LoteProduccionParametrosService::class)->sincronizarDesdeLote(
+                    $lote,
+                    $plantillatransformacionid,
+                    $parametrosLote
+                );
+                app(\App\Support\LoteProduccionRutaService::class)->inicializarDesdePlantilla(
+                    $lote,
+                    $plantillatransformacionid
                 );
             }
 

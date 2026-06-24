@@ -79,6 +79,8 @@
 
     document.querySelectorAll('[data-firma-canvas]').forEach(initCanvas);
 
+    window.AgroFusionFirmaPads = pads;
+
     document.querySelectorAll('.btn-limpiar-firma').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const pad = pads.get(btn.dataset.target);

@@ -97,6 +97,9 @@ class AsignacionEtapaPlantaService
     /**
      * @param  array{hora_inicio:string,hora_fin:string}  $data
      */
+    /**
+     * @param  array{hora_inicio: string, hora_fin: string, parametros?: list<array{variableestandarid: int, valor: float|int|string}>}  $data
+     */
     public function completar(AsignacionEtapaPlanta $asignacion, array $data, Usuario $usuario): RegistroProcesoMaquinaPlanta
     {
         if (! $asignacion->estaPendiente()) {
@@ -116,7 +119,13 @@ class AsignacionEtapaPlantaService
             throw new \InvalidArgumentException('La transformación del lote ya finalizó.');
         }
 
-        $registro = DB::transaction(function () use ($asignacion, $data, $lote, $esSupervisor, $usuario) {
+        $paramService = app(LoteProduccionParametrosService::class);
+        $parametrosRegistrados = $paramService->validarYFormatearValoresEtapa(
+            $asignacion,
+            $data['parametros'] ?? [],
+        );
+
+        $registro = DB::transaction(function () use ($asignacion, $data, $lote, $esSupervisor, $usuario, $parametrosRegistrados) {
             $paso = $this->transformacion->resolverPasoProcesoMaquina(
                 (int) $asignacion->procesoplantaid,
                 (int) $asignacion->maquinaplantaid
@@ -138,7 +147,8 @@ class AsignacionEtapaPlantaService
                     'maquina' => $maquina?->nombre,
                     'asignacion_id' => $asignacion->asignacionetapaplantaid,
                     'completada_por_supervisor' => $esSupervisor && (int) $asignacion->operador_usuarioid !== (int) $usuario->usuarioid,
-                ]),
+                    'parametros' => $parametrosRegistrados,
+                ], JSON_UNESCAPED_UNICODE),
                 'cumple_estandar' => true,
                 'observaciones' => $observaciones,
                 'hora_inicio' => $data['hora_inicio'],
@@ -162,10 +172,15 @@ class AsignacionEtapaPlantaService
 
         $this->notificaciones->descartarEtapaPlantaAsignada((int) $asignacion->asignacionetapaplantaid);
 
+        $this->transformacion->limpiarAsignacionesObsoletas($lote->fresh());
+
         return $registro;
     }
 
-    public function completarPorSupervisor(AsignacionEtapaPlanta $asignacion, Usuario $supervisor): RegistroProcesoMaquinaPlanta
+    /**
+     * @param  list<array{variableestandarid: int, valor: float|int|string}>  $parametros
+     */
+    public function completarPorSupervisor(AsignacionEtapaPlanta $asignacion, Usuario $supervisor, array $parametros = []): RegistroProcesoMaquinaPlanta
     {
         if (! UsuarioRol::gestionaPlanta($supervisor) && ! UsuarioRol::esAdminGlobal($supervisor)) {
             throw new \InvalidArgumentException('Solo el jefe de planta o administrador puede completar etapas desde procesamiento.');
@@ -176,6 +191,7 @@ class AsignacionEtapaPlantaService
         return $this->completar($asignacion, [
             'hora_inicio' => $inicio->toDateTimeString(),
             'hora_fin' => now()->toDateTimeString(),
+            'parametros' => $parametros,
         ], $supervisor);
     }
 }

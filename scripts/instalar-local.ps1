@@ -48,17 +48,41 @@ if ((Get-Content ".env" -Raw) -notmatch 'APP_KEY=base64:') {
 }
 
 if (-not (Test-Path "database/database.sqlite")) {
-    Write-Host "==> Sin SQLite en el repo: migrando y sembrando..."
-    New-Item -ItemType File -Path "database/database.sqlite" -Force | Out-Null
-    php artisan migrate --force
-    php artisan db:seed --force
+    if (Test-Path "database/database.snapshot.sqlite") {
+        Write-Host "==> Copiando database.snapshot.sqlite → database.sqlite" -ForegroundColor Yellow
+        Copy-Item "database/database.snapshot.sqlite" "database/database.sqlite" -Force
+    } else {
+        Write-Host "==> Sin snapshot: creando SQLite vacío y migrando..."
+        New-Item -ItemType File -Path "database/database.sqlite" -Force | Out-Null
+        php artisan migrate --force
+        php artisan db:seed --force
+    }
 } else {
-    Write-Host "==> Usando database/database.sqlite del repositorio"
-    php artisan migrate --force
+    Write-Host "==> Usando database/database.sqlite local"
 }
+
+php artisan migrate --force
+php artisan agrofusion:proteger-bd-local
 
 Write-Host "==> Reparando roles y permisos"
 php artisan agrofusion:reparar-permisos
+
+$usuarioCount = 0
+try {
+    $usuarioCount = [int](sqlite3 "database/database.sqlite" "SELECT COUNT(*) FROM usuario;" 2>$null)
+} catch { }
+
+if ($usuarioCount -eq 0 -and (Test-Path "database/database.snapshot.sqlite")) {
+    Write-Host "==> Base sin usuarios: restaurando desde database.snapshot.sqlite" -ForegroundColor Yellow
+    php artisan agrofusion:restaurar-datos-locales --force
+} elseif ($usuarioCount -eq 0) {
+    Write-Host "AVISO: database.sqlite tiene 0 usuarios. Ejecuta: git checkout 0dd37c7 -- database/database.sqlite" -ForegroundColor Yellow
+    php artisan db:seed --force
+    php artisan agrofusion:reparar-permisos
+}
+
+Write-Host "==> Asegurando stock demo (planta + mayorista)"
+php artisan agrofusion:asegurar-datos-demo
 
 if (-not (Test-Path "public/storage")) {
     Write-Host "==> php artisan storage:link"

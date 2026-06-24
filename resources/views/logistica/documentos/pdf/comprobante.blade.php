@@ -24,6 +24,8 @@
         .nota { margin-top: 16px; padding: 10px 12px; background: #f0fdf4; border-left: 4px solid #2c5530; font-size: 10px; }
         .nota--alerta { background: #fef2f2; border-left-color: #dc2626; color: #991b1b; }
         .nota--alerta strong { color: #b91c1c; }
+        .nota--personal { background: #fff7ed; border-left-color: #ea580c; color: #9a3412; }
+        .nota--personal strong { color: #c2410c; }
         .cond-no { color: #dc2626; font-weight: bold; }
         .footer { margin-top: 24px; font-size: 9px; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 10px; }
     </style>
@@ -129,6 +131,11 @@
         <strong>Observación condiciones:</strong> {{ $observacionCondiciones['texto'] }}
     </div>
     @endif
+    @if(!empty($observacionPersonalCondiciones))
+    <div class="nota nota--personal">
+        <strong>Observación personal:</strong> {{ $observacionPersonalCondiciones }}
+    </div>
+    @endif
     @endif
 
     @if(!empty($incidentesLineas))
@@ -139,13 +146,21 @@
         </thead>
         <tbody>
             @foreach($incidentesLineas as $fila)
-            <tr><td>{{ $fila['titulo'] }}</td><td>{{ $fila['ocurrio'] }}</td></tr>
+            <tr>
+                <td>{{ $fila['titulo'] }}</td>
+                <td @if($fila['ocurrio'] === 'Sí') class="cond-no" @endif>{{ $fila['ocurrio'] }}</td>
+            </tr>
             @endforeach
         </tbody>
     </table>
     @if(!empty($observacionIncidentes['texto'] ?? null))
     <div class="nota @if($observacionIncidentes['alerta'] ?? false) nota--alerta @endif">
         <strong>Observación incidentes:</strong> {{ $observacionIncidentes['texto'] }}
+    </div>
+    @endif
+    @if(!empty($observacionPersonalIncidentes))
+    <div class="nota nota--personal">
+        <strong>Observación personal:</strong> {{ $observacionPersonalIncidentes }}
     </div>
     @endif
     @endif
@@ -162,7 +177,7 @@
                 @if(!empty($firmaRecepcionImg))
                     <img src="{{ $firmaRecepcionImg }}" alt="Firma recepción" style="max-height:60px;max-width:180px;">
                 @endif
-                <br>{{ $firmaRecepcionEtiqueta ?? 'Firma recepción en destino' }}<br><small>{{ $destinoCliente ?? '—' }}</small>
+                <br>{{ $firmaRecepcionEtiqueta ?? 'Firma recepción en destino' }}<br><small>{{ $recepcionNombre ?? $destinoCliente ?? '—' }}</small>
             </td>
         </tr>
     </table>

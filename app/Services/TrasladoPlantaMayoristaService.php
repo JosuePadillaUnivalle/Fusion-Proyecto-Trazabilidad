@@ -757,6 +757,10 @@ class TrasladoPlantaMayoristaService
 
             ]);
 
+        } else {
+
+            $this->marcarRecepcionPlantaEnInsumo($insumoDestino, $ref);
+
         }
 
 
@@ -983,6 +987,22 @@ class TrasladoPlantaMayoristaService
 
         $this->capacidadTransporte->validarCarga($vehiculo, $pesoTotal);
 
+    }
+
+    private function marcarRecepcionPlantaEnInsumo(Insumo $insumo, string $ref): void
+    {
+        $descripcion = trim((string) $insumo->descripcion);
+        if ($descripcion !== '' && str_contains($descripcion, $ref)) {
+            return;
+        }
+
+        $marca = 'Producto recibido desde planta — '.$ref;
+        $esGenerica = $descripcion === ''
+            || str_contains(mb_strtolower($descripcion), 'producto terminado de planta');
+
+        $insumo->update([
+            'descripcion' => $esGenerica ? $marca : $descripcion.' | '.$marca,
+        ]);
     }
 
 }

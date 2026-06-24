@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use App\Services\ActividadInsumoService;
+use App\Services\LoteSiembraService;
 use App\Services\NotificacionUsuarioService;
 use App\Support\ActividadDetalleCatalogo;
 use App\Support\UsuarioRol;
@@ -262,6 +263,13 @@ class ActividadController extends Controller
             $responsableLabel = trim($user->nombre.' '.($user->apellido ?? ''));
         }
 
+        if ($request->boolean('completar') && ! $puedeDesignarResponsable) {
+            return redirect()->route('lotes.siembra.completar', [
+                'lote' => $lote,
+                'return' => $returnUrl,
+            ]);
+        }
+
         return view('lotes.siembra.create', compact(
             'lote',
             'tipoSiembra',
@@ -275,6 +283,102 @@ class ActividadController extends Controller
             'sugerenciaSiembra',
             'insumosSiembra',
         ));
+    }
+
+    public function completarSiembra(Request $request, Lote $lote)
+    {
+        $this->autorizarLoteParaActividad($request, $lote);
+        $lote->load(['usuario', 'cultivo', 'estadoTipo']);
+
+        $tipoSiembra = $this->tipoActividadSiembra();
+        $faseActual = $this->trazabilidad->resolverFaseActual($lote);
+        $actividadPendiente = $this->trazabilidad->actividadSiembraPendiente($lote);
+        $bloqueo = $actividadPendiente === null
+            ? $this->trazabilidad->mensajeActividadNoPermitida($lote, $tipoSiembra->nombre)
+            : null;
+
+        if (! $this->trazabilidad->tipoActividadPermitidoEnFase($tipoSiembra->nombre, $faseActual) || $bloqueo !== null) {
+            return redirect()
+                ->route('lotes.trazabilidad', $lote)
+                ->with('error', $bloqueo ?? 'Este lote no está en fase de siembra.');
+        }
+
+        if ($this->trazabilidad->siembraCompletada($lote)) {
+            return redirect()
+                ->route('lotes.trazabilidad', $lote)
+                ->with('info', 'La siembra de este lote ya fue registrada.');
+        }
+
+        $user = $request->user();
+        if ($actividadPendiente) {
+            $actividadPendiente->loadMissing('usuario');
+            if ((int) $actividadPendiente->usuarioid !== (int) $user->usuarioid
+                && ! $this->puedeDesignarResponsableActividad($user)) {
+                abort(403, 'Esta siembra está asignada a otro agricultor.');
+            }
+        } elseif ((int) $lote->usuarioid !== (int) $user->usuarioid
+            && ! $this->puedeDesignarResponsableActividad($user)) {
+            abort(403, 'No está autorizado para completar la siembra de este lote.');
+        }
+
+        $sugerenciaSiembra = $lote->cultivo
+            ? \App\Support\CultivoSiembraCatalogo::sugerenciaParaLote($lote->cultivo, (float) $lote->superficie)
+            : null;
+        $resumenSiembraCompletar = $this->trazabilidad->resumenSiembraCompletar($lote);
+        $returnUrl = $this->validReturnUrl($request->input('return'))
+            ?? route('lotes.trazabilidad', $lote);
+
+        return view('lotes.siembra.completar', compact(
+            'lote',
+            'tipoSiembra',
+            'actividadPendiente',
+            'sugerenciaSiembra',
+            'resumenSiembraCompletar',
+            'returnUrl',
+        ));
+    }
+
+    public function storeCompletarSiembra(Request $request, Lote $lote)
+    {
+        $this->autorizarLoteParaActividad($request, $lote);
+
+        $validator = Validator::make($request->all(), [
+            'evidencia_foto' => 'required|image|mimes:jpeg,jpg,png,webp|max:5120',
+            'observaciones' => 'nullable|string|max:250',
+        ], [
+            'evidencia_foto.required' => 'Debe subir una foto del trabajo realizado en campo.',
+            'evidencia_foto.image' => 'El archivo debe ser una imagen.',
+            'evidencia_foto.max' => 'La imagen no puede superar 5 MB.',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()
+                ->route('lotes.trazabilidad', $lote)
+                ->withErrors($validator)
+                ->withInput()
+                ->with('abrir_modal_completar_siembra', true);
+        }
+
+        $returnUrl = $this->validReturnUrl($request->input('return'))
+            ?? route('lotes.trazabilidad', $lote);
+
+        try {
+            app(LoteSiembraService::class)->completarConEvidencia(
+                $lote,
+                $request->user(),
+                $request->file('evidencia_foto'),
+                $request->input('observaciones')
+            );
+        } catch (ValidationException $e) {
+            return redirect()
+                ->route('lotes.trazabilidad', $lote)
+                ->withErrors($e->errors())
+                ->withInput()
+                ->with('abrir_modal_completar_siembra', true);
+        }
+
+        return redirect($returnUrl)
+            ->with('success', 'Siembra registrada con evidencia. El lote pasó a la fase de crecimiento.');
     }
 
     public function storeSiembra(Request $request, Lote $lote)
@@ -310,6 +414,24 @@ class ActividadController extends Controller
     {
         $this->autorizarLoteParaActividad($request, $lote);
         $lote->loadMissing('usuario');
+
+        $pendiente = $this->trazabilidad->actividadSiembraPendiente($lote);
+        if ($pendiente !== null) {
+            $pendiente->loadMissing('usuario');
+            $user = $request->user();
+            if ($user && (int) $pendiente->usuarioid === (int) $user->usuarioid) {
+                return redirect()
+                    ->route('lotes.trazabilidad', $lote)
+                    ->with('info', 'La siembra ya está asignada a usted. Suba la foto de evidencia para completarla.')
+                    ->with('abrir_modal_completar_siembra', true);
+            }
+
+            $responsable = trim(($pendiente->usuario->nombre ?? '').' '.($pendiente->usuario->apellido ?? '')) ?: 'otro agricultor';
+
+            return redirect()
+                ->route('lotes.trazabilidad', $lote)
+                ->with('warning', "La siembra ya está asignada a {$responsable}. Espere a que la complete con foto de evidencia.");
+        }
 
         try {
             $responsableId = $this->resolverUsuarioidActividad($request, $lote);
@@ -447,7 +569,19 @@ class ActividadController extends Controller
     public function show(Request $request, Actividad $actividad)
     {
         $this->autorizarActividadAsignada($request, $actividad);
-        $actividad->load(['lote']);
+        $actividad->load(['lote', 'tipoActividad', 'usuario']);
+
+        if ($actividad->lote && $actividad->fechafin === null) {
+            $tipo = mb_strtolower(trim($actividad->tipoActividad->nombre ?? ''));
+            if (str_contains($tipo, 'siembra')
+                && (int) $actividad->usuarioid === (int) $request->user()?->usuarioid) {
+                return redirect()->route('lotes.siembra.completar', $actividad->lote);
+            }
+
+            return redirect()
+                ->route('lotes.trazabilidad', $actividad->lote)
+                ->withFragment('historial-eventos');
+        }
 
         if ($actividad->lote) {
             return redirect()

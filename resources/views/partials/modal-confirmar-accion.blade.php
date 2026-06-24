@@ -88,6 +88,14 @@
             if (window.jQuery) window.jQuery('#modalConfirmarAccion').modal('hide');
             return;
         }
+        const btnConfirmar = document.getElementById('btnConfirmarAccion');
+        if (btnConfirmar?.dataset.submitting === '1') {
+            return;
+        }
+        if (btnConfirmar) {
+            btnConfirmar.dataset.submitting = '1';
+            btnConfirmar.disabled = true;
+        }
         if (state.callbackPendiente) {
             const cb = state.callbackPendiente;
             state.callbackPendiente = null;
@@ -190,6 +198,11 @@
             state.modoAviso = false;
             const cancelBtn = document.getElementById('btnCancelarConfirmar');
             if (cancelBtn) cancelBtn.style.display = '';
+            const btnConfirmar = document.getElementById('btnConfirmarAccion');
+            if (btnConfirmar) {
+                btnConfirmar.dataset.submitting = '0';
+                btnConfirmar.disabled = false;
+            }
         });
     }
 })();

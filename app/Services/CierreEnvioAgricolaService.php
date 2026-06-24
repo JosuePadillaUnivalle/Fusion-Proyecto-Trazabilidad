@@ -78,7 +78,7 @@ class CierreEnvioAgricolaService
             $pasoActual = EnvioCierreAgricolaCatalogo::PASO_EN_RUTA;
         }
 
-        return [
+        return app(RecepcionQrFirmaService::class)->enriquecerResumen([
             'paso_actual' => $pasoActual,
             'tiene_condiciones' => $tieneCondiciones,
             'en_ruta' => $enRuta,
@@ -98,7 +98,7 @@ class CierreEnvioAgricolaService
             'puede_firmar_recepcion' => $llegadaConfirmada && $tieneIncidentes && ! $recibido
                 && $firmaTransportista && ! $firmaRecepcion,
             'puede_finalizar' => $llegadaConfirmada && $tieneIncidentes && $firmaTransportista && $firmaRecepcion && ! $recibido,
-        ];
+        ], $envio);
     }
 
     /**
@@ -258,11 +258,16 @@ class CierreEnvioAgricolaService
             throw new InvalidArgumentException('La firma del transportista ya fue registrada.');
         }
 
-        return FirmaTransportistaEnvio::create([
+        $firma = FirmaTransportistaEnvio::create([
             'envioasignacionmultipleid' => $envio->envioasignacionmultipleid,
             'imagenfirma' => $this->normalizarImagenFirma($imagenBase64),
+            'nombrefirmante' => RecepcionQrFirmaService::nombreDesdeUsuario($usuario),
             'fechafirma' => now(),
         ]);
+
+        app(RecepcionQrFirmaService::class)->ensureToken($envio);
+
+        return $firma;
     }
 
     public function guardarFirmaRecepcion(EnvioAsignacionMultiple $envio, Usuario $usuario, string $imagenBase64): FirmaRecepcionEnvio

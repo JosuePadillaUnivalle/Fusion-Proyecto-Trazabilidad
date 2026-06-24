@@ -4,16 +4,15 @@ namespace App\Support;
 
 use App\Models\AsignacionEtapaPlanta;
 use App\Models\Usuario;
-use Carbon\Carbon;
 
 final class OperarioPlantaLoginNotificacion
 {
     /**
-     * Tareas de transformación recién asignadas al operario de planta.
+     * Tareas de transformación pendientes del operario de planta.
      *
      * @return list<array{clave: string, proceso: string, maquina: string, lote: string, url: string}>
      */
-    public static function nuevasTareasDesdeLogin(Usuario $user, ?Carbon $ultimoLoginPrevio): array
+    public static function nuevasTareasDesdeLogin(Usuario $user, ?\Carbon\Carbon $ultimoLoginPrevio = null): array
     {
         if (! UsuarioRol::esOperarioPlanta($user)) {
             return [];
@@ -24,11 +23,10 @@ final class OperarioPlantaLoginNotificacion
             ->where('operador_usuarioid', $user->usuarioid)
             ->pendientes()
             ->orderByDesc('creado_en')
-            ->limit(8)
+            ->limit(10)
             ->get()
-            ->filter(fn (AsignacionEtapaPlanta $a) => self::asignacionEsNueva($a->creado_en, $ultimoLoginPrevio))
             ->map(fn (AsignacionEtapaPlanta $a) => [
-                'clave' => OperarioPlantaTareaNotificacionVista::clave((int) $a->asignacionetapaplantaid),
+                'clave' => 'tarea:'.(int) $a->asignacionetapaplantaid,
                 'proceso' => $a->proceso?->nombre ?? 'Transformación',
                 'maquina' => $a->maquina?->nombre ?? 'Maquinaria',
                 'lote' => $a->loteProduccion?->codigo_lote ?? '—',
@@ -37,19 +35,10 @@ final class OperarioPlantaLoginNotificacion
             ->values()
             ->all();
 
-        return OperarioPlantaTareaNotificacionVista::filtrarPendientes((int) $user->usuarioid, $items);
-    }
-
-    private static function asignacionEsNueva(?Carbon $fechaAsignacion, ?Carbon $ultimoLoginPrevio): bool
-    {
-        if ($fechaAsignacion === null) {
-            return false;
-        }
-
-        if ($ultimoLoginPrevio === null) {
-            return $fechaAsignacion->greaterThanOrEqualTo(now()->subHours(24));
-        }
-
-        return $fechaAsignacion->greaterThan($ultimoLoginPrevio);
+        return LoginNotificacionAlcance::filtrarPendientes(
+            LoginNotificacionAlcance::OPERARIO_PLANTA,
+            (int) $user->usuarioid,
+            $items
+        );
     }
 }

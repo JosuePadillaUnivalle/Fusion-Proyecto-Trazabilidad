@@ -58,17 +58,18 @@
             height: 96px;
             margin: 0 auto 20px;
             border-radius: 50%;
-            border: 2px solid rgba(110, 231, 183, 0.7);
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(5, 56, 36, 0.35);
+            overflow: hidden;
             box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.18);
         }
 
-        .left-logo-ring i {
-            font-size: 2rem;
-            color: #a7f3d0;
+        .left-logo-ring img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
         }
 
         .auth-left h1 {
@@ -185,18 +186,23 @@
         }
 
         .auth-logo {
-            width: 52px;
-            height: 52px;
-            background: linear-gradient(135deg, #059669, #10b981);
-            border-radius: 14px;
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 14px;
+            overflow: hidden;
             box-shadow: 0 0 0 4px rgba(16, 185, 129, .15), 0 8px 24px rgba(16, 185, 129, .25);
         }
 
-        .auth-logo i { color: #fff; font-size: 1.3rem; }
+        .auth-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
 
         .auth-app-name {
             font-size: 1.25rem;
@@ -610,7 +616,7 @@
     <section class="auth-left" aria-hidden="true">
         <div class="auth-left-content">
             <div class="left-logo-ring">
-                <i class="fas fa-seedling"></i>
+                <img src="{{ asset('images/agrofusion-logo.jpeg') }}" alt="AgroFusion">
             </div>
             <h1>Bienvenido a AgroFusion</h1>
             <p>Controla y da seguimiento a toda la trazabilidad agrícola desde un solo lugar.</p>
@@ -623,7 +629,7 @@
             <!-- Brand -->
             <div class="auth-brand">
                 <div class="auth-logo">
-                    <i class="fas fa-seedling"></i>
+                    <img src="{{ asset('images/agrofusion-logo.jpeg') }}" alt="AgroFusion">
                 </div>
                 <span class="auth-app-name">AgroFusion</span>
                 <span class="auth-tagline">Sistema integral de gestión agrícola</span>

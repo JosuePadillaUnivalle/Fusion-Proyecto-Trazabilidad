@@ -349,5 +349,87 @@ body.login-notif-modal-open .ag-layout {
     background: linear-gradient(135deg, #1a3a5c, #0c1c30);
     color: #fff;
 }
+
+/* Tema agricultor (verde tierra) */
+.login-notif-modal--agricultor {
+    --login-notif-accent-a: #65a30d;
+    --login-notif-accent-b: #84cc16;
+    --login-notif-accent-c: #a3e635;
+    --login-notif-head-a: #365314;
+    --login-notif-head-b: #4d7c0f;
+    --login-notif-head-c: #65a30d;
+    --login-notif-badge-bg: #d9f99d;
+    --login-notif-badge-fg: #365314;
+    --login-notif-highlight-bg: linear-gradient(135deg, #f7fee7 0%, #ecfccb 100%);
+    --login-notif-highlight-border: #bef264;
+    --login-notif-highlight-icon: #d9f99d;
+    --login-notif-item-accent: #65a30d;
+    --login-notif-codigo: #365314;
+    --login-notif-qty-bg: #f7fee7;
+    --login-notif-qty-border: #d9f99d;
+}
+.login-notif-modal--agricultor .login-notif-modal__cta {
+    background: linear-gradient(135deg, #84cc16, #65a30d);
+    border: none;
+    color: #fff;
+}
+.login-notif-modal--agricultor .login-notif-modal__cta:hover {
+    background: linear-gradient(135deg, #65a30d, #4d7c0f);
+    color: #fff;
+}
+
+/* Tema jefe agricultor (ámbar tierra) */
+.login-notif-modal--jefe-agricultor {
+    --login-notif-accent-a: #b45309;
+    --login-notif-accent-b: #f59e0b;
+    --login-notif-accent-c: #fbbf24;
+    --login-notif-head-a: #78350f;
+    --login-notif-head-b: #92400e;
+    --login-notif-head-c: #b45309;
+    --login-notif-badge-bg: #fde68a;
+    --login-notif-badge-fg: #78350f;
+    --login-notif-highlight-bg: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    --login-notif-highlight-border: #fcd34d;
+    --login-notif-highlight-icon: #fde68a;
+    --login-notif-item-accent: #d97706;
+    --login-notif-codigo: #92400e;
+}
+.login-notif-modal--jefe-agricultor .login-notif-modal__cta {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border: none;
+    color: #1c1917;
+}
+.login-notif-modal--jefe-agricultor .login-notif-modal__cta:hover {
+    background: linear-gradient(135deg, #d97706, #b45309);
+    color: #fff;
+}
+
+/* Tema punto de venta / minorista (violeta) */
+.login-notif-modal--minorista {
+    --login-notif-accent-a: #7c3aed;
+    --login-notif-accent-b: #a78bfa;
+    --login-notif-accent-c: #c4b5fd;
+    --login-notif-head-a: #4c1d95;
+    --login-notif-head-b: #6d28d9;
+    --login-notif-head-c: #7c3aed;
+    --login-notif-badge-bg: #ddd6fe;
+    --login-notif-badge-fg: #4c1d95;
+    --login-notif-highlight-bg: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    --login-notif-highlight-border: #c4b5fd;
+    --login-notif-highlight-icon: #ddd6fe;
+    --login-notif-item-accent: #7c3aed;
+    --login-notif-codigo: #5b21b6;
+    --login-notif-qty-bg: #f5f3ff;
+    --login-notif-qty-border: #ddd6fe;
+}
+.login-notif-modal--minorista .login-notif-modal__cta {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    border: none;
+    color: #fff;
+}
+.login-notif-modal--minorista .login-notif-modal__cta:hover {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    color: #fff;
+}
 </style>
 @endonce

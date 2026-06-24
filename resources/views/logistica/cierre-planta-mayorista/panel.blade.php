@@ -285,6 +285,14 @@
         </div>
     </div>
 
+    <div id="cierre-panel-polling" class="d-none"
+         data-polling-url="{{ route('cierre.firmas-estado') }}"
+         data-polling-ruta="{{ $ruta->rutadistribucionid }}"
+         data-inicial-llegada="{{ ($resumen['llegada_confirmada'] ?? false) ? '1' : '0' }}"
+         data-inicial-puede-llegada="{{ (($resumen['puede_confirmar_llegada'] ?? false) || ($resumen['esperando_confirmacion'] ?? false)) ? '1' : '0' }}"
+         data-inicial-firma-recepcion="{{ ($resumen['firma_recepcion'] ?? false) ? '1' : '0' }}"
+         data-inicial-completado="{{ $recibidoEnDestino ? '1' : '0' }}"></div>
+
     @if($vistaReceptorEspera)
     <div class="cierre-ag-card mb-3">
         <div class="cierre-ag-card__head">
@@ -520,6 +528,20 @@
                         @endif
                     </div>
                 </div>
+                @if(count($paradasMapa ?? []) >= 1)
+                <div class="mt-2">
+                    @include('logistica.partials.btn-ver-recorrido-mapa', [
+                        'paradasMapa' => $paradasMapa ?? [],
+                        'bloque' => true,
+                        'clase' => 'btn-outline-primary btn-sm',
+                        'etiqueta' => 'Ver ruta',
+                    ])
+                    @include('logistica.partials.btn-ver-destino-google-maps', [
+                        'paradasMapa' => $paradasMapa ?? [],
+                        'bloque' => true,
+                    ])
+                </div>
+                @endif
             @elseif(($resumen['puede_empezar_ruta'] ?? false) && ! $soloLecturaPaso())
                 <p class="small text-muted mb-3">Condiciones registradas. Inicie el recorrido hacia {{ $ui['destino_articulo'] }} cuando salga del {{ $ui['origen_salida'] }}.</p>
                 <div class="cierre-ag-ruta-actions">
@@ -537,6 +559,10 @@
                         'bloque' => true,
                         'clase' => 'btn-outline-primary font-weight-bold',
                         'etiqueta' => 'Ver ruta',
+                    ])
+                    @include('logistica.partials.btn-ver-destino-google-maps', [
+                        'paradasMapa' => $paradasMapa ?? [],
+                        'bloque' => true,
                     ])
                 </div>
             @elseif(in_array(CierreCat::PASO_EN_RUTA, $pasosCompletados, true))
@@ -653,6 +679,14 @@
                         'id' => $ruta->rutadistribucionid,
                     ])
                 </div>
+                @if(count($paradasMapa ?? []) >= 1)
+                <div class="mt-2">
+                    @include('logistica.partials.btn-ver-destino-google-maps', [
+                        'paradasMapa' => $paradasMapa ?? [],
+                        'bloque' => true,
+                    ])
+                </div>
+                @endif
             @else
                 <p class="text-muted small mb-0">Disponible cuando el envío esté en ruta y haya llegado al destino.</p>
             @endif
@@ -829,19 +863,11 @@
                         <span class="small text-muted">{{ $ui['recibido_mensaje'] }}</span>
                     </div>
                 </div>
-            @elseif(($resumen['puede_firmar_recepcion'] ?? false) && ! $soloLecturaPaso())
-                @if(! $esTransportista)
-                <p class="small text-muted mb-3"><i class="fas fa-signature mr-1" style="color:#7c3aed;"></i> {{ $ui['firma_recepcion_hint'] }}</p>
-                @endif
-                <canvas class="cierre-ag-firma-box" data-firma-canvas="recepcion" width="400" height="160"></canvas>
-                <div class="cierre-ag-firma-actions">
-                    <button type="button" class="btn btn-outline-secondary btn-sm btn-limpiar-firma" data-target="recepcion">Limpiar</button>
-                    <button type="button" class="btn btn-success btn-sm font-weight-bold btn-guardar-firma"
-                            data-target="recepcion"
-                            data-url="{{ route($rutaPrefijo.'.cierre.firma-recepcion', $ruta) }}">
-                        Guardar firma recepción
-                    </button>
-                </div>
+            @elseif(($resumen['esperando_firma_qr'] ?? false) && ! $soloLecturaPaso())
+                @include('logistica.partials.cierre-firma-recepcion-qr', [
+                    'resumen' => $resumen,
+                    'pollingRuta' => $ruta->rutadistribucionid,
+                ])
             @else
                 <p class="text-muted small mb-0">Primero debe firmar el transportista asignado.</p>
             @endif
@@ -917,6 +943,7 @@
 
 @push('scripts')
 <script src="{{ asset('js/firma-canvas.js') }}?v=2"></script>
+<script src="{{ asset('js/cierre-panel-polling.js') }}?v=1"></script>
 <script>
 document.querySelectorAll('.cond-radio-si, .cond-radio-no').forEach(function (radio) {
     radio.addEventListener('change', function () {

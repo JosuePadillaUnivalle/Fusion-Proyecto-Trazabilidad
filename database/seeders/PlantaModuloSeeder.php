@@ -174,9 +174,9 @@ class PlantaModuloSeeder extends Seeder
 
         if (Schema::hasTable('variable_estandar') && Schema::hasTable('variable_proceso_maquina_planta')) {
             $vars = [
-                ['codigo' => 'VAR-TEMP', 'nombre' => 'Temperatura', 'unidad' => '°C', 'min' => 8, 'max' => 18, 'obj' => 12],
-                ['codigo' => 'VAR-PESO', 'nombre' => 'Peso muestra', 'unidad' => 'kg', 'min' => 0.2, 'max' => 50, 'obj' => 1],
-                ['codigo' => 'VAR-HUM', 'nombre' => 'Humedad relativa', 'unidad' => '%', 'min' => 40, 'max' => 95, 'obj' => 70],
+                ['codigo' => 'VAR-TEMP', 'nombre' => 'Temperatura', 'unidad' => '°C', 'desc' => 'Temperatura del producto o del equipo durante la operación.', 'min' => 8, 'max' => 18, 'obj' => 12],
+                ['codigo' => 'VAR-PESO', 'nombre' => 'Peso', 'unidad' => 'kg', 'desc' => 'Peso de muestra, lote o porción verificada en báscula.', 'min' => 0.2, 'max' => 50, 'obj' => 1],
+                ['codigo' => 'VAR-HUM', 'nombre' => 'Humedad relativa', 'unidad' => '%', 'desc' => 'Humedad del ambiente o del producto en la etapa.', 'min' => 40, 'max' => 95, 'obj' => 70],
             ];
 
             foreach ($vars as $v) {
@@ -185,7 +185,7 @@ class PlantaModuloSeeder extends Seeder
                     [
                         'nombre' => $v['nombre'],
                         'unidad' => $v['unidad'],
-                        'descripcion' => self::MARK,
+                        'descripcion' => $v['desc'],
                         'activo' => true,
                     ]
                 );

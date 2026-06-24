@@ -5,12 +5,18 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\DestinoProduccion;
 use App\Models\MaquinaPlanta;
+use App\Models\MaquinaVariablePlanta;
 use App\Models\ProcesoPlanta;
+use App\Models\VariableEstandar;
+use App\Support\MaquinaPlantaCodigo;
 use App\Support\PlantillaTransformacionDisponibilidad;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class MaquinaPlantaController extends Controller
@@ -43,7 +49,9 @@ class MaquinaPlantaController extends Controller
 
     public function create(): View
     {
-        return view('maquinas_planta.create');
+        return view('maquinas_planta.create', [
+            'variablesCatalogo' => VariableEstandar::where('activo', true)->orderBy('nombre')->get(),
+        ]);
     }
 
     public function show(Request $request, MaquinaPlanta $maquinas_plantum): View
@@ -86,46 +94,69 @@ class MaquinaPlantaController extends Controller
         $procesosFiltro = ProcesoPlanta::whereIn('procesoplantaid', $idsProceso)->orderBy('nombre')->get(['procesoplantaid', 'nombre']);
         $destinosFiltro = DestinoProduccion::whereIn('destinoproduccionid', $idsDestino)->orderBy('nombre')->get(['destinoproduccionid', 'nombre']);
 
+        $maquina->load(['variablesSugeridas.variableEstandar']);
+
         return view('maquinas_planta.show', compact('maquina', 'producciones', 'procesosFiltro', 'destinosFiltro'));
     }
 
     public function edit(MaquinaPlanta $maquinas_plantum): View
     {
-        return view('maquinas_planta.edit', ['maquina' => $maquinas_plantum]);
+        $maquinas_plantum->load(['variablesSugeridas.variableEstandar']);
+
+        return view('maquinas_planta.edit', [
+            'maquina' => $maquinas_plantum,
+            'variablesCatalogo' => VariableEstandar::where('activo', true)->orderBy('nombre')->get(),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'nombre' => 'required|string|max:100',
-            'codigo' => 'nullable|string|max:60',
+            'codigo' => [
+                'nullable', 'string', 'max:60',
+                Rule::unique('maquina_planta', 'codigo'),
+            ],
             'descripcion' => 'nullable|string',
             'activo' => 'nullable|boolean',
             'imagen' => 'nullable|file|mimes:jpeg,jpg,png,webp,gif|max:4096',
         ]);
         $data['activo'] = $request->boolean('activo', true);
+        $data['codigo'] = MaquinaPlantaCodigo::resolverParaGuardar(
+            $data['nombre'],
+            $data['codigo'] ?? null
+        );
         if ($request->hasFile('imagen')) {
             $data['imagenurl'] = $this->procesarImagen($request) ?? $data['imagenurl'] ?? null;
         }
 
         $maquina = MaquinaPlanta::create($data);
+        $this->syncVariablesSugeridas($maquina, $request->input('variables_sugeridas', []));
 
         return redirect()
             ->route('maquinas-planta.show', $maquina)
-            ->with('success', 'Máquina registrada correctamente.');
+            ->with('success', 'M?quina registrada correctamente.');
     }
 
     public function update(Request $request, MaquinaPlanta $maquinas_plantum): RedirectResponse
     {
         $data = $request->validate([
             'nombre' => 'required|string|max:100',
-            'codigo' => 'nullable|string|max:60',
+            'codigo' => [
+                'nullable', 'string', 'max:60',
+                Rule::unique('maquina_planta', 'codigo')->ignore($maquinas_plantum->maquinaplantaid, 'maquinaplantaid'),
+            ],
             'descripcion' => 'nullable|string',
             'activo' => 'nullable|boolean',
             'imagen' => 'nullable|file|mimes:jpeg,jpg,png,webp,gif|max:4096',
             'quitar_imagen' => 'nullable|boolean',
         ]);
         $data['activo'] = $request->boolean('activo');
+        $data['codigo'] = MaquinaPlantaCodigo::resolverParaGuardar(
+            $data['nombre'],
+            $data['codigo'] ?? null,
+            (int) $maquinas_plantum->maquinaplantaid
+        );
 
         if ($request->boolean('quitar_imagen')) {
             $this->eliminarImagen($maquinas_plantum->imagenurl);
@@ -139,10 +170,11 @@ class MaquinaPlantaController extends Controller
 
         unset($data['imagen'], $data['quitar_imagen']);
         $maquinas_plantum->update($data);
+        $this->syncVariablesSugeridas($maquinas_plantum, $request->input('variables_sugeridas', []));
 
         return redirect()
             ->route('maquinas-planta.show', $maquinas_plantum)
-            ->with('success', 'Máquina actualizada.');
+            ->with('success', 'M?quina actualizada.');
     }
 
     public function destroy(MaquinaPlanta $maquinas_plantum): RedirectResponse
@@ -150,7 +182,7 @@ class MaquinaPlantaController extends Controller
         $this->eliminarImagen($maquinas_plantum->imagenurl);
         $maquinas_plantum->delete();
 
-        return redirect()->route('maquinas-planta.index')->with('success', 'Máquina eliminada.');
+        return redirect()->route('maquinas-planta.index')->with('success', 'M?quina eliminada.');
     }
 
     public function toggleActivo(MaquinaPlanta $maquinas_plantum): RedirectResponse
@@ -160,8 +192,8 @@ class MaquinaPlantaController extends Controller
         $maquinas_plantum->update(['activo' => ! $maquinas_plantum->activo]);
 
         $mensaje = $maquinas_plantum->activo
-            ? 'La máquina quedó activa y disponible en registro.'
-            : 'La máquina quedó en mantenimiento.';
+            ? 'La m?quina qued? activa y disponible en registro.'
+            : 'La m?quina qued? en mantenimiento.';
 
         if (! $maquinas_plantum->activo) {
             $nuevasBloqueadas = count(array_diff(
@@ -169,13 +201,83 @@ class MaquinaPlantaController extends Controller
                 $bloqueadasAntes
             ));
             if ($nuevasBloqueadas > 0) {
-                $mensaje .= ' '.$nuevasBloqueadas.' proceso(s) de transformación quedaron temporalmente no disponibles.';
+                $mensaje .= ' '.$nuevasBloqueadas.' proceso(s) de transformaci?n quedaron temporalmente no disponibles.';
             }
         } else {
-            $mensaje .= ' Los procesos de transformación vinculados se reevaluarán automáticamente.';
+            $mensaje .= ' Los procesos de transformaci?n vinculados se reevaluar?n autom?ticamente.';
         }
 
         return back()->with('success', $mensaje);
+    }
+
+    public function variablesSugeridas(MaquinaPlanta $maquinas_plantum): JsonResponse
+    {
+        $items = $maquinas_plantum->variablesSugeridas()
+            ->with('variableEstandar')
+            ->get()
+            ->map(fn (MaquinaVariablePlanta $v) => [
+                'variableestandarid' => (int) $v->variableestandarid,
+                'nombre' => $v->variableEstandar?->nombre,
+                'unidad' => $v->variableEstandar?->unidad,
+                'valor_minimo' => $v->valor_minimo,
+                'valor_maximo' => $v->valor_maximo,
+                'valor_objetivo' => $v->valor_objetivo,
+                'obligatorio' => (bool) $v->obligatorio,
+            ])
+            ->values();
+
+        return response()->json([
+            'maquinaplantaid' => (int) $maquinas_plantum->maquinaplantaid,
+            'nombre' => $maquinas_plantum->nombre,
+            'imagen_src' => $maquinas_plantum->imagenSrc(),
+            'variables' => $items,
+        ]);
+    }
+
+    /** @param  list<array<string, mixed>>|null  $filas */
+    private function syncVariablesSugeridas(MaquinaPlanta $maquina, ?array $filas): void
+    {
+        if (! Schema::hasTable('maquina_variable_planta')) {
+            return;
+        }
+
+        $request = request();
+        $request->validate([
+            'variables_sugeridas' => ['nullable', 'array'],
+            'variables_sugeridas.*.variableestandarid' => ['required', 'integer', 'exists:variable_estandar,variableestandarid'],
+            'variables_sugeridas.*.valor_minimo' => ['required', 'numeric'],
+            'variables_sugeridas.*.valor_maximo' => ['required', 'numeric'],
+            'variables_sugeridas.*.valor_objetivo' => ['nullable', 'numeric'],
+            'variables_sugeridas.*.obligatorio' => ['nullable'],
+        ]);
+
+        $maquina->variablesSugeridas()->delete();
+        $filas = $filas ?? [];
+        $vistos = [];
+
+        foreach ($filas as $fila) {
+            $varId = (int) ($fila['variableestandarid'] ?? 0);
+            if ($varId <= 0 || isset($vistos[$varId])) {
+                continue;
+            }
+            $vistos[$varId] = true;
+
+            $min = (float) ($fila['valor_minimo'] ?? 0);
+            $max = (float) ($fila['valor_maximo'] ?? 0);
+            if ($max < $min) {
+                continue;
+            }
+
+            MaquinaVariablePlanta::create([
+                'maquinaplantaid' => $maquina->maquinaplantaid,
+                'variableestandarid' => $varId,
+                'valor_minimo' => $min,
+                'valor_maximo' => $max,
+                'valor_objetivo' => isset($fila['valor_objetivo']) && $fila['valor_objetivo'] !== ''
+                    ? (float) $fila['valor_objetivo'] : null,
+                'obligatorio' => filter_var($fila['obligatorio'] ?? true, FILTER_VALIDATE_BOOLEAN),
+            ]);
+        }
     }
 
     private function filteredQuery(Request $request)
@@ -215,7 +317,7 @@ class MaquinaPlantaController extends Controller
 
         $ruta = $file->storeAs('maquinas_planta', $nombre, 'public');
         if ($ruta === false) {
-            Log::error('No se pudo guardar la imagen de máquina en disco público.');
+            Log::error('No se pudo guardar la imagen de m?quina en disco p?blico.');
 
             return $imagenAnterior;
         }

@@ -19,6 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(prepend: [
+            \App\Http\Middleware\SyncAppUrlWithRequest::class,
+        ]);
+
         $middleware->validateCsrfTokens(except: [
             'logout',
         ]);

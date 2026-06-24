@@ -862,9 +862,6 @@
     }
 
     function enlazarPersistencia() {
-        document.querySelectorAll('#form-pedido, #form-traslado-mayorista, #form-pedido-dist-pdv').forEach((form) => {
-            form.addEventListener('submit', limpiarBorrador);
-        });
         document.querySelector('#wizard-btn-cancelar')?.addEventListener('click', limpiarBorrador);
 
         const esPaginaEnvio = () => (window.location.pathname || '').toLowerCase().includes('/pedidos/create');

@@ -115,6 +115,12 @@ final class RutaDistribucionCatalogo
         return self::etiquetasEstado()[$estado ?? ''] ?? ucfirst(str_replace('_', ' ', (string) $estado));
     }
 
+    /** @return array<string, string> */
+    public static function opcionesFiltroEstado(): array
+    {
+        return self::etiquetasEstado();
+    }
+
     /** @return array{clase: string, etiqueta: string} */
     public static function badgeEstado(RutaDistribucion $ruta): array
     {

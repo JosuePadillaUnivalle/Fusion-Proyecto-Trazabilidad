@@ -1,5 +1,13 @@
 {{-- Los avisos verdes de éxito operativo se omiten: la pantalla de destino ya muestra el resultado. --}}
 
+@if (session('info'))
+    <div class="ag-flash ag-flash--warning" role="status" style="border-color:#0d9488;background:#f0fdfa;color:#134e4a;">
+        <span class="ag-flash__icon"><i class="fas fa-info-circle"></i></span>
+        <span class="ag-flash__text">{{ session('info') }}</span>
+        <button type="button" class="ag-flash__close" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+    </div>
+@endif
+
 @if (session('warning'))    <div class="ag-flash ag-flash--warning" role="status">
         <span class="ag-flash__icon"><i class="fas fa-exclamation"></i></span>
         <span class="ag-flash__text">{{ session('warning') }}</span>

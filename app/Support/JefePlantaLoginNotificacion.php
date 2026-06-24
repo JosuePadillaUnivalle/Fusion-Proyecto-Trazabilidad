@@ -4,16 +4,15 @@ namespace App\Support;
 
 use App\Models\RutaDistribucion;
 use App\Models\Usuario;
-use Carbon\Carbon;
 
 final class JefePlantaLoginNotificacion
 {
     /**
-     * Traslados planta → mayorista pendientes de aprobación que el jefe aún no vio en modal.
+     * Traslados planta → mayorista pendientes de aprobación.
      *
      * @return list<array{clave: string, codigo: string, url: string, destino: string, productos: string}>
      */
-    public static function trasladosPendientesDesdeLogin(Usuario $user, ?Carbon $ultimoLoginPrevio): array
+    public static function trasladosPendientesDesdeLogin(Usuario $user, ?\Carbon\Carbon $ultimoLoginPrevio = null): array
     {
         if (! UsuarioRol::esJefePlanta($user) && ! UsuarioRol::esAdminGlobal($user)) {
             return [];
@@ -24,22 +23,15 @@ final class JefePlantaLoginNotificacion
             ->where('estado', RutaDistribucionCatalogo::ESTADO_PENDIENTE_APROBACION)
             ->with(['almacenMayoristaDestino', 'detallesTraslado'])
             ->orderByDesc('created_at')
-            ->limit(8)
+            ->limit(10)
             ->get()
-            ->filter(function (RutaDistribucion $ruta) use ($ultimoLoginPrevio) {
-                if (! self::esPendienteRelevante($ruta, $ultimoLoginPrevio)) {
-                    return false;
-                }
-
-                return true;
-            })
             ->map(function (RutaDistribucion $ruta) {
                 $destino = $ruta->almacenMayoristaDestino?->nombre ?? 'Centro mayorista';
                 $n = $ruta->detallesTraslado?->count() ?? 0;
                 $productos = $n === 1 ? '1 producto' : $n.' productos';
 
                 return [
-                    'clave' => JefePlantaTrasladoNotificacionVista::claveRuta((int) $ruta->rutadistribucionid),
+                    'clave' => 'traslado:'.(int) $ruta->rutadistribucionid,
                     'codigo' => $ruta->codigo ?? $ruta->nombre ?? 'Traslado #'.$ruta->rutadistribucionid,
                     'url' => route('logistica.traslados-planta.show', $ruta),
                     'destino' => $destino,
@@ -49,20 +41,10 @@ final class JefePlantaLoginNotificacion
             ->values()
             ->all();
 
-        return JefePlantaTrasladoNotificacionVista::filtrarPendientes((int) $user->usuarioid, $items);
-    }
-
-    private static function esPendienteRelevante(RutaDistribucion $ruta, ?Carbon $ultimoLoginPrevio): bool
-    {
-        $fecha = $ruta->updated_at ?? $ruta->created_at;
-        if ($fecha === null) {
-            return true;
-        }
-
-        if ($ultimoLoginPrevio === null) {
-            return $fecha->greaterThanOrEqualTo(now()->subDays(7));
-        }
-
-        return $fecha->greaterThan($ultimoLoginPrevio);
+        return LoginNotificacionAlcance::filtrarPendientes(
+            LoginNotificacionAlcance::JEFE_PLANTA_TRASLADO,
+            (int) $user->usuarioid,
+            $items
+        );
     }
 }

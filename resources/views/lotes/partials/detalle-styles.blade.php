@@ -45,6 +45,40 @@
         letter-spacing: -.02em;
         line-height: 1.15;
     }
+    .lote-hero__title-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    .lote-hero__thumb {
+        flex-shrink: 0;
+        width: 88px;
+        height: 88px;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 2px solid rgba(255,255,255,.35);
+        box-shadow: 0 8px 20px rgba(0,0,0,.18);
+        background: rgba(255,255,255,.08);
+    }
+    .lote-hero__thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .lote-hero__title-block {
+        flex: 1;
+        min-width: 0;
+    }
+    .lote-imagen-preview__img {
+        width: 100%;
+        max-width: 220px;
+        max-height: 160px;
+        object-fit: cover;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 14px rgba(15,23,42,.08);
+    }
     .lote-hero__meta {
         display: flex;
         flex-wrap: wrap;

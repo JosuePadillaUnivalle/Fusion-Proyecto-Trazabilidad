@@ -106,6 +106,9 @@
                                 <input type="file" class="custom-file-input" id="imagen" name="imagen" accept="image/*">
                                 <label class="custom-file-label" for="imagen">Elegir imagen…</label>
                             </div>
+                            <div id="lote-imagen-preview" class="lote-imagen-preview d-none mt-2">
+                                <img id="lote-imagen-preview-img" src="" alt="Vista previa del lote" class="lote-imagen-preview__img">
+                            </div>
                             <p class="campo-guia">Puedes omitirla y agregarla más tarde.</p>
                         </div>
                     </div>
@@ -374,6 +377,24 @@
             document.getElementById('imagen')?.addEventListener('change', function () {
                 var label = this.nextElementSibling;
                 if (label) label.textContent = this.files[0]?.name || 'Elegir imagen…';
+
+                var preview = document.getElementById('lote-imagen-preview');
+                var previewImg = document.getElementById('lote-imagen-preview-img');
+                if (!preview || !previewImg) return;
+
+                var file = this.files && this.files[0];
+                if (!file || !file.type.startsWith('image/')) {
+                    preview.classList.add('d-none');
+                    previewImg.removeAttribute('src');
+                    return;
+                }
+
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    previewImg.src = e.target.result;
+                    preview.classList.remove('d-none');
+                };
+                reader.readAsDataURL(file);
             });
         })();
     </script>

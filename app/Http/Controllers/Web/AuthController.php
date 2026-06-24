@@ -8,15 +8,12 @@ use App\Services\UsuarioUsernameService;
 use App\Support\CuentaEstado;
 use App\Support\RegistroValidacion;
 use App\Support\TiposLicenciaBolivia;
+use App\Support\AgricultorLoginNotificacion;
+use App\Support\JefeAgricultorLoginNotificacion;
 use App\Support\JefePlantaLoginNotificacion;
-use App\Support\JefePlantaTrasladoNotificacionVista;
 use App\Support\MayoristaLoginNotificacion;
-use App\Support\MayoristaPedidoNotificacionVista;
+use App\Support\MinoristaLoginNotificacion;
 use App\Support\OperarioPlantaLoginNotificacion;
-use App\Support\OperarioPlantaTareaNotificacionVista;
-use App\Support\PlantaLoginEnvio;
-use App\Support\TransportistaAsignacionNotificacionVista;
-use App\Support\TransportistaLoginEnvio;
 use App\Support\TransportistaLoginNotificacion;
 use App\Support\UsuarioRol;
 use Illuminate\Http\Request;
@@ -31,8 +28,7 @@ class AuthController extends Controller
     public function showLoginForm(Request $request)
     {
         if (Auth::check()) {
-            $this->cerrarSesionActiva($request);
-            Cookie::queue($this->cookieOlvidarRecordarme());
+            return redirect()->route('dashboard');
         }
 
         return response()
@@ -44,20 +40,22 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+        if (Auth::check()) {
+            return redirect()->route('dashboard');
+        }
+
         $credentials = $request->validate([
             'email' => 'required|email',
             'password' => 'required|string',
         ]);
 
         if (Auth::check()) {
-            $this->cerrarSesionActiva($request);
+            return redirect()->route('dashboard');
         }
-
-        Cookie::queue($this->cookieOlvidarRecordarme());
 
         if (! Auth::attempt(
             ['email' => $credentials['email'], 'password' => $credentials['password']],
-            $request->boolean('remember')
+            $request->boolean('remember', true)
         )) {
             return back()
                 ->withErrors(['email' => 'Credenciales inválidas.'])
@@ -90,28 +88,34 @@ class AuthController extends Controller
         if (UsuarioRol::esTransportista($user)) {
             $nuevas = TransportistaLoginNotificacion::nuevasAsignacionesDesdeLogin($user, $ultimoLoginPrevio);
             if ($nuevas !== []) {
-                TransportistaAsignacionNotificacionVista::marcarVistas((int) $user->usuarioid, $nuevas);
                 $request->session()->put('transportista_nuevas_asignaciones', $nuevas);
-            }
-
-            $envioTransportista = TransportistaLoginEnvio::envioPrioritario($user);
-            if ($envioTransportista) {
-                return redirect($envioTransportista['url']);
             }
         }
 
         if (UsuarioRol::esOperarioPlanta($user)) {
             $nuevasTareas = OperarioPlantaLoginNotificacion::nuevasTareasDesdeLogin($user, $ultimoLoginPrevio);
             if ($nuevasTareas !== []) {
-                OperarioPlantaTareaNotificacionVista::marcarVistas((int) $user->usuarioid, $nuevasTareas);
                 $request->session()->put('operario_planta_nuevas_tareas', $nuevasTareas);
+            }
+        }
+
+        if (UsuarioRol::esAgricultorOperativo($user) && ! UsuarioRol::esJefeAgricultor($user)) {
+            $actividades = AgricultorLoginNotificacion::actividadesPendientes($user);
+            if ($actividades !== []) {
+                $request->session()->put('agricultor_actividades_pendientes', $actividades);
+            }
+        }
+
+        if (UsuarioRol::esJefeAgricultor($user)) {
+            $enviosPendientes = JefeAgricultorLoginNotificacion::enviosPendientesConfirmacion($user);
+            if ($enviosPendientes !== []) {
+                $request->session()->put('jefe_agricultor_envios_pendientes', $enviosPendientes);
             }
         }
 
         if (UsuarioRol::esJefePlanta($user) || UsuarioRol::esAdminGlobal($user)) {
             $trasladosPendientes = JefePlantaLoginNotificacion::trasladosPendientesDesdeLogin($user, $ultimoLoginPrevio);
             if ($trasladosPendientes !== []) {
-                JefePlantaTrasladoNotificacionVista::marcarVistas((int) $user->usuarioid, $trasladosPendientes);
                 $request->session()->put('jefe_planta_traslados_pendientes', $trasladosPendientes);
             }
         }
@@ -119,14 +123,15 @@ class AuthController extends Controller
         if (UsuarioRol::puedeGestionarDistribucionMayorista($user) && ! UsuarioRol::esMinorista($user)) {
             $nuevasSolicitudes = MayoristaLoginNotificacion::nuevasSolicitudesDesdeLogin($user, $ultimoLoginPrevio);
             if ($nuevasSolicitudes !== []) {
-                MayoristaPedidoNotificacionVista::marcarVistas((int) $user->usuarioid, $nuevasSolicitudes);
                 $request->session()->put('mayorista_nuevas_solicitudes', $nuevasSolicitudes);
             }
         }
 
-        $envioPlanta = PlantaLoginEnvio::envioPrioritario($user);
-        if ($envioPlanta) {
-            return redirect($envioPlanta['url']);
+        if (UsuarioRol::esMinorista($user)) {
+            $enviosPdv = MinoristaLoginNotificacion::enviosPendientesConfirmacion($user);
+            if ($enviosPdv !== []) {
+                $request->session()->put('minorista_envios_pendientes', $enviosPdv);
+            }
         }
 
         return redirect()->route('dashboard');

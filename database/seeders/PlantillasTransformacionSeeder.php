@@ -20,6 +20,10 @@ class PlantillasTransformacionSeeder extends Seeder
             return;
         }
 
+        if (Schema::hasTable('maquina_variable_planta')) {
+            $this->call(MaquinaVariablePlantaSeeder::class);
+        }
+
         $definiciones = [
             [
                 'nombre' => 'Puré de papa',
@@ -238,5 +242,9 @@ class PlantillasTransformacionSeeder extends Seeder
         }
 
         $this->command?->info("Plantillas de transformación: {$creadas} rutas predefinidas.");
+
+        if (Schema::hasTable('plantilla_transformacion_paso_variable')) {
+            $this->call(PlantillaPasoVariableSeeder::class);
+        }
     }
 }

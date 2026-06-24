@@ -14,6 +14,7 @@ class FirmaRecepcionEnvio extends Model
         'envioasignacionmultipleid',
         'rutadistribucionid',
         'imagenfirma',
+        'nombrefirmante',
         'fechafirma',
     ];
 

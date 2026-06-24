@@ -1,18 +1,12 @@
 @php
-
     $traslados = session('jefe_planta_traslados_pendientes', []);
-
+    $clavesJson = json_encode(array_column($traslados, 'clave'));
 @endphp
 
-
-
 @if(! empty($traslados))
-
 <div class="login-notif-scrim" id="jefePlantaTrasladoScrim" aria-hidden="true"></div>
 
-
-
-<div class="modal fade login-notif-modal-root" id="modalJefePlantaTraslado" tabindex="-1" role="dialog" aria-labelledby="modalJefePlantaTrasladoTitulo" aria-hidden="true" data-backdrop="false" data-keyboard="true">
+<div class="modal fade login-notif-modal-root" id="modalJefePlantaTraslado" tabindex="-1" role="dialog" aria-labelledby="modalJefePlantaTrasladoTitulo" aria-hidden="true" data-backdrop="false" data-keyboard="true" data-login-notif-alcance="jefe_planta_traslado" data-login-notif-claves="{{ $clavesJson }}">
 
     <div class="modal-dialog modal-dialog-centered" role="document">
 
