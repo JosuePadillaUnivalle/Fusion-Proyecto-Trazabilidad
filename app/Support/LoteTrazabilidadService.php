@@ -11,6 +11,7 @@ use App\Models\Lote;
 use App\Models\Produccion;
 use App\Models\ProduccionAlmacenamiento;
 use App\Models\Usuario;
+use App\Services\PlanificacionCosechaService;
 use App\Support\EstadoLoteCatalogo;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -1146,11 +1147,19 @@ class LoteTrazabilidadService
             $siembraPendiente->loadMissing('usuario');
         }
         $user = $request->user();
+        $actividadesMarcablesIds = $this->idsActividadesMarcables($lote, $user);
         $puedeCompletarSiembraDirecta = $siguienteFase === 'siembra'
             && ! $this->siembraCompletada($lote)
             && $siembraPendiente === null
             && $user
             && (int) $lote->usuarioid === (int) $user->usuarioid;
+        $puedeCompletarSiembra = $puedeCompletarSiembraDirecta
+            || ($siembraPendiente !== null
+                && in_array((int) $siembraPendiente->actividadid, $actividadesMarcablesIds, true));
+        $sugerenciaSiembra = $lote->cultivo
+            ? CultivoSiembraCatalogo::sugerenciaParaLote($lote->cultivo, (float) $lote->superficie)
+            : null;
+        $resumenSiembraCompletar = $this->resumenSiembraCompletar($lote);
         $urlAsignarActividad = $faseActual === 'en_crecimiento'
             ? $this->urlAsignarActividadEnCrecimiento($lote)
             : null;
@@ -1182,9 +1191,8 @@ class LoteTrazabilidadService
                 && ! $puedeCompletarSiembraDirecta,
             'puede_completar_siembra_directa' => $puedeCompletarSiembraDirecta,
             'url_completar_siembra' => $puedeCompletarSiembraDirecta
-                ? route('lotes.siembra.create', [
+                ? route('lotes.siembra.completar', [
                     'lote' => $lote,
-                    'completar' => 1,
                     'return' => $this->returnUrlTrazabilidad($lote),
                 ])
                 : null,
@@ -1192,7 +1200,13 @@ class LoteTrazabilidadService
                 'actividadid' => (int) $siembraPendiente->actividadid,
                 'titulo' => $siembraPendiente->descripcion ?: ($siembraPendiente->tipoActividad->nombre ?? 'Siembra'),
                 'responsable' => trim(($siembraPendiente->usuario->nombre ?? '').' '.($siembraPendiente->usuario->apellido ?? '')) ?: null,
+                'fechainicio' => $siembraPendiente->fechainicio
+                    ? $this->formatearFechaApp($siembraPendiente->fechainicio)
+                    : null,
             ] : null,
+            'puede_completar_siembra' => $puedeCompletarSiembra,
+            'sugerencia_siembra' => $sugerenciaSiembra,
+            'resumen_siembra_completar' => $resumenSiembraCompletar,
             'url_asignar_actividad' => $urlAsignarActividad,
             'siguiente_actividad_crecimiento' => $siguienteActividadCrecimiento,
             'puede_ir_a_cosecha' => $faseActual === 'en_crecimiento' && $siguienteFase === 'cosecha'
@@ -1212,7 +1226,7 @@ class LoteTrazabilidadService
                 'data' => $porTipoFiltrado->values()->all(),
             ],
             'chart_linea' => $this->chartLineaMensual($eventosFiltrados),
-            'actividades_marcables_ids' => $this->idsActividadesMarcables($lote, $request->user()),
+            'actividades_marcables_ids' => $actividadesMarcablesIds,
         ]);
     }
 
@@ -1560,6 +1574,63 @@ class LoteTrazabilidadService
             'almacen_destino_resumen' => $almacenDestino
                 ? ($resumenesCapacidad[$almacenDestino->almacenid] ?? null)
                 : null,
+        ];
+    }
+
+    /** Resumen ampliado para completar siembra: mapa, insumo total y proyección de cosecha. */
+    public function resumenSiembraCompletar(Lote $lote): array
+    {
+        $lote->loadMissing(['insumoSemilla.unidadMedida', 'cultivo', 'catalogoTamanoConteo.tipoEmpaque']);
+
+        $insumo = CultivoSiembraCatalogo::sugerenciaDesdeLote($lote);
+        if (! $insumo && $lote->cultivo) {
+            $fallback = CultivoSiembraCatalogo::sugerenciaParaLote($lote->cultivo, (float) $lote->superficie);
+            $insumo = array_merge($fallback, [
+                'insumo_nombre' => $lote->cultivo_etiqueta ?? $lote->cultivo->nombre,
+            ]);
+        }
+
+        $proyeccionRaw = app(PlanificacionCosechaService::class)->estimacionDesdeLote($lote);
+        $proyeccion = null;
+        if ($proyeccionRaw && ($proyeccionRaw['ok'] ?? false)) {
+            $proyeccion = [
+                'kg_cosecha_estimados' => (float) ($proyeccionRaw['kg_cosecha_estimados'] ?? 0),
+                'unidades_estimadas' => (int) ($proyeccionRaw['unidades_estimadas'] ?? 0),
+                'empaques_estimados' => (int) ($proyeccionRaw['empaques_estimados'] ?? 0),
+                'empaque_label' => $proyeccionRaw['empaque_label'] ?? 'Cajas',
+                'unidades_por_caja' => $proyeccionRaw['unidades_por_caja'] ?? null,
+                'calibre_nombre' => $proyeccionRaw['calibre_nombre'] ?? null,
+                'hectareas' => (float) ($proyeccionRaw['hectareas'] ?? $lote->superficie),
+                'resumen' => $proyeccionRaw['resumen'] ?? null,
+            ];
+        }
+
+        $cantidadTotal = null;
+        $cantidadUnidad = null;
+        if ($insumo && ($insumo['tiene_dosis'] ?? false)) {
+            $cantidadTotal = (float) ($insumo['sugerido'] ?? 0);
+            $cantidadUnidad = $insumo['etiqueta_unidad'] ?? $insumo['unidad'] ?? 'kg';
+        } elseif ($proyeccionRaw && ($proyeccionRaw['semilla_cantidad'] ?? null) !== null) {
+            $cantidadTotal = (float) $proyeccionRaw['semilla_cantidad'];
+            $cantidadUnidad = $proyeccionRaw['semilla_unidad'] ?? 'kg';
+        }
+
+        $lat = $lote->latitud !== null ? (float) $lote->latitud : null;
+        $lng = $lote->longitud !== null ? (float) $lote->longitud : null;
+
+        return [
+            'insumo' => $insumo ? array_merge($insumo, [
+                'cantidad_total' => $cantidadTotal,
+                'cantidad_unidad' => $cantidadUnidad,
+            ]) : null,
+            'proyeccion' => $proyeccion,
+            'mapa' => [
+                'lat' => $lat,
+                'lng' => $lng,
+                'superficie_ha' => (float) $lote->superficie,
+                'ubicacion' => $lote->ubicacion_visible,
+                'tiene_coordenadas' => $lat !== null && $lng !== null && abs($lat) > 0.0001 && abs($lng) > 0.0001,
+            ],
         ];
     }
 }

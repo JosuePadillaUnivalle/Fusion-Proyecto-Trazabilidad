@@ -60,8 +60,7 @@
                             $titulo = 'Abrir formulario para enviar al almacén';
                         }
                         $siembraPendienteId = (int) ($actividad_siembra_pendiente['actividadid'] ?? 0);
-                        $puedeCompletarSiembra = $siembraPendienteId > 0
-                            && in_array($siembraPendienteId, $actividades_marcables_ids ?? [], true);
+                        $puedeCompletarSiembra = (bool) ($puede_completar_siembra ?? false);
                     @endphp
                     @if(!empty($step['url']))
                         <a href="{{ $step['url'] }}" class="fase-step {{ $step['estado'] }} fase-step-link" title="{{ $titulo }}">
@@ -76,12 +75,13 @@
                                 <span class="badge badge-fase-count">{{ $step['eventos'] }}</span>
                             @endif
                         </a>
-                    @elseif(($step['key'] ?? '') === 'siembra' && ($step['estado'] ?? '') === 'next' && ($puede_completar_siembra_directa ?? false) && !empty($url_completar_siembra))
-                        <a href="{{ $url_completar_siembra }}" class="fase-step {{ $step['estado'] }} fase-step-link" title="{{ $titulo }}">
+                    @elseif(($step['key'] ?? '') === 'siembra' && ($step['estado'] ?? '') === 'next' && $puedeCompletarSiembra)
+                        <button type="button" class="fase-step {{ $step['estado'] }} fase-step-link border-0"
+                                data-toggle="modal" data-target="#modalCompletarSiembra" title="{{ $titulo }}">
                             <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
                             {{ $step['label'] }}
                             <span class="d-block small mt-1"><i class="fas fa-camera"></i> Completar</span>
-                        </a>
+                        </button>
                     @elseif(($step['key'] ?? '') === 'siembra' && ($step['estado'] ?? '') === 'next' && ($puede_asignar_siembra ?? false))
                         <a href="#" role="button" class="fase-step {{ $step['estado'] }} fase-step-link"
                            data-toggle="modal" data-target="#modalAsignarSiembra" title="{{ $titulo }}">
@@ -90,13 +90,9 @@
                             <span class="d-block small mt-1"><i class="fas fa-arrow-right"></i> Siguiente</span>
                         </a>
                     @elseif(($step['key'] ?? '') === 'siembra' && !empty($actividad_siembra_pendiente) && $puedeCompletarSiembra)
-                        <button type="button"
-                                class="fase-step {{ $step['estado'] }} fase-step-link btn-completar-evidencia"
-                                data-action="{{ route('actividades.marcar-realizada', $siembraPendienteId) }}"
-                                data-titulo="{{ $actividad_siembra_pendiente['titulo'] ?? 'Siembra' }}"
-                                data-lote="{{ $lote->nombre }}"
-                                data-scroll-to="historial-eventos"
-                                title="Marcar siembra como realizada con foto">
+                        <button type="button" class="fase-step {{ $step['estado'] }} fase-step-link border-0"
+                                data-toggle="modal" data-target="#modalCompletarSiembra"
+                                title="Completar siembra con foto de evidencia">
                             <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
                             {{ $step['label'] }}
                             <span class="d-block small mt-1"><i class="fas fa-camera"></i> Completar</span>
@@ -158,11 +154,18 @@
                     @endif
                 </p>
                 @endif
-            @elseif(($puede_completar_siembra_directa ?? false) && !empty($url_completar_siembra) && ($siguiente_fase ?? '') === 'siembra')
+            @elseif($puede_completar_siembra ?? false)
                 <div class="text-center mb-3">
-                    <a href="{{ $url_completar_siembra }}" class="btn btn-success btn-sm">
-                        <i class="fas fa-camera mr-1"></i> Completar {{ $siguiente_fase_label }}
-                    </a>
+                    @if(!empty($actividad_siembra_pendiente))
+                        <p class="small text-success mb-2">
+                            <i class="fas fa-user-check mr-1"></i>
+                            Siembra asignada a <strong>{{ $actividad_siembra_pendiente['responsable'] ?? 'usted' }}</strong>.
+                            Suba la foto del trabajo en campo para completarla.
+                        </p>
+                    @endif
+                    <button type="button" class="btn btn-success btn-sm" data-toggle="modal" data-target="#modalCompletarSiembra">
+                        <i class="fas fa-camera mr-1"></i> Completar {{ $siguiente_fase_label ?: 'Siembra' }}
+                    </button>
                 </div>
             @elseif(($puede_asignar_siembra ?? false) && ($siguiente_fase ?? '') === 'siembra')
                 <div class="text-center mb-3">
@@ -170,17 +173,7 @@
                         <i class="fas fa-user-plus mr-1"></i> Asignar {{ $siguiente_fase_label }}
                     </button>
                 </div>
-            @elseif(!empty($actividad_siembra_pendiente) && in_array((int) ($actividad_siembra_pendiente['actividadid'] ?? 0), $actividades_marcables_ids ?? [], true))
-                <div class="text-center mb-3">
-                    <button type="button" class="btn btn-success btn-sm btn-completar-evidencia"
-                            data-action="{{ route('actividades.marcar-realizada', $actividad_siembra_pendiente['actividadid']) }}"
-                            data-titulo="{{ $actividad_siembra_pendiente['titulo'] ?? 'Siembra' }}"
-                            data-lote="{{ $lote->nombre }}"
-                            data-scroll-to="historial-eventos">
-                        <i class="fas fa-camera mr-1"></i> Completar {{ $siguiente_fase_label ?: 'Siembra' }}
-                    </button>
-                </div>
-            @elseif(!empty($actividad_siembra_pendiente))
+            @elseif(!empty($actividad_siembra_pendiente) && !($puede_completar_siembra ?? false))
                 <p class="text-center small text-muted mb-3">
                     <i class="fas fa-hourglass-half mr-1"></i>
                     Siembra asignada a <strong>{{ $actividad_siembra_pendiente['responsable'] ?? '—' }}</strong> — pendiente de realizar.
@@ -262,7 +255,12 @@
                                     <span class="text-muted">— {{ $actPend['responsable'] }}</span>
                                 @endif
                             </span>
-                            @if(!empty($actPend['actividadid']) && in_array((int) $actPend['actividadid'], $actividades_marcables_ids ?? [], true))
+                            @if(!empty($actPend['actividadid']) && in_array((int) $actPend['actividadid'], $actividades_marcables_ids ?? [], true) && !empty($actPend['es_siembra']) && ($puede_completar_siembra ?? false))
+                                <button type="button" class="btn btn-success btn-sm"
+                                        data-toggle="modal" data-target="#modalCompletarSiembra">
+                                    <i class="fas fa-camera mr-1"></i> Completar siembra
+                                </button>
+                            @elseif(!empty($actPend['actividadid']) && in_array((int) $actPend['actividadid'], $actividades_marcables_ids ?? [], true) && empty($actPend['es_siembra']))
                                 <button type="button" class="btn btn-success btn-sm btn-completar-evidencia"
                                         data-action="{{ route('actividades.marcar-realizada', $actPend['actividadid']) }}"
                                         data-titulo="{{ $actPend['titulo'] }}"
@@ -323,6 +321,7 @@
                             $puedeCompletarEvento = !empty($evento['actividadid'])
                                 && isset($evento['completada'])
                                 && ! $evento['completada']
+                                && ($evento['fase'] ?? '') !== 'siembra'
                                 && in_array((int) $evento['actividadid'], $actividades_marcables_ids ?? [], true);
                             $tieneEvidencia = !empty($evento['evidencia_url']);
                             $colorFaseEvento = ($fases_evento[$evento['fase']] ?? $fases[$evento['fase']])['color'] ?? '#6c757d';
@@ -407,7 +406,10 @@
 
 @include('partials.modal-completar-evidencia')
 @include('partials.modal-ver-evidencia')
-@if(($puede_asignar_siembra ?? false) || $errors->has('usuarioid') || $errors->has('siembra'))
+@if(($puede_completar_siembra ?? false) || $errors->has('evidencia_foto') || $errors->has('observaciones') || session('abrir_modal_completar_siembra'))
+    @include('lotes.partials.modal-completar-siembra')
+@endif
+@if(($puede_asignar_siembra ?? false) || $errors->has('usuarioid'))
     @include('lotes.partials.modal-asignar-siembra')
 @endif
 @if(($puede_enviar_almacen ?? false) || $errors->has('almacenid') || $errors->has('produccionid'))
@@ -432,7 +434,11 @@
         if (window.location.hash === '#historial-eventos') scrollToHistorial();
     });
 
-    @if($errors->has('usuarioid') || $errors->has('siembra'))
+    @if(session('abrir_modal_completar_siembra') || ($errors->has('siembra') && ($puede_completar_siembra ?? false)))
+    if (window.jQuery) {
+        window.jQuery('#modalCompletarSiembra').modal('show');
+    }
+    @elseif($errors->has('usuarioid') || ($errors->has('siembra') && ($puede_asignar_siembra ?? false)))
     if (window.jQuery) {
         window.jQuery('#modalAsignarSiembra').modal('show');
     }

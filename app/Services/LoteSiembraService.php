@@ -7,14 +7,14 @@ namespace App\Services;
 
 
 use App\Models\Actividad;
-
 use App\Models\Lote;
-
 use App\Models\Prioridad;
-
 use App\Models\TipoActividad;
+use App\Models\Usuario;
 
 use App\Support\LoteTrazabilidadService;
+
+use Illuminate\Http\UploadedFile;
 
 use Illuminate\Support\Facades\DB;
 
@@ -138,6 +138,79 @@ class LoteSiembraService
 
         return $actividad;
 
+    }
+
+
+
+    /**
+     * Registra la siembra como completada con foto (actividad pendiente o hito directo del agricultor).
+     */
+    public function completarConEvidencia(Lote $lote, Usuario $usuario, UploadedFile $foto, ?string $observaciones = null): Actividad
+    {
+        $tipo = $this->tipoSiembra();
+        $faseActual = $this->trazabilidad->resolverFaseActual($lote);
+
+        if ($this->trazabilidad->siembraCompletada($lote)) {
+            throw ValidationException::withMessages([
+                'siembra' => 'Este lote ya fue sembrado.',
+            ]);
+        }
+
+        if (! $this->trazabilidad->tipoActividadPermitidoEnFase($tipo->nombre, $faseActual)) {
+            throw ValidationException::withMessages([
+                'siembra' => 'El lote no está en fase de siembra.',
+            ]);
+        }
+
+        $pendiente = $this->trazabilidad->actividadSiembraPendiente($lote);
+        if ($pendiente && (int) $pendiente->usuarioid !== (int) $usuario->usuarioid) {
+            throw ValidationException::withMessages([
+                'siembra' => 'La siembra está asignada a otro agricultor.',
+            ]);
+        }
+
+        $evidenciaPath = \App\Support\EvidenciaFoto::guardar($foto, 'actividades_evidencia');
+        $ahora = now();
+
+        return DB::transaction(function () use ($lote, $usuario, $tipo, $pendiente, $evidenciaPath, $ahora, $observaciones) {
+            if ($pendiente) {
+                $pendiente->evidencia_foto_path = $evidenciaPath;
+                $pendiente->fechafin = $ahora;
+                if ($observaciones) {
+                    $pendiente->observaciones = trim(($pendiente->observaciones ?? '').' '.$observaciones);
+                }
+                $pendiente->save();
+                $actividad = $pendiente;
+            } else {
+                $prioridadId = Prioridad::query()->orderBy('prioridadid')->value('prioridadid')
+                    ?? Prioridad::firstOrCreate(['nombre' => 'Media'], ['nombre' => 'Media'])->prioridadid;
+
+                $actividad = Actividad::create([
+                    'loteid' => $lote->loteid,
+                    'usuarioid' => $usuario->usuarioid,
+                    'descripcion' => $tipo->nombre ?? 'Siembra',
+                    'fechainicio' => $ahora,
+                    'fechafin' => $ahora,
+                    'tipoactividadid' => $tipo->tipoactividadid,
+                    'prioridadid' => $prioridadId,
+                    'observaciones' => $observaciones ?: 'Siembra completada con evidencia fotográfica.',
+                    'evidencia_foto_path' => $evidenciaPath,
+                ]);
+            }
+
+            app(\App\Support\LoteEstadoPorActividad::class)->aplicarDesdeActividad($actividad);
+
+            $lote->refresh();
+            if (! $lote->fechasiembra) {
+                $lote->fechasiembra = $ahora->toDateString();
+                $lote->fechamodificacion = $ahora;
+                $lote->save();
+            }
+
+            $this->notificaciones->descartarActividadAsignada((int) $actividad->actividadid);
+
+            return $actividad;
+        });
     }
 
 

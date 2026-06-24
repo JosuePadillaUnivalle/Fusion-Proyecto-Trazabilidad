@@ -2,16 +2,21 @@
 
 namespace Tests\Feature;
 
+use App\Models\Actividad;
 use App\Models\Cultivo;
 use App\Models\EstadoLoteTipo;
 use App\Models\Lote;
+use App\Models\Prioridad;
 use App\Models\TipoActividad;
 use App\Models\UnidadMedida;
 use App\Models\Usuario;
+use App\Support\LoteTrazabilidadService;
 use Database\Seeders\CatalogosOperacionAgricolaSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -143,5 +148,68 @@ class ActividadLotePermisosTest extends TestCase
                 'usuarioid' => $agricultor->usuarioid,
             ])
             ->assertRedirect(route('lotes.trazabilidad', $lote));
+    }
+
+    public function test_agricultor_puede_completar_siembra_asignada_con_evidencia(): void
+    {
+        Storage::fake('public');
+        $tipoSiembra = TipoActividad::create(['nombre' => 'Siembra']);
+        $tipoPrep = TipoActividad::create(['nombre' => 'Labranza']);
+        $prioridad = Prioridad::query()->firstOrCreate(['nombre' => 'Media']);
+        $agricultor = $this->createUser('agricultor');
+        $estado = EstadoLoteTipo::query()->whereRaw('LOWER(nombre) LIKE ?', ['%planif%'])->first()
+            ?? EstadoLoteTipo::query()->firstOrFail();
+        $lote = Lote::create([
+            'usuarioid' => $agricultor->usuarioid,
+            'nombre' => 'Lote completar siembra',
+            'ubicacion' => 'Parcela test',
+            'superficie' => 1,
+            'unidadsuperficieid' => UnidadMedida::query()->firstOrCreate(
+                ['abreviatura' => 'ha'],
+                ['nombre' => 'Hectárea', 'categoria' => 'superficie']
+            )->unidadmedidaid,
+            'cultivoid' => Cultivo::query()->firstOrCreate(['nombre' => 'Tomate'], ['detalle' => 'Test'])->cultivoid,
+            'estadolotetipoid' => $estado->estadolotetipoid,
+            'fechacreacion' => now(),
+            'fechamodificacion' => now(),
+        ]);
+
+        Actividad::create([
+            'loteid' => $lote->loteid,
+            'usuarioid' => $agricultor->usuarioid,
+            'descripcion' => 'Preparación',
+            'fechainicio' => now()->subDay(),
+            'fechafin' => now()->subDay(),
+            'tipoactividadid' => $tipoPrep->tipoactividadid,
+            'prioridadid' => $prioridad->prioridadid,
+        ]);
+
+        $pendiente = Actividad::create([
+            'loteid' => $lote->loteid,
+            'usuarioid' => $agricultor->usuarioid,
+            'descripcion' => 'Siembra',
+            'fechainicio' => now(),
+            'fechafin' => null,
+            'tipoactividadid' => $tipoSiembra->tipoactividadid,
+            'prioridadid' => $prioridad->prioridadid,
+        ]);
+
+        $foto = UploadedFile::fake()->image('siembra.jpg');
+
+        $this->actingAs($agricultor)
+            ->post(route('lotes.siembra.completar.store', $lote), [
+                'evidencia_foto' => $foto,
+                'observaciones' => 'Surcos listos',
+                'return' => route('lotes.trazabilidad', $lote, absolute: false),
+            ])
+            ->assertRedirect(route('lotes.trazabilidad', $lote))
+            ->assertSessionHas('success');
+
+        $pendiente->refresh();
+        $this->assertNotNull($pendiente->fechafin);
+        $this->assertNotNull($pendiente->evidencia_foto_path);
+
+        $trazabilidad = app(LoteTrazabilidadService::class);
+        $this->assertTrue($trazabilidad->siembraCompletada($lote->fresh()));
     }
 }

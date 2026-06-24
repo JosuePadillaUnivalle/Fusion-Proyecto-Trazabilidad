@@ -188,6 +188,8 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::get('lotes/validar-ubicacion', [LoteController::class, 'validarUbicacion'])->name('lotes.validar-ubicacion')->middleware('action.permission:lotes,read');
     Route::post('lotes', [LoteController::class, 'store'])->name('lotes.store')->middleware('action.permission:lotes,create');
     Route::get('lotes/{lote}/trazabilidad', [LoteController::class, 'trazabilidad'])->name('lotes.trazabilidad')->middleware('action.permission:lotes,read');
+    Route::get('lotes/{lote}/siembra/completar', [ActividadController::class, 'completarSiembra'])->name('lotes.siembra.completar')->middleware('action.permission:lotes,read');
+    Route::post('lotes/{lote}/siembra/completar', [ActividadController::class, 'storeCompletarSiembra'])->name('lotes.siembra.completar.store')->middleware('action.permission:lotes,read');
     Route::get('lotes/{lote}/siembra', [ActividadController::class, 'createSiembra'])->name('lotes.siembra.create')->middleware('action.permission:lotes,read');
     Route::post('lotes/{lote}/siembra', [ActividadController::class, 'storeSiembra'])->name('lotes.siembra.store')->middleware('action.permission:lotes,read');
     Route::post('lotes/{lote}/asignar-siembra', [ActividadController::class, 'asignarSiembra'])->name('lotes.siembra.asignar')->middleware('action.permission:lotes,read');

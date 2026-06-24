@@ -25,12 +25,19 @@ final class AgricultorLoginNotificacion
             ->orderByDesc('fechainicio')
             ->limit(10)
             ->get()
-            ->map(fn (Actividad $a) => [
-                'clave' => 'actividad:'.(int) $a->actividadid,
-                'titulo' => $a->descripcion ?: ($a->tipoActividad?->nombre ?? 'Actividad de campo'),
-                'lote' => $a->lote?->nombre ?? '—',
-                'url' => route('actividades.show', $a),
-            ])
+            ->map(function (Actividad $a) {
+                $tipo = mb_strtolower(trim($a->tipoActividad?->nombre ?? ''));
+                $url = str_contains($tipo, 'siembra') && $a->lote
+                    ? route('lotes.siembra.completar', $a->lote)
+                    : route('actividades.show', $a);
+
+                return [
+                    'clave' => 'actividad:'.(int) $a->actividadid,
+                    'titulo' => $a->descripcion ?: ($a->tipoActividad?->nombre ?? 'Actividad de campo'),
+                    'lote' => $a->lote?->nombre ?? '—',
+                    'url' => $url,
+                ];
+            })
             ->values()
             ->all();
 
