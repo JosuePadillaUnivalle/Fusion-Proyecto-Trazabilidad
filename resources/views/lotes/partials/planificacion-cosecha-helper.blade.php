@@ -109,7 +109,7 @@
 
         function renderResultado(res) {
             if (!resultadoGrid) return;
-            const emp = res.calibre?.empaque_label || 'Cajas';
+            const emp = etiquetaEmpaqueCosecha(res.calibre?.empaque_label || 'Cajas');
             resultadoGrid.innerHTML =
                 '<div class="plan-resultado-item"><strong>' + fmtNum(res.unidades_estimadas, 0) + '</strong><span>Unidades</span></div>'
                 + '<div class="plan-resultado-item"><strong>' + fmtNum(res.empaques_estimados, 0) + '</strong><span>' + emp + '</span></div>'
@@ -146,8 +146,15 @@
             return 0;
         }
 
+        function etiquetaEmpaqueCosecha(label) {
+            if (!label || /saco/i.test(label)) {
+                return 'Cajas';
+            }
+            return label;
+        }
+
         function etiquetaEmpaqueCorto(c) {
-            const label = c.empaque_label || 'Cajas';
+            const label = etiquetaEmpaqueCosecha(c.empaque_label || 'Cajas');
             return label === 'Cajas' ? 'Caja' : label.replace(/s$/, '');
         }
 

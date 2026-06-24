@@ -17,6 +17,19 @@ class CosechaPresentacionService
         private readonly PlanificacionCosechaService $planificacion,
     ) {}
 
+    /**
+     * En campo la cosecha se cuenta en cajas; el saco es solo traslado agrícola→planta.
+     */
+    public static function tipoEmpaqueParaCosechaEnCampo(?string $nombreTipo): ?string
+    {
+        $n = mb_strtolower(trim($nombreTipo ?? ''));
+        if ($n === 'saco' || str_contains($n, 'saco')) {
+            return 'Caja de cartón';
+        }
+
+        return $nombreTipo;
+    }
+
     public static function etiquetaEmpaque(?string $nombreTipo): string
     {
         $n = mb_strtolower(trim($nombreTipo ?? ''));
@@ -75,7 +88,9 @@ class CosechaPresentacionService
         $conteo = max(1, (int) $calibre->conteo_por_empaque);
         $unidades = (int) round($kg / $pesoUnit);
         $empaques = (int) ceil($unidades / $conteo);
-        $empaqueLabel = self::etiquetaEmpaquePlural($calibre->tipoEmpaque?->nombre);
+        $empaqueLabel = self::etiquetaEmpaquePlural(
+            self::tipoEmpaqueParaCosechaEnCampo($calibre->tipoEmpaque?->nombre)
+        );
 
         return [
             'ok' => true,
@@ -83,7 +98,9 @@ class CosechaPresentacionService
             'unidades' => $unidades,
             'empaques' => $empaques,
             'empaque_label' => $empaqueLabel,
-            'empaque_singular' => self::etiquetaEmpaque($calibre->tipoEmpaque?->nombre),
+            'empaque_singular' => self::etiquetaEmpaque(
+                self::tipoEmpaqueParaCosechaEnCampo($calibre->tipoEmpaque?->nombre)
+            ),
             'calibre_nombre' => $calibre->nombre,
             'calibre_id' => (int) $calibre->catalogotamanoconteoid,
             'conteo_por_empaque' => $conteo,
@@ -125,7 +142,9 @@ class CosechaPresentacionService
 
         if ($row->cantidad_empaques !== null && $row->cantidad_unidades !== null) {
             $calibre = $row->catalogoTamanoConteo ?? $row->produccion?->lote?->catalogoTamanoConteo;
-            $empaqueLabel = self::etiquetaEmpaquePlural($calibre?->tipoEmpaque?->nombre);
+            $empaqueLabel = self::etiquetaEmpaquePlural(
+                self::tipoEmpaqueParaCosechaEnCampo($calibre?->tipoEmpaque?->nombre)
+            );
 
             return [
                 'ok' => true,
@@ -133,7 +152,9 @@ class CosechaPresentacionService
                 'unidades' => (int) $row->cantidad_unidades,
                 'empaques' => (int) $row->cantidad_empaques,
                 'empaque_label' => $empaqueLabel,
-                'empaque_singular' => self::etiquetaEmpaque($calibre?->tipoEmpaque?->nombre),
+                'empaque_singular' => self::etiquetaEmpaque(
+                    self::tipoEmpaqueParaCosechaEnCampo($calibre?->tipoEmpaque?->nombre)
+                ),
                 'calibre_nombre' => $calibre?->nombre,
                 'calibre_id' => $calibre ? (int) $calibre->catalogotamanoconteoid : null,
                 'resumen' => number_format((int) $row->cantidad_empaques, 0, ',', '.').' '.$empaqueLabel

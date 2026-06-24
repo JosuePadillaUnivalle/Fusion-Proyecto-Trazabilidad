@@ -547,7 +547,9 @@ class ProduccionController extends Controller
     {
         if ($produccion->cantidad_unidades !== null && $produccion->cantidad_empaques !== null) {
             $calibre = $produccion->catalogoTamanoConteo ?? $produccion->lote?->catalogoTamanoConteo;
-            $empaqueLabel = CosechaPresentacionService::etiquetaEmpaquePlural($calibre?->tipoEmpaque?->nombre);
+            $empaqueLabel = CosechaPresentacionService::etiquetaEmpaquePlural(
+                CosechaPresentacionService::tipoEmpaqueParaCosechaEnCampo($calibre?->tipoEmpaque?->nombre)
+            );
 
             return [
                 'ok' => true,

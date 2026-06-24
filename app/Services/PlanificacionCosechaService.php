@@ -107,7 +107,7 @@ class PlanificacionCosechaService
         } elseif ($modo === self::MODO_EMPAQUES) {
             $empaques = max(0, (int) ceil((float) ($input['objetivo_empaques'] ?? 0)));
             if ($empaques <= 0) {
-                return ['ok' => false, 'mensaje' => 'Indique cuántos empaques (cajas/sacas) desea obtener.'];
+                return ['ok' => false, 'mensaje' => 'Indique cuántas cajas desea obtener.'];
             }
             $unidades = $empaques * $conteoEmpaque;
             $kgCosecha = round($unidades * $pesoUnit, 2);
@@ -159,7 +159,9 @@ class PlanificacionCosechaService
                 'peso_promedio_kg' => $c['peso_promedio_kg'],
                 'conteo_por_empaque' => $c['conteo_por_empaque'],
                 'empaque' => $c['tipo_empaque'] ?? 'Empaque',
-                'empaque_label' => CosechaPresentacionService::etiquetaEmpaquePlural($c['tipo_empaque'] ?? null),
+                'empaque_label' => CosechaPresentacionService::etiquetaEmpaquePlural(
+                    CosechaPresentacionService::tipoEmpaqueParaCosechaEnCampo($c['tipo_empaque'] ?? null)
+                ),
             ],
             PedidoCatalogo::listarCalibresParaProducto('insumo:'.$insumoId)
         );
@@ -250,7 +252,9 @@ class PlanificacionCosechaService
 
         $calibre = $resultado['calibre'] ?? [];
         $conteo = (int) ($calibre['conteo_por_empaque'] ?? 0);
-        $empaqueLabel = CosechaPresentacionService::etiquetaEmpaquePlural($calibre['empaque'] ?? null);
+        $empaqueLabel = $calibre['empaque_label'] ?? CosechaPresentacionService::etiquetaEmpaquePlural(
+            CosechaPresentacionService::tipoEmpaqueParaCosechaEnCampo($calibre['empaque'] ?? null)
+        );
 
         $resultado['unidades_por_caja'] = $conteo > 0 ? $conteo : null;
         $resultado['empaque_label'] = $empaqueLabel;

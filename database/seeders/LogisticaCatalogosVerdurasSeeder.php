@@ -233,7 +233,7 @@ class LogisticaCatalogosVerdurasSeeder extends Seeder
                 ['nombre' => 'Mediana (80-100 g)', 'conteo' => 120, 'peso' => 0.090],
                 ['nombre' => 'Grande (120-150 g)', 'conteo' => 80, 'peso' => 0.135],
             ]],
-            ['patron' => '%papa%', 'empaque' => $saco, 'calibres' => [
+            ['patron' => '%papa%', 'empaque' => $caja, 'calibres' => [
                 ['nombre' => 'Mediana (150-200 g)', 'conteo' => 50, 'peso' => 0.175],
                 ['nombre' => 'Grande (250-300 g)', 'conteo' => 35, 'peso' => 0.275],
             ]],
@@ -241,7 +241,7 @@ class LogisticaCatalogosVerdurasSeeder extends Seeder
                 ['nombre' => 'Unidad estándar (300-400 g)', 'conteo' => 24, 'peso' => 0.350],
                 ['nombre' => 'Unidad grande (500-600 g)', 'conteo' => 18, 'peso' => 0.550],
             ]],
-            ['patron' => '%cebolla%', 'empaque' => $saco, 'calibres' => [
+            ['patron' => '%cebolla%', 'empaque' => $caja, 'calibres' => [
                 ['nombre' => 'Pequeña (80-100 g)', 'conteo' => 100, 'peso' => 0.090],
                 ['nombre' => 'Mediana (120-150 g)', 'conteo' => 70, 'peso' => 0.135],
                 ['nombre' => 'Grande (180-220 g)', 'conteo' => 50, 'peso' => 0.200],
