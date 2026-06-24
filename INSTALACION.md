@@ -33,7 +33,7 @@ php artisan storage:link
 php artisan serve --port=8001
 ```
 
-> El archivo `database/database.sqlite` ya viene en el repositorio con datos de demostración. **No ejecutes** `migrate:fresh` si quieres conservarlos.
+> Los datos de demostración viven en `database/database.snapshot.sqlite`. Tu copia de trabajo `database/database.sqlite` **no se versiona en Git** (así no se borra al hacer pull). Si la base queda sin usuarios, la app la restaura sola en local.
 
 ## Usuarios de prueba
 
@@ -41,6 +41,7 @@ php artisan serve --port=8001
 |-----|-------|------------|-----------------|
 | **Admin** (acceso total) | `admin@agrofusion.com` | `12345` | Crear lotes, asignar actividades, inventario, usuarios, etc. |
 | Agricultor | `agricultor@agrofusion.com` | `12345` | Solo sus lotes y actividades asignadas |
+| Agricultor (Luis) | `LuisGuerrero123@gmail.com` | `12345` | Sus lotes y actividades asignadas |
 | Planta | `planta@agrofusion.com` | `12345` | Módulo de planta |
 | Transportista | `transportista@agrofusion.com` | `12345` | Envíos y rutas |
 
@@ -57,7 +58,15 @@ php artisan agrofusion:asegurar-datos-demo
 
 Eso sincroniza roles Spatie, la matriz de permisos y los usuarios demo.
 
-Si la base quedó vacía o corrupta:
+Si la base quedó vacía (login «Credenciales inválidas» para todos):
+
+```powershell
+php artisan agrofusion:restaurar-datos-locales --force
+```
+
+Eso copia `database/database.snapshot.sqlite` (respaldo con lotes reales) y repara permisos.
+
+Si la base quedó vacía o corrupta (alternativa manual):
 
 ```powershell
 php artisan migrate --force
@@ -75,7 +84,8 @@ php artisan agrofusion:asegurar-datos-demo
 | Almacén mayorista/planta vacío | Stock demo no sembrado | `php artisan agrofusion:asegurar-datos-demo` |
 | Página en blanco / 500 | Falta `APP_KEY` o dependencias | `composer install` + `php artisan key:generate` |
 | Sin imágenes / evidencias | Falta enlace storage | `php artisan storage:link` |
-| Base vacía | Se corrió `migrate:fresh` | Volver a clonar o ejecutar `php artisan db:seed` |
+| Base vacía / login falla para todos | Git o `migrate:fresh` dejó la base sin usuarios | En local se **restaura sola** al abrir la app. Manual: `php artisan agrofusion:restaurar-datos-locales --force` |
+| Luis Guerrero no entra | Contraseña distinta a la demo | `LuisGuerrero123@gmail.com` / `12345` (la restauración normaliza contraseñas demo) |
 
 ## Puerto ocupado
 

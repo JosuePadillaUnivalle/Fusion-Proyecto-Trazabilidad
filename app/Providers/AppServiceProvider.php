@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Pagination\Paginator;
+use App\Support\LocalDatabaseGuard;
 use App\Support\UsuarioRol;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Blade;
@@ -26,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        LocalDatabaseGuard::asegurar();
+
         App::setLocale('es');
         Paginator::useBootstrapFour();
 

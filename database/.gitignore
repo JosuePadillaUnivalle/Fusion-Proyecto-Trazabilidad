@@ -1,2 +1,2 @@
 *.sqlite*
-!database.sqlite
+!database.snapshot.sqlite
