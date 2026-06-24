@@ -6,7 +6,7 @@ import { Colors } from '../../constants/colors';
 import { ROLE_LABELS } from '../../constants/roles';
 import { formatDate, formatDateTime } from '../../utils/helpers';
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
   const roleName = user?.roles?.[0]?.name || '';
 
@@ -40,6 +40,19 @@ export default function ProfileScreen() {
         <InfoRow icon="calendar-outline" label="Miembro desde" value={formatDate(user?.fecharegistro)} />
         <InfoRow icon="time-outline" label="Último acceso" value={formatDateTime(user?.ultimologin)} />
       </View>
+
+      <TouchableOpacity
+        style={styles.aboutButton}
+        onPress={() => navigation.navigate('PlataformaPresentacion')}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="play-circle-outline" size={22} color={Colors.primary} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aboutTitle}>Conoce AgroFusion</Text>
+          <Text style={styles.aboutSub}>Presentación de trazabilidad agrícola</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Ionicons name="log-out-outline" size={22} color="#FFF" />
@@ -79,6 +92,13 @@ const styles = StyleSheet.create({
   infoContent: { marginLeft: 12, flex: 1 },
   infoLabel: { fontSize: 12, color: Colors.textSecondary },
   infoValue: { fontSize: 15, color: Colors.text, fontWeight: '500' },
+  aboutButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: Colors.surface, marginHorizontal: 16, marginBottom: 8,
+    padding: 16, borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
+  },
+  aboutTitle: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  aboutSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   logoutButton: {
     flexDirection: 'row', backgroundColor: Colors.error, margin: 16, padding: 16,
     borderRadius: 12, justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 32,

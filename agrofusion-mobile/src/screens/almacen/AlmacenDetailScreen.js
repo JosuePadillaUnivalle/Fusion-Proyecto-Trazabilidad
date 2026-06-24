@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { almacenesApi } from '../../api/client';
+import { USE_MOCK_DATA } from '../../constants/designMode';
+import { getMockAlmacenById } from '../../data/mockRoleActions';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import StatusBadge from '../../components/StatusBadge';
 import { Colors } from '../../constants/colors';
@@ -16,10 +18,23 @@ export default function AlmacenDetailScreen({ route, navigation }) {
 
   const loadAlmacen = async () => {
     try {
+      if (USE_MOCK_DATA) {
+        const mock = getMockAlmacenById(id);
+        if (mock) {
+          setAlmacen(mock);
+          return;
+        }
+      }
       const res = await almacenesApi.get(id);
       setAlmacen(res.data?.data || res.data);
     } catch (e) {
-      Alert.alert('Error', 'No se pudo cargar el almacén');
+      if (USE_MOCK_DATA) {
+        const mock = getMockAlmacenById(id);
+        if (mock) setAlmacen(mock);
+        else Alert.alert('Error', 'No se pudo cargar el almacén');
+      } else {
+        Alert.alert('Error', 'No se pudo cargar el almacén');
+      }
     } finally { setLoading(false); }
   };
 

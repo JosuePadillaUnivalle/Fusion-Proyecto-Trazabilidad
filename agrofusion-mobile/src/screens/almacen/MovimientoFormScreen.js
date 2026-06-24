@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { movimientosApi, almacenesApi } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
+import { isMayorista } from '../../constants/roles';
+import { USE_MOCK_DATA } from '../../constants/designMode';
+import { getMockAlmacenesForForm, addMockMovimiento } from '../../data/mockRoleActions';
 import FormInput from '../../components/FormInput';
 import { Colors } from '../../constants/colors';
 
 export default function MovimientoFormScreen({ route, navigation }) {
   const { naturaleza = 'ingreso' } = route.params || {};
+  const { user } = useAuth();
+  const esMayorista = isMayorista(user);
   const [form, setForm] = useState({ cantidad: '', almacenid: '', observaciones: '' });
   const [almacenes, setAlmacenes] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -13,20 +19,48 @@ export default function MovimientoFormScreen({ route, navigation }) {
   useEffect(() => { loadAlmacenes(); }, []);
 
   const loadAlmacenes = async () => {
-    try { const res = await almacenesApi.list(); setAlmacenes(res.data?.data || res.data || []); } catch (e) {}
+    if (USE_MOCK_DATA) {
+      const role = esMayorista ? 'mayorista' : 'planta';
+      setAlmacenes(getMockAlmacenesForForm(role));
+      return;
+    }
+    try {
+      const res = await almacenesApi.list();
+      setAlmacenes(res.data?.data || res.data || []);
+    } catch (e) {}
   };
 
   const updateField = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
   const handleSave = async () => {
-    if (!form.cantidad || !form.almacenid) { Alert.alert('Error', 'Completa todos los campos obligatorios'); return; }
+    if (!form.cantidad || !form.almacenid) {
+      Alert.alert('Error', 'Completa todos los campos obligatorios');
+      return;
+    }
     setLoading(true);
     try {
-      await movimientosApi.create({ ...form, naturaleza, cantidad: parseFloat(form.cantidad), almacenid: parseInt(form.almacenid) });
+      if (USE_MOCK_DATA) {
+        addMockMovimiento({
+          naturaleza,
+          cantidad: form.cantidad,
+          almacenid: parseInt(form.almacenid, 10),
+          observaciones: form.observaciones,
+        });
+        navigation.goBack();
+        return;
+      }
+      await movimientosApi.create({
+        ...form,
+        naturaleza,
+        cantidad: parseFloat(form.cantidad),
+        almacenid: parseInt(form.almacenid, 10),
+      });
       navigation.goBack();
     } catch (e) {
       Alert.alert('Error', e.response?.data?.message || 'No se pudo registrar');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -37,6 +71,10 @@ export default function MovimientoFormScreen({ route, navigation }) {
             {naturaleza === 'egreso' ? 'Egreso' : 'Ingreso'}
           </Text>
         </View>
+
+        {USE_MOCK_DATA && (
+          <Text style={styles.mockHint}>Vista previa local — el movimiento se guarda solo en memoria.</Text>
+        )}
 
         <FormInput label="Cantidad *" icon="calculator-outline" value={form.cantidad} onChangeText={(v) => updateField('cantidad', v)} placeholder="0.00" keyboardType="numeric" />
 
@@ -62,6 +100,7 @@ export default function MovimientoFormScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { padding: 16, paddingBottom: 32 },
+  mockHint: { fontSize: 12, color: Colors.textMuted, marginBottom: 12, fontStyle: 'italic' },
   naturalezaBadge: { alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 16 },
   naturalezaText: { fontSize: 14, fontWeight: '600' },
   label: { fontSize: 14, fontWeight: '600', color: Colors.text, marginBottom: 8 },

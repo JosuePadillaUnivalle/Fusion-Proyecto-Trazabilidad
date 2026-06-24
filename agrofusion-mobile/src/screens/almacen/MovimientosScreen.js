@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { movimientosApi } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
+import { isOperadorPlanta, isMayorista } from '../../constants/roles';
+import { USE_MOCK_DATA } from '../../constants/designMode';
+import { getMockMovimientosForRole } from '../../data/mockWorkersData';
 import Card from '../../components/Card';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
@@ -9,17 +13,28 @@ import { Colors } from '../../constants/colors';
 import { formatDateTime } from '../../utils/helpers';
 
 export default function MovimientosScreen({ navigation }) {
+  const { user } = useAuth();
+  const esOperador = isOperadorPlanta(user);
+  const esMayorista = isMayorista(user);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('ingreso');
 
+  const roleKey = esMayorista ? 'mayorista' : 'planta';
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await movimientosApi.list(filter);
-      setData(res.data?.data || res.data || []);
-    } catch (e) {} finally { setLoading(false); setRefreshing(false); }
+      if (USE_MOCK_DATA && (esOperador || esMayorista)) {
+        setData(getMockMovimientosForRole(roleKey, filter));
+      } else {
+        const res = await movimientosApi.list(filter);
+        setData(res.data?.data || res.data || []);
+      }
+    } catch (e) {
+      if (USE_MOCK_DATA && (esOperador || esMayorista)) setData(getMockMovimientosForRole(roleKey, filter));
+    } finally { setLoading(false); setRefreshing(false); }
   };
 
   useEffect(() => { loadData(); }, [filter]);

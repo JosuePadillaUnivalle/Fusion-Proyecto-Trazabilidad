@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi } from '../api/client';
+import { USE_MOCK_DATA } from '../constants/designMode';
+import { DEMO_USERS } from '../data/mockWorkersData';
+import { ROLES } from '../constants/roles';
 
 const AuthContext = createContext(null);
 
@@ -45,7 +48,10 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(async () => {
     try {
-      await authApi.logout();
+      const stored = await AsyncStorage.getItem('auth_token');
+      if (stored && !stored.startsWith('demo-')) {
+        await authApi.logout();
+      }
     } catch (e) {}
     await AsyncStorage.multiRemove(['auth_token', 'user_data']);
     setToken(null);
@@ -63,8 +69,31 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginDemo = useCallback(async (roleKey) => {
+    const demo = DEMO_USERS[roleKey];
+    if (!demo) return null;
+    const demoUser = {
+      usuarioid: demo.usuarioid,
+      nombre: demo.nombre,
+      apellido: demo.apellido,
+      email: demo.email,
+      roles: [{ name: demo.role }],
+    };
+    const demoToken = `demo-${roleKey}-token`;
+    await AsyncStorage.setItem('auth_token', demoToken);
+    await AsyncStorage.setItem('user_data', JSON.stringify(demoUser));
+    setToken(demoToken);
+    setUser(demoUser);
+    return demoUser;
+  }, []);
+
+  const showDemoLogin = USE_MOCK_DATA;
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{
+      user, token, loading, login, register, logout, refreshUser,
+      loginDemo, showDemoLogin,
+    }}>
       {children}
     </AuthContext.Provider>
   );

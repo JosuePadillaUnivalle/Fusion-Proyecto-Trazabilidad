@@ -1,182 +1,513 @@
 import React, { useEffect, useState } from 'react';
+
 import {
+
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
+
 } from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
+
 import { useAuth } from '../../context/AuthContext';
+
 import { Colors } from '../../constants/colors';
+
 import {
-  ROLES, hasRole, canAccessAgricultural, canAccessPlant, canAccessLogistics,
+
+  canAccessAgricultural, canAccessPlant, canAccessLogistics,
+
   canAccessRetail, canAccessAdmin, ROLE_LABELS,
+
+  isMobileWorker,
+
 } from '../../constants/roles';
+
+import { WORKER_ROLE_CONFIG, getWorkerRoleKey } from '../../constants/roleFeatures';
+
+import { USE_MOCK_DATA } from '../../constants/designMode';
+
+import { getMockDashboardStats } from '../../data/mockAgricultorData';
+
+import {
+
+  getMockPlantaDashboardStats,
+
+  getMockTransportistaDashboardStats,
+
+  getMockMinoristaDashboardStats,
+
+  getMockMayoristaDashboardStats,
+
+} from '../../data/mockWorkersData';
+
+import WorkerDashboardLayout from '../../components/WorkerDashboardLayout';
+
 import { lotesApi, produccionesApi } from '../../api/client';
 
+
+
+const STAT_COLORS = {
+
+  primary: Colors.primary,
+
+  warning: Colors.warning,
+
+  success: Colors.success,
+
+  error: Colors.error,
+
+  info: Colors.info,
+
+};
+
+
+
+const STAT_GETTERS = {
+
+  agricultor: getMockDashboardStats,
+
+  planta: getMockPlantaDashboardStats,
+
+  transportista: getMockTransportistaDashboardStats,
+
+  minorista: getMockMinoristaDashboardStats,
+
+  mayorista: getMockMayoristaDashboardStats,
+
+};
+
+
+
+function buildStatsRows(config, stats, navigation) {
+
+  const rows = [];
+
+  for (let i = 0; i < config.stats.length; i += 2) {
+
+    rows.push(
+
+      config.stats.slice(i, i + 2).map((s) => ({
+
+        icon: s.icon,
+
+        label: s.label,
+
+        value: String(stats[s.key] ?? 0),
+
+        color: STAT_COLORS[s.colorKey] || Colors.primary,
+
+        onPress: () => navigation.navigate(s.screen),
+
+      })),
+
+    );
+
+  }
+
+  return rows;
+
+}
+
+
+
+function buildMenuItems(config, navigation) {
+
+  return config.menu.map((item) => ({
+
+    title: item.title,
+
+    subtitle: item.subtitle,
+
+    icon: item.icon,
+
+    color: item.color || (item.colorKey ? STAT_COLORS[item.colorKey] : Colors.primary),
+
+    onPress: () => navigation.navigate(item.screen),
+
+  }));
+
+}
+
+
+
 export default function DashboardScreen({ navigation }) {
+
   const { user } = useAuth();
-  const [stats, setStats] = useState({ lotes: 0, producciones: 0 });
+
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadStats = async () => {
+  const [managerStats, setManagerStats] = useState({ lotes: 0, producciones: 0 });
+
+
+
+  const workerRoleKey = getWorkerRoleKey(user);
+
+  const esTrabajador = isMobileWorker(user);
+
+
+
+  const loadManagerStats = async () => {
+
+    if (esTrabajador) return;
+
     try {
+
       const [lotesRes, prodRes] = await Promise.allSettled([
+
         canAccessAgricultural(user) ? lotesApi.list() : Promise.resolve({ data: [] }),
+
         canAccessAgricultural(user) ? produccionesApi.list() : Promise.resolve({ data: [] }),
+
       ]);
-      setStats({
+
+      setManagerStats({
+
         lotes: lotesRes.status === 'fulfilled' ? (lotesRes.value.data?.data || lotesRes.value.data || []).length : 0,
+
         producciones: prodRes.status === 'fulfilled' ? (prodRes.value.data?.data || prodRes.value.data || []).length : 0,
+
       });
+
     } catch (e) {}
+
   };
 
-  useEffect(() => { loadStats(); }, []);
 
-  const onRefresh = async () => { setRefreshing(true); await loadStats(); setRefreshing(false); };
+
+  useEffect(() => { loadManagerStats(); }, []);
+
+
+
+  const onRefresh = async () => {
+
+    setRefreshing(true);
+
+    await loadManagerStats();
+
+    setRefreshing(false);
+
+  };
+
+
+
+  const userName = user ? `${user.nombre || ''} ${user.apellido || ''}`.trim() : 'Usuario';
+
+  const userRole = user?.roles?.[0]?.name || 'Sin rol';
+
+
+
+  if (workerRoleKey && WORKER_ROLE_CONFIG[workerRoleKey]) {
+
+    const config = WORKER_ROLE_CONFIG[workerRoleKey];
+
+    const getter = STAT_GETTERS[workerRoleKey];
+
+    const stats = USE_MOCK_DATA
+
+      ? getter(user?.usuarioid)
+
+      : Object.fromEntries(config.stats.map((s) => [s.key, 0]));
+
+
+
+    return (
+
+      <WorkerDashboardLayout
+
+        userName={userName}
+
+        userRole={userRole}
+
+        roleIcon={config.icon}
+
+        refreshing={refreshing}
+
+        onRefresh={onRefresh}
+
+        statsRows={buildStatsRows(config, stats, navigation)}
+
+        menuItems={buildMenuItems(config, navigation)}
+
+      />
+
+    );
+
+  }
+
+
 
   const menuItems = [];
 
   if (canAccessAgricultural(user)) {
-    menuItems.push(
-      { title: 'Lotes', subtitle: 'Gestión de parcelas', icon: 'map-outline', color: Colors.primary, screen: 'Lotes' },
-      { title: 'Actividades', subtitle: 'Tareas y calendario', icon: 'calendar-outline', color: Colors.info, screen: 'Actividades' },
-      { title: 'Cosechas', subtitle: 'Registro de producciones', icon: 'basket-outline', color: Colors.warning, screen: 'Producciones' },
-      { title: 'Insumos', subtitle: 'Inventario de materiales', icon: 'flask-outline', color: Colors.purple, screen: 'Insumos' },
-      { title: 'Certificaciones', subtitle: 'Certificados de campo', icon: 'shield-checkmark-outline', color: Colors.success, screen: 'Certificaciones' },
-      { title: 'Clima', subtitle: 'Datos meteorológicos', icon: 'cloud-outline', color: Colors.info, screen: 'Clima' },
-    );
-  }
 
-  if (canAccessAgricultural(user) || canAccessPlant(user)) {
     menuItems.push(
-      { title: 'Almacenes', subtitle: 'Gestión de almacenes', icon: 'business-outline', color: '#5D4037', screen: 'Almacenes' },
-      { title: 'Movimientos', subtitle: 'Ingresos y egresos', icon: 'swap-horizontal-outline', color: '#455A64', screen: 'Movimientos' },
+
+      { title: 'Lotes', subtitle: 'Parcelas', icon: 'map-outline', color: Colors.primary, onPress: () => navigation.navigate('Lotes') },
+
+      { title: 'Actividades', subtitle: 'Tareas', icon: 'calendar-outline', color: Colors.primary, onPress: () => navigation.navigate('Actividades') },
+
+      { title: 'Cosechas', subtitle: 'Producción', icon: 'basket-outline', color: Colors.primary, onPress: () => navigation.navigate('Producciones') },
+
     );
+
   }
 
   if (canAccessPlant(user)) {
+
     menuItems.push(
-      { title: 'Procesamiento', subtitle: 'Procesos de planta', icon: 'business-outline', color: '#E65100', screen: 'Procesamiento' },
-      { title: 'Procesos', subtitle: 'Catálogo de procesos', icon: 'cog-outline', color: '#BF360C', screen: 'ProcesosPlanta' },
-      { title: 'Máquinas', subtitle: 'Equipos de planta', icon: 'hardware-chip-outline', color: '#4E342E', screen: 'Maquinas' },
-      { title: 'Plantillas', subtitle: 'Plantillas de transformación', icon: 'document-text-outline', color: '#1A237E', screen: 'Plantillas' },
-      { title: 'Mis Tareas', subtitle: 'Tareas asignadas', icon: 'list-circle-outline', color: '#00695C', screen: 'TareasPlanta' },
+
+      { title: 'Procesamiento', subtitle: 'Planta', icon: 'business-outline', color: '#475569', onPress: () => navigation.navigate('Procesamiento') },
+
+      { title: 'Mis Tareas', subtitle: 'Asignadas', icon: 'list-circle-outline', color: '#475569', onPress: () => navigation.navigate('TareasPlanta') },
+
     );
+
   }
 
   if (canAccessLogistics(user)) {
+
     menuItems.push(
-      { title: 'Envíos', subtitle: 'Asignaciones y envíos', icon: 'cube-outline', color: Colors.info, screen: 'Envios' },
-      { title: 'Rutas', subtitle: 'Rutas multi-entrega', icon: 'git-branch-outline', color: '#283593', screen: 'Rutas' },
-      { title: 'Transportistas', subtitle: 'Gestión de conductores', icon: 'car-sport-outline', color: '#37474F', screen: 'Transportistas' },
-      { title: 'Vehículos', subtitle: 'Flota vehicular', icon: 'car-outline', color: '#546E7A', screen: 'Vehiculos' },
-      { title: 'Incidentes', subtitle: 'Reportes de incidentes', icon: 'warning-outline', color: Colors.error, screen: 'Incidentes' },
+
+      { title: 'Envíos', subtitle: 'Despachos', icon: 'cube-outline', color: '#475569', onPress: () => navigation.navigate('Envios') },
+
+      { title: 'Rutas', subtitle: 'Entregas', icon: 'git-branch-outline', color: '#475569', onPress: () => navigation.navigate('Rutas') },
+
     );
+
   }
 
   if (canAccessRetail(user)) {
+
     menuItems.push(
-      { title: 'Pedidos', subtitle: 'Pedidos y órdenes', icon: 'cart-outline', color: '#AD1457', screen: 'Pedidos' },
-      { title: 'Puntos de Venta', subtitle: 'Puntos de distribución', icon: 'storefront-outline', color: '#6A1B9A', screen: 'PuntosVenta' },
-      { title: 'Distribución', subtitle: 'Pedidos de distribución', icon: 'send-outline', color: '#4527A0', screen: 'PedidosDistribucion' },
+
+      { title: 'Pedidos', subtitle: 'Órdenes', icon: 'cart-outline', color: '#475569', onPress: () => navigation.navigate('Pedidos') },
+
     );
+
   }
 
   if (canAccessAdmin(user)) {
+
     menuItems.push(
-      { title: 'Usuarios', subtitle: 'Gestión de usuarios', icon: 'people-outline', color: Colors.primary, screen: 'Usuarios' },
+
+      { title: 'Usuarios', subtitle: 'Gestión', icon: 'people-outline', color: Colors.accent, onPress: () => navigation.navigate('Usuarios') },
+
     );
+
   }
 
   menuItems.push(
-    { title: 'Mi Perfil', subtitle: 'Ver y editar perfil', icon: 'person-circle-outline', color: '#424242', screen: 'Profile' },
+
+    { title: 'Mi Perfil', subtitle: 'Cuenta', icon: 'person-circle-outline', color: '#475569', onPress: () => navigation.navigate('Profile') },
+
   );
 
-  const userName = user ? `${user.nombre || ''} ${user.apellido || ''}`.trim() : 'Usuario';
-  const userRole = user?.roles?.[0]?.name || 'Sin rol';
+
 
   return (
+
     <ScrollView
+
       style={styles.container}
+
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+
     >
-      <View style={styles.welcomeCard}>
-        <View style={styles.welcomeContent}>
-          <Text style={styles.welcomeText}>Bienvenido</Text>
-          <Text style={styles.userName}>{userName}</Text>
-          <View style={styles.roleBadge}>
-            <Text style={styles.roleBadgeText}>{ROLE_LABELS[userRole] || userRole}</Text>
+
+      <View style={styles.header}>
+
+        <View style={styles.headerTop}>
+
+          <View>
+
+            <Text style={styles.greeting}>Panel de control</Text>
+
+            <Text style={styles.userName}>{userName}</Text>
+
           </View>
+
+          <View style={styles.avatar}>
+
+            <Text style={styles.avatarText}>{(userName[0] || 'U').toUpperCase()}</Text>
+
+          </View>
+
         </View>
-        <View style={styles.logoCircle}>
-          <Ionicons name="leaf" size={36} color="rgba(255,255,255,0.3)" />
+
+        <View style={styles.roleBadge}>
+
+          <Ionicons name="shield-checkmark-outline" size={12} color={Colors.primaryDark} />
+
+          <Text style={styles.roleBadgeText}>{ROLE_LABELS[userRole] || userRole}</Text>
+
         </View>
+
       </View>
+
+
 
       {canAccessAgricultural(user) && (
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.lotes}</Text>
-            <Text style={styles.statLabel}>Lotes</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.producciones}</Text>
-            <Text style={styles.statLabel}>Cosechas</Text>
-          </View>
+
+        <View style={styles.statsSection}>
+
+          <StatCard icon="map-outline" label="Lotes activos" value={String(managerStats.lotes)} color={Colors.primary} onPress={() => navigation.navigate('Lotes')} />
+
+          <StatCard icon="basket-outline" label="Cosechas" value={String(managerStats.producciones)} color={Colors.primary} onPress={() => navigation.navigate('Producciones')} />
+
         </View>
+
       )}
 
-      <Text style={styles.sectionTitle}>Módulos</Text>
-      <View style={styles.grid}>
-        {menuItems.map((item, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.menuCard}
-            onPress={() => navigation.navigate(item.screen)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.menuIcon, { backgroundColor: item.color + '20' }]}>
-              <Ionicons name={item.icon} size={26} color={item.color} />
-            </View>
-            <Text style={styles.menuTitle}>{item.title}</Text>
-            <Text style={styles.menuSubtitle} numberOfLines={1}>{item.subtitle}</Text>
-          </TouchableOpacity>
-        ))}
+
+
+      <View style={styles.section}>
+
+        <Text style={styles.sectionTitle}>Módulos del sistema</Text>
+
+        <View style={styles.grid}>
+
+          {menuItems.map((item) => (
+
+            <TouchableOpacity key={item.title} style={styles.menuCard} onPress={item.onPress} activeOpacity={0.7}>
+
+              <View style={[styles.iconCircle, { backgroundColor: item.color + '15' }]}>
+
+                <Ionicons name={item.icon} size={22} color={item.color} />
+
+              </View>
+
+              <Text style={styles.menuTitle}>{item.title}</Text>
+
+              <Text style={styles.menuSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+
+            </TouchableOpacity>
+
+          ))}
+
+        </View>
+
       </View>
+
     </ScrollView>
+
   );
+
 }
 
+
+
+function StatCard({ icon, label, value, color, onPress }) {
+
+  return (
+
+    <TouchableOpacity style={styles.statCard} onPress={onPress} activeOpacity={0.8}>
+
+      <View style={styles.statHeader}>
+
+        <View style={[styles.statIcon, { backgroundColor: color + '15' }]}>
+
+          <Ionicons name={icon} size={22} color={color} />
+
+        </View>
+
+        <Text style={styles.statLabel}>{label}</Text>
+
+      </View>
+
+      <Text style={styles.statNumber}>{value}</Text>
+
+    </TouchableOpacity>
+
+  );
+
+}
+
+
+
 const styles = StyleSheet.create({
+
   container: { flex: 1, backgroundColor: Colors.background },
-  welcomeCard: {
-    backgroundColor: Colors.primary, padding: 24, flexDirection: 'row',
-    justifyContent: 'space-between', alignItems: 'center',
+
+  header: {
+
+    backgroundColor: Colors.surface, margin: 16, marginBottom: 12,
+
+    borderRadius: 16, padding: 20, borderWidth: 1, borderColor: Colors.border,
+
   },
-  welcomeContent: { flex: 1 },
-  welcomeText: { fontSize: 14, color: 'rgba(255,255,255,0.8)' },
-  userName: { fontSize: 24, fontWeight: 'bold', color: '#FFF', marginTop: 4 },
+
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+
+  greeting: { fontSize: 13, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
+
+  userName: { fontSize: 22, fontWeight: '700', color: Colors.text, marginTop: 4 },
+
+  avatar: {
+
+    width: 48, height: 48, borderRadius: 14, backgroundColor: Colors.divider,
+
+    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border,
+
+  },
+
+  avatarText: { fontSize: 18, fontWeight: '700', color: Colors.textSecondary },
+
   roleBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 4,
-    borderRadius: 12, marginTop: 8, alignSelf: 'flex-start',
+
+    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.divider,
+
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, marginTop: 16, alignSelf: 'flex-start',
+
+    borderWidth: 1, borderColor: Colors.border,
+
   },
-  roleBadgeText: { color: '#FFF', fontSize: 12, fontWeight: '600' },
-  logoCircle: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
-  statsRow: { flexDirection: 'row', padding: 16, gap: 12 },
+
+  roleBadgeText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600' },
+
+  statsSection: { flexDirection: 'row', paddingHorizontal: 16, gap: 12, marginBottom: 8 },
+
   statCard: {
-    flex: 1, backgroundColor: Colors.surface, borderRadius: 12, padding: 16,
-    alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1, shadowRadius: 3, elevation: 2,
+
+    flex: 1, backgroundColor: Colors.surface, borderRadius: 16, padding: 16,
+
+    borderWidth: 1, borderColor: Colors.border,
+
   },
-  statNumber: { fontSize: 28, fontWeight: 'bold', color: Colors.primary },
-  statLabel: { fontSize: 13, color: Colors.textSecondary, marginTop: 4 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, paddingHorizontal: 16, marginBottom: 12 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 12, gap: 12 },
+
+  statHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+
+  statIcon: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+
+  statLabel: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600' },
+
+  statNumber: { fontSize: 28, fontWeight: '700', color: Colors.text },
+
+  section: { padding: 16, paddingTop: 8 },
+
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 12 },
+
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+
   menuCard: {
-    width: '47%', backgroundColor: Colors.surface, borderRadius: 12, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1,
-    shadowRadius: 3, elevation: 2,
+
+    width: '47.4%', backgroundColor: Colors.surface, borderRadius: 16, padding: 16,
+
+    borderWidth: 1, borderColor: Colors.border,
+
   },
-  menuIcon: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+
+  iconCircle: {
+
+    width: 44, height: 44, borderRadius: 12,
+
+    justifyContent: 'center', alignItems: 'center', marginBottom: 14,
+
+  },
+
   menuTitle: { fontSize: 15, fontWeight: '600', color: Colors.text },
-  menuSubtitle: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+
+  menuSubtitle: { fontSize: 12, color: Colors.textMuted, marginTop: 3 },
+
 });
+
+

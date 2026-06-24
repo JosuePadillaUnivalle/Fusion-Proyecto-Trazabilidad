@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { climasApi } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
+import { USE_MOCK_DATA } from '../../constants/designMode';
+import { getMockClima } from '../../data/mockAgricultorData';
 import Card from '../../components/Card';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
@@ -9,15 +12,25 @@ import { Colors } from '../../constants/colors';
 import { formatDate } from '../../utils/helpers';
 
 export default function ClimaScreen() {
+  const { user } = useAuth();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = async () => {
     try {
-      const res = await climasApi.list();
-      setData(res.data?.data || res.data || []);
-    } catch (e) {} finally { setLoading(false); setRefreshing(false); }
+      if (USE_MOCK_DATA) {
+        setData(getMockClima(user?.usuarioid));
+      } else {
+        const res = await climasApi.list();
+        setData(res.data?.data || res.data || []);
+      }
+    } catch (e) {
+      if (USE_MOCK_DATA) setData(getMockClima(user?.usuarioid));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => { loadData(); }, []);
@@ -66,6 +79,11 @@ export default function ClimaScreen() {
 
   return (
     <View style={styles.container}>
+      {USE_MOCK_DATA && (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>Datos de ejemplo — sin conexión a OpenWeather</Text>
+        </View>
+      )}
       <FlatList
         data={data}
         keyExtractor={(item) => String(item.climaid || item.id)}
@@ -80,6 +98,8 @@ export default function ClimaScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  banner: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#f8f9fa', borderBottomWidth: 1, borderBottomColor: '#dee2e6' },
+  bannerText: { fontSize: 12, color: '#64748b' },
   list: { padding: 16 },
   weatherGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', marginTop: 12, gap: 12 },
   weatherItem: { alignItems: 'center', minWidth: 70 },
