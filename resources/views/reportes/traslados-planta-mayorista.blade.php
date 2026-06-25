@@ -59,7 +59,6 @@
                                 <th>Destino</th>
                                 <th>Transportista</th>
                                 <th>Fecha</th>
-                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -71,14 +70,9 @@
                                     <td>{{ $fila['destino'] }}</td>
                                     <td>{{ $fila['transportista'] }}</td>
                                     <td>{{ $fila['fecha'] }}</td>
-                                    <td class="text-right">
-                                        @if(!empty($fila['url']))
-                                            <a href="{{ $fila['url'] }}" class="btn btn-xs btn-outline-primary btn-sm py-0">Ver</a>
-                                        @endif
-                                    </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="7" class="text-center text-muted py-4">Sin traslados en el período</td></tr>
+                                <tr><td colspan="6" class="text-center text-muted py-4">Sin traslados en el período</td></tr>
                             @endforelse
                         </tbody>
                     </table>

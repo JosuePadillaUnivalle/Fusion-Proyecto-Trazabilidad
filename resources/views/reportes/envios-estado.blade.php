@@ -3,6 +3,7 @@
 @php
     $kpis = $datos['kpis'] ?? [];
     $tabla = $datos['tabla'] ?? collect();
+    $detalle = $datos['detalleMovimientos'] ?? collect();
     $chartConfig = [
         'type' => 'doughnut',
         'labels' => $datos['chart']['labels'] ?? [],
@@ -10,14 +11,31 @@
     ];
     $exportConfig = [
         'filename' => 'envios_estado',
-        'sheet' => 'Envíos por estado',
-        'headers' => ['Estado', 'Cantidad', 'Cancelados', '%'],
-        'rows' => $tabla->map(fn ($r) => [
-            $r['estado'],
-            $r['total'],
-            $r['cancelados'] ?? 0,
-            ($r['porcentaje'] ?? 0).'%',
-        ])->all(),
+        'sections' => [
+            [
+                'title' => 'Resumen por estado',
+                'headers' => ['Estado', 'Cantidad', 'Cancelados', '%'],
+                'rows' => $tabla->map(fn ($r) => [
+                    $r['estado'],
+                    $r['total'],
+                    $r['cancelados'] ?? 0,
+                    ($r['porcentaje'] ?? 0).'%',
+                ])->all(),
+            ],
+            [
+                'title' => 'Movimientos del período',
+                'headers' => ['Fecha', 'Canal', 'Referencia', 'Estado', 'Origen', 'Destino', 'Transportista'],
+                'rows' => $detalle->map(fn ($r) => [
+                    $r['fecha'],
+                    $r['canal'],
+                    $r['referencia'],
+                    $r['estado'],
+                    $r['origen'],
+                    $r['destino'],
+                    $r['transportista'] ?: '—',
+                ])->all(),
+            ],
+        ],
     ];
     $variacion = $kpis['variacion'] ?? 0;
     $kpisDisplay = [
@@ -37,7 +55,7 @@
     <div class="row">
         <div class="col-lg-5 mb-3 mb-lg-0">
             <div class="rpt-panel h-100">
-                <div class="rpt-panel__head"><i class="fas fa-chart-pie mr-1"></i>Distribución</div>
+                <div class="rpt-panel__head"><i class="fas fa-chart-pie mr-1"></i>Distribución por estado</div>
                 <div class="rpt-panel__body">
                     <div class="rpt-chart-wrap">
                         <canvas id="rptChart"></canvas>
@@ -50,7 +68,7 @@
         </div>
         <div class="col-lg-7">
             <div class="rpt-panel">
-                <div class="rpt-panel__head"><i class="fas fa-table mr-1"></i>Detalle por estado</div>
+                <div class="rpt-panel__head"><i class="fas fa-table mr-1"></i>Resumen por estado</div>
                 <div class="rpt-panel__body rpt-panel__body--table table-responsive">
                     <table class="table table-hover mb-0" id="rptTable">
                         <thead>
@@ -76,6 +94,40 @@
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="rpt-panel mt-3">
+        <div class="rpt-panel__head"><i class="fas fa-list mr-1"></i>Movimientos del período (detalle)</div>
+        <div class="rpt-panel__body rpt-panel__body--table table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Canal</th>
+                        <th>Referencia</th>
+                        <th>Estado</th>
+                        <th>Origen</th>
+                        <th>Destino</th>
+                        <th>Transportista</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($detalle as $fila)
+                        <tr>
+                            <td class="text-nowrap">{{ $fila['fecha'] }}</td>
+                            <td><span class="badge badge-light border">{{ $fila['canal'] }}</span></td>
+                            <td class="font-weight-bold">{{ $fila['referencia'] }}</td>
+                            <td>{{ $fila['estado'] }}</td>
+                            <td>{{ $fila['origen'] }}</td>
+                            <td>{{ $fila['destino'] }}</td>
+                            <td>{{ $fila['transportista'] ?: '—' }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="7" class="text-center text-muted py-4">Sin movimientos en el período</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
 @endsection

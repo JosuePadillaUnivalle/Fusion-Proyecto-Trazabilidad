@@ -62,7 +62,7 @@ return [
 
             'title' => 'Stock por ámbito',
 
-            'subtitle' => 'Planta, mayorista y puntos de venta',
+            'subtitle' => 'Agrícola, planta, mayorista y puntos de venta',
 
             'icon' => 'fa-warehouse',
 

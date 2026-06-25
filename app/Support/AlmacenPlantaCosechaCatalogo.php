@@ -6,8 +6,11 @@ use App\Models\Almacen;
 use App\Models\AlmacenMovimiento;
 use App\Models\EnvioAsignacionMultiple;
 use App\Models\Insumo;
+use App\Models\CatalogoTamanoConteo;
 use App\Models\ProduccionAlmacenamiento;
 use App\Services\AlmacenCapacidadService;
+use App\Services\CosechaPresentacionService;
+use App\Services\PlanificacionCosechaService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -33,6 +36,113 @@ final class AlmacenPlantaCosechaCatalogo
         $clave = $clave ?? self::claveCultivo($nombre);
 
         return mb_convert_case($clave, MB_CASE_TITLE, 'UTF-8');
+    }
+
+    /**
+     * @return array{cantidad: float, unidad: string, kg: float, empaque: ?string}
+     */
+    public static function metricasProduccionAlmacenamiento(
+        ProduccionAlmacenamiento $c,
+        AlmacenCapacidadService $capacidad,
+        ?CosechaPresentacionService $presentacion = null
+    ): array {
+        $presentacion ??= app(CosechaPresentacionService::class);
+        $present = $presentacion->paraAlmacenamiento($c);
+        $kg = (float) ($present['kg'] ?? 0);
+        if ($kg <= 0) {
+            $kg = (float) $capacidad->convertirAKg((float) $c->cantidad, $c->unidadMedida);
+        }
+
+        $unidades = (int) ($present['unidades'] ?? 0);
+        if ($unidades <= 0 && self::unidadEsConteo($c->unidadMedida?->abreviatura ?? $c->unidadMedida?->nombre)) {
+            $unidades = (int) round((float) $c->cantidad);
+        }
+
+        $empaque = null;
+        if (($present['ok'] ?? false) && (int) ($present['empaques'] ?? 0) > 0) {
+            $empaque = number_format((int) $present['empaques'], 0, ',', '.')
+                .' '.($present['empaque_label'] ?? 'Cajas');
+        }
+
+        return [
+            'cantidad' => $unidades > 0 ? (float) $unidades : (float) $c->cantidad,
+            'unidad' => $unidades > 0 ? 'unidades' : ($c->unidadMedida?->abreviatura ?? 'kg'),
+            'kg' => round($kg, 4),
+            'empaque' => $empaque,
+        ];
+    }
+
+    /**
+     * @return array{cantidad: float, unidad: string, kg: float, empaque: ?string}
+     */
+    public static function metricasInsumoRecepcion(
+        Insumo $insumo,
+        AlmacenCapacidadService $capacidad,
+        ?CosechaPresentacionService $presentacion = null
+    ): array {
+        $presentacion ??= app(CosechaPresentacionService::class);
+        $kg = (float) $capacidad->convertirAKg((float) $insumo->stock, $insumo->unidadMedida);
+        $abbr = $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? 'kg';
+
+        if (self::unidadEsConteo($abbr)) {
+            return [
+                'cantidad' => (float) $insumo->stock,
+                'unidad' => 'unidades',
+                'kg' => round($kg, 4),
+                'empaque' => null,
+            ];
+        }
+
+        $calibre = self::resolverCalibrePorNombreCultivo($insumo->nombre);
+        $present = $presentacion->desdeKg($kg, $calibre);
+        $unidades = (int) ($present['unidades'] ?? 0);
+
+        return [
+            'cantidad' => $unidades > 0 ? (float) $unidades : (float) $insumo->stock,
+            'unidad' => $unidades > 0 ? 'unidades' : ($abbr ?: 'kg'),
+            'kg' => round($kg, 4),
+            'empaque' => ($present['ok'] ?? false) && (int) ($present['empaques'] ?? 0) > 0
+                ? number_format((int) $present['empaques'], 0, ',', '.').' '.($present['empaque_label'] ?? 'Cajas')
+                : null,
+        ];
+    }
+
+    public static function unidadEsConteo(?string $unidad): bool
+    {
+        $u = mb_strtolower(trim((string) $unidad));
+        if ($u === '') {
+            return false;
+        }
+
+        return in_array($u, ['und', 'un', 'u', 'unidad', 'unidades'], true)
+            || str_contains($u, 'und')
+            || str_contains($u, 'unidad');
+    }
+
+    private static function resolverCalibrePorNombreCultivo(string $nombre): ?CatalogoTamanoConteo
+    {
+        $clave = self::claveCultivo($nombre);
+        $semilla = Insumo::query()
+            ->whereHas('tipo', fn ($t) => $t->whereRaw('LOWER(TRIM(nombre)) LIKE ?', ['%siembra%']))
+            ->where(function ($q) use ($clave, $nombre) {
+                $q->whereRaw('LOWER(TRIM(nombre)) = ?', [$clave])
+                    ->orWhereRaw('LOWER(TRIM(nombre)) LIKE ?', ['%'.$clave.'%'])
+                    ->orWhereRaw('LOWER(TRIM(nombre)) LIKE ?', ['%'.Str::lower(trim($nombre)).'%']);
+            })
+            ->orderByDesc('insumoid')
+            ->first();
+
+        if (! $semilla) {
+            return null;
+        }
+
+        $ctx = app(PlanificacionCosechaService::class)->contexto((int) $semilla->insumoid);
+        $calibreId = $ctx['calibre_default_id'] ?? null;
+        if (! $calibreId) {
+            return null;
+        }
+
+        return CatalogoTamanoConteo::query()->with('tipoEmpaque')->find((int) $calibreId);
     }
 
     /**
@@ -70,6 +180,8 @@ final class AlmacenPlantaCosechaCatalogo
                     : '';
                 $acciones = self::resolverAccionesConsolidadas($lineas, $almacen, $rutaPrefijo, $clave);
 
+                $unidad = (string) ($lineas->first()->unidad ?? 'kg');
+
                 return (object) [
                     'categoria' => 'cosecha_consolidada',
                     'tipo_label' => 'Cosecha',
@@ -78,9 +190,9 @@ final class AlmacenPlantaCosechaCatalogo
                     'clave' => $clave,
                     'detalle' => ($conteo === 1 ? '1 entrada' : $conteo.' entradas').$detalleFecha,
                     'cantidad' => $cantTotal,
-                    'unidad' => 'kg',
+                    'unidad' => $unidad,
                     'kg' => $kgTotal,
-                    'empaque' => null,
+                    'empaque' => $lineas->first()->empaque ?? null,
                     'fecha_orden' => $ultimaFecha,
                     'search' => strtolower(trim($nombre.' cosecha '.$clave)),
                     'lineas_count' => $conteo,
@@ -165,15 +277,22 @@ final class AlmacenPlantaCosechaCatalogo
             ->each(function (ProduccionAlmacenamiento $c) use ($lineas, $capacidad, $almacen, $rutaPrefijo, $clave) {
                 $lote = $c->produccion?->lote;
                 $cultivo = $lote?->cultivo?->nombre ?? 'Cultivo';
-                $kg = $capacidad->convertirAKg((float) $c->cantidad, $c->unidadMedida);
+                $metricas = ($almacen->ambito ?? '') === AlmacenAmbito::AGRICOLA
+                    ? self::metricasProduccionAlmacenamiento($c, $capacidad)
+                    : [
+                        'cantidad' => (float) $c->cantidad,
+                        'unidad' => $c->unidadMedida?->abreviatura ?? 'kg',
+                        'kg' => (float) $capacidad->convertirAKg((float) $c->cantidad, $c->unidadMedida),
+                        'empaque' => null,
+                    ];
                 $fecha = $c->fechaentrada ? \Carbon\Carbon::parse($c->fechaentrada) : null;
 
                 $lineas->push([
                     'tipo' => 'produccion',
                     'titulo' => $cultivo.' · '.($lote?->nombre ?? 'Producción #'.$c->produccionid),
-                    'cantidad' => (float) $c->cantidad,
-                    'kg' => $kg,
-                    'unidad' => $c->unidadMedida?->abreviatura ?? 'kg',
+                    'cantidad' => $metricas['cantidad'],
+                    'kg' => $metricas['kg'],
+                    'unidad' => $metricas['unidad'],
                     'fecha' => $fecha,
                     'origen_etiqueta' => 'Lote agrícola',
                     'origen_detalle' => $lote?->nombre ?? 'Producción en campo',
@@ -196,7 +315,14 @@ final class AlmacenPlantaCosechaCatalogo
             ->get()
             ->filter(fn (Insumo $insumo) => self::claveCultivo($insumo->nombre) === $clave)
             ->each(function (Insumo $insumo) use ($lineas, $almacen, $capacidad, $rutaPrefijo, $clave) {
-                $kg = $capacidad->convertirAKg((float) $insumo->stock, $insumo->unidadMedida);
+                $metricas = ($almacen->ambito ?? '') === AlmacenAmbito::AGRICOLA
+                    ? self::metricasInsumoRecepcion($insumo, $capacidad)
+                    : [
+                        'cantidad' => (float) $insumo->stock,
+                        'unidad' => $insumo->unidadMedida?->abreviatura ?? 'kg',
+                        'kg' => (float) $capacidad->convertirAKg((float) $insumo->stock, $insumo->unidadMedida),
+                        'empaque' => null,
+                    ];
                 $movimiento = self::ultimoMovimientoRecepcion($insumo);
                 $origen = self::resolverOrigenRecepcion($movimiento);
                 $fecha = $movimiento?->fecha ?? self::fechaDesdeDescripcionRecepcion($insumo->descripcion);
@@ -205,9 +331,9 @@ final class AlmacenPlantaCosechaCatalogo
                 $lineas->push([
                     'tipo' => 'recepcion_pedido',
                     'titulo' => $insumo->nombre,
-                    'cantidad' => (float) $insumo->stock,
-                    'kg' => $kg,
-                    'unidad' => $insumo->unidadMedida?->abreviatura ?? 'kg',
+                    'cantidad' => $metricas['cantidad'],
+                    'kg' => $metricas['kg'],
+                    'unidad' => $metricas['unidad'],
                     'fecha' => $fecha,
                     'origen_etiqueta' => $origen['etiqueta'],
                     'origen_detalle' => $origen['origen'],

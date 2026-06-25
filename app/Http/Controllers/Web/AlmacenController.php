@@ -617,6 +617,17 @@ class AlmacenController extends Controller
             $esRecepcionPedido = ! $esMayorista && AlmacenPlantaCosechaCatalogo::esRecepcionPedidoInsumo($insumo);
             $kg = $this->capacidadService->convertirAKg((float) $insumo->stock, $insumo->unidadMedida);
             $claveCultivo = AlmacenPlantaCosechaCatalogo::claveCultivo($insumo->nombre);
+            if ($esAgricola && $esRecepcionPedido) {
+                $metricas = AlmacenPlantaCosechaCatalogo::metricasInsumoRecepcion($insumo, $this->capacidadService);
+                $cantidad = $metricas['cantidad'];
+                $unidad = $metricas['unidad'];
+                $kg = $metricas['kg'];
+                $empaque = $metricas['empaque'];
+            } else {
+                $cantidad = (float) $insumo->stock;
+                $unidad = $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? '';
+                $empaque = null;
+            }
 
             $items->push((object) [
                 'categoria' => $esMayorista ? 'producto_terminado' : ($esRecepcionPedido ? 'cosecha' : 'insumo'),
@@ -626,10 +637,10 @@ class AlmacenController extends Controller
                     ? AlmacenPlantaCosechaCatalogo::etiquetaCultivo($insumo->nombre)
                     : $insumo->nombre,
                 'detalle' => $insumo->descripcion ? \Illuminate\Support\Str::limit($insumo->descripcion, 60) : '—',
-                'cantidad' => (float) $insumo->stock,
-                'unidad' => $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? '',
+                'cantidad' => $cantidad,
+                'unidad' => $unidad,
                 'kg' => $kg,
-                'empaque' => null,
+                'empaque' => $empaque ?? null,
                 'fecha_orden' => AlmacenPlantaCosechaCatalogo::fechaDesdeDescripcionRecepcion($insumo->descripcion)?->timestamp ?? 0,
                 'search' => strtolower(trim($insumo->nombre.' '.$tipoNombre)),
                 'insumoid' => $insumo->insumoid,
@@ -649,7 +660,18 @@ class AlmacenController extends Controller
             $lote = $c->produccion?->lote;
             $cultivo = $lote?->cultivo?->nombre ?? 'Cultivo';
             $nombre = $cultivo.' · '.($lote?->nombre ?? 'Producción #'.$c->produccionid);
-            $kg = $this->capacidadService->convertirAKg((float) $c->cantidad, $c->unidadMedida);
+            if ($esAgricola) {
+                $metricas = AlmacenPlantaCosechaCatalogo::metricasProduccionAlmacenamiento($c, $this->capacidadService);
+                $cantidad = $metricas['cantidad'];
+                $unidad = $metricas['unidad'];
+                $kg = $metricas['kg'];
+                $empaque = $metricas['empaque'];
+            } else {
+                $cantidad = (float) $c->cantidad;
+                $unidad = $c->unidadMedida?->abreviatura ?? 'kg';
+                $kg = $this->capacidadService->convertirAKg((float) $c->cantidad, $c->unidadMedida);
+                $empaque = null;
+            }
 
             $fechaEntrada = $c->fechaentrada ? \Carbon\Carbon::parse($c->fechaentrada) : null;
             $claveCultivo = AlmacenPlantaCosechaCatalogo::claveCultivo($cultivo !== '' ? $cultivo : $nombre, $cultivo !== '' ? $cultivo : null);
@@ -660,10 +682,10 @@ class AlmacenController extends Controller
                 'tipo_filtro' => 'cosecha',
                 'nombre' => AlmacenPlantaCosechaCatalogo::etiquetaCultivo($cultivo !== '' ? $cultivo : $nombre, $claveCultivo),
                 'detalle' => $fechaEntrada ? $fechaEntrada->format('d/m/Y') : '—',
-                'cantidad' => (float) $c->cantidad,
-                'unidad' => $c->unidadMedida?->abreviatura ?? 'kg',
+                'cantidad' => $cantidad,
+                'unidad' => $unidad,
                 'kg' => $kg,
-                'empaque' => null,
+                'empaque' => $empaque,
                 'fecha_orden' => $fechaEntrada?->timestamp ?? 0,
                 'search' => strtolower(trim($nombre.' cosecha '.$cultivo)),
                 'produccionid' => $c->produccionid,

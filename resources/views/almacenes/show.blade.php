@@ -463,7 +463,7 @@
                             <td class="text-right">
                                 @php
                                     $uLower = strtolower($item->unidad ?? '');
-                                    $esUnidad = in_array($item->categoria, ['producto_planta', 'producto_terminado'], true)
+                                    $esUnidad = in_array($item->categoria, ['producto_planta', 'producto_terminado', 'cosecha', 'cosecha_consolidada'], true)
                                         && ! str_contains($uLower, 'kg');
                                 @endphp
                                 {{ number_format($item->cantidad, $esUnidad ? 0 : 2) }}

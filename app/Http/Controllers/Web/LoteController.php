@@ -528,6 +528,9 @@ class LoteController extends Controller
                 'almacenid' => $almacen->almacenid,
                 'cantidad' => $produccion->cantidad,
                 'unidadmedidaid' => $produccion->unidadmedidaid,
+                'catalogotamanoconteoid' => $produccion->catalogotamanoconteoid,
+                'cantidad_unidades' => $produccion->cantidad_unidades,
+                'cantidad_empaques' => $produccion->cantidad_empaques,
                 'fechaentrada' => now(),
                 'observaciones' => "Cosecha del lote {$lote->nombre}",
             ]);

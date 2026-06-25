@@ -21,7 +21,7 @@ class AlmacenPlantaCosechaController extends Controller
         string $clave,
         AlmacenCapacidadService $capacidadService
     ): View {
-        $ctx = $this->contextoPlanta($request, $almacen);
+        $ctx = $this->contextoCosecha($request, $almacen);
 
         $lineas = AlmacenPlantaCosechaCatalogo::lineasDetalladas(
             $almacen,
@@ -49,7 +49,7 @@ class AlmacenPlantaCosechaController extends Controller
         string $clave,
         ProduccionAlmacenamiento $produccionAlmacenamiento
     ): RedirectResponse {
-        $ctx = $this->contextoPlanta($request, $almacen);
+        $ctx = $this->contextoCosecha($request, $almacen);
 
         abort_unless(
             (int) $produccionAlmacenamiento->almacenid === (int) $almacen->almacenid,
@@ -72,7 +72,7 @@ class AlmacenPlantaCosechaController extends Controller
         string $clave,
         Insumo $insumo
     ): RedirectResponse {
-        $ctx = $this->contextoPlanta($request, $almacen);
+        $ctx = $this->contextoCosecha($request, $almacen);
 
         abort_unless((int) $insumo->almacenid === (int) $almacen->almacenid, 404);
         abort_unless(AlmacenPlantaCosechaCatalogo::esRecepcionPedidoInsumo($insumo), 404);
@@ -89,11 +89,12 @@ class AlmacenPlantaCosechaController extends Controller
     /**
      * @return array{rutaPrefijo: string, ambito: string, tituloModulo: string}
      */
-    private function contextoPlanta(Request $request, Almacen $almacen): array
+    private function contextoCosecha(Request $request, Almacen $almacen): array
     {
         $ctx = AlmacenAmbito::contexto($request);
-        abort_unless($ctx['ambito'] === AlmacenAmbito::PLANTA, 404);
-        abort_unless(($almacen->ambito ?? '') === AlmacenAmbito::PLANTA, 404);
+        $ambito = (string) ($ctx['ambito'] ?? '');
+        abort_unless(in_array($ambito, [AlmacenAmbito::PLANTA, AlmacenAmbito::AGRICOLA], true), 404);
+        abort_unless(($almacen->ambito ?? '') === $ambito, 404);
 
         return $ctx;
     }

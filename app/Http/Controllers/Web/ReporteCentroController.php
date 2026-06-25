@@ -35,21 +35,13 @@ class ReporteCentroController extends Controller
 
 
         $items = ReporteCatalogo::paraUsuario($user)->map(function (array $item) use ($servicio) {
-
             $preview = null;
-
             $metodo = $item['preview'] ?? null;
-
             if (is_string($metodo) && method_exists($servicio, $metodo)) {
-
                 $preview = $servicio->{$metodo}();
-
             }
 
-
-
             return array_merge($item, ['preview' => $preview]);
-
         });
 
 

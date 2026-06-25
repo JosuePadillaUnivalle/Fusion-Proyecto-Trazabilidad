@@ -3,6 +3,7 @@
 @php
     $kpis = $datos['kpis'] ?? [];
     $detalle = $datos['detalleAlmacen'] ?? collect();
+    $resumenAmbito = $datos['resumenAmbito'] ?? collect();
     $kpisDisplay = [
         ['value' => number_format($kpis['stock'] ?? 0, 0).' kg', 'label' => 'Stock total'],
         ['value' => $kpis['almacenes'] ?? 0, 'label' => 'Almacenes'],
@@ -76,6 +77,36 @@
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="rpt-panel mt-3">
+        <div class="rpt-panel__head"><i class="fas fa-sitemap mr-1"></i>Resumen por ámbito</div>
+        <div class="rpt-panel__body rpt-panel__body--table table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Ámbito</th>
+                        <th class="text-right">Almacenes</th>
+                        <th class="text-right">Referencias</th>
+                        <th class="text-right">Stock (kg)</th>
+                        <th class="text-right">Bajo mínimo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($resumenAmbito as $fila)
+                        <tr>
+                            <td class="font-weight-bold">{{ $fila['ambito'] }}</td>
+                            <td class="text-right">{{ $fila['almacenes'] }}</td>
+                            <td class="text-right">{{ $fila['productos'] }}</td>
+                            <td class="text-right font-weight-bold">{{ number_format($fila['stock'], 0) }} kg</td>
+                            <td class="text-right {{ ($fila['criticos'] ?? 0) > 0 ? 'text-danger font-weight-bold' : '' }}">{{ $fila['criticos'] ?? 0 }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="5" class="text-center text-muted py-4">Sin datos por ámbito</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
 @endsection

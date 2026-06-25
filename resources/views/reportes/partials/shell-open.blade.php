@@ -70,7 +70,6 @@
                 <a href="{{ route($item['route']) }}" class="btn btn-sm btn-outline-secondary">Limpiar</a>
                 <button type="button" class="btn btn-sm rpt-btn-outline-accent" onclick="rptPreviewPdf()"><i class="fas fa-eye mr-1"></i>Vista previa PDF</button>
                 <button type="button" class="btn btn-sm btn-outline-danger" onclick="rptExportPdf()"><i class="fas fa-file-pdf mr-1"></i>Descargar PDF</button>
-                <button type="button" class="btn btn-sm btn-outline-success" onclick="rptExportExcel()"><i class="fas fa-file-excel mr-1"></i>Excel</button>
             </div>
         </form>
     </div>

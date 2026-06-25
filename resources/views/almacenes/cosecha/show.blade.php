@@ -4,7 +4,7 @@
 
 @extends('layouts.app')
 
-@section('title', $nombre.' | Cosecha en planta')
+@section('title', $nombre.' | Cosecha en almacén')
 @section('page_title', 'Detalle de cosecha')
 
 @section('breadcrumbs')
@@ -77,7 +77,10 @@
                                     </div>
                                 </td>
                                 <td class="text-right">
-                                    {{ number_format($linea['cantidad'], 2) }}
+                                    @php
+                                        $esUnidadLinea = ! str_contains(strtolower($linea['unidad'] ?? ''), 'kg');
+                                    @endphp
+                                    {{ number_format($linea['cantidad'], $esUnidadLinea ? 0 : 2) }}
                                     <small class="text-muted">{{ $linea['unidad'] }}</small>
                                 </td>
                                 <td class="text-right">{{ number_format($linea['kg'], 2) }} kg</td>
@@ -103,7 +106,7 @@
                                             @can('inventario.delete')
                                             <form action="{{ $linea['url_destroy'] }}" method="POST" class="d-inline m-0 on-submit-confirm"
                                                   data-confirm-title="¿Eliminar esta entrada?"
-                                                  data-confirm-text="Se quitará {{ number_format($linea['cantidad'], 2) }} {{ $linea['unidad'] }} del almacén de planta.">
+                                                  data-confirm-text="Se quitará {{ number_format($linea['cantidad'], $esUnidadLinea ? 0 : 2) }} {{ $linea['unidad'] }} del almacén{{ ($ambito ?? '') === 'planta' ? ' de planta' : ' agrícola' }}.">
                                                 @csrf @method('DELETE')
                                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
                                             </form>

@@ -318,7 +318,10 @@
                             <td>{{ $linea->almacen_nombre ?: '—' }}</td>
                             <td><span class="mov-producto">{{ $linea->producto }}</span></td>
                             <td class="text-right">
-                                <span class="mov-cantidad">{{ number_format((float) $linea->cantidad, 2) }}</span>
+                                @php
+                                    $esUnidadMov = ! str_contains(strtolower($linea->unidad ?? ''), 'kg');
+                                @endphp
+                                <span class="mov-cantidad">{{ number_format((float) $linea->cantidad, $esUnidadMov ? 0 : 2) }}</span>
                                 <small class="text-muted">{{ $linea->unidad }}</small>
                             </td>
                             <td>{{ $linea->responsable ?: '—' }}</td>

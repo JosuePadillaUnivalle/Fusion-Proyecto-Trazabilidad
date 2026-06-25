@@ -13,6 +13,7 @@ use App\Services\AlmacenCapacidadService;
 use App\Services\DestinosMotivoAlmacenService;
 use App\Services\ReferenciasAlmacenDisponiblesService;
 use App\Support\AlmacenAmbito;
+use App\Support\AlmacenPlantaCosechaCatalogo;
 use App\Support\CampoJefeScope;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -142,7 +143,7 @@ class AlmacenMovimientoController extends Controller
 
         if ($ambito === AlmacenAmbito::AGRICOLA && $filtroNaturaleza !== 'salida') {
             $cosechas = ProduccionAlmacenamiento::query()
-                ->with(['almacen', 'produccion.lote.cultivo', 'unidadMedida'])
+                ->with(['almacen.responsable', 'produccion.lote.usuario', 'produccion.lote.cultivo', 'unidadMedida'])
                 ->whereHas('almacen', fn ($a) => AlmacenAmbito::scope($a, AlmacenAmbito::AGRICOLA));
             CampoJefeScope::aplicarEnProduccionAlmacenamiento($cosechas, $user);
             $cosechas = $cosechas
@@ -156,6 +157,8 @@ class AlmacenMovimientoController extends Controller
                 $loteNombre = $lote?->nombre ?? ('Producción #'.$c->produccionid);
                 $producto = $cultivo.' · '.$loteNombre;
                 $fecha = $c->fechaentrada ? Carbon::parse($c->fechaentrada) : Carbon::today();
+                $metricas = AlmacenPlantaCosechaCatalogo::metricasProduccionAlmacenamiento($c, $this->capacidadService);
+                $responsable = $this->responsableLineaCosecha($c);
 
                 $lineas->push((object) [
                     'tipo_linea' => 'cosecha',
@@ -166,9 +169,9 @@ class AlmacenMovimientoController extends Controller
                     'almacen_id' => (int) ($c->almacenid ?? 0),
                     'almacen_nombre' => $c->almacen?->nombre ?? '',
                     'producto' => $producto,
-                    'cantidad' => (float) $c->cantidad,
-                    'unidad' => $c->unidadMedida?->abreviatura ?? 'kg',
-                    'responsable' => '—',
+                    'cantidad' => $metricas['cantidad'],
+                    'unidad' => $metricas['unidad'],
+                    'responsable' => $responsable,
                     'referencia' => 'Cosecha #'.$c->produccionid,
                     'observaciones' => $c->observaciones ?? '',
                     'url_ver' => route($prefijo.'.movimientos.cosecha.show', [
@@ -183,6 +186,27 @@ class AlmacenMovimientoController extends Controller
         return $lineas
             ->sortByDesc(fn ($l) => Carbon::parse($l->fecha)->format('Y-m-d').str_pad((string) $l->orden_id, 10, '0', STR_PAD_LEFT))
             ->values();
+    }
+
+    private function responsableLineaCosecha(ProduccionAlmacenamiento $c): string
+    {
+        $lote = $c->produccion?->lote;
+        $candidatos = [
+            $lote?->usuario,
+            $c->almacen?->responsable,
+        ];
+
+        foreach ($candidatos as $usuario) {
+            if ($usuario === null) {
+                continue;
+            }
+            $nombre = trim(($usuario->nombre ?? '').' '.($usuario->apellido ?? ''));
+            if ($nombre !== '') {
+                return $nombre;
+            }
+        }
+
+        return '—';
     }
 
     public function create(Request $request, string $naturaleza)

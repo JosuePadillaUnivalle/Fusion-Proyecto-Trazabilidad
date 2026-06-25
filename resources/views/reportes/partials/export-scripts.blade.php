@@ -1,12 +1,11 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (function () {
     const meta = document.getElementById('rpt-print-meta');
     const chartCfg = @json($chartConfig ?? ['type' => 'doughnut', 'labels' => [], 'values' => []]);
-    const exportCfg = @json($exportConfig ?? ['headers' => [], 'rows' => [], 'sheet' => 'Reporte']);
+    const exportCfg = @json($exportConfig ?? ['headers' => [], 'rows' => [], 'sections' => []]);
     const kpisCfg = @json($kpisPdf ?? []);
 
     const chartPalettes = {
@@ -53,6 +52,18 @@
         });
     }
 
+    function exportSections() {
+        if (exportCfg.sections && exportCfg.sections.length) {
+            return exportCfg.sections;
+        }
+
+        return [{
+            title: null,
+            headers: exportCfg.headers || [],
+            rows: exportCfg.rows || [],
+        }];
+    }
+
     function buildPdfDoc() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
@@ -81,14 +92,27 @@
             y += 8 + (lines.length * 5);
         }
 
-        doc.autoTable({
-            startY: y + 6,
-            head: [exportCfg.headers || []],
-            body: exportCfg.rows || [],
-            theme: 'striped',
-            styles: { fontSize: 9, textColor: [30, 41, 59] },
-            headStyles: { fillColor: headerRgb, textColor: [255, 255, 255] },
-            alternateRowStyles: { fillColor: [248, 250, 252] },
+        let startY = y + 6;
+        exportSections().forEach(function (section) {
+            if (section.title) {
+                doc.setFontSize(11);
+                doc.setTextColor(headerRgb[0], headerRgb[1], headerRgb[2]);
+                doc.text(section.title, 14, startY);
+                startY += 6;
+            }
+
+            doc.autoTable({
+                startY: startY,
+                head: [section.headers || []],
+                body: section.rows || [],
+                theme: 'striped',
+                styles: { fontSize: 8, textColor: [30, 41, 59], cellPadding: 2 },
+                headStyles: { fillColor: headerRgb, textColor: [255, 255, 255], fontSize: 8 },
+                alternateRowStyles: { fillColor: [248, 250, 252] },
+                margin: { left: 14, right: 14 },
+            });
+
+            startY = (doc.lastAutoTable?.finalY || startY) + 10;
         });
 
         return doc;
@@ -112,14 +136,6 @@
     window.rptExportPdf = function () {
         const doc = buildPdfDoc();
         doc.save((exportCfg.filename || 'reporte') + '_' + new Date().toISOString().slice(0, 10) + '.pdf');
-    };
-
-    window.rptExportExcel = function () {
-        const data = [exportCfg.headers || []].concat(exportCfg.rows || []);
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, exportCfg.sheet || 'Reporte');
-        XLSX.writeFile(wb, (exportCfg.filename || 'reporte') + '_' + new Date().toISOString().slice(0, 10) + '.xlsx');
     };
 
     if (window.jQuery) {

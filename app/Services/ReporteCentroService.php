@@ -2,15 +2,23 @@
 
 namespace App\Services;
 
+use App\Models\AlmacenajeLoteProduccion;
 use App\Models\EnvioAsignacionMultiple;
 use App\Models\Insumo;
+use App\Models\InventarioPresentacionLote;
+use App\Models\Pedido;
 use App\Models\PedidoDistribucion;
+use App\Models\ProduccionAlmacenamiento;
 use App\Models\RutaDistribucion;
+use App\Models\RutaDistribucionParada;
 use App\Models\Usuario;
 use App\Models\Almacen;
+use App\Services\AlmacenCapacidadService;
 use App\Support\AlmacenAmbito;
+use App\Support\LoteProduccionNombre;
 use App\Support\CampoJefeScope;
 use App\Support\EnvioAsignacionEstadoCatalogo;
+use App\Support\EnvioPedidoService;
 use App\Support\EtiquetaDemo;
 use App\Support\InsumoCatalogo;
 use App\Support\PedidoCatalogo;
@@ -20,12 +28,17 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class ReporteCentroService
 {
     public function __construct(
-        private readonly ReporteDistribucionService $distribucion
+        private readonly ReporteDistribucionService $distribucion,
+        private readonly AlmacenCapacidadService $capacidad,
+        private readonly ProductoPlantaInventarioService $inventarioPlanta,
+        private readonly InventarioPresentacionService $inventarioPresentacion,
+        private readonly DistribucionRutaService $rutasDistribucion,
     ) {}
 
     /** @return array{desde: string, hasta: string} */
@@ -108,6 +121,19 @@ class ReporteCentroService
                 'cancelacion' => $total > 0 ? round(($totalCancelados / $total) * 100, 1) : 0.0,
             ],
             'tabla' => $tabla,
+            'detalleMovimientos' => collect($filas)
+                ->sortByDesc('fecha_orden')
+                ->take(150)
+                ->values()
+                ->map(fn (array $f) => [
+                    'fecha' => $f['fecha'] ?? '—',
+                    'canal' => $f['canal'] ?? '—',
+                    'referencia' => $f['referencia'] ?? '—',
+                    'estado' => $f['estado_etiqueta'] ?? '—',
+                    'transportista' => ($f['transportista_nombre'] ?? '') !== '' ? $f['transportista_nombre'] : '—',
+                    'origen' => $f['origen'] ?? '—',
+                    'destino' => $f['destino'] ?? '—',
+                ]),
             'chart' => [
                 'labels' => $tabla->pluck('estado')->all(),
                 'values' => $tabla->pluck('total')->all(),
@@ -117,17 +143,17 @@ class ReporteCentroService
 
     public function stockAmbitoPreview(): ?string
     {
-        $kg = (float) Insumo::query()
-            ->join('almacen', 'insumo.almacenid', '=', 'almacen.almacenid')
-            ->where('almacen.activo', true)
-            ->sum('insumo.stock');
+        $totalKg = (float) $this->stockOperativoPorAmbito()->sum('stock_kg');
 
-        return $kg > 0 ? number_format($kg, 0).' kg total' : 'Sin stock';
+        return $totalKg > 0 ? number_format($totalKg, 0).' kg en red' : 'Sin stock';
     }
 
-    /** @return array<string, mixed> */
-    /** @param  array<string, mixed>  $filtros */
-    public function stockAmbito(?string $ambitoFiltro = null, array $filtros = []): array
+    /**
+     * Stock operativo real por ámbito (insumos + cosecha + producto planta).
+     *
+     * @return Collection<int, array{clave: string, etiqueta: string, stock_kg: float, almacenes: int, productos: int, criticos: int}>
+     */
+    private function stockOperativoPorAmbito(): Collection
     {
         $ambitos = [
             AlmacenAmbito::AGRICOLA => 'Agrícola',
@@ -136,45 +162,104 @@ class ReporteCentroService
             AlmacenAmbito::PUNTO_VENTA => 'Punto de venta',
         ];
 
-        if ($ambitoFiltro && isset($ambitos[$ambitoFiltro])) {
-            $ambitos = [$ambitoFiltro => $ambitos[$ambitoFiltro]];
-        }
-
-        $resumenAmbito = [];
-        $detalleAlmacen = collect();
-
-        foreach ($ambitos as $clave => $etiqueta) {
-            $filas = Insumo::query()
-                ->select('almacen.nombre as almacen')
-                ->selectRaw('SUM(insumo.stock) as stock')
-                ->selectRaw('COUNT(insumo.insumoid) as productos')
-                ->selectRaw('SUM(CASE WHEN insumo.stock <= COALESCE(insumo.stockminimo, ?) THEN 1 ELSE 0 END) as criticos', [InsumoCatalogo::UMBRAL_ALERTA_STOCK])
-                ->join('almacen', 'insumo.almacenid', '=', 'almacen.almacenid')
-                ->where('almacen.activo', true)
-                ->where('almacen.ambito', $clave)
-                ->groupBy('almacen.nombre')
-                ->orderBy('almacen.nombre')
+        return collect($ambitos)->map(function (string $etiqueta, string $clave) {
+            $almacenes = Almacen::query()
+                ->where('activo', true)
+                ->where('ambito', $clave)
+                ->orderBy('nombre')
                 ->get();
 
-            $stockAmbito = (float) $filas->sum('stock');
-            $resumenAmbito[] = [
-                'ambito' => $etiqueta,
+            $filas = $almacenes->map(fn (Almacen $almacen) => $this->filaStockAlmacen($almacen));
+
+            return [
                 'clave' => $clave,
-                'stock' => $stockAmbito,
-                'almacenes' => $filas->count(),
+                'etiqueta' => $etiqueta,
+                'stock_kg' => (float) $filas->sum('stock'),
+                'almacenes' => $filas->filter(fn (array $f) => ($f['stock'] ?? 0) > 0)->count(),
                 'productos' => (int) $filas->sum('productos'),
                 'criticos' => (int) $filas->sum('criticos'),
             ];
+        })->values();
+    }
 
-            foreach ($filas as $fila) {
+    /** @return array{stock: float, productos: int, criticos: int} */
+    private function filaStockAlmacen(Almacen $almacen): array
+    {
+        $stockKg = $this->capacidad->ocupadoKg($almacen);
+
+        $insumosActivos = Insumo::query()
+            ->where('almacenid', $almacen->almacenid)
+            ->where('stock', '>', 0);
+
+        $productos = (int) (clone $insumosActivos)->count()
+            + (int) ProduccionAlmacenamiento::query()
+                ->where('almacenid', $almacen->almacenid)
+                ->whereNull('fechasalida')
+                ->count()
+            + (int) AlmacenajeLoteProduccion::query()
+                ->where('almacenid', $almacen->almacenid)
+                ->whereNull('fecha_retiro')
+                ->count();
+
+        $criticos = (int) Insumo::query()
+            ->where('almacenid', $almacen->almacenid)
+            ->where('stock', '>', 0)
+            ->whereColumn('stock', '<=', DB::raw('COALESCE(stockminimo, '.InsumoCatalogo::UMBRAL_ALERTA_STOCK.')'))
+            ->count();
+
+        return [
+            'stock' => $stockKg,
+            'productos' => $productos,
+            'criticos' => $criticos,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    /** @param  array<string, mixed>  $filtros */
+    public function stockAmbito(?string $ambitoFiltro = null, array $filtros = []): array
+    {
+        $resumenOperativo = $this->stockOperativoPorAmbito();
+
+        if ($ambitoFiltro) {
+            $resumenOperativo = $resumenOperativo->where('clave', $ambitoFiltro)->values();
+        }
+
+        $detalleAlmacen = collect();
+        $resumenAmbito = [];
+
+        foreach ($resumenOperativo as $bloque) {
+            $clave = $bloque['clave'];
+            $etiqueta = $bloque['etiqueta'];
+
+            $almacenes = Almacen::query()
+                ->where('activo', true)
+                ->where('ambito', $clave)
+                ->orderBy('nombre')
+                ->get();
+
+            foreach ($almacenes as $almacen) {
+                $fila = $this->filaStockAlmacen($almacen);
+                if ($fila['stock'] <= 0 && $fila['productos'] <= 0) {
+                    continue;
+                }
                 $detalleAlmacen->push([
                     'ambito' => $etiqueta,
-                    'almacen' => $fila->almacen,
-                    'stock' => (float) $fila->stock,
-                    'productos' => (int) $fila->productos,
-                    'criticos' => (int) $fila->criticos,
+                    'almacen' => $almacen->nombre,
+                    'stock' => (float) $fila['stock'],
+                    'productos' => (int) $fila['productos'],
+                    'criticos' => (int) $fila['criticos'],
                 ]);
             }
+
+            $filasAmbito = $detalleAlmacen->where('ambito', $etiqueta);
+            $resumenAmbito[] = [
+                'ambito' => $etiqueta,
+                'clave' => $clave,
+                'stock' => (float) $filasAmbito->sum('stock'),
+                'almacenes' => $filasAmbito->count(),
+                'productos' => (int) $filasAmbito->sum('productos'),
+                'criticos' => (int) $filasAmbito->sum('criticos'),
+            ];
         }
 
         if (! empty($filtros['solo_criticos'])) {
@@ -216,10 +301,11 @@ class ReporteCentroService
 
     public function transportistasPreview(): ?string
     {
-        $datos = $this->distribucion->datosReporte();
-        $top = $datos['topTransportistas'] ?? collect();
+        $periodo = $this->resolverPeriodo(request());
+        $datos = $this->transportistas($periodo['desde'], $periodo['hasta']);
+        $n = (int) ($datos['kpis']['transportistas'] ?? 0);
 
-        return $top->isNotEmpty() ? $top->count().' activos' : null;
+        return $n > 0 ? $n.' activos' : null;
     }
 
     /** @return array<string, mixed> */
@@ -362,7 +448,10 @@ class ReporteCentroService
 
     public function pedidosPdvPreview(): ?string
     {
-        $n = PedidoDistribucion::query()->count();
+        $n = PedidoDistribucion::query()
+            ->whereRaw('UPPER(COALESCE(numero_solicitud, "")) NOT LIKE ?', ['%DEMO%'])
+            ->whereRaw('UPPER(COALESCE(numero_solicitud, "")) NOT LIKE ?', ['MOD-PED-%'])
+            ->count();
 
         return $n > 0 ? $n.' pedidos' : null;
     }
@@ -383,7 +472,8 @@ class ReporteCentroService
             $query->where('puntoventaid', (int) $filtros['puntoventaid']);
         }
 
-        $pedidos = $query->orderByDesc('fechapedido')->get();
+        $pedidos = $query->orderByDesc('fechapedido')->get()
+            ->reject(fn (PedidoDistribucion $p) => $this->esPedidoDistribucionDemo($p));
 
         $porEstado = $pedidos->groupBy(fn ($p) => PedidoDistribucionCatalogo::etiquetaEstado($p->estado))
             ->map(fn (Collection $g, string $estado) => ['estado' => $estado, 'total' => $g->count()])
@@ -417,32 +507,36 @@ class ReporteCentroService
 
     public function productosTerminadosPreview(): ?string
     {
-        $tipoId = InsumoCatalogo::tipoProductoTerminadoId();
-        if ($tipoId === null) {
-            return null;
+        $datos = $this->productosTerminados();
+        $productos = (int) ($datos['kpis']['productos'] ?? 0);
+
+        if ($productos <= 0) {
+            return 'Sin producto terminado';
         }
 
-        $n = Insumo::query()->where('tipoinsumoid', $tipoId)->where('stock', '>', 0)->count();
+        $stockKg = (float) ($datos['kpis']['stock_kg'] ?? 0);
 
-        return $n > 0 ? $n.' con stock' : null;
+        return $productos.' referencias · '.number_format($stockKg, 0).' kg';
     }
 
     /** @return array<string, mixed> */
     /** @param  array<string, mixed>  $filtros */
     public function productosTerminados(?string $ambitoFiltro = null, array $filtros = []): array
     {
-        $tipoId = InsumoCatalogo::tipoProductoTerminadoId();
+        $this->inventarioPlanta->sincronizarDesdeAlmacenajes();
+        $tipoId = $this->inventarioPlanta->tipoProductoTerminadoId();
+
+        $ambitos = $ambitoFiltro
+            ? [$ambitoFiltro]
+            : [AlmacenAmbito::PLANTA, AlmacenAmbito::MAYORISTA];
+
         $query = Insumo::query()
             ->with(['almacen', 'unidadMedida'])
+            ->withCount(['presentaciones' => fn ($q) => $q->where('activo', true)])
             ->where('tipoinsumoid', $tipoId)
             ->where('stock', '>', 0)
-            ->whereHas('almacen', function ($q) use ($ambitoFiltro) {
-                $q->where('activo', true);
-                if ($ambitoFiltro) {
-                    $q->where('ambito', $ambitoFiltro);
-                } else {
-                    $q->whereIn('ambito', [AlmacenAmbito::PLANTA, AlmacenAmbito::MAYORISTA]);
-                }
+            ->whereHas('almacen', function ($q) use ($ambitos) {
+                $q->where('activo', true)->whereIn('ambito', $ambitos);
             });
 
         if (! empty($filtros['q'])) {
@@ -450,46 +544,88 @@ class ReporteCentroService
             $query->whereRaw('LOWER(nombre) LIKE ?', [$term]);
         }
 
-        $productos = $query->orderBy('nombre')->get();
+        $insumos = $query->orderBy('nombre')->get();
 
-        $porAmbito = $productos->groupBy(fn ($i) => $i->almacen?->ambito ?? 'otro')
-            ->map(function (Collection $g, string $ambito) {
-                return [
-                    'ambito' => match ($ambito) {
-                        AlmacenAmbito::PLANTA => 'Planta',
-                        AlmacenAmbito::MAYORISTA => 'Mayorista',
-                        default => ucfirst($ambito),
-                    },
-                    'productos' => $g->count(),
-                    'stock' => (float) $g->sum('stock'),
-                ];
-            })->values();
+        foreach ($insumos as $insumo) {
+            if (($insumo->almacen?->ambito ?? '') === AlmacenAmbito::MAYORISTA) {
+                $this->inventarioPresentacion->asegurarInventarioDesdeStock(
+                    (int) $insumo->almacenid,
+                    (int) $insumo->insumoid
+                );
+            }
+        }
 
-        $tabla = $productos->map(fn (Insumo $i) => [
+        $detallePresentacion = $this->filasInventarioPresentacionProductoTerminado($tipoId, $ambitos, $filtros);
+        $detallePlanta = $this->filasAlmacenajePlantaProductoTerminado($ambitos, $filtros);
+
+        if ($insumos->isEmpty() && ($detallePlanta->isNotEmpty() || $detallePresentacion->isNotEmpty())) {
+            $this->inventarioPlanta->sincronizarDesdeAlmacenajes();
+            $insumos = (clone $query)->orderBy('nombre')->get();
+        }
+
+        $tabla = $insumos->map(fn (Insumo $i) => [
             'nombre' => $i->nombre,
             'almacen' => $i->almacen?->nombre ?? '—',
-            'ambito' => match ($i->almacen?->ambito ?? '') {
-                AlmacenAmbito::PLANTA => 'Planta',
-                AlmacenAmbito::MAYORISTA => 'Mayorista',
-                default => '—',
-            },
+            'ambito' => $this->etiquetaAmbito($i->almacen?->ambito),
             'stock' => (float) $i->stock,
+            'stock_kg' => $this->stockInsumoEnKg($i),
             'unidad' => $i->unidadMedida?->abreviatura ?? 'kg',
+            'presentaciones' => (int) ($i->presentaciones_count ?? 0),
         ])->values();
+
+        $resumenProducto = $insumos->groupBy(fn (Insumo $i) => Str::lower(trim($i->nombre)))
+            ->map(function (Collection $grupo) {
+                $primero = $grupo->first();
+
+                return [
+                    'nombre' => $primero->nombre,
+                    'referencias' => $grupo->count(),
+                    'stock_kg' => (float) $grupo->sum(fn (Insumo $i) => $this->stockInsumoEnKg($i)),
+                    'planta_kg' => (float) $grupo
+                        ->filter(fn (Insumo $i) => ($i->almacen?->ambito ?? '') === AlmacenAmbito::PLANTA)
+                        ->sum(fn (Insumo $i) => $this->stockInsumoEnKg($i)),
+                    'mayorista_kg' => (float) $grupo
+                        ->filter(fn (Insumo $i) => ($i->almacen?->ambito ?? '') === AlmacenAmbito::MAYORISTA)
+                        ->sum(fn (Insumo $i) => $this->stockInsumoEnKg($i)),
+                ];
+            })
+            ->sortByDesc('stock_kg')
+            ->values();
+
+        $stockKgTotal = (float) $resumenProducto->sum('stock_kg');
+        if ($stockKgTotal <= 0) {
+            $stockKgTotal = (float) $detallePresentacion->sum('kg') + (float) $detallePlanta->sum('kg');
+        }
+
+        $porAmbito = collect($ambitos)->map(function (string $ambito) use ($insumos) {
+            $grupo = $insumos->filter(fn (Insumo $i) => ($i->almacen?->ambito ?? '') === $ambito);
+
+            return [
+                'ambito' => $this->etiquetaAmbito($ambito),
+                'productos' => $grupo->count(),
+                'stock_kg' => (float) $grupo->sum(fn (Insumo $i) => $this->stockInsumoEnKg($i)),
+            ];
+        })->filter(fn (array $r) => $r['productos'] > 0 || $r['stock_kg'] > 0)->values();
 
         return [
             'ambitoFiltro' => $ambitoFiltro,
             'kpis' => [
-                'productos' => $productos->count(),
-                'stock' => (float) $productos->sum('stock'),
-                'planta' => (int) $productos->filter(fn ($i) => ($i->almacen?->ambito ?? '') === AlmacenAmbito::PLANTA)->count(),
-                'mayorista' => (int) $productos->filter(fn ($i) => ($i->almacen?->ambito ?? '') === AlmacenAmbito::MAYORISTA)->count(),
+                'productos' => $insumos->count(),
+                'stock_kg' => $stockKgTotal,
+                'stock' => (float) $insumos->sum('stock'),
+                'planta' => (int) $insumos->filter(fn (Insumo $i) => ($i->almacen?->ambito ?? '') === AlmacenAmbito::PLANTA)->count(),
+                'mayorista' => (int) $insumos->filter(fn (Insumo $i) => ($i->almacen?->ambito ?? '') === AlmacenAmbito::MAYORISTA)->count(),
+                'lotes' => $detallePresentacion->count() + $detallePlanta->count(),
+                'presentaciones' => $detallePresentacion->pluck('presentacion')->unique()->filter()->count(),
             ],
             'tabla' => $tabla,
+            'resumenProducto' => $resumenProducto,
+            'detallePresentacion' => $detallePresentacion,
+            'detallePlanta' => $detallePlanta,
             'porAmbito' => $porAmbito,
             'chart' => [
                 'labels' => $porAmbito->pluck('ambito')->all(),
-                'values' => $porAmbito->pluck('stock')->all(),
+                'values' => $porAmbito->pluck('stock_kg')->all(),
             ],
         ];
     }
@@ -518,9 +654,100 @@ class ReporteCentroService
             return true;
         }
 
-        $pedido = $asignacion->pedido;
+        return $this->esPedidoAgricolaDemo($asignacion->pedido);
+    }
 
-        return $pedido && EtiquetaDemo::esDemo($pedido->numero_solicitud ?? '');
+    private function esReferenciaOperativaDemo(?string $referencia): bool
+    {
+        if (EtiquetaDemo::esDemo($referencia)) {
+            return true;
+        }
+
+        $ref = strtoupper(trim((string) $referencia));
+
+        return str_starts_with($ref, 'MOD-PED-');
+    }
+
+    private function esPedidoAgricolaDemo(?Pedido $pedido): bool
+    {
+        if ($pedido === null) {
+            return false;
+        }
+
+        if ($this->esReferenciaOperativaDemo($pedido->numero_solicitud)) {
+            return true;
+        }
+
+        if (str_contains((string) ($pedido->observaciones ?? ''), '[MOD-PEDIDOS]')) {
+            return true;
+        }
+
+        return EtiquetaDemo::esDemo($pedido->nombre_planta ?? '');
+    }
+
+    private function esPedidoDistribucionDemo(PedidoDistribucion $pedido): bool
+    {
+        return $this->esReferenciaOperativaDemo($pedido->numero_solicitud)
+            || str_contains((string) ($pedido->observaciones ?? ''), '[DEMO');
+    }
+
+    private function resolverTransportistaPedidoPdv(PedidoDistribucion $pedido): ?Usuario
+    {
+        if ($pedido->relationLoaded('transportista') === false) {
+            $pedido->load('transportista');
+        }
+
+        if ($pedido->transportista !== null) {
+            return $pedido->transportista;
+        }
+
+        $pedido->loadMissing('rutaDistribucion.transportista');
+        if ($pedido->rutaDistribucion?->transportista !== null) {
+            return $pedido->rutaDistribucion->transportista;
+        }
+
+        $ruta = RutaDistribucion::query()
+            ->with('transportista')
+            ->where(function ($q) use ($pedido) {
+                $q->whereHas('pedidos', fn ($p) => $p->where('pedidodistribucionid', $pedido->pedidodistribucionid));
+                if (Schema::hasTable('ruta_distribucion_parada')) {
+                    $q->orWhereHas('paradas', fn ($p) => $p->where('pedidodistribucionid', $pedido->pedidodistribucionid));
+                }
+            })
+            ->orderByDesc('rutadistribucionid')
+            ->first();
+
+        return $ruta?->transportista;
+    }
+
+    /** @return array{origen: string, destino: string} */
+    private function resolverOrigenDestinoAsignacionAgricola(EnvioAsignacionMultiple $asignacion): array
+    {
+        $trayecto = EnvioPedidoService::trayectoPartes($asignacion);
+
+        $origen = $trayecto['recogidas'][0] ?? null;
+        if ($origen === null || $origen === '' || $origen === '—') {
+            $pedido = $asignacion->pedido;
+            if ($pedido?->origen_direccion) {
+                $origen = trim((string) $pedido->origen_direccion);
+            }
+        }
+        if ($origen === null || $origen === '' || $origen === '—') {
+            $origen = $this->etiquetaAlmacen($asignacion->almacen);
+        }
+        if ($origen === '—') {
+            $origen = 'Almacén agrícola';
+        }
+
+        $destino = $trayecto['destino'] ?? null;
+        if ($destino === null || $destino === '' || $destino === '—') {
+            $destino = EnvioPedidoService::etiquetaPlantaDestinoLista($asignacion->pedido);
+        }
+        if ($destino === null || $destino === '' || $destino === '—') {
+            $destino = 'Planta';
+        }
+
+        return ['origen' => $origen, 'destino' => $destino];
     }
 
     /** @param  list<array<string, mixed>>  $filas
@@ -562,7 +789,7 @@ class ReporteCentroService
         $soloAgricolaJefe = CampoJefeScope::debeAcotar($user);
 
         $asignacionesQuery = EnvioAsignacionMultiple::query()
-            ->with(['pedido', 'transportista', 'almacen'])
+            ->with(['pedido', 'transportista', 'almacen', 'ruta.paradas'])
             ->whereHas('pedido', fn ($p) => PedidoCatalogo::aplicarFiltroLogistica($p))
             ->whereDate('fecha_asignacion', '>=', $desde)
             ->whereDate('fecha_asignacion', '<=', $hasta);
@@ -579,12 +806,19 @@ class ReporteCentroService
             }
             $estado = strtolower(trim((string) ($a->estado ?? 'pendiente')));
             $transportista = $a->transportista;
+            $trayectoAgricola = $this->resolverOrigenDestinoAsignacionAgricola($a);
             $filas[] = [
                 'estado_etiqueta' => EnvioAsignacionEstadoCatalogo::etiqueta($estado),
                 'transportista_id' => $a->transportista_usuarioid,
-                'transportista_nombre' => trim(($transportista?->nombre ?? '').' '.($transportista?->apellido ?? '')),
+                'transportista_nombre' => $this->nombreTransportista($transportista),
                 'cancelado' => $estado === 'cancelado',
                 'completado' => in_array($estado, ['recibido_planta', 'entregado', 'completada'], true),
+                'fecha' => $a->fecha_asignacion?->format('d/m/Y') ?? '—',
+                'fecha_orden' => $a->fecha_asignacion?->timestamp ?? 0,
+                'canal' => 'Agrícola → planta',
+                'referencia' => $a->pedido?->numero_solicitud ?? ('Asig. #'.$a->envioasignacionmultipleid),
+                'origen' => $trayectoAgricola['origen'],
+                'destino' => $trayectoAgricola['destino'],
             ];
         }
 
@@ -593,7 +827,15 @@ class ReporteCentroService
         }
 
         $rutas = RutaDistribucion::query()
-            ->with('transportista')
+            ->with([
+                'transportista',
+                'almacenPlantaOrigen',
+                'almacenMayoristaDestino',
+                'almacenMayoristaOrigen',
+                'almacenOrigen',
+                'paradas.puntoVenta',
+                'pedidos.puntoVenta',
+            ])
             ->where(function ($q) use ($desde, $hasta) {
                 $q->whereBetween(DB::raw('DATE(COALESCE(fecha_salida, created_at))'), [$desde, $hasta]);
             })
@@ -605,34 +847,62 @@ class ReporteCentroService
             }
             $estado = strtolower(trim((string) ($r->estado ?? '')));
             $transportista = $r->transportista;
+            $canal = ($r->tipo_ruta ?? '') === RutaDistribucionCatalogo::TIPO_RUTA_PLANTA_MAYORISTA
+                ? 'Planta → mayorista'
+                : 'Distribución';
+            $trayecto = $this->resolverOrigenDestinoRuta($r);
             $filas[] = [
                 'estado_etiqueta' => RutaDistribucionCatalogo::etiquetaEstado($r->estado),
                 'transportista_id' => $r->transportista_usuarioid,
-                'transportista_nombre' => trim(($transportista?->nombre ?? '').' '.($transportista?->apellido ?? '')),
+                'transportista_nombre' => $this->nombreTransportista($transportista),
                 'cancelado' => in_array($estado, [
                     RutaDistribucionCatalogo::ESTADO_CANCELADA,
                     RutaDistribucionCatalogo::ESTADO_RECHAZADA,
                 ], true),
                 'completado' => $estado === RutaDistribucionCatalogo::ESTADO_COMPLETADA,
+                'fecha' => $r->fecha_salida?->format('d/m/Y') ?? $r->created_at?->format('d/m/Y') ?? '—',
+                'fecha_orden' => $r->fecha_salida?->timestamp ?? $r->created_at?->timestamp ?? 0,
+                'canal' => $canal,
+                'referencia' => $r->codigo ?: ($r->nombre ?: 'Ruta #'.$r->rutadistribucionid),
+                'origen' => $trayecto['origen'],
+                'destino' => $trayecto['destino'],
             ];
         }
 
         $pedidos = PedidoDistribucion::query()
+            ->with(['puntoVenta', 'transportista', 'rutaDistribucion.transportista', 'almacenMayoristaOrigen', 'almacenPlantaOrigen'])
             ->whereDate('fechapedido', '>=', $desde)
             ->whereDate('fechapedido', '<=', $hasta)
             ->get();
 
         foreach ($pedidos as $p) {
+            if ($this->esPedidoDistribucionDemo($p)) {
+                continue;
+            }
             $estado = strtolower(trim((string) ($p->estado ?? '')));
+            $transportista = $this->resolverTransportistaPedidoPdv($p);
+            $origen = $this->etiquetaAlmacen($p->almacenMayoristaOrigen);
+            if ($origen === '—') {
+                $origen = $this->etiquetaAlmacen($p->almacenPlantaOrigen);
+            }
+            if ($origen === '—') {
+                $origen = 'Mayorista';
+            }
             $filas[] = [
                 'estado_etiqueta' => 'PDV · '.PedidoDistribucionCatalogo::etiquetaEstado($p->estado),
-                'transportista_id' => $p->transportista_usuarioid,
-                'transportista_nombre' => null,
+                'transportista_id' => $transportista?->usuarioid ?? $p->transportista_usuarioid ?? $p->rutaDistribucion?->transportista_usuarioid,
+                'transportista_nombre' => $this->nombreTransportista($transportista),
                 'cancelado' => in_array($estado, [
                     PedidoDistribucionCatalogo::ESTADO_CANCELADO,
                     PedidoDistribucionCatalogo::ESTADO_RECHAZADO,
                 ], true),
                 'completado' => $estado === PedidoDistribucionCatalogo::ESTADO_RECIBIDO,
+                'fecha' => $p->fechapedido?->format('d/m/Y') ?? '—',
+                'fecha_orden' => $p->fechapedido?->timestamp ?? 0,
+                'canal' => 'Mayorista → PDV',
+                'referencia' => $p->numero_solicitud ?? ('Pedido #'.$p->pedidodistribucionid),
+                'origen' => $origen,
+                'destino' => $p->puntoVenta?->nombre ?? 'Punto de venta',
             ];
         }
 
@@ -653,5 +923,181 @@ class ReporteCentroService
         }
 
         return $ubicacion !== '' ? $nombre.', '.$ubicacion : $nombre;
+    }
+
+    private function nombreTransportista(?Usuario $usuario): string
+    {
+        if ($usuario === null) {
+            return '';
+        }
+
+        return trim($usuario->nombre.' '.($usuario->apellido ?? ''));
+    }
+
+    /** @return array{origen: string, destino: string} */
+    private function resolverOrigenDestinoRuta(RutaDistribucion $ruta): array
+    {
+        if ($ruta->esTrasladoPlantaMayorista()) {
+            return [
+                'origen' => $this->etiquetaAlmacen($ruta->almacenPlantaOrigen),
+                'destino' => $this->etiquetaAlmacen($ruta->almacenMayoristaDestino),
+            ];
+        }
+
+        $trayecto = $this->rutasDistribucion->trayectoPartes($ruta);
+        $origen = $trayecto['origen'] ?? null;
+        if ($origen === null || $origen === '') {
+            $origen = $this->etiquetaAlmacen($ruta->almacenMayoristaOrigen ?? $ruta->almacenOrigen);
+        }
+
+        $destinos = $trayecto['destinos'] ?? [];
+        if ($destinos === []) {
+            $paradas = $ruta->paradas
+                ?->where('tipo', RutaDistribucionCatalogo::PARADA_ENTREGA_PDV)
+                ->map(function (RutaDistribucionParada $p) {
+                    $nombre = trim((string) ($p->destino ?? ''));
+                    if ($nombre !== '') {
+                        return $nombre;
+                    }
+
+                    return $p->puntoVenta?->nombre;
+                })
+                ->filter()
+                ->unique()
+                ->values() ?? collect();
+
+            if ($paradas->isEmpty()) {
+                $paradas = $ruta->pedidos
+                    ?->map(fn (PedidoDistribucion $p) => $p->puntoVenta?->nombre)
+                    ->filter()
+                    ->unique()
+                    ->values() ?? collect();
+            }
+
+            if ($paradas->isEmpty()) {
+                $destino = $ruta->nombre ?: 'Sin destino definido';
+            } elseif ($paradas->count() === 1) {
+                $destino = (string) $paradas->first();
+            } else {
+                $destino = $paradas->first().' (+'.($paradas->count() - 1).' PDV)';
+            }
+        } elseif (count($destinos) === 1) {
+            $destino = $destinos[0];
+        } else {
+            $destino = $destinos[0].' (+'.(count($destinos) - 1).' PDV)';
+        }
+
+        return [
+            'origen' => ($origen === '—' || $origen === null || $origen === '') ? 'Mayorista' : $origen,
+            'destino' => $destino,
+        ];
+    }
+
+    private function etiquetaAmbito(?string $ambito): string
+    {
+        return match ($ambito) {
+            AlmacenAmbito::PLANTA => 'Planta',
+            AlmacenAmbito::MAYORISTA => 'Mayorista',
+            default => $ambito ? ucfirst($ambito) : '—',
+        };
+    }
+
+    private function stockInsumoEnKg(Insumo $insumo): float
+    {
+        if (Schema::hasTable('inventario_presentacion_lote')) {
+            $kg = (float) InventarioPresentacionLote::query()
+                ->where('insumoid', $insumo->insumoid)
+                ->where('almacenid', $insumo->almacenid)
+                ->sum('cantidad_kg');
+            if ($kg > 0) {
+                return $kg;
+            }
+        }
+
+        $abrev = Str::lower(trim((string) ($insumo->unidadMedida?->abreviatura ?? 'kg')));
+
+        return in_array($abrev, ['kg', 'kilo', 'kilogramo', 'kilogramos'], true)
+            ? (float) $insumo->stock
+            : (float) $insumo->stock;
+    }
+
+    /**
+     * @param  list<string>  $ambitos
+     * @param  array<string, mixed>  $filtros
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function filasInventarioPresentacionProductoTerminado(int $tipoId, array $ambitos, array $filtros): Collection
+    {
+        if (! Schema::hasTable('inventario_presentacion_lote')) {
+            return collect();
+        }
+
+        $query = InventarioPresentacionLote::query()
+            ->with(['almacen', 'insumo', 'presentacion.tipoEmpaque', 'loteProduccion'])
+            ->where(function ($q) {
+                $q->where('cantidad_unidades', '>', 0)->orWhere('cantidad_kg', '>', 0);
+            })
+            ->whereHas('insumo', fn ($q) => $q->where('tipoinsumoid', $tipoId))
+            ->whereHas('almacen', fn ($q) => $q->where('activo', true)->whereIn('ambito', $ambitos));
+
+        if (! empty($filtros['q'])) {
+            $term = '%'.Str::lower($filtros['q']).'%';
+            $query->whereHas('insumo', fn ($q) => $q->whereRaw('LOWER(nombre) LIKE ?', [$term]));
+        }
+
+        return $query->orderBy('insumoid')->get()->map(fn (InventarioPresentacionLote $inv) => [
+            'producto' => $inv->insumo?->nombre ?? '—',
+            'presentacion' => $inv->presentacion?->nombre ?? '—',
+            'empaque' => $inv->presentacion?->tipoEmpaque?->nombre ?? ($inv->presentacion?->tipo_envase ?? '—'),
+            'lote' => $inv->etiquetaLote(),
+            'almacen' => $inv->almacen?->nombre ?? '—',
+            'ambito' => $this->etiquetaAmbito($inv->almacen?->ambito),
+            'unidades' => (float) $inv->cantidad_unidades,
+            'kg' => (float) $inv->cantidad_kg,
+        ])->values();
+    }
+
+    /**
+     * @param  list<string>  $ambitos
+     * @param  array<string, mixed>  $filtros
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function filasAlmacenajePlantaProductoTerminado(array $ambitos, array $filtros): Collection
+    {
+        if (! in_array(AlmacenAmbito::PLANTA, $ambitos, true)) {
+            return collect();
+        }
+
+        $query = AlmacenajeLoteProduccion::query()
+            ->with(['almacen', 'loteProduccionPedido.unidadMedida'])
+            ->whereNull('fecha_retiro')
+            ->where('cantidad', '>', 0)
+            ->whereHas('almacen', fn ($q) => $q->where('activo', true)->where('ambito', AlmacenAmbito::PLANTA));
+
+        $term = ! empty($filtros['q']) ? Str::lower($filtros['q']) : null;
+
+        return $query->orderByDesc('fecha_almacenaje')->get()
+            ->map(function (AlmacenajeLoteProduccion $ingreso) {
+                $lote = $ingreso->loteProduccionPedido;
+                $nombre = $lote ? LoteProduccionNombre::productoDesdeLote($lote) : '—';
+
+                return [
+                    'producto' => $nombre,
+                    'lote' => $lote?->codigo_lote ?? $lote?->nombre ?? '—',
+                    'almacen' => $ingreso->almacen?->nombre ?? '—',
+                    'ambito' => 'Planta',
+                    'ubicacion' => $ingreso->ubicacion ?: '—',
+                    'cantidad' => (float) $ingreso->cantidad,
+                    'unidad' => $lote?->unidadMedida?->abreviatura ?? 'kg',
+                    'kg' => (float) $ingreso->cantidad,
+                    'fecha' => $ingreso->fecha_almacenaje?->format('d/m/Y') ?? '—',
+                    '_nombre_busqueda' => Str::lower($nombre),
+                ];
+            })
+            ->when($term, fn (Collection $c) => $c->filter(
+                fn (array $f) => str_contains($f['_nombre_busqueda'], $term)
+            ))
+            ->map(fn (array $f) => collect($f)->except('_nombre_busqueda')->all())
+            ->values();
     }
 }
