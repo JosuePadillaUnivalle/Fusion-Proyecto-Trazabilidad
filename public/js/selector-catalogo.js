@@ -334,9 +334,14 @@
             this.modalEl.querySelector('#selectorCatalogoBuscar').value = '';
             this.modalEl.querySelector('#selectorCatalogoBuscar').placeholder = cfg.searchPlaceholder || 'Escriba para buscar…';
 
-            this.modalEl.classList.remove('sel-theme-planta', 'sel-theme-vehiculo', 'sel-theme-origen', 'sel-theme-chofer');
+            this.modalEl.classList.remove('sel-theme-planta', 'sel-theme-vehiculo', 'sel-theme-origen', 'sel-theme-chofer', 'sel-theme-semilla');
             if (cfg.theme) {
                 this.modalEl.classList.add('sel-theme-' + cfg.theme);
+            }
+
+            const headerIconWrap = this.modalEl.querySelector('.sel-modal-header-icon');
+            if (headerIconWrap) {
+                headerIconWrap.style.display = cfg.theme === 'semilla' ? 'none' : '';
             }
 
             const colNombre = this.modalEl.querySelector('#selectorCatalogoColNombre');
@@ -604,6 +609,25 @@
                         ${this.escape(todosLabel)}
                     </td>
                     <td class="sel-col-meta">Quitar filtro</td>
+                </tr>`;
+            }
+
+            if (cfg.pinnedOption && this.page === 1) {
+                const pin = cfg.pinnedOption;
+                const pinId = String(pin.id ?? '');
+                const pinLabel = pin.label || 'Asignarse a sí mismo';
+                const pinMeta = pin.meta || '';
+                html += `
+                <tr class="selector-catalogo-row selector-catalogo-row--pinned"
+                    data-item-id="${this.escape(pinId)}"
+                    data-item-label="${this.escape(pinLabel)}"
+                    data-item-extra="{}"
+                    role="button">
+                    <td class="sel-col-nombre">
+                        <span class="sel-row-icon"><i class="fas fa-user-check text-success"></i></span>
+                        <strong>${this.escape(pinLabel)}</strong>
+                    </td>
+                    <td class="sel-col-meta">${this.escape(pinMeta)}</td>
                 </tr>`;
             }
 

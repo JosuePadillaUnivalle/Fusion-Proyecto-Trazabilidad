@@ -60,8 +60,20 @@ class CatalogoSelectorController extends Controller
             $query = Usuario::query()->where('activo', true);
         }
         $esTransportista = $request->filled('roles') && str_contains((string) $request->roles, 'transportista');
+        $incluirSelfActor = $request->boolean('incluir_self_actor')
+            && $request->user()
+            && UsuarioRol::esAdminGlobal($request->user());
 
-        if ($request->filled('roles')) {
+        if ($incluirSelfActor) {
+            $actorId = (int) $request->user()->usuarioid;
+            $query->where(function (Builder $q) use ($actorId) {
+                $q->where('usuarioid', $actorId)
+                    ->orWhere(function (Builder $inner) {
+                        $inner->whereIn('role', ['agricultor'])
+                            ->orWhereHas('roles', fn (Builder $r) => $r->where('name', 'agricultor'));
+                    });
+            });
+        } elseif ($request->filled('roles')) {
             $roles = array_filter(array_map('trim', explode(',', (string) $request->roles)));
             if ($roles !== []) {
                 $query->where(function (Builder $q) use ($roles) {
@@ -76,7 +88,7 @@ class CatalogoSelectorController extends Controller
         }
 
         // El administrador supervisa el sistema; no es responsable operativo de parcelas.
-        if (! $request->boolean('incluir_admin')) {
+        if (! $incluirSelfActor && ! $request->boolean('incluir_admin')) {
             $query->whereNotIn('role', ['admin', 'Admin']);
         }
 
@@ -419,7 +431,7 @@ class CatalogoSelectorController extends Controller
         $query = Lote::query()->with(['cultivo', 'usuario']);
 
         if (UsuarioRol::debeAcotarPorAsignacion($request->user())) {
-            $query->where('usuarioid', (int) $request->user()->usuarioid);
+            \App\Support\LoteAcceso::aplicarScopeVisibles($query, $request->user());
         } elseif (
             UsuarioRol::esJefeAgricultor($request->user())
             && ! UsuarioRol::esAdminGlobal($request->user())
@@ -584,6 +596,10 @@ class CatalogoSelectorController extends Controller
                 ->all();
 
             $query->whereIn('tipoinsumoid', $tipoIds === [] ? [-1] : $tipoIds);
+
+            if ($slug === 'material_siembra') {
+                InsumoCatalogo::aplicarFiltroMaterialSiembraInventario($query);
+            }
         }
 
         if ($request->boolean('solo_con_stock')) {
@@ -674,13 +690,34 @@ class CatalogoSelectorController extends Controller
                 }
             }
 
+            $metaSemilla = null;
+            $metaLineas = null;
+            if ($esSemilla && ! $request->boolean('ambito_planta')) {
+                $ubicacion = 'Inventario agrícola';
+                if ($i->almacen && AlmacenAmbito::resolverAmbito($i->almacen) === AlmacenAmbito::AGRICOLA) {
+                    $ubicacion = $alm ?? 'Almacén agrícola';
+                }
+                $metaSemilla = $ubicacion.' · '.$stockEtiqueta;
+                $metaLineas = [
+                    ['icon' => 'fa-boxes', 'text' => $stockEtiqueta],
+                    ['icon' => 'fa-warehouse', 'text' => $ubicacion],
+                ];
+                if ($dosisPorHa > 0) {
+                    $metaLineas[] = [
+                        'icon' => 'fa-ruler-combined',
+                        'text' => number_format($dosisPorHa, 2, ',', '.').' '.($dosisUnidad ?? 'kg').'/ha',
+                    ];
+                }
+            }
+
             return [
                 'id' => $i->insumoid,
                 'label' => $i->nombre,
-                'meta' => trim(
+                'meta' => $metaSemilla ?? trim(
                     ($alm ? $alm.' · ' : '')
                     .$tipoEtiqueta.' · '.$stockEtiqueta
                 ),
+                'meta_lineas' => $metaLineas,
                 'extra' => [
                     'stock' => $stock,
                     'unidad' => $unidad,

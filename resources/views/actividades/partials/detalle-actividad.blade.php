@@ -5,19 +5,108 @@
 
 @push('styles')
 <style>
-.act-det-panel {
-    background: #f8fafc;
+.act-det-resumen {
+    background: linear-gradient(135deg, #f8fafc 0%, #f0fdf4 100%);
+    border: 1px solid #bbf7d0;
+    border-left: 4px solid #16a34a;
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
+    margin-top: .65rem;
+    margin-bottom: 1.35rem;
+    box-shadow: 0 4px 14px rgba(22, 163, 74, .08);
+}
+.act-det-resumen.is-empty { display: none; margin-bottom: 0; }
+.act-det-resumen:not(.is-empty) + .form-group {
+    margin-top: .25rem;
+}
+.act-det-resumen__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-bottom: .85rem;
+}
+.act-det-resumen__title {
+    font-size: .8rem;
+    font-weight: 700;
+    color: #166534;
+    margin: 0;
+}
+.act-det-resumen__card {
+    display: flex;
+    align-items: flex-start;
+    gap: .9rem;
+    background: #fff;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    padding: .85rem 1rem;
-    margin-top: .5rem;
+    padding: .85rem;
+    margin-bottom: .65rem;
 }
-.act-det-panel.is-empty { display: none; }
-.act-det-panel__title {
-    font-size: .78rem;
+.act-det-resumen__card:last-child { margin-bottom: 0; }
+.act-det-resumen__thumb {
+    width: 72px;
+    height: 72px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+.act-det-resumen__thumb--riego {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #dbeafe, #eff6ff);
+    color: #2563eb;
+    font-size: 1.6rem;
+}
+.act-det-resumen__body { flex: 1; min-width: 0; }
+.act-det-resumen__nombre {
     font-weight: 700;
-    color: #475569;
+    color: #0f172a;
+    font-size: .92rem;
+    line-height: 1.35;
+    margin-bottom: .45rem;
+}
+.act-det-resumen__cant-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
     margin-bottom: .35rem;
+}
+.act-det-resumen__cant-label {
+    font-size: .75rem;
+    font-weight: 600;
+    color: #64748b;
+}
+.act-det-resumen__cant-input {
+    max-width: 110px;
+    text-align: right;
+    font-weight: 700;
+    color: #14532d;
+}
+.act-det-resumen__unidad {
+    font-size: .82rem;
+    font-weight: 600;
+    color: #475569;
+}
+.act-det-resumen__hint {
+    font-size: .76rem;
+    color: #15803d;
+    line-height: 1.45;
+    margin: 0;
+}
+.act-det-resumen__riego-nombre {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e3a8a;
+    margin: 0;
+}
+.act-det-resumen__riego-desc {
+    font-size: .78rem;
+    color: #64748b;
+    margin: .2rem 0 0;
 }
 .act-det-calc {
     background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
@@ -101,15 +190,22 @@
     margin-bottom: .5rem;
     flex-wrap: wrap;
 }
+.act-det-modal-loading {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: #64748b;
+}
 </style>
 @endpush
 
 <input type="hidden" name="detalle_actividad_json" id="detalle_actividad_json" value="{{ old('detalle_actividad_json', '') }}">
 
-<div id="actDetResumenPanel" class="act-det-panel is-empty">
-    <div class="act-det-panel__title"><i class="fas fa-check-circle text-success mr-1"></i> Detalle registrado</div>
-    <div id="actDetResumenTexto" class="small text-muted mb-0"></div>
-    <button type="button" class="btn btn-link btn-sm p-0 mt-1" id="btnActDetEditar">Cambiar detalle</button>
+<div id="actDetResumenPanel" class="act-det-resumen is-empty">
+    <div class="act-det-resumen__head">
+        <p class="act-det-resumen__title mb-0"><i class="fas fa-check-circle mr-1"></i> Detalle de la actividad</p>
+        <button type="button" class="btn btn-link btn-sm p-0" id="btnActDetEditar">Cambiar</button>
+    </div>
+    <div id="actDetResumenContent"></div>
 </div>
 
 <div class="modal fade" id="modalActDetInsumos" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" data-keyboard="false">
@@ -161,7 +257,7 @@
     <div id="siembraCantidadWrap" class="d-none mt-2">
         <label class="small font-weight-bold">¿Cuánto va a usar?</label>
         <div class="input-group" style="max-width:220px;">
-            <input type="number" step="0.01" min="0.01" class="form-control" id="siembraCantidadInput">
+            <input type="text" inputmode="decimal" autocomplete="off" class="form-control act-det-cant-numeric" id="siembraCantidadInput">
             <div class="input-group-append"><span class="input-group-text" id="siembraCantidadUnidad">kg</span></div>
         </div>
         <small class="text-muted d-block mt-1">Puede usar más o menos que la sugerencia.</small>
@@ -180,12 +276,17 @@
 
     const hiddenJson = document.getElementById('detalle_actividad_json');
     const resumenPanel = document.getElementById('actDetResumenPanel');
-    const resumenTexto = document.getElementById('actDetResumenTexto');
+    const resumenContent = document.getElementById('actDetResumenContent');
     const selTipo = document.querySelector('[name="tipoactividadid"]');
-    const selLote = document.querySelector('[name="loteid"]');
+
+    function obtenerLoteId() {
+        const el = document.querySelector('[name="loteid"]');
+        return el && el.value ? String(el.value) : '';
+    }
 
     let estado = { modo: null, insumos: [], riego: null };
     let catalogoActual = [];
+    let cacheCatalogo = {};
     let maxInsumos = 10;
     let sugerenciaActual = null;
     let tipoSlugActual = '';
@@ -214,6 +315,62 @@
         return x.toLocaleString('es-BO', { maximumFractionDigits: 2 });
     }
 
+    function normalizarCantidadTexto(raw) {
+        let v = String(raw || '').replace(',', '.');
+        v = v.replace(/[^\d.]/g, '');
+        const parts = v.split('.');
+        if (parts.length > 2) {
+            v = parts[0] + '.' + parts.slice(1).join('');
+        }
+        return v;
+    }
+
+    function aplicarLimiteCantidad(input, maxStock) {
+        const v = normalizarCantidadTexto(input.value);
+        input.value = v;
+        if (v === '' || v === '.') return null;
+        let num = parseFloat(v);
+        if (!Number.isFinite(num) || num < 0) {
+            input.value = '';
+            return null;
+        }
+        if (Number.isFinite(maxStock) && num > maxStock) {
+            num = maxStock;
+            input.value = String(maxStock);
+        }
+        return num;
+    }
+
+    function bindCantidadNumerica(input, maxStock, onChange) {
+        input.addEventListener('input', function () {
+            aplicarLimiteCantidad(input, maxStock);
+            if (typeof onChange === 'function') onChange();
+        });
+        input.addEventListener('blur', function () {
+            const num = aplicarLimiteCantidad(input, maxStock);
+            if (num !== null) {
+                input.value = String(Math.round(num * 100) / 100);
+            }
+            if (typeof onChange === 'function') onChange();
+        });
+    }
+
+    function hintDesdeItem(item, cantidad, divisor) {
+        const sugDet = item.sugerencia_detalle;
+        const baseSug = item.sugerencia ?? (sugDet && sugDet.tiene_dosis ? sugDet.sugerido : null);
+        if (!sugDet || !sugDet.tiene_dosis || baseSug == null) {
+            return 'Cantidad máxima disponible: ' + fmtNum(item.stock) + ' ' + item.unidad + '.';
+        }
+        if (divisor > 1) {
+            return 'Repartido entre ' + divisor + ' insumos: '
+                + fmtNum(baseSug / divisor) + ' ' + item.unidad
+                + ' (dosis total ' + fmtNum(baseSug) + ' ' + item.unidad
+                + ' · ' + fmtNum(sugDet.por_ha) + ' ' + item.unidad + '/ha × ' + fmtNum(sugDet.superficie_ha) + ' ha).';
+        }
+        return 'Sugerido: ' + fmtNum(cantidad ?? baseSug) + ' ' + item.unidad
+            + ' (' + fmtNum(sugDet.por_ha) + ' ' + item.unidad + '/ha × ' + fmtNum(sugDet.superficie_ha) + ' ha).';
+    }
+
     function renderCalcSiembra(container, sug) {
         if (!container || !sug || !sug.tiene_dosis) {
             if (container) container.classList.add('d-none');
@@ -237,34 +394,95 @@
         sugerenciaActual = sug;
     }
 
-    function persistir() {
-        if (hiddenJson) hiddenJson.value = JSON.stringify(estado);
-        if (resumenPanel && resumenTexto) {
-            const txt = textoResumen();
-            if (txt) {
-                resumenPanel.classList.remove('is-empty');
-                resumenTexto.textContent = txt;
-            } else {
-                resumenPanel.classList.add('is-empty');
-            }
+    function renderResumen() {
+        if (!resumenPanel || !resumenContent) return;
+
+        if (estado.modo === 'riego' && estado.riego) {
+            const tipo = tiposRiego.find(function (t) { return t.key === estado.riego.key; });
+            resumenPanel.classList.remove('is-empty');
+            resumenContent.innerHTML =
+                '<div class="act-det-resumen__card">' +
+                    '<div class="act-det-resumen__thumb act-det-resumen__thumb--riego"><i class="fas fa-tint"></i></div>' +
+                    '<div class="act-det-resumen__body">' +
+                        '<p class="act-det-resumen__riego-nombre mb-0">' + estado.riego.label + '</p>' +
+                        '<p class="act-det-resumen__riego-desc">' + (tipo?.descripcion || 'Tipo de riego seleccionado para esta actividad.') + '</p>' +
+                    '</div>' +
+                '</div>';
+            return;
         }
+
+        if (estado.modo === 'insumos' && estado.insumos.length) {
+            resumenPanel.classList.remove('is-empty');
+            resumenContent.innerHTML = estado.insumos.map(function (ins, idx) {
+                const img = ins.imagen
+                    ? '<img src="' + ins.imagen + '" alt="" class="act-det-resumen__thumb" loading="lazy">'
+                    : '<div class="act-det-resumen__thumb act-det-resumen__thumb--riego"><i class="fas fa-flask"></i></div>';
+                return '<div class="act-det-resumen__card">' +
+                    img +
+                    '<div class="act-det-resumen__body">' +
+                        '<div class="act-det-resumen__nombre">' + ins.nombre + '</div>' +
+                        '<div class="act-det-resumen__cant-row">' +
+                            '<span class="act-det-resumen__cant-label">Cantidad a usar</span>' +
+                            '<input type="text" inputmode="decimal" autocomplete="off" class="form-control form-control-sm act-det-resumen__cant-input act-det-resumen-cant-inline" data-idx="' + idx + '" value="' + fmtNum(ins.cantidad) + '">' +
+                            '<span class="act-det-resumen__unidad">' + ins.unidad + '</span>' +
+                        '</div>' +
+                        '<p class="act-det-resumen__hint">' + (ins.sugerencia_hint || ('Sugerido según la superficie del lote.')) + '</p>' +
+                        '<p class="act-det-resumen__stock text-success small mb-0 mt-1">' +
+                            '<i class="fas fa-boxes mr-1"></i>Stock en bodega: <strong>' + fmtNum(ins.stock) + ' ' + ins.unidad + '</strong> disponibles' +
+                        '</p>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+
+            resumenContent.querySelectorAll('.act-det-resumen-cant-inline').forEach(function (input) {
+                const idx = Number(input.dataset.idx);
+                const ins = estado.insumos[idx];
+                if (!ins) return;
+                bindCantidadNumerica(input, Number(ins.stock), function () {
+                    const num = aplicarLimiteCantidad(input, Number(ins.stock));
+                    if (num !== null && num > 0) {
+                        ins.cantidad = num;
+                        persistir(false);
+                    }
+                });
+            });
+            return;
+        }
+
+        resumenPanel.classList.add('is-empty');
+        resumenContent.innerHTML = '';
     }
 
-    function textoResumen() {
-        if (estado.modo === 'riego' && estado.riego) {
-            return 'Riego: ' + estado.riego.label;
-        }
-        if (estado.modo === 'insumos' && estado.insumos.length) {
-            return estado.insumos.map(function (i) {
-                return i.nombre + ' (' + fmtNum(i.cantidad) + ' ' + i.unidad + ')';
-            }).join(', ');
-        }
-        return '';
+    function persistir(redraw) {
+        if (hiddenJson) hiddenJson.value = JSON.stringify(estado);
+        if (redraw !== false) renderResumen();
     }
 
     function cargarCatalogo(tipoSlug, loteId) {
+        const key = tipoSlug + ':' + (loteId || '');
+        if (cacheCatalogo[key]) {
+            return Promise.resolve(cacheCatalogo[key]);
+        }
         const url = endpoint + '?tipo_slug=' + encodeURIComponent(tipoSlug) + (loteId ? '&loteid=' + loteId : '');
-        return fetch(url, { headers: { 'Accept': 'application/json' } }).then(function (r) { return r.json(); });
+        return fetch(url, { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                cacheCatalogo[key] = json;
+                return json;
+            });
+    }
+
+    function mostrarCargandoModal() {
+        const lista = document.getElementById('actDetInsumosLista');
+        const cantWrap = document.getElementById('actDetInsumosCantidades');
+        const vacio = document.getElementById('actDetInsumosVacio');
+        const calc = document.getElementById('actDetSiembraCalc');
+        if (lista) {
+            lista.innerHTML = '<div class="act-det-modal-loading"><i class="fas fa-spinner fa-spin fa-lg mr-2"></i>Cargando insumos…</div>';
+        }
+        if (cantWrap) cantWrap.innerHTML = '';
+        vacio?.classList.add('d-none');
+        calc?.classList.add('d-none');
     }
 
     function pintarInsumosModal(items, meta) {
@@ -323,33 +541,27 @@
         const wrap = document.getElementById('actDetInsumosCantidades');
         if (!wrap) return;
         wrap.innerHTML = '<label class="small font-weight-bold d-block mb-2">Cantidad a usar</label>';
+        const divisor = Math.max(1, items.length);
+
         items.forEach(function (item) {
             const prev = estado.insumos.find(function (i) { return Number(i.insumoid) === Number(item.id); });
             const sugDet = item.sugerencia_detalle;
-            const divisor = Math.max(1, items.length);
             const baseSug = item.sugerencia ?? (sugDet && sugDet.tiene_dosis ? sugDet.sugerido : null);
             const val = prev ? prev.cantidad : (baseSug != null ? Math.round((baseSug / divisor) * 100) / 100 : '');
-            let hint = '';
-            if (sugDet && sugDet.tiene_dosis && !prev && baseSug != null) {
-                if (divisor > 1) {
-                    hint = '<small class="text-success d-block mt-1">Repartido entre ' + divisor + ' insumos: '
-                        + fmtNum(baseSug / divisor) + ' ' + item.unidad
-                        + ' (dosis total ' + fmtNum(baseSug) + ' ' + item.unidad
-                        + ' · ' + fmtNum(sugDet.por_ha) + ' ' + item.unidad + '/ha × ' + fmtNum(sugDet.superficie_ha) + ' ha)</small>';
-                } else {
-                    hint = '<small class="text-success d-block mt-1">Sugerido: ' + fmtNum(baseSug) + ' ' + item.unidad
-                        + ' (' + fmtNum(sugDet.por_ha) + ' ' + item.unidad + '/ha × ' + fmtNum(sugDet.superficie_ha) + ' ha)</small>';
-                }
-            }
+            const hint = hintDesdeItem(item, val, divisor);
+
             const linea = document.createElement('div');
             linea.className = 'act-det-linea';
             linea.innerHTML =
                 '<div class="flex-grow-1"><small class="text-muted d-block">' + item.nombre + '</small>' +
                 '<div class="input-group input-group-sm" style="max-width:200px;">' +
-                '<input type="number" step="0.01" min="0.01" max="' + item.stock + '" class="form-control act-det-cant-input" data-id="' + item.id + '" data-nombre="' + item.nombre + '" data-unidad="' + item.unidad + '" data-stock="' + item.stock + '" value="' + (val || '') + '">' +
+                '<input type="text" inputmode="decimal" autocomplete="off" class="form-control act-det-cant-input act-det-cant-numeric" data-id="' + item.id + '" data-nombre="' + item.nombre + '" data-unidad="' + item.unidad + '" data-stock="' + item.stock + '" value="' + (val || '') + '">' +
                 '<div class="input-group-append"><span class="input-group-text">' + item.unidad + '</span></div></div>' +
-                hint + '</div>';
+                '<small class="text-success d-block mt-1 act-det-cant-hint">' + hint + '</small></div>';
             wrap.appendChild(linea);
+
+            const input = linea.querySelector('.act-det-cant-input');
+            bindCantidadNumerica(input, Number(item.stock));
         });
     }
 
@@ -366,19 +578,21 @@
             alert('Demasiados insumos seleccionados.');
             return false;
         }
+        const divisor = Math.max(1, cardsSel.length);
+
         inputs.forEach(function (inp) {
-            const cant = parseFloat(inp.value);
             const stock = parseFloat(inp.dataset.stock);
-            if (!cant || cant <= 0) return;
-            if (cant > stock) {
-                alert('La cantidad de «' + inp.dataset.nombre + '» supera el stock (' + fmtNum(stock) + ').');
-                throw new Error('stock');
-            }
+            const cant = aplicarLimiteCantidad(inp, stock);
+            if (cant === null || cant <= 0) return;
+            const item = catalogoActual.find(function (x) { return String(x.id) === inp.dataset.id; });
             filas.push({
                 insumoid: Number(inp.dataset.id),
                 nombre: inp.dataset.nombre,
                 cantidad: cant,
                 unidad: inp.dataset.unidad,
+                stock: stock,
+                imagen: item?.imagen || '',
+                sugerencia_hint: item ? hintDesdeItem(item, cant, divisor) : '',
             });
         });
         if (!filas.length) {
@@ -413,7 +627,12 @@
     function confirmarRiego() {
         const sel = document.querySelector('#actDetRiegoLista .act-det-riego-card.is-selected');
         if (!sel) { alert('Seleccione un tipo de riego.'); return false; }
-        estado = { modo: 'riego', riego: { key: sel.dataset.key, label: sel.dataset.label }, stock_aplicado: false };
+        const tipo = tiposRiego.find(function (t) { return t.key === sel.dataset.key; });
+        estado = {
+            modo: 'riego',
+            riego: { key: sel.dataset.key, label: sel.dataset.label },
+            stock_aplicado: false,
+        };
         persistir();
         modalDetConfirmado = true;
         $('#modalActDetRiego').modal('hide');
@@ -425,7 +644,7 @@
         const opt = selTipo.options[selTipo.selectedIndex];
         tipoNombreActual = opt ? opt.textContent.trim() : '';
         tipoSlugActual = slugDesdeTipoNombre(tipoNombreActual);
-        const loteId = selLote ? selLote.value : '';
+        const loteId = obtenerLoteId();
 
         if (tipoSlugActual === 'riego') {
             modalDetConfirmado = false;
@@ -440,11 +659,18 @@
             ? 'Elija un insumo y la cantidad. Todo se descuenta de la bodega agrícola al completar la actividad.'
             : 'Puede elegir varios insumos. La dosis sugerida por hectárea se reparte entre los que seleccione.';
 
+        modalDetConfirmado = false;
+        mostrarCargandoModal();
+        $('#modalActDetInsumos').modal('show');
+
         cargarCatalogo(tipoSlugActual, loteId).then(function (json) {
             catalogoActual = json.data || [];
-            modalDetConfirmado = false;
             pintarInsumosModal(catalogoActual, json.meta || {});
-            $('#modalActDetInsumos').modal('show');
+        }).catch(function () {
+            const lista = document.getElementById('actDetInsumosLista');
+            if (lista) {
+                lista.innerHTML = '<div class="alert alert-danger small mb-0">No se pudo cargar el catálogo. Intente de nuevo.</div>';
+            }
         });
     }
 
@@ -463,6 +689,10 @@
 
     $('#modalActDetInsumos').on('hidden.bs.modal', revertirTipoSinDetalle);
     $('#modalActDetRiego').on('hidden.bs.modal', revertirTipoSinDetalle);
+
+    document.getElementById('selector_wrap_actividad_lote')?.addEventListener('selector-catalogo:change', function () {
+        cacheCatalogo = {};
+    });
 
     if (selTipo && !modoSiembra) {
         selTipo.addEventListener('change', function () {
@@ -483,6 +713,16 @@
             e.preventDefault();
             alert('Debe completar el detalle de insumos en el modal.');
             abrirModalParaTipo();
+            return;
+        }
+        if ((slug === 'fertilizantes' || slug === 'pesticidas' || slug === 'material_siembra') && estado.insumos.length) {
+            for (const ins of estado.insumos) {
+                if (!ins.cantidad || ins.cantidad <= 0 || ins.cantidad > Number(ins.stock || 0)) {
+                    e.preventDefault();
+                    alert('Revise la cantidad de «' + ins.nombre + '». Máximo: ' + fmtNum(ins.stock) + ' ' + ins.unidad + '.');
+                    return;
+                }
+            }
         }
         if (slug === 'riego' && (!estado.riego || !estado.riego.key)) {
             e.preventDefault();
@@ -491,7 +731,6 @@
         }
     });
 
-    // Modo siembra inline
     if (modoSiembra) {
         renderCalcSiembra(document.getElementById('siembraCalcInline'), sugerenciaSiembraInicial);
         const cont = document.getElementById('siembraInsumosInline');
@@ -513,12 +752,12 @@
                     cantWrap?.classList.remove('d-none');
                     if (cantUnidad) cantUnidad.textContent = item.unidad;
                     if (cantInput) {
-                        cantInput.max = item.stock;
-                        cantInput.value = (sugerenciaSiembraInicial && sugerenciaSiembraInicial.tiene_dosis) ? sugerenciaSiembraInicial.sugerido : '';
                         cantInput.dataset.id = item.id;
                         cantInput.dataset.nombre = item.nombre;
                         cantInput.dataset.unidad = item.unidad;
                         cantInput.dataset.stock = item.stock;
+                        cantInput.value = (sugerenciaSiembraInicial && sugerenciaSiembraInicial.tiene_dosis) ? sugerenciaSiembraInicial.sugerido : '';
+                        bindCantidadNumerica(cantInput, Number(item.stock));
                     }
                 });
                 cont.appendChild(card);
@@ -529,16 +768,11 @@
 
         document.getElementById('formSiembra')?.addEventListener('submit', function (e) {
             const card = cont?.querySelector('.act-det-insumo-card.is-selected');
-            const cant = parseFloat(cantInput?.value || '');
-            if (!card || !cant || cant <= 0) {
+            const stock = parseFloat(cantInput?.dataset.stock || '0');
+            const cant = aplicarLimiteCantidad(cantInput, stock);
+            if (!card || cant === null || cant <= 0) {
                 e.preventDefault();
                 alert('Seleccione el material de siembra y la cantidad a usar.');
-                return;
-            }
-            const stock = parseFloat(cantInput.dataset.stock);
-            if (cant > stock) {
-                e.preventDefault();
-                alert('La cantidad supera el stock disponible (' + fmtNum(stock) + ').');
                 return;
             }
             estado = {
@@ -548,10 +782,11 @@
                     nombre: cantInput.dataset.nombre,
                     cantidad: cant,
                     unidad: cantInput.dataset.unidad,
+                    stock: stock,
                 }],
                 stock_aplicado: false,
             };
-            persistir();
+            persistir(false);
         });
     }
 

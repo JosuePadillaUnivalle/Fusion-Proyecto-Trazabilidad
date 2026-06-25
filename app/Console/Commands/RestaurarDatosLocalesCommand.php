@@ -35,8 +35,18 @@ class RestaurarDatosLocalesCommand extends Command
         if ($usuarios > 0 && ! $this->option('force')) {
             $this->info("La base ya tiene {$usuarios} usuario(s). Nada que hacer.");
             $this->line('Usa --force si quieres sobrescribir con el snapshot.');
+            $this->warn('⚠ --force BORRA lotes y datos nuevos. Se guarda copia en database.backup.sqlite.');
 
             return self::SUCCESS;
+        }
+
+        if (is_file($destino)) {
+            $backup = database_path('database.backup.sqlite');
+            if (! copy($destino, $backup)) {
+                $this->warn('No se pudo crear database.backup.sqlite antes de restaurar.');
+            } else {
+                $this->line('Copia de seguridad: database/database.backup.sqlite');
+            }
         }
 
         if (! copy($origen, $destino)) {
@@ -51,6 +61,8 @@ class RestaurarDatosLocalesCommand extends Command
         \App\Support\LocalDatabaseGuard::normalizarCredencialesDemo();
 
         $this->info('Base de datos restaurada desde database.snapshot.sqlite');
+        $this->warn('Se perdieron cambios locales posteriores al snapshot (lotes nuevos, etc.).');
+        $this->line('Si necesitas recuperar: revisa database/database.backup.sqlite');
         $this->call('agrofusion:reparar-permisos');
         $this->call('agrofusion:asegurar-datos-demo');
 
@@ -60,6 +72,7 @@ class RestaurarDatosLocalesCommand extends Command
         $this->info("Listo: {$total} usuarios, {$lotes} lotes.");
         $this->line('  admin@agrofusion.com / 12345');
         $this->line('  LuisGuerrero123@gmail.com / 12345');
+        $this->line('  (En local TODAS las cuentas usan la contraseña 12345)');
 
         return self::SUCCESS;
     }

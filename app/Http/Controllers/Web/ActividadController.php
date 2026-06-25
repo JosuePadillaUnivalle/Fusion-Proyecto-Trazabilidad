@@ -190,15 +190,18 @@ class ActividadController extends Controller
         if ($responsableInicial) {
             $u = Usuario::find($responsableInicial);
             $responsableLabel = $u ? trim($u->nombre.' '.($u->apellido ?? '')) : '';
-        } elseif (
-            $lote?->usuarioid
-            && $this->puedeAsignarResponsableActividad($user, (int) $lote->usuarioid)
-        ) {
-            $responsableInicial = $lote->usuarioid;
-            $responsableLabel = trim($lote->usuario->nombre.' '.($lote->usuario->apellido ?? ''));
         } elseif (! $puedeDesignarResponsable && $user) {
             $responsableInicial = $user->usuarioid;
             $responsableLabel = trim($user->nombre.' '.($user->apellido ?? ''));
+        }
+
+        $responsablePinnedOption = null;
+        if ($puedeDesignarResponsable && $user) {
+            $responsablePinnedOption = [
+                'id' => (int) $user->usuarioid,
+                'label' => 'Asignarse a sí mismo',
+                'meta' => trim($user->nombre.' '.($user->apellido ?? '')),
+            ];
         }
 
         $usuariosResponsables = $this->usuariosResponsablesActividad($request);
@@ -216,6 +219,7 @@ class ActividadController extends Controller
             'esJefeAgricultorDesignando',
             'responsableInicial',
             'responsableLabel',
+            'responsablePinnedOption',
             'usuariosResponsables',
         ));
     }
@@ -252,15 +256,18 @@ class ActividadController extends Controller
         if ($responsableInicial) {
             $u = Usuario::find($responsableInicial);
             $responsableLabel = $u ? trim($u->nombre.' '.($u->apellido ?? '')) : '';
-        } elseif (
-            $lote->usuarioid
-            && $this->puedeAsignarResponsableActividad($user, (int) $lote->usuarioid)
-        ) {
-            $responsableInicial = $lote->usuarioid;
-            $responsableLabel = trim($lote->usuario->nombre.' '.($lote->usuario->apellido ?? ''));
         } elseif (! $puedeDesignarResponsable && $user) {
             $responsableInicial = $user->usuarioid;
             $responsableLabel = trim($user->nombre.' '.($user->apellido ?? ''));
+        }
+
+        $responsablePinnedOption = null;
+        if ($puedeDesignarResponsable && $user) {
+            $responsablePinnedOption = [
+                'id' => (int) $user->usuarioid,
+                'label' => 'Asignarse a sí mismo',
+                'meta' => trim($user->nombre.' '.($user->apellido ?? '')),
+            ];
         }
 
         if ($request->boolean('completar') && ! $puedeDesignarResponsable) {
@@ -280,6 +287,7 @@ class ActividadController extends Controller
             'esJefeAgricultorDesignando',
             'responsableInicial',
             'responsableLabel',
+            'responsablePinnedOption',
             'sugerenciaSiembra',
             'insumosSiembra',
         ));
@@ -490,8 +498,12 @@ class ActividadController extends Controller
 
         // Prioridad por defecto si no se envió
         if (empty($data['prioridadid'])) {
-            $prioridadDefault = Prioridad::first();
-            $data['prioridadid'] = $prioridadDefault ? $prioridadDefault->prioridadid : null;
+            $prioridadDefault = Prioridad::query()
+                ->whereRaw('LOWER(nombre) = ?', ['media'])
+                ->first()
+                ?? Prioridad::query()->orderBy('prioridadid')->skip(1)->first()
+                ?? Prioridad::query()->orderBy('prioridadid')->first();
+            $data['prioridadid'] = $prioridadDefault?->prioridadid;
         }
 
         $usuarioid = $this->resolverUsuarioidActividad($request, $lote);
@@ -508,6 +520,9 @@ class ActividadController extends Controller
         $actividad = Actividad::create([
             'loteid' => $data['loteid'],
             'usuarioid' => $usuarioid,
+            'usuarioid_ejecutor' => $marcandoCompletada && $request->user()
+                ? (int) $request->user()->usuarioid
+                : null,
             'descripcion' => $data['descripcion'],
             'fechainicio' => $data['fechainicio'] ?? now(),
             'fechafin' => $data['fechafin'] ?? null,
@@ -517,6 +532,8 @@ class ActividadController extends Controller
             'evidencia_foto_path' => $evidenciaPath,
             'detalle_json' => $detalle !== [] ? json_encode($detalle, JSON_UNESCAPED_UNICODE) : null,
         ]);
+
+        app(\App\Support\ActividadSecuenciaService::class)->asignarOrden($actividad);
 
         if (! empty($data['fechafin']) && $detalle !== []) {
             $this->actividadInsumos->aplicarStockSiCorresponde($actividad, $detalle);
@@ -673,12 +690,31 @@ class ActividadController extends Controller
     /**
      * Marcar actividad como realizada y cambiar estado del lote según tipo
      */
+    public function resumenCompletar(Request $request, Actividad $actividad)
+    {
+        $this->autorizarMarcarActividadCompletada($request, $actividad);
+
+        if ($actividad->fechafin !== null) {
+            return response()->json(['error' => 'Actividad ya completada'], 422);
+        }
+
+        return response()->json($this->trazabilidad->resumenActividadCompletar($actividad));
+    }
+
+    /**
+     * Marcar actividad como realizada y cambiar estado del lote según tipo
+     */
     public function marcarRealizada(Request $request, Actividad $actividad)
     {
         $this->autorizarMarcarActividadCompletada($request, $actividad);
 
         if ($actividad->fechafin !== null) {
             return $this->redirectDespuesDeMarcar($request, $actividad, 'error', 'Esta actividad ya está completada.');
+        }
+
+        $bloqueoOrden = app(\App\Support\ActividadSecuenciaService::class)->mensajeBloqueoOrden($actividad);
+        if ($bloqueoOrden !== null) {
+            return $this->redirectDespuesDeMarcar($request, $actividad, 'error', $bloqueoOrden);
         }
 
         $validator = Validator::make($request->all(), [
@@ -703,6 +739,10 @@ class ActividadController extends Controller
                 'actividades_evidencia'
             );
             $actividad->fechafin = now();
+            $completador = $request->user();
+            if ($completador) {
+                $actividad->usuarioid_ejecutor = (int) $completador->usuarioid;
+            }
             $actividad->save();
 
             if ($actividad->detalle_json) {
@@ -800,7 +840,7 @@ class ActividadController extends Controller
             ->exists();
 
         if (! $permitido) {
-            abort(403, 'No tienes acceso a este lote.');
+            \App\Support\LoteAcceso::denegarConModal($request);
         }
     }
 
@@ -824,7 +864,11 @@ class ActividadController extends Controller
         $user = $request->user();
 
         if (UsuarioRol::debeAcotarPorAsignacion($user)) {
-            $query->whereHas('lote', fn ($q) => $q->where('usuarioid', (int) $user->usuarioid));
+            $uid = (int) $user->usuarioid;
+            $query->where(function ($q) use ($uid) {
+                $q->where('usuarioid', $uid)
+                    ->orWhere('usuarioid_ejecutor', $uid);
+            });
         } elseif (UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
             $query->whereHas('lote', fn ($q) => $q->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($user)));
         }
@@ -835,13 +879,7 @@ class ActividadController extends Controller
     private function queryLotesParaActividad(Request $request)
     {
         $query = Lote::query()->with(['cultivo', 'usuario'])->orderBy('nombre');
-        $user = $request->user();
-
-        if (UsuarioRol::debeAcotarPorAsignacion($user)) {
-            $query->where('usuarioid', (int) $user->usuarioid);
-        } elseif (UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
-            $query->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($user));
-        }
+        \App\Support\LoteAcceso::aplicarScopeOperativoActividad($query, $request->user());
 
         return $query;
     }
@@ -859,12 +897,10 @@ class ActividadController extends Controller
 
         if (UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
             $ids = UsuarioRol::idsEmpleadosOperativosDeJefeAgricultor($user);
-            if ($ids === []) {
-                return collect();
-            }
+            $ids[] = (int) $user->usuarioid;
 
             return Usuario::query()
-                ->whereIn('usuarioid', $ids)
+                ->whereIn('usuarioid', array_values(array_unique($ids)))
                 ->orderBy('nombre')
                 ->get();
         }
@@ -889,12 +925,14 @@ class ActividadController extends Controller
     {
         $params = [
             'roles' => 'agricultor',
-            'excluir_jefes_agricolas' => 1,
         ];
 
         if ($user && UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
             $params['supervisor_usuarioid'] = $user->usuarioid;
-            $params['solo_empleados_equipo'] = 1;
+        }
+
+        if ($user && UsuarioRol::esAdminGlobal($user)) {
+            $params['incluir_self_actor'] = true;
         }
 
         return $params;
@@ -905,6 +943,10 @@ class ActividadController extends Controller
         $usuario = Usuario::find($usuarioid);
         if (! $usuario || ! $usuario->activo) {
             return false;
+        }
+
+        if ($actor && (int) $usuarioid === (int) $actor->usuarioid) {
+            return UsuarioRol::gestionaCampo($actor);
         }
 
         if (! UsuarioRol::esResponsableActividadPermitido($usuario)) {
@@ -943,12 +985,8 @@ class ActividadController extends Controller
             return (int) $lote->usuarioid;
         }
 
-        $mensaje = UsuarioRol::esJefeAgricultor($auth) && ! UsuarioRol::esAdminGlobal($auth)
-            ? 'Debe asignar un agricultor de su equipo como responsable. El jefe agrícola no ejecuta actividades de campo.'
-            : 'Debe asignar un agricultor operativo como responsable de la actividad.';
-
         throw ValidationException::withMessages([
-            'usuarioid' => $mensaje,
+            'usuarioid' => 'Seleccione quién ejecutará la actividad: un operario de su equipo o usted mismo.',
         ]);
     }
 

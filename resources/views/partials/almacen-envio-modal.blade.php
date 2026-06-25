@@ -54,11 +54,23 @@
                                        placeholder="Sin límite">
                             </div>
                         </div>
-                        <p class="small text-muted mb-2" id="{{ $modalId }}-resultados">Cargando almacenes…</p>
-                        <div class="almacen-modal-lista" id="{{ $modalId }}-lista-items"></div>
-                        <div class="text-center py-4 text-muted d-none" id="{{ $modalId }}-sin-resultados">
-                            <i class="fas fa-inbox fa-2x mb-2 opacity-25 d-block"></i>
-                            No hay almacenes que coincidan con los filtros.
+                        <div class="row">
+                            <div class="col-lg-7">
+                                <p class="small text-muted mb-2" id="{{ $modalId }}-resultados">Cargando almacenes…</p>
+                                <div class="almacen-modal-lista" id="{{ $modalId }}-lista-items"></div>
+                                <div class="text-center py-4 text-muted d-none" id="{{ $modalId }}-sin-resultados">
+                                    <i class="fas fa-inbox fa-2x mb-2 opacity-25 d-block"></i>
+                                    No hay almacenes que coincidan con los filtros.
+                                </div>
+                            </div>
+                            <div class="col-lg-5 mt-3 mt-lg-0">
+                                <div class="almacen-modal-preview-panel" id="{{ $modalId }}-preview-panel" aria-live="polite">
+                                    <p class="text-muted small mb-0">
+                                        <i class="fas fa-mouse-pointer mr-1"></i>
+                                        Pase el cursor sobre un almacén o haga clic para ver la previsualización.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

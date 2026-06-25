@@ -7,6 +7,7 @@ use App\Models\Almacen;
 use App\Models\CertificacionLote;
 use App\Models\Cultivo;
 use App\Models\EstadoLoteTipo;
+use App\Models\Insumo;
 use App\Models\Lote;
 use App\Models\Produccion;
 use App\Models\ProduccionAlmacenamiento;
@@ -51,7 +52,7 @@ class LoteTrazabilidadService
         'en produccion' => 'en_crecimiento',
         'listo para cosecha' => 'cosecha',
         'cosechado' => 'cosecha',
-        'certificado' => 'envio_almacen',
+        'certificado' => 'certificacion',
         'no conforme' => 'certificacion',
         'finalizado' => 'envio_almacen',
         'en descanso' => 'preparacion',
@@ -271,18 +272,28 @@ class LoteTrazabilidadService
             ->first(fn (Produccion $p) => $p->almacenamientos->isEmpty());
     }
 
-    public function puedeCertificarCampo(Lote $lote): bool
+    public function puedeCertificarCampo(Lote $lote, ?Usuario $user = null): bool
     {
-        $lote->loadMissing('producciones');
+        if ($user && ! UsuarioRol::gestionaCampo($user)) {
+            return false;
+        }
+
+        $lote->loadMissing(['producciones', 'actividades.tipoActividad']);
         $cert = app(CertificacionCampoService::class);
 
         return $this->resolverFaseActual($lote) === 'certificacion'
             && ! $cert->fueEvaluado($lote)
-            && $lote->producciones->isNotEmpty();
+            && $lote->producciones->isNotEmpty()
+            && $this->actividadesPendientes($lote, false)->isEmpty()
+            && $this->actividadesCrecimientoCompletas($lote);
     }
 
-    public function puedeEnviarAlmacenCampo(Lote $lote): bool
+    public function puedeEnviarAlmacenCampo(Lote $lote, ?Usuario $user = null): bool
     {
+        if ($user && ! UsuarioRol::gestionaCampo($user)) {
+            return false;
+        }
+
         $cert = app(CertificacionCampoService::class);
 
         return $cert->estaCertificado($lote)
@@ -318,19 +329,7 @@ class LoteTrazabilidadService
     /** @return Collection<int, Actividad> */
     public function actividadesPendientes(Lote $lote, bool $soloFaseActual = true): Collection
     {
-        $lote->loadMissing('actividades.tipoActividad');
-        $faseActual = $soloFaseActual ? $this->resolverFaseActual($lote) : null;
-
-        return $lote->actividades
-            ->whereNull('fechafin')
-            ->when($faseActual !== null, fn (Collection $items) => $items->filter(
-                fn (Actividad $actividad) => $this->tipoActividadPermitidoEnFase(
-                    $actividad->tipoActividad->nombre ?? null,
-                    $faseActual
-                )
-            ))
-            ->sortByDesc('fechainicio')
-            ->values();
+        return app(ActividadSecuenciaService::class)->pendientesOrdenadas($lote, $soloFaseActual);
     }
 
     public function esActividadCrecimientoEsencial(Actividad $actividad): bool
@@ -363,6 +362,41 @@ class LoteTrazabilidadService
             && $this->actividadesPendientesEsencialesCrecimiento($lote)->isEmpty();
     }
 
+    public function puedeUsuarioRegistrarCosecha(Lote $lote, ?Usuario $user): bool
+    {
+        if (! $user || ! $this->puedeRegistrarCosecha($lote)) {
+            return false;
+        }
+
+        if (UsuarioRol::gestionaCampo($user)) {
+            return true;
+        }
+
+        if (UsuarioRol::debeAcotarPorAsignacion($user)) {
+            return $this->operarioAsignadoACosecha($lote, $user);
+        }
+
+        return true;
+    }
+
+    public function puedeUsuarioIrACosecha(Lote $lote, ?Usuario $user): bool
+    {
+        return $this->puedeIrACosecha($lote) && $this->puedeUsuarioRegistrarCosecha($lote, $user);
+    }
+
+    private function operarioAsignadoACosecha(Lote $lote, Usuario $user): bool
+    {
+        $lote->loadMissing(['actividades.tipoActividad']);
+
+        return $lote->actividades->contains(function (Actividad $actividad) use ($user) {
+            $tipo = mb_strtolower(trim($actividad->tipoActividad->nombre ?? ''));
+
+            return str_contains($tipo, 'cosecha')
+                && (int) $actividad->usuarioid === (int) $user->usuarioid
+                && $actividad->fechafin === null;
+        });
+    }
+
     /**
      * @return array{
      *     meta_label: ?string,
@@ -373,7 +407,7 @@ class LoteTrazabilidadService
      */
     public function panelPendientesLegible(Lote $lote, string $faseActual): array
     {
-        $lote->loadMissing(['actividades.tipoActividad', 'actividades.usuario']);
+        $lote->loadMissing(['actividades.tipoActividad', 'actividades.usuario', 'actividades.prioridad']);
         $pend = $this->pasosHaciaCompleto($lote, $faseActual);
         $siguienteKey = $pend['siguiente_fase'] ?? null;
 
@@ -387,12 +421,20 @@ class LoteTrazabilidadService
         }
 
         $actividadesAbiertas = $this->actividadesPendientes($lote)
-            ->map(fn (Actividad $a) => [
-                'actividadid' => (int) $a->actividadid,
-                'titulo' => $a->descripcion ?: ($a->tipoActividad->nombre ?? 'Actividad'),
-                'responsable' => trim(($a->usuario->nombre ?? '').' '.($a->usuario->apellido ?? '')) ?: null,
-                'es_siembra' => str_contains(mb_strtolower(trim($a->tipoActividad->nombre ?? '')), 'siembra'),
-            ])
+            ->map(function (Actividad $a) {
+                $secuencia = app(ActividadSecuenciaService::class);
+
+                return [
+                    'actividadid' => (int) $a->actividadid,
+                    'titulo' => $a->descripcion ?: ($a->tipoActividad->nombre ?? 'Actividad'),
+                    'responsable' => trim(($a->usuario->nombre ?? '').' '.($a->usuario->apellido ?? '')) ?: null,
+                    'prioridad' => $a->prioridad?->nombre,
+                    'prioridad_badge' => PrioridadCatalogo::badgeClase($a->prioridad?->nombre),
+                    'es_siembra' => str_contains(mb_strtolower(trim($a->tipoActividad->nombre ?? '')), 'siembra'),
+                    'orden_secuencia' => (int) ($a->orden_secuencia ?? 0),
+                    'en_turno' => $secuencia->esSiguienteEnCola($a, false),
+                ];
+            })
             ->values()
             ->all();
 
@@ -736,13 +778,17 @@ class LoteTrazabilidadService
     {
         $lote->loadMissing([
             'cultivo',
+            'usuario',
+            'insumoSemilla',
             'historialEstados.estadoTipo',
             'historialEstados.usuario',
             'loteInsumos.insumo',
             'loteInsumos.usuario',
             'actividades.tipoActividad',
             'actividades.usuario',
+            'actividades.ejecutor',
             'producciones.unidadMedida',
+            'producciones.catalogoTamanoConteo.tipoEmpaque',
             'producciones.destino',
             'producciones.almacenamientos.almacen',
             'producciones.almacenamientos.unidadMedida',
@@ -760,12 +806,13 @@ class LoteTrazabilidadService
             });
 
             if (! $tieneActividadSiembra) {
+                $cultivo = $this->nombreCultivoSiembrado($lote);
                 $eventos->push($this->evento(
                     $lote->fechasiembra,
                     'siembra',
                     'siembra',
-                    'Siembra iniciada',
-                    'Cultivo: '.($lote->cultivo->nombre ?? 'No especificado'),
+                    'Siembra de '.$cultivo,
+                    '',
                     null,
                     'seedling',
                     'success'
@@ -774,46 +821,57 @@ class LoteTrazabilidadService
         }
 
         foreach ($lote->historialEstados as $historial) {
-            $estadoNombre = $historial->estadoTipo->nombre ?? '';
-            if (EstadoLoteCatalogo::slugFromNombre($estadoNombre) === 'sembrado') {
+            if ($this->historialEstadoOmitirEnTrazabilidad($historial, $lote)) {
                 continue;
             }
 
+            $estadoNombre = $historial->estadoTipo->nombre ?? '';
+
             $usuarioHist = $historial->usuario;
-            $nombreHist = trim(($usuarioHist->nombre ?? '').' '.($usuarioHist->apellido ?? ''));
-            $rolHist = ucfirst($usuarioHist->role ?? '');
-            $descripcion = $this->formatearObservacionHistorial(
-                $historial->observaciones,
-                $nombreHist ?: null,
-                $rolHist ?: null,
-            );
+            $nombreHist = trim(($usuarioHist->nombre ?? '').' '.($usuarioHist->apellido ?? '')) ?: null;
+            $presentacion = $this->presentarEventoEstado($historial, $lote, $nombreHist);
 
             $eventos->push($this->evento(
                 $historial->fecha_cambio,
                 'estado',
                 $this->faseFromEstado($estadoNombre),
-                'Estado cambiado a: '.ucfirst($estadoNombre),
-                $descripcion,
-                $nombreHist ?: null,
+                $presentacion['titulo'],
+                $presentacion['descripcion'],
+                $nombreHist,
                 'exchange-alt',
                 'info'
             ));
         }
 
         foreach ($lote->loteInsumos as $insumo) {
-            $nombreInsumo = mb_strtolower(trim($insumo->insumo->nombre ?? ''));
-            $faseInsumo = str_contains($nombreInsumo, 'fumig') || str_contains($nombreInsumo, 'fitosanit')
-                ? 'fumigacion'
-                : 'regado';
+            if ($this->loteInsumoYaRepresentadoEnActividad($insumo)) {
+                continue;
+            }
+
+            $faseInsumo = $this->faseEventoDesdeInsumo($insumo);
+            $imagenInsumo = $insumo->insumo
+                ? InsumoImagenCatalogo::urlPara($insumo->insumo)
+                : null;
+            $unidad = $insumo->insumo?->unidadMedida?->abreviatura
+                ?? $insumo->insumo?->unidadMedida?->nombre
+                ?? 'ud';
             $eventos->push($this->evento(
                 $insumo->fechauo,
                 'insumo',
                 $faseInsumo,
                 'Aplicación: '.($insumo->insumo->nombre ?? 'Insumo'),
-                'Cantidad: '.$insumo->cantidadusada.' — '.($insumo->observaciones ?? ''),
-                $insumo->usuario->nombre ?? null,
+                'Cantidad: '.number_format((float) $insumo->cantidadusada, 2, '.', '').' '.$unidad
+                    .($insumo->observaciones ? ' — '.$insumo->observaciones : ''),
+                trim(($insumo->usuario->nombre ?? '').' '.($insumo->usuario->apellido ?? '')) ?: null,
                 'flask',
-                'warning'
+                'warning',
+                null,
+                null,
+                self::FASES[$faseInsumo]['label'] ?? null,
+                $imagenInsumo,
+                null,
+                null,
+                $imagenInsumo ? 'insumo' : null,
             ));
         }
 
@@ -825,84 +883,93 @@ class LoteTrazabilidadService
                 continue;
             }
 
+            // La cosecha registrada en Producción ya tiene evento propio con foto y cantidades.
+            if (str_contains($tipoNombre, 'cosecha') && $lote->producciones->isNotEmpty()) {
+                continue;
+            }
+
             $fasePipeline = $this->resolverFasePipelineActividad($actividad, $lote);
-            $faseAct = match (true) {
-                str_contains($tipoNombre, 'siembra') => 'siembra',
-                str_contains($tipoNombre, 'cosecha') => 'cosecha',
-                str_contains($tipoNombre, 'riego') || str_contains($tipoNombre, 'regad') => 'regado',
-                str_contains($tipoNombre, 'fumig') || str_contains($tipoNombre, 'plaga') => 'fumigacion',
-                str_contains($tipoNombre, 'fertiliz') => 'fertilizacion',
-                str_contains($tipoNombre, 'labranza') => 'preparacion',
-                default => 'regado',
-            };
-            $etapaLabel = self::FASES[$fasePipeline]['label'] ?? ucfirst($fasePipeline);
             $nombreTipo = $actividad->tipoActividad->nombre ?? 'Actividad';
-            $descripcionAct = trim((string) ($actividad->descripcion ?? ''));
-            $evidenciaAct = $actividad->fechafin !== null
-                ? EvidenciaFoto::urlDesdePath($actividad->evidencia_foto_path ?? null)
-                : null;
+            $descripcionAct = $this->descripcionHistorialActividad($actividad);
+            $evidenciaHistorial = $this->evidenciaHistorialActividad($actividad, $tipoNombre);
+            $fechaEvento = $actividad->fechafin ?? $actividad->fechainicio;
             $eventos->push($this->evento(
-                $actividad->fechainicio,
+                $fechaEvento,
                 'actividad',
-                $faseAct,
+                $fasePipeline,
                 $nombreTipo,
                 $descripcionAct,
-                $actividad->usuario->nombre ?? null,
+                app(ActividadSecuenciaService::class)->nombreEjecutor($actividad)
+                    ?? ($actividad->usuario->nombre ?? null),
                 'tasks',
                 'primary',
                 $actividad->fechafin !== null,
                 (int) $actividad->actividadid,
-                $etapaLabel,
-                $evidenciaAct,
+                null,
+                $evidenciaHistorial['url'],
+                null,
+                $evidenciaHistorial['icono'],
+                $evidenciaHistorial['tipo'],
             ));
         }
 
-        foreach ($lote->actividades as $actividad) {
-            $tipoNombre = strtolower(trim($actividad->tipoActividad->nombre ?? ''));
-            if (! str_contains($tipoNombre, 'siembra') || $actividad->fechafin === null) {
-                continue;
-            }
+        $siembraCompletada = $lote->actividades
+            ->filter(function (Actividad $actividad) {
+                $nombre = mb_strtolower(trim($actividad->tipoActividad->nombre ?? ''));
 
-            $descripcionSiembra = trim((string) ($actividad->descripcion ?? ''));
-            $evidenciaSiembra = EvidenciaFoto::urlDesdePath($actividad->evidencia_foto_path ?? null);
+                return str_contains($nombre, 'siembra') && $actividad->fechafin !== null;
+            })
+            ->sortByDesc(fn (Actividad $a) => $this->parseFechaApp($a->fechafin ?? $a->fechainicio)->timestamp)
+            ->first();
+
+        if ($siembraCompletada) {
+            $cultivoSiembra = $this->nombreCultivoSiembrado($lote, $siembraCompletada);
+            $descripcionSiembra = $this->descripcionSiembraHistorial($siembraCompletada, $lote, $cultivoSiembra);
+            $evidenciaSiembra = EvidenciaFoto::urlDesdePath($siembraCompletada->evidencia_foto_path ?? null);
             $eventos->push($this->evento(
-                $actividad->fechafin ?? $actividad->fechainicio,
+                $siembraCompletada->fechafin ?? $siembraCompletada->fechainicio,
                 'siembra',
                 'siembra',
-                'Siembra realizada',
+                'Siembra de '.$cultivoSiembra,
                 $descripcionSiembra,
-                $actividad->usuario->nombre ?? null,
+                app(ActividadSecuenciaService::class)->nombreEjecutor($siembraCompletada)
+                    ?? trim(($siembraCompletada->usuario->nombre ?? '').' '.($siembraCompletada->usuario->apellido ?? ''))
+                    ?: null,
                 'seedling',
                 'info',
                 true,
                 null,
-                self::FASES['siembra']['label'],
+                null,
                 $evidenciaSiembra,
+                null,
+                null,
+                $evidenciaSiembra ? 'foto' : null,
             ));
         }
 
         foreach ($lote->producciones as $produccion) {
             $evidenciaCosecha = EvidenciaFoto::urlDesdeImagenUrl($produccion->imagenurl ?? null);
             $eventos->push($this->evento(
-                $produccion->fechacosecha,
+                $this->fechaEventoCosecha($lote, $produccion),
                 'cosecha',
                 'cosecha',
-                'Cosecha registrada',
-                'Cantidad: '.number_format((float) $produccion->cantidad, 2).' '
-                    .($produccion->unidadMedida->abreviatura ?? 'kg')
-                    .' — Destino: '.($produccion->destino->nombre ?? 'N/D'),
-                null,
+                'Cosechado',
+                $this->descripcionCosechaHistorial($produccion, $lote),
+                $this->nombreUsuarioCosecha($lote),
                 'tractor',
                 'success',
-                null,
+                true,
                 null,
                 null,
                 $evidenciaCosecha,
                 (int) $produccion->produccionid,
+                null,
+                $evidenciaCosecha ? 'foto' : null,
             ));
 
             foreach ($produccion->almacenamientos as $alm) {
-                $eventos->push($this->evento(
+                $alm->loadMissing('almacen');
+                $eventoAlmacen = $this->evento(
                     $alm->fechaentrada ?? $produccion->fechacosecha,
                     'almacenamiento',
                     'envio_almacen',
@@ -913,7 +980,12 @@ class LoteTrazabilidadService
                     null,
                     'warehouse',
                     'secondary'
-                ));
+                );
+                if ($alm->almacen) {
+                    $eventoAlmacen['almacenid'] = (int) $alm->almacenid;
+                    $eventoAlmacen['almacen_url'] = AlmacenAmbito::urlVerAlmacen($alm->almacen);
+                }
+                $eventos->push($eventoAlmacen);
             }
 
             foreach ($produccion->ventas as $venta) {
@@ -947,16 +1019,112 @@ class LoteTrazabilidadService
                 'certificacion',
                 $titulo,
                 $detalle,
-                $cert->usuario->nombre ?? null,
+                trim(($cert->usuario->nombre ?? '').' '.($cert->usuario->apellido ?? '')) ?: null,
                 'certificate',
                 $cert->esNoConforme() ? 'danger' : 'success'
             ));
         }
 
-        return $eventos
+        return $this->deduplicarEventos($eventos)
             ->filter(fn ($e) => $e['fecha'] !== null)
-            ->sortByDesc(fn ($e) => Carbon::parse($e['fecha'])->timestamp)
+            ->pipe(fn (Collection $c) => $this->ordenarEventosHistorialCronologico($c));
+    }
+
+    /** @var array<string, int> */
+    private const ETAPAS_HISTORIAL_ORDEN = [
+        'planificacion' => 1,
+        'siembra' => 2,
+        'actividad' => 3,
+        'cosecha' => 4,
+        'certificacion' => 5,
+        'almacen' => 6,
+    ];
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $eventos
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function ordenarEventosHistorialCronologico(Collection $eventos): Collection
+    {
+        return $eventos
+            ->sortBy(fn (array $e) => $this->claveOrdenHistorial($e))
             ->values();
+    }
+
+    /**
+     * Clave única para ordenar: etapa del ciclo (asc) y luego fecha/hora (asc).
+     * sortBy con un solo extractor es compatible con todas las versiones de Laravel.
+     */
+    private function claveOrdenHistorial(array $evento): string
+    {
+        $etapa = $this->etapaOrdenHistorial($evento);
+        $ts = str_pad((string) $this->parseFechaApp($evento['fecha'])->timestamp, 12, '0', STR_PAD_LEFT);
+        $desempate = str_pad((string) ($evento['actividadid'] ?? $evento['produccionid'] ?? 0), 8, '0', STR_PAD_LEFT);
+
+        return sprintf('%02d-%s-%s', $etapa, $ts, $desempate);
+    }
+
+    /**
+     * Etapa fija del ciclo: planificación → siembra → actividades → cosecha → certificación → almacén.
+     */
+    private function etapaOrdenHistorial(array $evento): int
+    {
+        $etapa = $this->clasificarEtapaHistorial($evento);
+
+        return self::ETAPAS_HISTORIAL_ORDEN[$etapa] ?? 3;
+    }
+
+    private function clasificarEtapaHistorial(array $evento): string
+    {
+        $tipo = (string) ($evento['tipo'] ?? '');
+        $fase = (string) ($evento['fase'] ?? '');
+        $titulo = $this->normalizarTextoHistorial((string) ($evento['titulo'] ?? ''));
+
+        if ($tipo === 'siembra') {
+            return 'siembra';
+        }
+
+        if ($tipo === 'cosecha') {
+            return 'cosecha';
+        }
+
+        if ($tipo === 'certificacion') {
+            return 'certificacion';
+        }
+
+        if (in_array($tipo, ['almacenamiento', 'venta'], true)) {
+            return 'almacen';
+        }
+
+        if ($tipo === 'estado' || ($tipo === 'actividad' && $fase === 'preparacion')) {
+            if (
+                $fase === 'preparacion'
+                || str_contains($titulo, 'planificacion')
+            ) {
+                return 'planificacion';
+            }
+        }
+
+        if (in_array($tipo, ['actividad', 'insumo'], true)) {
+            return 'actividad';
+        }
+
+        if ($tipo === 'estado') {
+            return 'actividad';
+        }
+
+        return 'actividad';
+    }
+
+    private function normalizarTextoHistorial(string $texto): string
+    {
+        $t = mb_strtolower(trim($texto));
+
+        return str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü'],
+            ['a', 'e', 'i', 'o', 'u', 'n', 'u'],
+            $t
+        );
     }
 
     /**
@@ -1065,14 +1233,17 @@ class LoteTrazabilidadService
         $base = $this->buildLoteDetalleBase($lote);
         $filtros = $this->parseFiltros($request);
         $eventos = $this->buildEventos($lote);
-        $eventosFiltrados = $this->filtrarEventos($eventos, $filtros);
+        $eventosFiltrados = $this->numerarYOrdenarEventosHistorial(
+            $this->filtrarEventos($eventos, $filtros)
+        );
         $faseActual = $this->resolverFaseActual($lote);
 
         $porFase = $eventos->groupBy('fase')->map->count();
         $porTipo = $eventos->groupBy('tipo')->map->count();
         $porTipoFiltrado = $eventosFiltrados->groupBy('tipo')->map->count();
 
-        $fasesPipeline = collect(self::FASES)->map(function ($meta, $key) use ($faseActual, $porFase, $porTipo, $lote) {
+        $user = $request->user();
+        $fasesPipeline = collect(self::FASES)->map(function ($meta, $key) use ($faseActual, $porFase, $porTipo, $lote, $user) {
             $ordenActual = self::FASES[$faseActual]['orden'] ?? 1;
             $ordenSiguiente = $ordenActual + 1;
             $completo = $this->trazabilidadCompleta($lote);
@@ -1088,7 +1259,7 @@ class LoteTrazabilidadService
             $url = null;
             if ($estado === 'next' || ($estado === 'active' && ! $completo)) {
                 $candidata = $this->urlAccionFase($lote, $key);
-                if ($key === 'cosecha' && $faseActual === 'en_crecimiento' && ! $this->puedeIrACosecha($lote)) {
+                if ($key === 'cosecha' && $faseActual === 'en_crecimiento' && ! $this->puedeUsuarioIrACosecha($lote, $user)) {
                     $url = null;
                 } elseif ($key === 'envio_almacen' && ! app(CertificacionCampoService::class)->estaCertificado($lote)) {
                     $url = null;
@@ -1135,10 +1306,12 @@ class LoteTrazabilidadService
 
         $siguienteFase = $this->siguienteFase($faseActual);
         $urlSiguienteFase = $siguienteFase ? $this->urlAccionFase($lote, $siguienteFase) : null;
-        $puedeCertificarCampo = $this->puedeCertificarCampo($lote);
-        $puedeEnviarAlmacen = $this->puedeEnviarAlmacenCampo($lote);
+        $puedeCertificarCampo = $this->puedeCertificarCampo($lote, $user);
+        $puedeEnviarAlmacen = $this->puedeEnviarAlmacenCampo($lote, $user);
         $produccionPendienteAlmacen = $this->produccionPendienteAlmacen($lote);
         if ($puedeCertificarCampo || $puedeEnviarAlmacen) {
+            $urlSiguienteFase = null;
+        } elseif ($siguienteFase === 'cosecha' && ! $this->puedeUsuarioIrACosecha($lote, $user)) {
             $urlSiguienteFase = null;
         }
         $certCampo = app(CertificacionCampoService::class);
@@ -1146,13 +1319,12 @@ class LoteTrazabilidadService
         if ($siembraPendiente) {
             $siembraPendiente->loadMissing('usuario');
         }
-        $user = $request->user();
         $actividadesMarcablesIds = $this->idsActividadesMarcables($lote, $user);
         $puedeCompletarSiembraDirecta = $siguienteFase === 'siembra'
             && ! $this->siembraCompletada($lote)
             && $siembraPendiente === null
             && $user
-            && (int) $lote->usuarioid === (int) $user->usuarioid;
+            && UsuarioRol::gestionaCampo($user);
         $puedeCompletarSiembra = $puedeCompletarSiembraDirecta
             || ($siembraPendiente !== null
                 && in_array((int) $siembraPendiente->actividadid, $actividadesMarcablesIds, true));
@@ -1160,7 +1332,7 @@ class LoteTrazabilidadService
             ? CultivoSiembraCatalogo::sugerenciaParaLote($lote->cultivo, (float) $lote->superficie)
             : null;
         $resumenSiembraCompletar = $this->resumenSiembraCompletar($lote);
-        $urlAsignarActividad = $faseActual === 'en_crecimiento'
+        $urlAsignarActividad = ($faseActual === 'en_crecimiento' && $user && UsuarioRol::gestionaCampo($user))
             ? $this->urlAsignarActividadEnCrecimiento($lote)
             : null;
         $siguienteActividadCrecimiento = $faseActual === 'en_crecimiento'
@@ -1210,7 +1382,7 @@ class LoteTrazabilidadService
             'url_asignar_actividad' => $urlAsignarActividad,
             'siguiente_actividad_crecimiento' => $siguienteActividadCrecimiento,
             'puede_ir_a_cosecha' => $faseActual === 'en_crecimiento' && $siguienteFase === 'cosecha'
-                ? $this->puedeIrACosecha($lote)
+                ? $this->puedeUsuarioIrACosecha($lote, $user)
                 : true,
             'actividades_pendientes_count' => $faseActual === 'en_crecimiento'
                 ? $this->actividadesPendientesEsencialesCrecimiento($lote)->count()
@@ -1435,6 +1607,8 @@ class LoteTrazabilidadService
         ?string $faseLabelOverride = null,
         ?string $evidenciaUrl = null,
         ?int $produccionid = null,
+        ?string $evidenciaIcono = null,
+        ?string $evidenciaTipo = null,
     ): array {
         $row = [
             'fecha' => $fecha,
@@ -1464,8 +1638,481 @@ class LoteTrazabilidadService
         if ($produccionid !== null) {
             $row['produccionid'] = $produccionid;
         }
+        if ($evidenciaIcono !== null) {
+            $row['evidencia_icono'] = $evidenciaIcono;
+        }
+        if ($evidenciaTipo !== null) {
+            $row['evidencia_tipo'] = $evidenciaTipo;
+        }
 
         return $row;
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $eventos
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function numerarYOrdenarEventosHistorial(Collection $eventos): Collection
+    {
+        $cronologico = $this->ordenarEventosHistorialCronologico($eventos);
+
+        return $cronologico
+            ->map(function (array $evento, int $idx) {
+                $evento['paso'] = $idx + 1;
+
+                return $evento;
+            })
+            ->reverse()
+            ->values();
+    }
+
+    private function fechaEventoCosecha(Lote $lote, Produccion $produccion): mixed
+    {
+        $historial = $lote->historialEstados
+            ->filter(fn ($h) => EstadoLoteCatalogo::slugFromNombre($h->estadoTipo->nombre ?? '') === 'cosechado')
+            ->sortByDesc(fn ($h) => $this->parseFechaApp($h->fecha_cambio)->timestamp)
+            ->first();
+
+        if ($historial?->fecha_cambio) {
+            return $historial->fecha_cambio;
+        }
+
+        $fecha = $produccion->fechacosecha;
+        if ($fecha === null) {
+            return now();
+        }
+
+        $parsed = $this->parseFechaApp($fecha);
+
+        if ($parsed->format('H:i:s') === '00:00:00') {
+            $ultimaActividad = $lote->actividades
+                ->filter(fn (Actividad $a) => $a->fechafin !== null)
+                ->sortByDesc(fn (Actividad $a) => $this->parseFechaApp($a->fechafin)->timestamp)
+                ->first();
+
+            if ($ultimaActividad?->fechafin) {
+                $base = $this->parseFechaApp($ultimaActividad->fechafin);
+
+                return $base->copy()->addMinute();
+            }
+
+            return $parsed->endOfDay();
+        }
+
+        return $parsed;
+    }
+
+    private function historialEstadoOmitirEnTrazabilidad($historial, Lote $lote): bool
+    {
+        $estadoNombre = $historial->estadoTipo->nombre ?? '';
+        $slug = EstadoLoteCatalogo::slugFromNombre($estadoNombre);
+
+        $estadosVisibles = ['planificado', 'disponible'];
+        if ($slug !== null && $slug !== '' && ! in_array($slug, $estadosVisibles, true)) {
+            return true;
+        }
+
+        if ($slug === 'sembrado') {
+            return true;
+        }
+
+        if ($slug === 'listo_para_cosecha') {
+            return true;
+        }
+
+        if ($slug === 'en_crecimiento' && $lote->actividades->contains(fn (Actividad $a) => $a->fechafin !== null)) {
+            return true;
+        }
+
+        if ($slug === 'cosechado' && $lote->producciones->isNotEmpty()) {
+            return true;
+        }
+
+        if ($slug === 'certificado' && $lote->certificaciones->isNotEmpty()) {
+            return true;
+        }
+
+        $obs = trim((string) ($historial->observaciones ?? ''));
+        if ($obs === '') {
+            return false;
+        }
+
+        if (preg_match('/^Actividad\s*«.+»\s+completada\.?$/u', $obs)) {
+            return true;
+        }
+
+        if (preg_match('/Actividad\s*«\s*Siembra\s*»\s+completada/i', $obs)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{titulo: string, descripcion: string}
+     */
+    private function presentarEventoEstado($historial, Lote $lote, ?string $registradoPor): array
+    {
+        $estadoNombre = trim((string) ($historial->estadoTipo->nombre ?? ''));
+        $slug = EstadoLoteCatalogo::slugFromNombre($estadoNombre);
+        $obs = trim((string) ($historial->observaciones ?? ''));
+
+        $encargado = trim(($lote->usuario->nombre ?? '').' '.($lote->usuario->apellido ?? ''));
+
+        $titulo = match ($slug) {
+            'planificado', 'disponible' => 'En planificación',
+            'en_preparacion' => 'En preparación',
+            'sembrado' => 'Sembrado',
+            'en_crecimiento', 'en_produccion' => 'En crecimiento',
+            'listo_para_cosecha' => 'Listo para cosecha',
+            'certificado' => 'Certificado',
+            'cosechado' => 'Cosechado',
+            'no_conforme' => 'No conforme',
+            default => $estadoNombre !== '' ? 'En '.mb_strtolower($estadoNombre) : 'Actualización del lote',
+        };
+
+        if (str_contains(mb_strtolower($obs), 'registro inicial')) {
+            $descripcion = $encargado !== ''
+                ? 'Encargado del lote: '.$encargado
+                : 'Alta del lote en el sistema.';
+        } elseif (preg_match('/^Motivo:\s*(.+)$/s', $obs, $m)) {
+            $descripcion = 'Motivo: '.trim($m[1]);
+        } elseif ($obs !== '') {
+            $descripcion = $this->formatearObservacionHistorial($obs, null, null);
+            if ($descripcion === 'Cambio de estado registrado en el lote.') {
+                $descripcion = '';
+            }
+        } else {
+            $descripcion = '';
+        }
+
+        if ($descripcion === '' && $encargado !== '' && ! str_contains(mb_strtolower($obs), 'registro inicial')) {
+            $descripcion = 'Encargado del lote: '.$encargado;
+        }
+
+        return [
+            'titulo' => $titulo,
+            'descripcion' => $descripcion,
+        ];
+    }
+
+    private function nombreCultivoSiembrado(Lote $lote, ?Actividad $siembra = null): string
+    {
+        $lote->loadMissing(['cultivo', 'insumoSemilla']);
+
+        if ($lote->cultivo?->nombre) {
+            return trim($lote->cultivo->nombre);
+        }
+
+        if ($lote->insumoSemilla?->nombre) {
+            return trim($lote->insumoSemilla->nombre);
+        }
+
+        if ($siembra) {
+            $desc = trim((string) ($siembra->descripcion ?? ''));
+            if ($desc !== '' && ! str_contains(mb_strtolower($desc), 'siembra')) {
+                return $desc;
+            }
+        }
+
+        return 'cultivo';
+    }
+
+    private function descripcionCosechaHistorial(Produccion $produccion, Lote $lote): string
+    {
+        $produccion->loadMissing(['unidadMedida', 'catalogoTamanoConteo.tipoEmpaque']);
+        $lote->loadMissing('catalogoTamanoConteo.tipoEmpaque');
+
+        $unidad = trim((string) ($produccion->unidadMedida->abreviatura ?? 'kg'));
+        $partes = [number_format((float) $produccion->cantidad, 0, '.', '.').' '.$unidad];
+
+        if ($produccion->cantidad_empaques !== null && (int) $produccion->cantidad_empaques > 0) {
+            $calibre = $produccion->catalogoTamanoConteo ?? $lote->catalogoTamanoConteo;
+            $empaqueLabel = \App\Services\CosechaPresentacionService::etiquetaEmpaquePlural(
+                \App\Services\CosechaPresentacionService::tipoEmpaqueParaCosechaEnCampo($calibre?->tipoEmpaque?->nombre)
+            );
+            $partes[] = number_format((int) $produccion->cantidad_empaques, 0, ',', '.').' '.$empaqueLabel;
+        }
+
+        if ($produccion->cantidad_unidades !== null && (int) $produccion->cantidad_unidades > 0) {
+            $partes[] = number_format((int) $produccion->cantidad_unidades, 0, ',', '.').' unidades';
+        }
+
+        return implode('/', $partes);
+    }
+
+    private function nombreUsuarioCosecha(Lote $lote): ?string
+    {
+        $historial = $lote->historialEstados
+            ->filter(fn ($h) => EstadoLoteCatalogo::slugFromNombre($h->estadoTipo->nombre ?? '') === 'cosechado')
+            ->sortByDesc(fn ($h) => $this->parseFechaApp($h->fecha_cambio)->timestamp)
+            ->first();
+
+        if ($historial?->usuario) {
+            $nombre = trim(($historial->usuario->nombre ?? '').' '.($historial->usuario->apellido ?? ''));
+
+            return $nombre !== '' ? $nombre : null;
+        }
+
+        if ($lote->usuario) {
+            $nombre = trim(($lote->usuario->nombre ?? '').' '.($lote->usuario->apellido ?? ''));
+
+            return $nombre !== '' ? $nombre : null;
+        }
+
+        return null;
+    }
+
+    private function descripcionSiembraHistorial(Actividad $siembra, Lote $lote, string $cultivoNombre): string
+    {
+        $material = $this->materialSiembraHistorial($siembra, $lote);
+        if ($material !== '') {
+            return $material;
+        }
+
+        $detalle = $this->descripcionHistorialActividad($siembra);
+        if ($detalle === '') {
+            return '';
+        }
+
+        $normalizado = mb_strtolower(trim($detalle));
+        $cultivo = mb_strtolower(trim($cultivoNombre));
+
+        if ($normalizado === 'siembra' || $normalizado === $cultivo) {
+            return '';
+        }
+
+        if (str_starts_with($normalizado, 'cultivo:')) {
+            return '';
+        }
+
+        if (str_starts_with($normalizado, 'insumo aplicado:')) {
+            return $detalle;
+        }
+
+        if (str_contains($normalizado, 'siembra') && $normalizado === $cultivo) {
+            return '';
+        }
+
+        return $detalle;
+    }
+
+    private function materialSiembraHistorial(Actividad $siembra, Lote $lote): string
+    {
+        $detalle = json_decode((string) ($siembra->detalle_json ?? ''), true);
+        if (is_array($detalle) && ($detalle['modo'] ?? '') === 'insumos') {
+            foreach ($detalle['insumos'] ?? [] as $fila) {
+                if (! is_array($fila)) {
+                    continue;
+                }
+                $nombre = trim((string) ($fila['nombre'] ?? ''));
+                $cant = (float) ($fila['cantidad'] ?? 0);
+                $unidad = trim((string) ($fila['unidad'] ?? 'ud'));
+                if ($nombre !== '' && $cant > 0) {
+                    return 'Material de siembra: '.number_format($cant, 2, '.', '').' '.$unidad.' de '.$nombre;
+                }
+            }
+        }
+
+        $lote->loadMissing(['insumoSemilla.unidadMedida', 'cultivo', 'loteInsumos.insumo.unidadMedida']);
+        $insumoRegistro = $lote->loteInsumos->first(
+            fn ($li) => (int) ($li->actividadid ?? 0) === (int) $siembra->actividadid && (float) ($li->cantidadusada ?? 0) > 0
+        );
+        if ($insumoRegistro) {
+            $nombre = trim((string) ($insumoRegistro->insumo->nombre ?? 'semilla'));
+            $unidad = trim((string) ($insumoRegistro->insumo->unidadMedida->abreviatura ?? 'kg'));
+
+            return 'Material de siembra: '.number_format((float) $insumoRegistro->cantidadusada, 2, '.', '').' '.$unidad.' de '.$nombre;
+        }
+
+        $sugerencia = CultivoSiembraCatalogo::sugerenciaDesdeLote($lote);
+        if (! $sugerencia && $lote->cultivo) {
+            $fallback = CultivoSiembraCatalogo::sugerenciaParaLote($lote->cultivo, (float) $lote->superficie);
+            $sugerencia = array_merge($fallback, [
+                'insumo_nombre' => $lote->insumoSemilla?->nombre ?? $lote->cultivo->nombre,
+            ]);
+        }
+
+        if ($sugerencia && ($sugerencia['tiene_dosis'] ?? false) && (float) ($sugerencia['sugerido'] ?? 0) > 0) {
+            $nombre = trim((string) ($sugerencia['insumo_nombre'] ?? 'semilla'));
+            $unidad = trim((string) ($sugerencia['unidad'] ?? 'kg'));
+
+            return 'Material de siembra: '.number_format((float) $sugerencia['sugerido'], 2, '.', '').' '.$unidad.' de '.$nombre;
+        }
+
+        return '';
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $eventos
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function deduplicarEventos(Collection $eventos): Collection
+    {
+        $tieneEventoSiembra = $eventos->contains(fn (array $e) => ($e['tipo'] ?? '') === 'siembra');
+        $vistos = [];
+        $siembraIncluida = false;
+        $cosechaIncluida = false;
+
+        return $eventos->filter(function (array $evento) use (&$vistos, &$siembraIncluida, &$cosechaIncluida, $tieneEventoSiembra) {
+            $tipo = (string) ($evento['tipo'] ?? '');
+            $titulo = mb_strtolower(trim((string) ($evento['titulo'] ?? '')));
+            $fecha = $evento['fecha'] ?? null;
+            $fechaKey = $fecha ? $this->parseFechaApp($fecha)->format('Y-m-d H:i') : '';
+
+            if ($tipo === 'siembra') {
+                if ($siembraIncluida) {
+                    return false;
+                }
+                $siembraIncluida = true;
+            }
+
+            if ($tipo === 'cosecha') {
+                if ($cosechaIncluida) {
+                    return false;
+                }
+                $cosechaIncluida = true;
+            }
+
+            $clave = $tipo.'|'.$titulo.'|'.$fechaKey;
+            if (isset($vistos[$clave])) {
+                return false;
+            }
+
+            if ($tipo === 'estado' && $tieneEventoSiembra && str_contains($titulo, 'en crecimiento')) {
+                $desc = mb_strtolower((string) ($evento['descripcion'] ?? ''));
+                if (str_contains($desc, 'siembra')) {
+                    return false;
+                }
+            }
+
+            $vistos[$clave] = true;
+
+            return true;
+        })->values();
+    }
+
+    private function loteInsumoYaRepresentadoEnActividad($insumo): bool
+    {
+        if (! empty($insumo->actividadid)) {
+            return true;
+        }
+
+        $obs = trim((string) ($insumo->observaciones ?? ''));
+
+        return $obs !== '' && preg_match('/^Actividad\s*#\d+/i', $obs) === 1;
+    }
+
+    private function faseEventoDesdeInsumo($insumo): string
+    {
+        $nombreInsumo = mb_strtolower(trim($insumo->insumo->nombre ?? ''));
+        $tipoInsumo = mb_strtolower(trim($insumo->insumo?->tipo?->nombre ?? ''));
+
+        if (
+            str_contains($nombreInsumo, 'fumig')
+            || str_contains($nombreInsumo, 'fitosanit')
+            || str_contains($nombreInsumo, 'plaga')
+            || str_contains($nombreInsumo, 'insectic')
+            || str_contains($nombreInsumo, 'herbic')
+            || str_contains($tipoInsumo, 'pestic')
+        ) {
+            return 'en_crecimiento';
+        }
+
+        if (
+            str_contains($nombreInsumo, 'fertiliz')
+            || str_contains($nombreInsumo, 'urea')
+            || str_contains($nombreInsumo, 'abono')
+            || str_contains($nombreInsumo, 'npk')
+            || str_contains($tipoInsumo, 'fertiliz')
+        ) {
+            return 'en_crecimiento';
+        }
+
+        return 'en_crecimiento';
+    }
+
+    private function descripcionHistorialActividad(Actividad $actividad): string
+    {
+        $detalle = json_decode((string) ($actividad->detalle_json ?? ''), true);
+        $detalle = is_array($detalle) ? $detalle : [];
+        $modo = (string) ($detalle['modo'] ?? '');
+
+        if ($modo === 'riego') {
+            $label = trim((string) ($detalle['riego']['label'] ?? ''));
+
+            return $label !== '' ? 'Tipo de riego: '.$label : '';
+        }
+
+        if ($modo === 'insumos') {
+            $partes = [];
+            foreach ($detalle['insumos'] ?? [] as $fila) {
+                if (! is_array($fila)) {
+                    continue;
+                }
+                $nombre = trim((string) ($fila['nombre'] ?? ''));
+                $cant = (float) ($fila['cantidad'] ?? 0);
+                $unidad = trim((string) ($fila['unidad'] ?? 'ud'));
+                if ($nombre !== '' && $cant > 0) {
+                    $partes[] = $nombre.': '.number_format($cant, 2, '.', '').' '.$unidad;
+                }
+            }
+            if ($partes !== []) {
+                return 'Insumo aplicado: '.implode(' · ', $partes);
+            }
+        }
+
+        return trim((string) ($actividad->descripcion ?? ''));
+    }
+
+    /**
+     * @return array{url: ?string, icono: ?string, tipo: ?string}
+     */
+    private function evidenciaHistorialActividad(Actividad $actividad, string $tipoNombre): array
+    {
+        $vacio = ['url' => null, 'icono' => null, 'tipo' => null];
+        if ($actividad->fechafin === null) {
+            return $vacio;
+        }
+
+        $esRiego = str_contains($tipoNombre, 'riego') || str_contains($tipoNombre, 'regad');
+        if ($esRiego) {
+            return ['url' => null, 'icono' => 'tint', 'tipo' => 'icono'];
+        }
+
+        $imagenInsumo = $this->imagenInsumoDesdeDetalleActividad($actividad);
+        if ($imagenInsumo !== null) {
+            return ['url' => $imagenInsumo, 'icono' => null, 'tipo' => 'insumo'];
+        }
+
+        $foto = EvidenciaFoto::urlDesdePath($actividad->evidencia_foto_path ?? null);
+        if ($foto !== null) {
+            return ['url' => $foto, 'icono' => null, 'tipo' => 'foto'];
+        }
+
+        return $vacio;
+    }
+
+    private function imagenInsumoDesdeDetalleActividad(Actividad $actividad): ?string
+    {
+        $detalle = json_decode((string) ($actividad->detalle_json ?? ''), true);
+        if (! is_array($detalle) || ($detalle['modo'] ?? '') !== 'insumos') {
+            return null;
+        }
+
+        foreach ($detalle['insumos'] ?? [] as $fila) {
+            if (! is_array($fila)) {
+                continue;
+            }
+            $insumoModel = isset($fila['insumoid'])
+                ? Insumo::query()->find((int) $fila['insumoid'])
+                : null;
+            if ($insumoModel) {
+                return InsumoImagenCatalogo::urlPara($insumoModel);
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -1496,17 +2143,24 @@ class LoteTrazabilidadService
     }
 
     /** @return array<string, mixed> */
-    public function datosFormularioEnvioAlmacen(Lote $lote): array
+    public function datosFormularioEnvioAlmacen(Lote $lote, ?Usuario $user = null): array
     {
         AlmacenAmbito::asegurarAmbitosEnRegistros();
         $capacidadService = app(\App\Services\AlmacenCapacidadService::class);
+        $lote->loadMissing('usuario');
 
-        $almacenesTodos = AlmacenAmbito::scope(
-            Almacen::with(['tipoAlmacen', 'unidadMedida', 'almacenamientos'])
-                ->where('activo', true)
-                ->where('capacidad', '>', 0),
-            AlmacenAmbito::AGRICOLA
-        )->get();
+        $queryAlmacenes = AlmacenAmbito::scopeEnvioCampoDesdeLote(
+            AlmacenAmbito::scope(
+                Almacen::with(['tipoAlmacen', 'unidadMedida', 'almacenamientos'])
+                    ->where('activo', true)
+                    ->where('capacidad', '>', 0),
+                AlmacenAmbito::AGRICOLA
+            ),
+            $lote,
+            $user
+        );
+
+        $almacenesTodos = $queryAlmacenes->get();
 
         $usoPorAlmacen = ProduccionAlmacenamiento::query()
             ->selectRaw('almacenid, COUNT(*) as total')
@@ -1574,6 +2228,60 @@ class LoteTrazabilidadService
             'almacen_destino_resumen' => $almacenDestino
                 ? ($resumenesCapacidad[$almacenDestino->almacenid] ?? null)
                 : null,
+        ];
+    }
+
+    /** Resumen para completar actividades de campo (plagas, fertilización, riego). */
+    public function resumenActividadCompletar(Actividad $actividad): array
+    {
+        $actividad->loadMissing(['lote.cultivo', 'lote.insumoSemilla', 'tipoActividad', 'prioridad']);
+        $lote = $actividad->lote;
+        $detalle = json_decode((string) ($actividad->detalle_json ?? ''), true);
+        $detalle = is_array($detalle) ? $detalle : [];
+
+        $insumos = [];
+        if (($detalle['modo'] ?? '') === 'insumos') {
+            foreach ($detalle['insumos'] ?? [] as $fila) {
+                if (! is_array($fila)) {
+                    continue;
+                }
+                $insumoModel = isset($fila['insumoid']) ? Insumo::query()->with('tipo')->find((int) $fila['insumoid']) : null;
+                $insumos[] = [
+                    'nombre' => (string) ($fila['nombre'] ?? $insumoModel?->nombre ?? 'Insumo'),
+                    'cantidad' => (float) ($fila['cantidad'] ?? 0),
+                    'unidad' => (string) ($fila['unidad'] ?? 'ud'),
+                    'imagen' => $insumoModel ? InsumoImagenCatalogo::urlPara($insumoModel) : null,
+                ];
+            }
+        }
+
+        $lat = $lote && $lote->latitud !== null ? (float) $lote->latitud : null;
+        $lng = $lote && $lote->longitud !== null ? (float) $lote->longitud : null;
+
+        return [
+            'tipo' => $actividad->tipoActividad?->nombre ?? 'Actividad',
+            'titulo' => $actividad->descripcion ?: ($actividad->tipoActividad?->nombre ?? 'Actividad'),
+            'prioridad' => $actividad->prioridad?->nombre,
+            'prioridad_badge' => PrioridadCatalogo::badgeClase($actividad->prioridad?->nombre),
+            'observaciones' => trim((string) ($actividad->observaciones ?? '')) ?: null,
+            'riego' => ($detalle['modo'] ?? '') === 'riego'
+                ? ActividadDetalleCatalogo::textoResumenDesdeDetalle($actividad->tipoActividad?->nombre, $detalle)
+                : null,
+            'insumos' => $insumos,
+            'lote' => $lote ? [
+                'nombre' => $lote->nombre,
+                'ubicacion' => $lote->ubicacion_visible ?? $lote->ubicacion,
+                'superficie' => $lote->superficie_etiqueta ?? ((float) $lote->superficie.' ha'),
+                'codigo' => $lote->codigo_trazabilidad,
+                'cultivo' => $lote->cultivo_etiqueta ?? $lote->cultivo?->nombre,
+            ] : null,
+            'mapa' => [
+                'lat' => $lat,
+                'lng' => $lng,
+                'superficie_ha' => $lote ? (float) $lote->superficie : null,
+                'ubicacion' => $lote?->ubicacion_visible ?? $lote?->ubicacion,
+                'tiene_coordenadas' => $lat !== null && $lng !== null && abs($lat) > 0.0001 && abs($lng) > 0.0001,
+            ],
         ];
     }
 

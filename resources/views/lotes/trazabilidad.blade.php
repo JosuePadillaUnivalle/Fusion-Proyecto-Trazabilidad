@@ -20,6 +20,13 @@
 
 @section('content')
 <div class="trz-dash">
+    @if(!empty($solo_lectura_lote))
+        <div class="alert alert-info border-0 shadow-sm mb-3">
+            <i class="fas fa-eye mr-1"></i>
+            Está consultando este lote en modo solo lectura porque participó en actividades del mismo.
+            Solo podrá ejecutar tareas que le hayan sido asignadas explícitamente.
+        </div>
+    @endif
     @include('lotes.partials.detalle-header')
     @include('lotes.partials.detalle-stats')
     @include('lotes.partials.detalle-nav')
@@ -247,12 +254,23 @@
                     </p>
                     <ul class="list-unstyled trz-checklist mb-3">
                         @foreach($panel['actividades_abiertas'] as $actPend)
-                        <li class="is-pending d-flex flex-wrap align-items-center justify-content-between" style="gap:.35rem;">
+                        <li class="is-pending d-flex flex-wrap align-items-center justify-content-between {{ empty($actPend['en_turno']) ? 'opacity-75' : '' }}" style="gap:.35rem;">
                             <span>
-                                <i class="fas fa-hourglass-half text-warning mr-2"></i>
+                                @if(!empty($actPend['orden_secuencia']))
+                                    <span class="badge badge-light border mr-1" title="Orden de ejecución">#{{ $actPend['orden_secuencia'] }}</span>
+                                @endif
+                                <i class="fas fa-hourglass-half {{ !empty($actPend['en_turno']) ? 'text-warning' : 'text-muted' }} mr-2"></i>
                                 {{ $actPend['titulo'] }}
+                                @if(!empty($actPend['prioridad']))
+                                    <span class="badge badge-{{ $actPend['prioridad_badge'] ?? 'secondary' }} ml-1">
+                                        {{ ucfirst($actPend['prioridad']) }}
+                                    </span>
+                                @endif
                                 @if(!empty($actPend['responsable']))
                                     <span class="text-muted">— {{ $actPend['responsable'] }}</span>
+                                @endif
+                                @if(empty($actPend['en_turno']))
+                                    <span class="badge badge-secondary ml-1">En espera</span>
                                 @endif
                             </span>
                             @if(!empty($actPend['actividadid']) && in_array((int) $actPend['actividadid'], $actividades_marcables_ids ?? [], true) && !empty($actPend['es_siembra']) && ($puede_completar_siembra ?? false))
@@ -263,6 +281,7 @@
                             @elseif(!empty($actPend['actividadid']) && in_array((int) $actPend['actividadid'], $actividades_marcables_ids ?? [], true) && empty($actPend['es_siembra']))
                                 <button type="button" class="btn btn-success btn-sm btn-completar-evidencia"
                                         data-action="{{ route('actividades.marcar-realizada', $actPend['actividadid']) }}"
+                                        data-resumen-url="{{ route('actividades.resumen-completar', $actPend['actividadid']) }}"
                                         data-titulo="{{ $actPend['titulo'] }}"
                                         data-lote="{{ $lote->nombre }}"
                                         data-scroll-to="historial-eventos">
@@ -324,11 +343,12 @@
                                 && ($evento['fase'] ?? '') !== 'siembra'
                                 && in_array((int) $evento['actividadid'], $actividades_marcables_ids ?? [], true);
                             $tieneEvidencia = !empty($evento['evidencia_url']);
+                            $tieneEvidenciaIcono = !empty($evento['evidencia_icono']);
                             $colorFaseEvento = ($fases_evento[$evento['fase']] ?? $fases[$evento['fase']])['color'] ?? '#6c757d';
                         @endphp
                         <div class="evento-trz-wrap" style="--paso-color: {{ $colorFaseEvento }};">
                             <div class="evento-trz-paso" aria-hidden="true">
-                                <span class="evento-trz-paso__num">{{ $loop->iteration }}</span>
+                                <span class="evento-trz-paso__num">{{ $evento['paso'] ?? $loop->iteration }}</span>
                             </div>
                         <div class="evento-trz{{ $puedeCompletarEvento ? ' tiene-accion' : '' }}"
                             data-tipo="{{ $evento['tipo'] }}"
@@ -341,26 +361,47 @@
                                         <span class="badge badge-fase mr-1" style="background:{{ ($fases_evento[$evento['fase']] ?? $fases[$evento['fase']])['color'] ?? '#6c757d' }}">
                                             {{ $evento['fase_label'] }}
                                         </span>
-                                        <span class="badge badge-light text-uppercase">{{ $evento['tipo'] }}</span>
+                                        @if(! in_array($evento['tipo'] ?? '', ['actividad', 'siembra', 'estado'], true))
+                                            <span class="badge badge-light text-uppercase">{{ $evento['tipo'] }}</span>
+                                        @endif
                                     </div>
                                     <small class="text-muted"><i class="fas fa-calendar-alt mr-1"></i>{{ $evento['fecha_fmt'] }}</small>
                                 </div>
                                 <strong class="d-block mt-2">{{ $evento['titulo'] }}</strong>
-                                @if(!empty($evento['descripcion']))
-                                    <p class="mb-1 small text-muted">{{ $evento['descripcion'] }}</p>
+                                @php
+                                    $descEvento = trim((string) ($evento['descripcion'] ?? ''));
+                                    $tituloEvento = trim((string) ($evento['titulo'] ?? ''));
+                                    $mostrarDesc = $descEvento !== ''
+                                        && mb_strtolower($descEvento) !== mb_strtolower($tituloEvento);
+                                @endphp
+                                @if($mostrarDesc)
+                                    <p class="mb-1 small text-muted">{{ $descEvento }}</p>
                                 @endif
-                                @if($tieneEvidencia)
+                                @if($tieneEvidenciaIcono)
+                                    <div class="evento-trz-evidencia evento-trz-evidencia--icono mt-2">
+                                        <div class="evento-trz-evidencia__icono" title="Actividad de riego">
+                                            <i class="fas fa-{{ $evento['evidencia_icono'] }}"></i>
+                                        </div>
+                                        <span class="evento-trz-evidencia__caption small text-muted d-block mt-1">
+                                            <i class="fas fa-tint mr-1"></i> Riego registrado
+                                        </span>
+                                    </div>
+                                @elseif($tieneEvidencia)
                                     <div class="evento-trz-evidencia mt-2">
                                         <button type="button" class="evento-trz-evidencia__link btn-ver-evidencia border-0 p-0 bg-transparent"
                                                 data-url="{{ $evento['evidencia_url'] }}"
                                                 data-titulo="{{ $evento['titulo'] }}"
                                                 title="Ver evidencia en tamaño completo">
                                             <img src="{{ $evento['evidencia_url'] }}"
-                                                 alt="Evidencia: {{ $evento['titulo'] }}"
+                                                 alt="{{ ($evento['evidencia_tipo'] ?? '') === 'insumo' ? 'Insumo aplicado: ' : 'Evidencia: ' }}{{ $evento['titulo'] }}"
                                                  class="evento-trz-evidencia__img"
                                                  loading="lazy" decoding="async">
                                             <span class="evento-trz-evidencia__caption small text-muted">
-                                                <i class="fas fa-camera mr-1"></i> Evidencia fotográfica
+                                                @if(($evento['evidencia_tipo'] ?? '') === 'insumo')
+                                                    <i class="fas fa-flask mr-1"></i> Insumo utilizado
+                                                @else
+                                                    <i class="fas fa-camera mr-1"></i> Evidencia fotográfica
+                                                @endif
                                             </span>
                                         </button>
                                     </div>
@@ -374,16 +415,22 @@
                                             {{ $evento['completada'] ? 'Completada' : 'Pendiente' }}
                                         </span>
                                     @endif
+                                    @if(($evento['tipo'] ?? '') === 'almacenamiento' && !empty($evento['almacen_url']) && ($puede_ver_almacen_historial ?? false))
+                                        <a href="{{ $evento['almacen_url'] }}" class="btn btn-sm btn-outline-primary ml-auto">
+                                            <i class="fas fa-warehouse mr-1"></i> Ver almacén
+                                        </a>
+                                    @endif
                                 </div>
                             </div>
                             @if($puedeCompletarEvento)
                                 <div class="evento-trz-accion">
                                     <button type="button" class="btn btn-success btn-sm btn-completar-evidencia"
                                             data-action="{{ route('actividades.marcar-realizada', $evento['actividadid']) }}"
+                                            data-resumen-url="{{ route('actividades.resumen-completar', $evento['actividadid']) }}"
                                             data-titulo="{{ $evento['titulo'] }}"
                                             data-lote="{{ $lote->nombre }}"
                                             data-scroll-to="historial-eventos"
-                                            title="Subir foto y marcar como completada">
+                                            title="Ver resumen y subir foto">
                                         <i class="fas fa-check mr-1"></i> Completar
                                     </button>
                                 </div>
@@ -401,7 +448,7 @@
         </div>
     </div>
 
-    @include('lotes.partials.detalle-actions')
+    @include('lotes.partials.detalle-actions', ['ocultarGestion' => true])
 </div>
 
 @include('partials.modal-completar-evidencia')

@@ -102,7 +102,61 @@ class ActividadLotePermisosTest extends TestCase
                 'loteid' => $lote->loteid,
                 'tipo' => 'Riego',
             ]))
-            ->assertForbidden();
+            ->assertRedirect()
+            ->assertSessionHas('error_modal', true);
+    }
+
+    public function test_agricultor_ve_lote_donde_participo_en_listado_y_trazabilidad(): void
+    {
+        TipoActividad::create(['nombre' => 'Siembra']);
+        $jefe = $this->createUser('jefe_agricultor', [
+            'email' => 'jefe.participa@test.local',
+            'nombreusuario' => 'jefe_participa',
+        ]);
+        $operario = $this->createUser('agricultor', [
+            'email' => 'oper.participa@test.local',
+            'nombreusuario' => 'oper_participa',
+        ]);
+        $lote = $this->crearLote($jefe);
+
+        Actividad::create([
+            'loteid' => $lote->loteid,
+            'usuarioid' => $operario->usuarioid,
+            'usuarioid_ejecutor' => $operario->usuarioid,
+            'descripcion' => 'Siembra',
+            'fechainicio' => now(),
+            'fechafin' => now(),
+            'tipoactividadid' => TipoActividad::where('nombre', 'Siembra')->value('tipoactividadid'),
+            'prioridadid' => Prioridad::query()->orderBy('prioridadid')->value('prioridadid'),
+        ]);
+
+        $this->actingAs($operario)
+            ->get(route('lotes.index'))
+            ->assertOk()
+            ->assertSee($lote->nombre);
+
+        $this->actingAs($operario)
+            ->get(route('lotes.trazabilidad', $lote))
+            ->assertOk()
+            ->assertSee('modo solo lectura', false);
+    }
+
+    public function test_agricultor_sin_participacion_recibe_modal_no_403_crudo(): void
+    {
+        $operario = $this->createUser('agricultor', [
+            'email' => 'oper.ajeno@test.local',
+            'nombreusuario' => 'oper_ajeno',
+        ]);
+        $jefe = $this->createUser('jefe_agricultor', [
+            'email' => 'jefe.ajeno@test.local',
+            'nombreusuario' => 'jefe_ajeno',
+        ]);
+        $lote = $this->crearLote($jefe);
+
+        $this->actingAs($operario)
+            ->get(route('lotes.trazabilidad', $lote))
+            ->assertRedirect()
+            ->assertSessionHas('error_modal', true);
     }
 
     public function test_agricultor_puede_acceder_ruta_siembra_de_su_lote_sin_403(): void

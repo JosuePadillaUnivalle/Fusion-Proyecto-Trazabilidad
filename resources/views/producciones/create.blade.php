@@ -11,7 +11,6 @@
 
 @push('styles')
 @include('partials.modulo-produccion-styles')
-@include('partials.almacen-envio-styles')
 <style>
     .form-card {
         border: none;
@@ -217,20 +216,10 @@
                         </div>
                     </div>
 
-                    @include('partials.almacen-envio-selector', [
-                        'almacenes' => $almacenes,
-                        'almacenesMasUsados' => $almacenesMasUsados ?? $almacenes,
-                        'almacenesMenosUsados' => $almacenesMenosUsados ?? collect(),
-                        'almacenesTodos' => $almacenesTodos ?? collect(),
-                        'resumenesCapacidad' => $resumenesCapacidad ?? [],
-                        'sectionId' => 'almacenSection',
-                        'hiddenInputId' => 'almacenid',
-                        'selectedAlmacenId' => $selectedAlmacenId ?? old('almacenid'),
-                        'etiquetaAmbito' => 'agrícola',
-                        'almacenRequerido' => true,
-                        'modoPreview' => true,
-                        'guiaTexto' => 'Toda cosecha debe indicar el almacén agrícola de destino. Elija uno de los sugeridos o busque otro en el listado completo.',
-                    ])
+                    <div class="alert alert-light border small mb-0 mt-3">
+                        <i class="fas fa-info-circle text-success mr-1"></i>
+                        El envío al almacén se realiza <strong>después</strong> de certificar el lote, desde la trazabilidad del lote.
+                    </div>
 
                     {{-- Evidencia fotográfica --}}
                     <div class="form-group mt-4">
@@ -279,15 +268,6 @@
 @endsection
 
 @push('scripts')
-@include('partials.almacen-envio-scripts', [
-    'sectionId' => 'almacenSection',
-    'hiddenInputId' => 'almacenid',
-    'formSelector' => 'form[action*="producciones"]',
-    'almacenesCatalogo' => $almacenesCatalogo ?? [],
-    'requiereAlmacen' => true,
-    'cantidadInputId' => 'cantidad',
-    'unidadSelectId' => 'unidadmedidaid',
-])
 <script>
     $(document).ready(function() {
         const wrapLoteProd = document.getElementById('selector_wrap_produccion_lote');

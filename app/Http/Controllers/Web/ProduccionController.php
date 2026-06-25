@@ -187,22 +187,7 @@ class ProduccionController extends Controller
         }
 
         $unidades = UnidadMedida::where('categoria', 'peso')->get();
-        AlmacenAmbito::asegurarAmbitosEnRegistros();
-        $almacenesTodos = AlmacenAmbito::scope(
-            Almacen::with(['tipoAlmacen', 'unidadMedida', 'almacenamientos'])
-                ->where('activo', true)
-                ->where('capacidad', '>', 0),
-            AlmacenAmbito::AGRICOLA
-        )->get();
-        $almacenesMasUsados = $this->almacenesDestacadosParaCosecha($almacenesTodos, 'mas');
-        $almacenesMenosUsados = $this->almacenesDestacadosParaCosecha($almacenesTodos, 'menos');
-        $almacenes = $almacenesMasUsados;
-        $resumenesCapacidad = $almacenesTodos
-            ->mapWithKeys(fn (Almacen $almacen) => [
-                $almacen->almacenid => $this->capacidadService->resumen($almacen),
-            ])
-            ->all();
-        $almacenesCatalogo = $this->catalogoAlmacenesCosecha($almacenesTodos);
+
         $lotePreseleccionado = $loteidParam
             ?? (old('loteid') ?: ($lotes->count() === 1 ? $lotes->first()->loteid : null));
         $lotePreseleccionadoLabel = null;
@@ -220,40 +205,30 @@ class ProduccionController extends Controller
             $loteActivo = $lotes->firstWhere('loteid', $lotePreseleccionado)
                 ?? Lote::with(['usuario', 'cultivo', 'insumoSemilla', 'estadoTipo', 'catalogoTamanoConteo.tipoEmpaque'])
                     ->find($lotePreseleccionado);
+            if ($loteActivo && $request->user() && ! $this->trazabilidadService->puedeUsuarioRegistrarCosecha($loteActivo, $request->user())) {
+                return redirect()
+                    ->route('lotes.trazabilidad', $loteActivo)
+                    ->with('error', 'Solo el jefe agrícola, administrador u operario asignado a la cosecha pueden registrar la cosecha.');
+            }
             if ($loteActivo) {
                 $estimacionLoteInicial = $this->planificacionCosecha->estimacionUiDesdeLote($loteActivo);
             }
             $usarLoteFijo = $loteActivo !== null && ($lotes->count() === 1 || $loteidParam);
         }
 
-        $selectedAlmacenId = old('almacenid');
+        $selectedAlmacenId = null;
         $almacenDestinoPreview = null;
         $resumenAlmacenPreview = null;
-        if ($selectedAlmacenId) {
-            $almacenDestinoPreview = $almacenesTodos->firstWhere('almacenid', (int) $selectedAlmacenId);
-            if ($almacenDestinoPreview) {
-                $resumenAlmacenPreview = $resumenesCapacidad[$almacenDestinoPreview->almacenid] ?? null;
-            }
-        }
 
         return view('producciones.create', compact(
             'lotes',
             'unidades',
-            'almacenes',
-            'almacenesMasUsados',
-            'almacenesMenosUsados',
-            'almacenesTodos',
-            'almacenesCatalogo',
-            'resumenesCapacidad',
             'lotePreseleccionado',
             'lotePreseleccionadoLabel',
             'returnUrl',
             'estimacionLoteInicial',
             'loteActivo',
             'usarLoteFijo',
-            'selectedAlmacenId',
-            'almacenDestinoPreview',
-            'resumenAlmacenPreview',
             'loteidParam',
         ));
     }
@@ -265,19 +240,24 @@ class ProduccionController extends Controller
             'cantidad' => 'required|numeric|min:0.01',
             'unidadmedidaid' => 'required|exists:unidadmedida,unidadmedidaid',
             'observaciones' => 'nullable|string',
-            'almacenid' => 'required|exists:almacen,almacenid',
             'evidencia_foto' => 'required|image|mimes:jpeg,jpg,png,webp|max:5120',
         ], [
             'evidencia_foto.required' => 'Debe subir una foto de la cosecha realizada.',
             'evidencia_foto.image' => 'El archivo debe ser una imagen.',
             'evidencia_foto.max' => 'La imagen no puede superar 5 MB.',
-            'almacenid.required' => 'Debe seleccionar el almacén agrícola de destino.',
         ]);
 
         DB::beginTransaction();
 
         try {
             $lote = Lote::with(['estadoTipo', 'cultivo'])->findOrFail($data['loteid']);
+            $user = $request->user();
+
+            if (! $this->trazabilidadService->puedeUsuarioRegistrarCosecha($lote, $user)) {
+                return back()->withErrors([
+                    'loteid' => 'No tiene permiso para registrar la cosecha de este lote. Solo el jefe agrícola, administrador u operario asignado a la cosecha pueden hacerlo.',
+                ])->withInput();
+            }
 
             if (! $this->trazabilidadService->puedeRegistrarCosecha($lote)) {
                 $pendientes = $this->trazabilidadService->actividadesCrecimientoPendientes($lote);
@@ -310,61 +290,6 @@ class ProduccionController extends Controller
                 'imagenurl' => 'storage/'.$rutaEvidencia,
             ]);
 
-            $mensajeAlmacen = '';
-            $avisoAlmacenPendiente = null;
-            if (! empty($data['almacenid'])) {
-                $bloqueo = $this->certificacionCampo->mensajeBloqueoAlmacen($lote);
-                $almacenDestino = AlmacenAmbito::scope(Almacen::query(), AlmacenAmbito::AGRICOLA)
-                    ->where('almacenid', $data['almacenid'])
-                    ->firstOrFail();
-
-                if ($bloqueo !== null) {
-                    $produccion->update(['almacendestinoid' => $almacenDestino->almacenid]);
-                    $avisoAlmacenPendiente = $bloqueo;
-                } else {
-                $almacen = $almacenDestino;
-
-                // ================================
-                // 1) Capacidad del almacén en KG
-                // ================================
-                $unidadAlmacen = $almacen->unidadMedida; // relación unidadMedida en modelo Almacen
-                $resumenAlmacen = $this->capacidadService->resumen($almacen);
-                $capacidadKg = $resumenAlmacen['capacidad_kg'];
-                $ocupadoKg = $resumenAlmacen['ocupado_kg'];
-
-                // =====================================
-                // 3) Nueva cantidad a ingresar en KG
-                // =====================================
-                $unidadProduccion = UnidadMedida::find($data['unidadmedidaid']);
-                $nuevaCantidadKg = $cantidadBaseKg;
-
-                $disponibleKg = $capacidadKg - $ocupadoKg;
-
-                if ($nuevaCantidadKg > $disponibleKg) {
-                    throw new \Exception(
-                        "La cantidad a almacenar ({$data['cantidad']} {$unidadProduccion->abreviatura}) " .
-                        "excede la capacidad disponible del almacén. Disponible: " .
-                        round($disponibleKg, 2) . " kg"
-                    );
-                }
-
-                // Si pasa la validación, guardamos en la unidad que vino del formulario
-                ProduccionAlmacenamiento::create([
-                    'produccionid' => $produccion->produccionid,
-                    'almacenid' => $almacen->almacenid,
-                    'cantidad' => $data['cantidad'],
-                    'unidadmedidaid' => $data['unidadmedidaid'],
-                    'catalogotamanoconteoid' => $presentacion['calibre_id'] ?? null,
-                    'cantidad_unidades' => $presentacion['unidades'] ?? null,
-                    'cantidad_empaques' => $presentacion['empaques'] ?? null,
-                    'fechaentrada' => now(),
-                    'observaciones' => $this->observacionAlmacenCosecha($lote, $presentacion),
-                ]);
-
-                $mensajeAlmacen = " y almacenado en {$almacen->nombre}";
-                }
-            }
-
             // Cambiar estado del lote a "Cosechado"
             $estadoCosechadoId = EstadoLoteCatalogo::idPorSlug('cosechado');
 
@@ -380,33 +305,23 @@ class ProduccionController extends Controller
                     'loteid' => $lote->loteid,
                     'estadolotetipoid' => $estadoCosechadoId,
                     'fecha_cambio' => now(),
-                    'observaciones' => $this->observacionHistorialCosecha($data, $unidad, $presentacion, $mensajeAlmacen),
-                    'usuarioid' => $lote->usuarioid,
+                    'observaciones' => $this->observacionHistorialCosecha($data, $unidad, $presentacion),
+                    'usuarioid' => $user->usuarioid,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
             }
 
-            app(OperacionAgricolaAutomaticaService::class)->desdeProduccion($produccion);
-
             DB::commit();
 
             $unidad = UnidadMedida::find($data['unidadmedidaid']);
-            $mensaje = $this->mensajeExitoCosecha($data, $lote, $unidad, $presentacion, $mensajeAlmacen);
-            if ($mensajeAlmacen === '') {
-                $mensaje .= ' Certifique el lote en Certificaciones y luego envíelo al almacén desde la trazabilidad del lote.';
-            } else {
-                $mensaje .= ' El ingreso aparece en Movimientos de almacén agrícola.';
-            }
+            $mensaje = $this->mensajeExitoCosecha($data, $lote, $unidad, $presentacion);
+            $mensaje .= ' Certifique el lote en Certificaciones y luego envíelo al almacén desde la trazabilidad del lote.';
 
             $returnUrl = $this->validReturnUrl($request->input('return'));
             $redirect = $returnUrl
                 ? redirect($returnUrl)->with('success', $mensaje)
                 : redirect()->route('producciones.index')->with('success', $mensaje);
-
-            if ($avisoAlmacenPendiente !== null) {
-                $redirect = $redirect->with('warning', 'La cosecha quedó registrada, pero no se envió al almacén: '.$avisoAlmacenPendiente);
-            }
 
             return $redirect;
 
@@ -589,27 +504,29 @@ class ProduccionController extends Controller
 
     /** @param  array<string, mixed>  $data */
     /** @param  array<string, mixed>  $presentacion */
-    private function observacionHistorialCosecha(array $data, UnidadMedida $unidad, array $presentacion, string $mensajeAlmacen): string
+    private function observacionHistorialCosecha(array $data, UnidadMedida $unidad, array $presentacion): string
     {
-        $txt = "Cosecha: {$data['cantidad']} {$unidad->abreviatura}";
+        $partes = [number_format((float) $data['cantidad'], 0, '.', '.').' '.$unidad->abreviatura];
         if ($presentacion['ok'] ?? false) {
-            $txt .= ' · '.($presentacion['resumen'] ?? '');
+            if (! empty($presentacion['empaques'])) {
+                $partes[] = number_format((int) $presentacion['empaques'], 0, ',', '.').' '.($presentacion['empaque_label'] ?? 'Cajas');
+            }
+            if (! empty($presentacion['unidades'])) {
+                $partes[] = number_format((int) $presentacion['unidades'], 0, ',', '.').' unidades';
+            }
         }
 
-        return $txt.$mensajeAlmacen;
+        return 'Cosecha: '.implode('/', $partes);
     }
 
     /** @param  array<string, mixed>  $data */
     /** @param  array<string, mixed>  $presentacion */
-    private function mensajeExitoCosecha(array $data, Lote $lote, UnidadMedida $unidad, array $presentacion, string $mensajeAlmacen): string
+    private function mensajeExitoCosecha(array $data, Lote $lote, UnidadMedida $unidad, array $presentacion): string
     {
         $cultivo = $lote->cultivo?->nombre ?? $lote->cultivo_etiqueta ?? 'cultivo';
         $mensaje = "¡Cosecha registrada! {$data['cantidad']} {$unidad->abreviatura} de {$cultivo}";
         if ($presentacion['ok'] ?? false) {
             $mensaje .= ' ('.($presentacion['resumen'] ?? '').')';
-        }
-        if ($mensajeAlmacen !== '') {
-            $mensaje .= $mensajeAlmacen;
         }
 
         return $mensaje;

@@ -123,7 +123,21 @@ class CertificacionController extends Controller
 
     private function evaluarLote(int $loteid, string $resultado, ?string $observaciones, ?string $recomendaciones = null): void
     {
+        $user = auth()->user();
+        if (! $user || ! \App\Support\UsuarioRol::gestionaCampo($user)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'loteid' => 'Solo el jefe agrícola o administrador puede certificar lotes.',
+            ]);
+        }
+
         $lote = Lote::findOrFail($loteid);
+        $trazabilidad = app(\App\Support\LoteTrazabilidadService::class);
+
+        if (! $trazabilidad->puedeCertificarCampo($lote, $user)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'loteid' => 'No puede certificar este lote: complete todas las actividades pendientes y asegúrese de haber registrado riego, control de plagas y fertilización.',
+            ]);
+        }
 
         $prefijo = $resultado === CertificacionLote::RAZON_NO_CONFORME ? 'NCONF' : 'CERT';
         $codigo = $prefijo.'-'.now()->format('Y').'-'.str_pad((string) $lote->loteid, 4, '0', STR_PAD_LEFT);

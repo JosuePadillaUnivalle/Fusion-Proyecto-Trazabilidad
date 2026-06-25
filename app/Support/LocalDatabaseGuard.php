@@ -14,6 +14,9 @@ class LocalDatabaseGuard
 {
     private const DEMO_PASSWORD = '12345';
 
+    /** Incrementar al cambiar la política de contraseñas locales. */
+    private const CREDENCIALES_LOCAL_VERSION = 2;
+
     /** @var list<string> */
     private const DEMO_EMAILS = [
         'admin@agrofusion.com',
@@ -73,6 +76,8 @@ class LocalDatabaseGuard
         }
 
         if ($usuarios > 0) {
+            self::normalizarCredencialesDemoSiHaceFalta();
+
             return false;
         }
 
@@ -121,6 +126,12 @@ class LocalDatabaseGuard
             return;
         }
 
+        if (self::debeProteger()) {
+            self::normalizarTodasCredencialesLocales();
+
+            return;
+        }
+
         $hash = Hash::make(self::DEMO_PASSWORD);
 
         DB::table('usuario')
@@ -129,5 +140,43 @@ class LocalDatabaseGuard
                 'passwordhash' => $hash,
                 'activo' => 1,
             ]);
+    }
+
+    /** En local todas las cuentas usan la misma clave documentada (12345). */
+    public static function normalizarTodasCredencialesLocales(): void
+    {
+        if (! Schema::hasTable('usuario')) {
+            return;
+        }
+
+        $hash = Hash::make(self::DEMO_PASSWORD);
+
+        DB::table('usuario')->update([
+            'passwordhash' => $hash,
+            'activo' => 1,
+        ]);
+
+        if (Schema::hasColumn('usuario', 'estado_cuenta')) {
+            DB::table('usuario')
+                ->where('estado_cuenta', CuentaEstado::PENDIENTE)
+                ->update(['estado_cuenta' => CuentaEstado::APROBADO]);
+        }
+
+        cache()->forever('agrofusion_demo_cred_version', self::CREDENCIALES_LOCAL_VERSION);
+    }
+
+    /** Repara contraseñas demo tras pulls o migraciones que dejan hashes inconsistentes. */
+    public static function normalizarCredencialesDemoSiHaceFalta(): void
+    {
+        if (! self::debeProteger()) {
+            return;
+        }
+
+        $version = (int) cache()->get('agrofusion_demo_cred_version', 0);
+        if ($version >= self::CREDENCIALES_LOCAL_VERSION) {
+            return;
+        }
+
+        self::normalizarTodasCredencialesLocales();
     }
 }

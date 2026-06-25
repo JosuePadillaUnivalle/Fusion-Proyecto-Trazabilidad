@@ -36,7 +36,7 @@
             </div>
         </div>
 
-        @include('partials.dashboard-alertas')
+        @include('partials.agricultor-tareas-pendientes-inicio')
 
         @include('dashboard.partials.filtros', [
             'filtros' => $filtros,

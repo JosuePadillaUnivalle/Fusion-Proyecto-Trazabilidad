@@ -12,8 +12,16 @@ class LoteEliminacionService
 {
     public function eliminar(Lote $lote): void
     {
-        $id = (int) $lote->loteid;
+        $lote->loadMissing('estadoTipo');
         $nombre = (string) $lote->nombre;
+
+        if (! \App\Support\EstadoLoteCatalogo::loteSePuedeEliminar($lote->estadoTipo?->nombre)) {
+            throw new \InvalidArgumentException(
+                'Solo se pueden eliminar lotes en estado Planificado.'
+            );
+        }
+
+        $id = (int) $lote->loteid;
 
         EliminacionSegura::ejecutar(function () use ($lote, $id): void {
             DB::transaction(function () use ($lote, $id): void {

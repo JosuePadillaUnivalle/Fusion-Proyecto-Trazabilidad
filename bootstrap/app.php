@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -68,6 +69,28 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return null;
+        });
+
+        $exceptions->render(function (AccessDeniedHttpException $e, Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage() ?: 'Acceso denegado.'], 403);
+            }
+
+            $mensaje = trim((string) $e->getMessage());
+            if ($mensaje === '') {
+                return null;
+            }
+
+            $destino = $request->headers->get('referer');
+            if (! is_string($destino) || $destino === '') {
+                $destino = route('lotes.index', absolute: false);
+            }
+
+            return redirect()->to($destino)->with([
+                'error' => $mensaje,
+                'error_modal' => true,
+                'error_modal_titulo' => 'Acceso restringido',
+            ]);
         });
 
         $exceptions->render(function (TokenMismatchException $e, Request $request) {

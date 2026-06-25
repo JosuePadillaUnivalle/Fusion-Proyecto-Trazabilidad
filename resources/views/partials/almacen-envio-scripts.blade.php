@@ -250,6 +250,79 @@
         });
     }
 
+    function actualizarPreviewPanelModal(item) {
+        const panel = document.getElementById(modalId + '-preview-panel');
+        if (!panel) return;
+        if (!item) {
+            panel.innerHTML =
+                '<p class="text-muted small mb-0">' +
+                    '<i class="fas fa-mouse-pointer mr-1"></i>' +
+                    'Pase el cursor sobre un almacén o haga clic para ver la previsualización.' +
+                '</p>';
+            return;
+        }
+        panel.innerHTML = htmlPreviewAlmacen(item, 'modal');
+    }
+
+    function relocateModalNodes() {
+        const $modal = $('#' + modalId);
+        if ($modal.length && $modal.closest('.modal').length && !$modal.data('relocated')) {
+            $modal.appendTo(document.body);
+            $modal.data('relocated', true);
+        }
+        const hoverEl = document.getElementById('almacenHoverPreview-' + sectionId);
+        if (hoverEl && hoverEl.closest('.modal') && !hoverEl.dataset.relocated) {
+            document.body.appendChild(hoverEl);
+            hoverEl.dataset.relocated = '1';
+        }
+    }
+
+    function abrirModalBuscar(opciones) {
+        relocateModalNodes();
+        const $m = $('#' + modalId);
+        const irMapa = opciones && opciones.mapa;
+
+        $m.off('show.bs.modal.almacenAnidado').on('show.bs.modal.almacenAnidado', function () {
+            const z = 1050 + (10 * $('.modal:visible').length);
+            $(this).css('z-index', z);
+            $('body').addClass('modal-almacen-anidado');
+            window.setTimeout(function () {
+                $('.modal-backdrop').not('.modal-stack').last()
+                    .css('z-index', z - 1)
+                    .addClass('modal-stack');
+            }, 0);
+        });
+
+        $m.off('hidden.bs.modal.almacenAnidado').on('hidden.bs.modal.almacenAnidado', function () {
+            $('.modal-backdrop.modal-stack').last().remove();
+            if ($('.modal:visible').length) {
+                $('body').addClass('modal-open');
+            } else {
+                $('body').removeClass('modal-almacen-anidado');
+            }
+        });
+
+        if (irMapa) {
+            $m.one('show.bs.modal', function () {
+                $(this).trigger('show.bs.modal.almacenAnidado');
+            });
+            $m.modal('show');
+            window.setTimeout(function () {
+                $('#' + modalId + '-tab-mapa').tab('show');
+            }, 150);
+        } else {
+            $m.one('show.bs.modal', function () {
+                $(this).trigger('show.bs.modal.almacenAnidado');
+            });
+            $('#' + modalId + '-tab-lista').tab('show');
+            $m.modal('show');
+        }
+
+        $m.one('hidden.bs.modal', function () {
+            $(this).trigger('hidden.bs.modal.almacenAnidado');
+        });
+    }
+
     function posicionarHoverPreview(e, hoverEl) {
         if (!hoverEl) return;
         const pad = 14;
@@ -293,7 +366,9 @@
 
         $(document).on('mouseenter', '#' + modalId + '-lista-items .almacen-modal-item', function (e) {
             const id = $(this).data('id');
-            mostrar(almacenPorId(id), e, 'modal');
+            const item = almacenPorId(id);
+            mostrar(item, e, 'modal');
+            actualizarPreviewPanelModal(item);
         });
         $(document).on('mousemove', '#' + modalId + '-lista-items .almacen-modal-item', function (e) {
             if (hoverEl.style.display === 'block') posicionarHoverPreview(e, hoverEl);
@@ -546,14 +621,19 @@
         if (!items.length) {
             sinRes.removeClass('d-none');
             resumen.text('0 almacenes encontrados');
+            actualizarPreviewPanelModal(null);
             return;
         }
 
         sinRes.addClass('d-none');
         resumen.text(items.length + ' almacén' + (items.length === 1 ? '' : 'es') + ' encontrado' + (items.length === 1 ? '' : 's'));
 
+        let previewItem = null;
         items.forEach(function (item) {
             const sel = String(seleccionado) === String(item.id) ? ' is-selected' : '';
+            if (sel) {
+                previewItem = item;
+            }
             const html =
                 '<div class="almacen-modal-item' + sel + '" data-id="' + item.id + '">' +
                     '<div class="almacen-modal-icon"><i class="fas ' + iconoTipo(item.tipo) + '"></i></div>' +
@@ -572,6 +652,8 @@
                 '</div>';
             cont.append(html);
         });
+
+        actualizarPreviewPanelModal(previewItem || items[0]);
     }
 
     function filtrarCatalogo() {
@@ -768,6 +850,7 @@
             recomendarAlmacen(productoHint);
         }
 
+        relocateModalNodes();
         bindHoverPreview();
 
         if (formSelector && requiereAlmacen) {
@@ -830,7 +913,9 @@
                 .on('input change', aplicarFiltrosModal);
 
             $(document).on('click', '#' + modalId + '-lista-items .almacen-modal-item', function () {
-                seleccionarAlmacenPorId($(this).data('id'), true);
+                const id = $(this).data('id');
+                actualizarPreviewPanelModal(almacenPorId(id));
+                seleccionarAlmacenPorId(id, true);
             });
 
             $('a[href="#' + modalId + '-mapa"]').on('shown.bs.tab', function () {
@@ -844,20 +929,15 @@
             });
 
             $(document).on('click', '.btn-cambiar-almacen-modal[data-section="' + sectionId + '"]', function () {
-                $('#' + modalId + '-tab-lista').tab('show');
-                $('#' + modalId).modal('show');
+                abrirModalBuscar();
             });
 
             $(document).on('click', '.btn-buscar-almacenes[data-section="' + sectionId + '"]', function () {
-                $('#' + modalId + '-tab-lista').tab('show');
-                $('#' + modalId).modal('show');
+                abrirModalBuscar();
             });
 
             $(document).on('click', '.btn-ver-mapa-almacenes[data-section="' + sectionId + '"]', function () {
-                $('#' + modalId).modal('show');
-                window.setTimeout(function () {
-                    $('#' + modalId + '-tab-mapa').tab('show');
-                }, 150);
+                abrirModalBuscar({ mapa: true });
             });
 
             $(document).on('click', '.almacen-destacados-filtro [data-filtro][data-section="' + sectionId + '"]', function () {

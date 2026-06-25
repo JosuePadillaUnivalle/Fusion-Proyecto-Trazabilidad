@@ -12,7 +12,9 @@ use App\Models\Prioridad;
 use App\Models\TipoActividad;
 use App\Models\Usuario;
 
+use App\Support\ActividadSecuenciaService;
 use App\Support\LoteTrazabilidadService;
+use App\Support\UsuarioRol;
 
 use Illuminate\Http\UploadedFile;
 
@@ -31,6 +33,8 @@ class LoteSiembraService
         private readonly LoteTrazabilidadService $trazabilidad,
 
         private readonly NotificacionUsuarioService $notificaciones,
+
+        private readonly ActividadSecuenciaService $secuencia,
 
     ) {}
 
@@ -104,7 +108,7 @@ class LoteSiembraService
                 $prioridadId = Prioridad::firstOrCreate(['nombre' => 'Media'], ['nombre' => 'Media'])->prioridadid;
             }
 
-            return Actividad::create([
+            $actividad = Actividad::create([
 
                 'loteid' => $lote->loteid,
 
@@ -123,6 +127,10 @@ class LoteSiembraService
                 'observaciones' => 'Siembra asignada desde trazabilidad del lote.',
 
             ]);
+
+            $this->secuencia->asignarOrden($actividad);
+
+            return $actividad;
 
         });
 
@@ -163,10 +171,19 @@ class LoteSiembraService
         }
 
         $pendiente = $this->trazabilidad->actividadSiembraPendiente($lote);
-        if ($pendiente && (int) $pendiente->usuarioid !== (int) $usuario->usuarioid) {
-            throw ValidationException::withMessages([
-                'siembra' => 'La siembra está asignada a otro agricultor.',
-            ]);
+        if ($pendiente) {
+            $bloqueoOrden = $this->secuencia->mensajeBloqueoOrden($pendiente);
+            if ($bloqueoOrden !== null) {
+                throw ValidationException::withMessages(['siembra' => $bloqueoOrden]);
+            }
+
+            $esAsignado = (int) $pendiente->usuarioid === (int) $usuario->usuarioid;
+            $puedeSustituir = UsuarioRol::gestionaCampo($usuario);
+            if (! $esAsignado && ! $puedeSustituir) {
+                throw ValidationException::withMessages([
+                    'siembra' => 'La siembra está asignada a otro agricultor.',
+                ]);
+            }
         }
 
         $evidenciaPath = \App\Support\EvidenciaFoto::guardar($foto, 'actividades_evidencia');
@@ -176,6 +193,7 @@ class LoteSiembraService
             if ($pendiente) {
                 $pendiente->evidencia_foto_path = $evidenciaPath;
                 $pendiente->fechafin = $ahora;
+                $pendiente->usuarioid_ejecutor = (int) $usuario->usuarioid;
                 if ($observaciones) {
                     $pendiente->observaciones = trim(($pendiente->observaciones ?? '').' '.$observaciones);
                 }
@@ -188,6 +206,7 @@ class LoteSiembraService
                 $actividad = Actividad::create([
                     'loteid' => $lote->loteid,
                     'usuarioid' => $usuario->usuarioid,
+                    'usuarioid_ejecutor' => $usuario->usuarioid,
                     'descripcion' => $tipo->nombre ?? 'Siembra',
                     'fechainicio' => $ahora,
                     'fechafin' => $ahora,
@@ -196,6 +215,7 @@ class LoteSiembraService
                     'observaciones' => $observaciones ?: 'Siembra completada con evidencia fotográfica.',
                     'evidencia_foto_path' => $evidenciaPath,
                 ]);
+                $this->secuencia->asignarOrden($actividad);
             }
 
             app(\App\Support\LoteEstadoPorActividad::class)->aplicarDesdeActividad($actividad);

@@ -28,6 +28,7 @@
     $theme = $theme ?? null;
     $variant = $variant ?? 'filtros';
     $registerScript = $registerScript ?? true;
+    $pinnedOption = $pinnedOption ?? null;
     $esVarianteFiltros = $variant !== 'legacy';
 @endphp
 
@@ -116,6 +117,7 @@ document.addEventListener('DOMContentLoaded', function () {
         emptyLabel: @json($emptyLabel),
         placeholderEmpty: @json($placeholderEmpty),
         params: @json($params),
+        pinnedOption: @json($pinnedOption),
         filter: @json($filter),
         filterAlmacen: @json($filterAlmacen),
         searchLabel: @json($searchLabel),

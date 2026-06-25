@@ -70,7 +70,8 @@
             @if(!empty($puedeMarcarCompletada))
                 <button type="button" class="btn btn-success btn-completar-evidencia"
                     data-action="{{ route('actividades.marcar-realizada', $actividad) }}"
-                    data-titulo="{{ $actividad->tipoActividad->nombre ?? 'Actividad' }}"
+                    data-resumen-url="{{ route('actividades.resumen-completar', $actividad) }}"
+                    data-titulo="{{ $actividad->descripcion ?: ($actividad->tipoActividad->nombre ?? 'Actividad') }}"
                     data-lote="{{ $actividad->lote->nombre ?? 'Sin lote' }}">
                     <i class="fas fa-check mr-1"></i> Marcar como completada
                 </button>

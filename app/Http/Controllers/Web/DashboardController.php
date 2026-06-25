@@ -38,6 +38,7 @@ use App\Models\UsuarioNotificacion;
 use App\Models\AsignacionEtapaPlanta;
 use App\Services\NotificacionUsuarioService;
 use App\Services\RecepcionPlantaMayoristaService;
+use App\Support\AgricultorLoginNotificacion;
 use App\Support\UsuarioRol;
 use App\Support\EtiquetaDemo;
 use App\Support\InsumoCatalogo;
@@ -59,10 +60,16 @@ class DashboardController extends Controller
         $extras = compact('alertas', 'totalAlertas', 'filtros');
 
         if (UsuarioRol::debeAcotarPorAsignacion($user)) {
+            $inicio = $this->buildAgricultorInicioData($user, $filtros);
+
             return view('dashboard.inicio.agricultor', array_merge(
-                $this->buildAgricultorInicioData($user, $filtros),
+                $inicio,
                 $this->filtrosContextoAgricultor($user),
-                $extras,
+                [
+                    'filtros' => $filtros,
+                    'tareasPendientes' => $inicio['tareasPendientes'] ?? [],
+                    'totalTareasPendientes' => $inicio['totalTareasPendientes'] ?? 0,
+                ],
             ));
         }
 
@@ -753,16 +760,20 @@ class DashboardController extends Controller
         $completadas = (clone $actividades)->whereNotNull('fechafin');
         $filtros->aplicarFecha($completadas, 'fechafin');
 
+        $tareasPendientes = AgricultorLoginNotificacion::todasActividadesPendientes($user);
+
         return [
             'stats' => [
                 'lotes_asignados' => (clone $lotes)->count(),
-                'actividades_pendientes' => (clone $actividades)->whereNull('fechafin')->count(),
+                'actividades_pendientes' => count($tareasPendientes),
                 'actividades_hoy' => (clone $actividades)->whereDate('fechainicio', now()->toDateString())->count(),
                 'completadas_mes' => $completadas->count(),
             ],
             'lotesRecientes' => (clone $lotes)->with(['cultivo', 'estadoTipo'])->orderByDesc('loteid')->limit(5)->get(),
             'actividadesPendientes' => (clone $actividades)->with(['lote', 'tipoActividad'])
                 ->whereNull('fechafin')->orderBy('fechainicio')->limit(8)->get(),
+            'tareasPendientes' => $tareasPendientes,
+            'totalTareasPendientes' => count($tareasPendientes),
         ];
     }
 

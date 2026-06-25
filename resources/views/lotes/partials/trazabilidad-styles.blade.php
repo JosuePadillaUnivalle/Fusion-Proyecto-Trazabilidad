@@ -173,6 +173,18 @@
 }
 .trz-dash .evento-trz-evidencia__caption {
     display: block;
-    margin-top: .35rem;
+    margin-top: .25rem;
+}
+.trz-dash .evento-trz-evidencia--icono .evento-trz-evidencia__icono {
+    width: 72px;
+    height: 72px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+    border: 1px solid #7dd3fc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0369a1;
+    font-size: 1.75rem;
 }
 </style>

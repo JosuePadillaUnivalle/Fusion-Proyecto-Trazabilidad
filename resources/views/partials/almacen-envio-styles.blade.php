@@ -204,7 +204,7 @@
     }
     .almacen-hover-preview {
         position: fixed;
-        z-index: 1080;
+        z-index: 1095;
         display: none;
         pointer-events: none;
         max-width: 320px;
@@ -213,6 +213,22 @@
         border-radius: 12px;
         padding: .85rem 1rem;
         box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+    }
+    .almacen-modal-preview-panel {
+        position: sticky;
+        top: .5rem;
+        background: linear-gradient(160deg, #f0fdf4, #fff);
+        border: 2px solid #86efac;
+        border-radius: 12px;
+        padding: 1rem 1.1rem;
+        min-height: 180px;
+        box-shadow: 0 4px 14px rgba(34, 197, 94, .12);
+    }
+    .almacen-modal-preview-panel .almacen-hover-preview__titulo {
+        font-size: 1rem;
+    }
+    body.modal-almacen-anidado .modal-backdrop.modal-stack {
+        opacity: .35;
     }
     .almacen-hover-preview__titulo {
         font-weight: 700;

@@ -641,6 +641,71 @@
             color: #b91c1c;
         }
 
+        #modalSelectorCatalogo.sel-theme-semilla .sel-modal-header {
+            background: linear-gradient(135deg, #166534 0%, #15803d 100%);
+            position: relative;
+            justify-content: center;
+        }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-modal-header-inner {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            min-width: 0;
+        }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-modal-header-icon {
+            display: none !important;
+        }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-modal-header .modal-title {
+            flex: 0 1 auto;
+            text-align: center;
+        }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-modal-header .close {
+            position: absolute;
+            right: 1.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-modal-search-panel {
+            background: #f0fdf4;
+            border-color: #86efac;
+        }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-modal-search-label { color: #166534; }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-modal-table-wrap { border-color: #bbf7d0; }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-modal-table thead th {
+            background: #ecfdf5;
+            color: #166534;
+            border-bottom-color: #bbf7d0;
+        }
+        #modalSelectorCatalogo.sel-theme-semilla .selector-catalogo-row:hover { background: #f0fdf4; }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-col-nombre .sel-row-icon {
+            background: #dcfce7;
+            color: #15803d;
+        }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-meta-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-meta-line {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8rem;
+            color: #475569;
+        }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-meta-line i {
+            width: 1rem;
+            color: #16a34a;
+            text-align: center;
+        }
+        #modalSelectorCatalogo.sel-theme-semilla .sel-col-nombre strong {
+            display: block;
+            font-size: 0.92rem;
+            color: #14532d;
+        }
+
         /* Combobox filtros (variante natural, sin LED) */
         .selector-filtros-field {
             position: relative;

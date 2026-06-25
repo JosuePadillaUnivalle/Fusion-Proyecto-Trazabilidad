@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Almacen;
+use App\Models\Lote;
 use App\Models\Usuario;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -255,5 +256,89 @@ class AlmacenAmbito
                 $a->update(['ambito' => $ambito]);
             }
         });
+    }
+
+    /**
+     * Almacenes agrícolas que el usuario puede elegir al enviar cosecha desde trazabilidad.
+     *
+     * @param  Builder<\App\Models\Almacen>  $query
+     */
+    public static function scopeEnvioCampoDesdeLote(Builder $query, Lote $lote, ?Usuario $user): Builder
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('almacen', 'responsable_usuarioid')) {
+            return $query;
+        }
+
+        if (! $user || UsuarioRol::esAdminGlobal($user)) {
+            if ($lote->usuarioid) {
+                return $query->where('responsable_usuarioid', (int) $lote->usuarioid);
+            }
+
+            return $query;
+        }
+
+        if (UsuarioRol::esJefeAgricultor($user)) {
+            return $query->where('responsable_usuarioid', (int) $user->usuarioid);
+        }
+
+        $ids = array_values(array_unique(array_filter([
+            (int) $user->usuarioid,
+            $lote->usuarioid ? (int) $lote->usuarioid : null,
+        ])));
+
+        if ($ids === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn('responsable_usuarioid', $ids);
+    }
+
+    public static function puedeUsarAlmacenEnvioCampo(Almacen $almacen, Lote $lote, ?Usuario $user): bool
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('almacen', 'responsable_usuarioid')) {
+            return true;
+        }
+
+        $responsable = (int) ($almacen->responsable_usuarioid ?? 0);
+        if ($responsable <= 0) {
+            return $user !== null && UsuarioRol::esAdminGlobal($user);
+        }
+
+        if (! $user) {
+            return false;
+        }
+
+        if (UsuarioRol::esAdminGlobal($user)) {
+            return $lote->usuarioid
+                ? $responsable === (int) $lote->usuarioid
+                : true;
+        }
+
+        if (UsuarioRol::esJefeAgricultor($user)) {
+            return $responsable === (int) $user->usuarioid;
+        }
+
+        $permitidos = array_values(array_unique(array_filter([
+            (int) $user->usuarioid,
+            $lote->usuarioid ? (int) $lote->usuarioid : null,
+        ])));
+
+        return in_array($responsable, $permitidos, true);
+    }
+
+    public static function urlVerAlmacen(Almacen $almacen): string
+    {
+        $prefijo = self::routePrefix(self::resolverAmbito($almacen));
+
+        return route($prefijo.'.show', $almacen);
+    }
+
+    public static function puedeVerAlmacenDesdeHistorial(?Usuario $user): bool
+    {
+        return $user && (
+            UsuarioRol::esAdminGlobal($user)
+            || UsuarioRol::esJefePlanta($user)
+            || UsuarioRol::esJefeAgricultor($user)
+        );
     }
 }

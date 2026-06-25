@@ -19,6 +19,8 @@
         const cosechaPreview = document.getElementById('planCosechaPreview');
         const errorPreview = document.getElementById('planErrorPreview');
         const errorTexto = document.getElementById('planErrorTexto');
+        const limitePreview = document.getElementById('planLimiteAviso');
+        const limiteTexto = document.getElementById('planLimiteTexto');
         const modoRadios = document.querySelectorAll('input[name="plan_modo_ui"]');
         const modoCards = document.querySelectorAll('.plan-modo-card');
         const resultadoGrid = document.getElementById('planResultadoGrid');
@@ -77,6 +79,60 @@
             });
         }
 
+        function sanitizarEntradaNumerica(input, soloEnteros) {
+            if (!input) {
+                return;
+            }
+            let v = String(input.value ?? '');
+            if (soloEnteros) {
+                v = v.replace(/\D/g, '');
+            } else {
+                v = v.replace(/,/g, '.');
+                v = v.replace(/[^\d.]/g, '');
+                const punto = v.indexOf('.');
+                if (punto !== -1) {
+                    v = v.slice(0, punto + 1) + v.slice(punto + 1).replace(/\./g, '');
+                }
+            }
+            if (input.value !== v) {
+                input.value = v;
+            }
+        }
+
+        function enlazarSoloNumeros(input, soloEnteros, onChange) {
+            if (!input) {
+                return;
+            }
+            input.addEventListener('keydown', function (e) {
+                const teclasOk = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+                if (teclasOk.includes(e.key) || e.ctrlKey || e.metaKey) {
+                    return;
+                }
+                if (soloEnteros) {
+                    if (!/^\d$/.test(e.key)) {
+                        e.preventDefault();
+                    }
+                } else if (!/^[\d.,]$/.test(e.key)) {
+                    e.preventDefault();
+                }
+            });
+            input.addEventListener('input', function () {
+                sanitizarEntradaNumerica(input, soloEnteros);
+                if (typeof onChange === 'function') {
+                    onChange();
+                }
+            });
+            input.addEventListener('paste', function (e) {
+                e.preventDefault();
+                const texto = (e.clipboardData || window.clipboardData).getData('text') || '';
+                const limpio = soloEnteros
+                    ? texto.replace(/\D/g, '')
+                    : texto.replace(/,/g, '.').replace(/[^\d.]/g, '');
+                input.value = limpio;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+        }
+
         function modoActual() {
             const checked = document.querySelector('input[name="plan_modo_ui"]:checked');
             return checked ? checked.value : 'hectareas';
@@ -131,6 +187,186 @@
             cosechaPreview?.classList.add('d-none');
             planificacionErrorActiva = true;
             ultimoMensajeError = msg;
+        }
+
+        function mostrarAvisoLimite(msg) {
+            if (!limitePreview || !limiteTexto) return;
+            if (!msg) {
+                limitePreview.classList.add('d-none');
+                limiteTexto.textContent = '';
+                return;
+            }
+            limiteTexto.textContent = msg;
+            limitePreview.classList.remove('d-none');
+        }
+
+        function calcularLimites(ctx, calibre) {
+            const maxHa = parseFloat(ctx?.hectareas_max_stock ?? NaN);
+            if (!Number.isFinite(maxHa) || maxHa < 0) {
+                return { maxHa: null, maxUnidades: null, maxEmpaques: null };
+            }
+            if (maxHa <= 0) {
+                return { maxHa: 0, maxUnidades: 0, maxEmpaques: 0 };
+            }
+            const rendimiento = parseFloat(ctx?.rendimiento_kg_ha || 0);
+            if (!calibre || !Number.isFinite(rendimiento) || rendimiento <= 0) {
+                return { maxHa: maxHa, maxUnidades: null, maxEmpaques: null };
+            }
+            const pesoUnit = Math.max(0.0001, parseFloat(calibre.peso_promedio_kg));
+            const conteo = Math.max(1, parseInt(calibre.conteo_por_empaque, 10) || 1);
+            const kgMax = rendimiento * maxHa;
+            const maxUnidades = Math.round(kgMax / pesoUnit);
+            const maxEmpaques = maxUnidades <= 0 ? 0 : Math.ceil(maxUnidades / conteo);
+
+            return { maxHa: maxHa, maxUnidades: maxUnidades, maxEmpaques: maxEmpaques };
+        }
+
+        function actualizarAtributosMaximos() {
+            const limites = calcularLimites(ultimoContexto, obtenerCalibreActivo());
+            if (objetivoUnidades) {
+                if (limites.maxUnidades !== null) {
+                    objetivoUnidades.max = limites.maxUnidades;
+                } else {
+                    objetivoUnidades.removeAttribute('max');
+                }
+            }
+            if (objetivoEmpaques) {
+                if (limites.maxEmpaques !== null) {
+                    objetivoEmpaques.max = limites.maxEmpaques;
+                } else {
+                    objetivoEmpaques.removeAttribute('max');
+                }
+            }
+            if (supInput) {
+                if (limites.maxHa !== null) {
+                    supInput.max = limites.maxHa;
+                } else {
+                    supInput.removeAttribute('max');
+                }
+            }
+            const stock = parseFloat(ultimoContexto?.stock_disponible ?? NaN);
+            if (cantInput) {
+                if (Number.isFinite(stock) && stock > 0) {
+                    cantInput.max = stock;
+                } else {
+                    cantInput.removeAttribute('max');
+                }
+            }
+        }
+
+        function estaDentroDeLimite(input, max, usarEnteros) {
+            if (!input || max === null || !Number.isFinite(max)) {
+                return true;
+            }
+            const raw = String(input.value ?? '').trim();
+            if (raw === '') {
+                return true;
+            }
+            const n = parseFloat(raw);
+            if (!Number.isFinite(n) || n <= 0) {
+                return true;
+            }
+            const tol = usarEnteros ? 0.5 : 0.0005;
+            return n <= max + tol;
+        }
+
+        function limitarValorInput(input, max, mensaje, usarEnteros) {
+            if (!input || max === null || !Number.isFinite(max)) {
+                return false;
+            }
+            const raw = String(input.value ?? '').trim();
+            if (raw === '') {
+                return false;
+            }
+            const n = parseFloat(raw);
+            const tol = usarEnteros ? 0.5 : 0.0005;
+            if (!Number.isFinite(n) || n <= max + tol) {
+                return false;
+            }
+
+            const valorTope = usarEnteros ? Math.floor(max) : Math.round(max * 1000) / 1000;
+            input.value = valorTope > 0 ? String(valorTope) : '';
+            mostrarAvisoLimite(mensaje);
+            return true;
+        }
+
+        function aplicarLimiteKg() {
+            const stock = parseFloat(ultimoContexto?.stock_disponible ?? NaN);
+            const unidad = ultimoContexto?.stock_unidad || ultimoContexto?.dosis_unidad || 'kg';
+            if (!cantInput || !Number.isFinite(stock) || stock <= 0) {
+                if (cantInput) {
+                    cantInput.removeAttribute('max');
+                }
+                return false;
+            }
+
+            cantInput.max = stock;
+            return limitarValorInput(
+                cantInput,
+                stock,
+                'Lo máximo que puedes utilizar en kg es ' + fmtNum(stock, 2) + ' ' + unidad + '.',
+                false
+            );
+        }
+
+        function aplicarLimiteSegunModo() {
+            const limites = calcularLimites(ultimoContexto, obtenerCalibreActivo());
+            let capEstaVuelta = false;
+            const modoCalc = modoActual();
+
+            if (limites.maxHa !== null) {
+                if (modoCalc === 'unidades' && limites.maxUnidades !== null) {
+                    capEstaVuelta = limitarValorInput(
+                        objetivoUnidades,
+                        limites.maxUnidades,
+                        'Lo máximo que puedes cosechar en unidades es ' + fmtNum(limites.maxUnidades, 0) + '.',
+                        true
+                    ) || capEstaVuelta;
+                } else if (modoCalc === 'empaques' && limites.maxEmpaques !== null) {
+                    capEstaVuelta = limitarValorInput(
+                        objetivoEmpaques,
+                        limites.maxEmpaques,
+                        'Lo máximo que puedes cosechar en cajas es ' + fmtNum(limites.maxEmpaques, 0) + '.',
+                        true
+                    ) || capEstaVuelta;
+                } else if (modoCalc === 'hectareas') {
+                    capEstaVuelta = limitarValorInput(
+                        supInput,
+                        limites.maxHa,
+                        'Lo máximo que puedes planificar en hectáreas es ' + fmtNum(limites.maxHa, 3) + '.',
+                        false
+                    ) || capEstaVuelta;
+                }
+            }
+
+            capEstaVuelta = aplicarLimiteKg() || capEstaVuelta;
+
+            if (!capEstaVuelta && todosLosValoresDentroDeLimite(limites, modoCalc)) {
+                mostrarAvisoLimite('');
+            }
+        }
+
+        function todosLosValoresDentroDeLimite(limites, modoCalc) {
+            if (limites.maxHa !== null) {
+                if (modoCalc === 'unidades' && limites.maxUnidades !== null
+                    && !estaDentroDeLimite(objetivoUnidades, limites.maxUnidades, true)) {
+                    return false;
+                }
+                if (modoCalc === 'empaques' && limites.maxEmpaques !== null
+                    && !estaDentroDeLimite(objetivoEmpaques, limites.maxEmpaques, true)) {
+                    return false;
+                }
+                if (modoCalc === 'hectareas' && !estaDentroDeLimite(supInput, limites.maxHa, false)) {
+                    return false;
+                }
+            }
+
+            const stock = parseFloat(ultimoContexto?.stock_disponible ?? NaN);
+            if (Number.isFinite(stock) && stock > 0 && !estaDentroDeLimite(cantInput, stock, false)) {
+                return false;
+            }
+
+            return true;
         }
 
         function semillaRequeridaEstimada() {
@@ -264,7 +500,7 @@
             } else if (modoCalc === 'empaques') {
                 const objetivo = valorNumericoPositivo(objetivoEmpaques);
                 if (objetivo === null) {
-                    return { ok: false, mensaje: 'Indique cuántos empaques (cajas/sacas) desea obtener.' };
+                    return { ok: false, mensaje: 'Indique cuántas cajas desea obtener.' };
                 }
                 empaques = Math.ceil(objetivo);
                 unidades = empaques * conteoEmpaque;
@@ -397,6 +633,7 @@
                     panel?.classList.remove('d-none');
                     mostrarError('');
                     ultimoContexto = ctx;
+                    actualizarAtributosMaximos();
 
                     if (modoAvanzadoDisponible(ctx)) {
                         poblarCalibres(ctx.calibres, calibreInicial || ctx.calibre_default_id);
@@ -534,6 +771,9 @@
                 return;
             }
 
+            aplicarLimiteSegunModo();
+            actualizarAtributosMaximos();
+
             if ((!calibreSelect?.value || !modoAvanzadoDisponible(ultimoContexto || {})) && ultimoContexto?.tiene_dosis) {
                 recalcularBasico(ultimoContexto);
                 return;
@@ -569,6 +809,7 @@
                 actualizarModoUi();
                 haEditadaManual = false;
                 mostrarError('');
+                mostrarAvisoLimite('');
                 recalcular();
             });
         });
@@ -583,7 +824,7 @@
             });
         });
 
-        [objetivoUnidades, objetivoEmpaques, calibreSelect].forEach(function (el) {
+        [calibreSelect].forEach(function (el) {
             el?.addEventListener('input', function () {
                 sincronizarCalibreHidden();
                 actualizarModoUi();
@@ -596,20 +837,37 @@
             });
         });
 
-        supInput.addEventListener('input', function () {
+        enlazarSoloNumeros(objetivoUnidades, true, function () {
+            sincronizarCalibreHidden();
+            actualizarModoUi();
+            recalcular();
+        });
+        enlazarSoloNumeros(objetivoEmpaques, true, function () {
+            sincronizarCalibreHidden();
+            actualizarModoUi();
+            recalcular();
+        });
+        enlazarSoloNumeros(supInput, false, function () {
             if (modo === 'hectareas') {
                 haEditadaManual = true;
                 recalcular();
             }
         });
-
-        cantInput?.addEventListener('input', function () {
+        enlazarSoloNumeros(cantInput, false, function () {
             semillaEditadaManual = true;
+            const capKg = aplicarLimiteKg();
+            if (!capKg && todosLosValoresDentroDeLimite(
+                calcularLimites(ultimoContexto, obtenerCalibreActivo()),
+                modoActual()
+            )) {
+                mostrarAvisoLimite('');
+            }
         });
 
         semillaWrap.addEventListener('selector-catalogo:change', function (e) {
             semillaEditadaManual = false;
             haEditadaManual = false;
+            mostrarAvisoLimite('');
             const id = e.detail?.id || '';
             if (!id) {
                 cargarContexto('');

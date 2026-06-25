@@ -160,6 +160,7 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
     Route::get('actividades/{actividad}/edit', [ActividadController::class, 'edit'])->name('actividades.edit')->middleware('action.permission:lotes,update');
     Route::put('actividades/{actividad}', [ActividadController::class, 'update'])->name('actividades.update')->middleware('action.permission:lotes,update');
     Route::delete('actividades/{actividad}', [ActividadController::class, 'destroy'])->name('actividades.destroy')->middleware('action.permission:lotes,update');
+    Route::get('actividades/{actividad}/resumen-completar', [ActividadController::class, 'resumenCompletar'])->name('actividades.resumen-completar');
     Route::post('actividades/{actividad}/marcar-realizada', [ActividadController::class, 'marcarRealizada'])->name('actividades.marcar-realizada');
     Route::get('climas/datos-tiempo', [ClimaController::class, 'datosTiempo'])->name('climas.datos-tiempo');
     Route::get('climas', [ClimaController::class, 'index'])->name('climas.index');

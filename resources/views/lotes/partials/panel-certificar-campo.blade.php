@@ -11,6 +11,7 @@
         </p>
 
         @can('certificaciones.create')
+            @if(\App\Support\UsuarioRol::gestionaCampo(auth()->user()))
             <form action="{{ route('certificaciones.store') }}" method="POST" class="mb-3">
                 @csrf
                 <input type="hidden" name="loteid" value="{{ $lote->loteid }}">
@@ -57,6 +58,12 @@
                     </div>
                 </div>
             </form>
+            @else
+            <div class="alert alert-light border small mb-0">
+                <i class="fas fa-info-circle mr-1"></i>
+                Solo el jefe agrícola o administrador puede certificar este lote.
+            </div>
+            @endif
         @else
             <div class="alert alert-light border small mb-0">
                 <i class="fas fa-info-circle mr-1"></i>

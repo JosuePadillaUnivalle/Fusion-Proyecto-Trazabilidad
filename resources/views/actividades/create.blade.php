@@ -21,18 +21,37 @@
             <div class="row">
                 <div class="col-md-8">
 
-                    @include('partials.selector-catalogo', [
-                        'id' => 'actividad_lote',
-                        'name' => 'loteid',
-                        'label' => 'Lote',
-                        'icon' => 'fa-map-marked-alt',
-                        'value' => old('loteid', $loteid ?? null),
-                        'labelSelected' => $loteLabel ?? '',
-                        'endpoint' => route('catalogo-selector.lotes'),
-                        'title' => 'Seleccionar lote',
-                        'searchPlaceholder' => 'Nombre, código o ubicación…',
-                        'required' => true,
-                    ])
+                    @php
+                        $loteFijoId = (int) old('loteid', $loteid ?? 0);
+                        $loteBloqueado = $loteFijoId > 0 && (
+                            ! empty($loteid) || ! empty($desdeTrazabilidad) || old('desde_trazabilidad')
+                        );
+                    @endphp
+
+                    @if($loteBloqueado)
+                        <div class="form-group">
+                            <label><i class="fas fa-map-marked-alt mr-1"></i> Lote <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control bg-light font-weight-bold" readonly
+                                   value="{{ $loteLabel ?? ('Lote #' . $loteFijoId) }}">
+                            <input type="hidden" name="loteid" value="{{ $loteFijoId }}">
+                            <small class="form-text text-muted">
+                                <i class="fas fa-lock mr-1"></i> Lote fijado. Para registrar en otro lote, vuelva a la trazabilidad de ese lote.
+                            </small>
+                        </div>
+                    @else
+                        @include('partials.selector-catalogo', [
+                            'id' => 'actividad_lote',
+                            'name' => 'loteid',
+                            'label' => 'Lote',
+                            'icon' => 'fa-map-marked-alt',
+                            'value' => old('loteid'),
+                            'labelSelected' => $loteLabel ?? '',
+                            'endpoint' => route('catalogo-selector.lotes'),
+                            'title' => 'Seleccionar lote',
+                            'searchPlaceholder' => 'Nombre, código o ubicación…',
+                            'required' => true,
+                        ])
+                    @endif
 
                     @if(!empty($puedeDesignarResponsable))
                         @include('partials.selector-catalogo', [
@@ -44,11 +63,12 @@
                             'labelSelected' => $responsableLabel ?? '',
                             'endpoint' => route('catalogo-selector.usuarios'),
                             'params' => $responsableSelectorParams ?? ['roles' => 'agricultor'],
+                            'pinnedOption' => $responsablePinnedOption ?? null,
                             'title' => 'Seleccionar responsable',
                             'searchPlaceholder' => 'Nombre, correo o usuario…',
                             'help' => ! empty($esJefeAgricultorDesignando)
-                                ? 'Asigne un agricultor de su equipo. Usted supervisa; el empleado recibirá la alerta y será el responsable.'
-                                : 'Elija el agricultor operativo que ejecutará la actividad. Recibirá una alerta en su panel.',
+                                ? 'Elija un operario de su equipo o «Asignarse a sí mismo» si va a ejecutar la tarea.'
+                                : 'Elija el operario que ejecutará la actividad, o «Asignarse a sí mismo».',
                             'required' => true,
                         ])
                     @else
@@ -78,20 +98,27 @@
                         <small class="text-muted">Al elegir el tipo se abrirá un cuadro para indicar insumos o tipo de riego.</small>
                     </div>
 
-                    @include('actividades.partials.detalle-actividad', ['modoSiembra' => false, 'sugerenciaSiembra' => null, 'insumosSiembra' => []])
-
-                    <div class="form-group">
-                        <label><i class="fas fa-align-left mr-1"></i> Descripción</label>
-                        <input type="text" name="descripcion" class="form-control" maxlength="200"
-                               value="{{ old('descripcion') }}">
-                        <small class="form-text text-muted">Opcional. Si la deja vacía, se usará el tipo de actividad.</small>
-                    </div>
+                    @include('actividades.partials.detalle-actividad', [
+                        'modoSiembra' => false,
+                        'sugerenciaSiembra' => null,
+                        'insumosSiembra' => [],
+                    ])
 
                     <div class="form-group">
                         <label><i class="fas fa-flag mr-1"></i> Prioridad <span class="text-danger">*</span></label>
                         <select name="prioridadid" class="form-control" required>
+                            @php
+                                $prioridadSeleccionada = old('prioridadid');
+                                if (! $prioridadSeleccionada) {
+                                    $prioridadSeleccionada = $prioridades->firstWhere(
+                                        fn ($p) => mb_strtolower(trim($p->nombre ?? '')) === 'media'
+                                    )?->prioridadid ?? $prioridades->first()?->prioridadid;
+                                }
+                            @endphp
                             @foreach($prioridades as $p)
-                                <option value="{{ $p->prioridadid }}">{{ ucfirst($p->nombre) }}</option>
+                                <option value="{{ $p->prioridadid }}" @selected((int) $prioridadSeleccionada === (int) $p->prioridadid)>
+                                    {{ ucfirst($p->nombre) }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
@@ -105,7 +132,7 @@
                     <div class="alert alert-light border small mb-0">
                         <i class="fas fa-bell text-info mr-1"></i>
                         @if(!empty($puedeDesignarResponsable))
-                            La actividad quedará <strong>pendiente</strong> hasta que el agricultor asignado la marque como completada.
+                            La actividad quedará <strong>pendiente</strong> hasta que quien la ejecute la marque como completada con foto de evidencia.
                         @else
                             La actividad quedará <strong>pendiente</strong> hasta que la marque como completada desde Actividades o la trazabilidad del lote.
                         @endif
@@ -126,9 +153,9 @@
                                 <i class="fas fa-user mr-1"></i> <strong>Responsable:</strong>
                                 @if(!empty($puedeDesignarResponsable))
                                     @if(!empty($esJefeAgricultorDesignando))
-                                        Usted asigna a un empleado; él recibe la alerta
+                                        Puede asignar a un operario o a usted mismo para ejecutar la tarea
                                     @else
-                                        Lo designa quien registra; el agricultor recibe alerta
+                                        Elija el ejecutor o asígnese a usted mismo si va a completar la tarea
                                     @endif
                                 @else
                                     Usted (agricultor asignado al lote)
@@ -185,21 +212,19 @@
 </div>
 @endsection
 
+@if($errors->any())
 @push('scripts')
 <script>
-document.getElementById('selector_wrap_actividad_lote')?.addEventListener('selector-catalogo:change', function (e) {
-    const extra = e.detail.extra || {};
-    @if(!empty($puedeDesignarResponsable))
-    const idsResponsablesPermitidos = @json(
-        ($usuariosResponsables ?? collect())->pluck('usuarioid')->map(fn ($id) => (int) $id)->values()
-    );
-    if (extra.usuarioid && idsResponsablesPermitidos.includes(Number(extra.usuarioid)) && window.CatalogoSelector) {
-        const respInput = document.querySelector('#selector_wrap_actividad_responsable .selector-catalogo-value');
-        if (!respInput || !respInput.value) {
-            window.CatalogoSelector.setValue('actividad_responsable', extra.usuarioid, extra.responsable || '');
-        }
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.ag-flash--error').forEach(function (el) { el.remove(); });
+    if (window.ModalConfirmar) {
+        window.ModalConfirmar.aviso({
+            titulo: 'No se pudo registrar la actividad',
+            mensaje: @json($errors->first()),
+            tono: 'warning',
+        });
     }
-    @endif
 });
 </script>
 @endpush
+@endif

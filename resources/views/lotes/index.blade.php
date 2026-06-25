@@ -154,11 +154,11 @@
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-blue">
                 <div class="inner">
-                    <h3>{{ $stats['en_produccion'] }}</h3>
-                    <p>En crecimiento</p>
+                    <h3>{{ $stats['planificados'] }}</h3>
+                    <p>Planificados</p>
                 </div>
-                <div class="icon"><i class="fas fa-leaf"></i></div>
-                <span class="small-box-footer">Lotes activos</span>
+                <div class="icon"><i class="fas fa-clipboard-list"></i></div>
+                <span class="small-box-footer">Pendientes de siembra</span>
             </div>
         </div>
         <div class="col-lg-3 col-6">
@@ -172,14 +172,14 @@
             </div>
         </div>
         <div class="col-lg-3 col-6">
-            <div class="small-box small-box-purple">
+            <div class="small-box small-box-green">
                 <div class="inner">
-                    <h3>{{ $stats['con_mapa'] }}</h3>
-                    <p>Con GPS</p>
+                    <h3>{{ $stats['en_produccion'] }}</h3>
+                    <p>En crecimiento</p>
                 </div>
-                <div class="icon"><i class="fas fa-map-pin"></i></div>
-                <a href="{{ route('lotes.mapa') }}" class="small-box-footer">
-                    {{ $stats['sin_gps'] }} sin GPS · Ver mapa <i class="fas fa-arrow-circle-right"></i>
+                <div class="icon"><i class="fas fa-leaf"></i></div>
+                <a href="{{ route('lotes.index', ['estadolotetipoid' => \App\Support\EstadoLoteCatalogo::idPorSlug('en_crecimiento')]) }}" class="small-box-footer">
+                    Lotes activos <i class="fas fa-arrow-circle-right"></i>
                 </a>
             </div>
         </div>
@@ -302,6 +302,7 @@
                             $estadoNombre = $l->estadoTipo->nombre ?? 'Sin estado';
                             $badge = $estadoBadge($estadoNombre);
                             $loteCerrado = \App\Support\EstadoLoteCatalogo::loteEsCerrado($estadoNombre);
+                            $puedeEliminarLote = \App\Support\EstadoLoteCatalogo::loteSePuedeEliminar($estadoNombre);
                         @endphp
                         <tr>
                             <td>
@@ -319,13 +320,14 @@
                             <td class="text-muted small">{{ Str::limit($l->ubicacion_visible, 28) }}</td>
                             <td class="text-center">
                                 <div class="lote-acciones">
+                                    <a href="{{ route('lotes.trazabilidad', $l) }}" class="btn btn-outline-success" title="Trazabilidad del lote"><i class="fas fa-route"></i></a>
                                     <a href="{{ route('lotes.show', $l) }}" class="btn btn-outline-info" title="Ver"><i class="fas fa-eye"></i></a>
-                                    @if($loteCerrado)
-                                        <a href="{{ route('lotes.trazabilidad', $l) }}" class="btn btn-outline-success" title="Trazabilidad del lote"><i class="fas fa-route"></i></a>
-                                    @else
+                                    @if(! $loteCerrado)
                                         @can('lotes.update')
                                         <a href="{{ route('lotes.edit', $l) }}" class="btn btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>
                                         @endcan
+                                    @endif
+                                    @if($puedeEliminarLote)
                                         @can('lotes.delete')
                                         <form action="{{ route('lotes.destroy', $l) }}" method="POST" class="on-submit-confirm">
                                             @csrf @method('DELETE')
@@ -358,6 +360,7 @@
                             $estadoNombre = $l->estadoTipo->nombre ?? 'Sin estado';
                             $badge = $estadoBadge($estadoNombre);
                             $loteCerrado = \App\Support\EstadoLoteCatalogo::loteEsCerrado($estadoNombre);
+                            $puedeEliminarLote = \App\Support\EstadoLoteCatalogo::loteSePuedeEliminar($estadoNombre);
                         @endphp
                 <div class="lote-row-card">
                     <div class="lote-avatar">
@@ -379,13 +382,14 @@
                     </div>
                     <span class="badge {{ $badge }} mr-2 d-none d-md-inline">{{ ucfirst($estadoNombre) }}</span>
                     <div class="lote-acciones flex-shrink-0">
+                        <a href="{{ route('lotes.trazabilidad', $l) }}" class="btn btn-outline-success" title="Trazabilidad"><i class="fas fa-route"></i></a>
                         <a href="{{ route('lotes.show', $l) }}" class="btn btn-outline-info" title="Ver"><i class="fas fa-eye"></i></a>
-                        @if($loteCerrado)
-                            <a href="{{ route('lotes.trazabilidad', $l) }}" class="btn btn-outline-success" title="Trazabilidad"><i class="fas fa-route"></i></a>
-                        @else
+                        @if(! $loteCerrado)
                             @can('lotes.update')
                             <a href="{{ route('lotes.edit', $l) }}" class="btn btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>
                             @endcan
+                        @endif
+                        @if($puedeEliminarLote)
                             @can('lotes.delete')
                             <form action="{{ route('lotes.destroy', $l) }}" method="POST" class="on-submit-confirm">
                                 @csrf @method('DELETE')

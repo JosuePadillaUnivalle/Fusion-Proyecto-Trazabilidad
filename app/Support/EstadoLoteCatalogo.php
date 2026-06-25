@@ -29,15 +29,20 @@ class EstadoLoteCatalogo
             'descripcion' => 'El cultivo alcanzó las condiciones para ser cosechado.',
             'orden' => 4,
         ],
+        'certificado' => [
+            'label' => 'Certificado',
+            'descripcion' => 'El lote fue certificado en campo.',
+            'orden' => 5,
+        ],
         'cosechado' => [
             'label' => 'Cosechado',
             'descripcion' => 'La producción fue recolectada.',
-            'orden' => 5,
+            'orden' => 6,
         ],
         'finalizado' => [
             'label' => 'Finalizado',
             'descripcion' => 'El ciclo del lote terminó y ya no se realizarán más actividades.',
-            'orden' => 6,
+            'orden' => 7,
         ],
     ];
 
@@ -52,7 +57,7 @@ class EstadoLoteCatalogo
         'en produccion' => 'en_crecimiento',
         'en certificación' => 'en_crecimiento',
         'en certificacion' => 'en_crecimiento',
-        'certificado' => 'listo_para_cosecha',
+        'certificado' => 'certificado',
         'listo para cosecha' => 'listo_para_cosecha',
         'cosechado' => 'cosechado',
         'en descanso' => 'finalizado',
@@ -151,6 +156,12 @@ class EstadoLoteCatalogo
         }
 
         return in_array(mb_strtolower(trim($nombreEstado)), ['certificado', 'no conforme'], true);
+    }
+
+    /** Solo lotes en planificación (incluye legacy «Disponible») pueden eliminarse. */
+    public static function loteSePuedeEliminar(?string $nombreEstado): bool
+    {
+        return self::slugFromNombre($nombreEstado) === 'planificado';
     }
 
     /** @return array<int> */

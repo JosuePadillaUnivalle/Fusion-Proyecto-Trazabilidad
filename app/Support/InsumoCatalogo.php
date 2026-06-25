@@ -211,6 +211,34 @@ class InsumoCatalogo
         return $ids === [] ? $query->whereRaw('1 = 0') : $query->whereIn('tipoinsumoid', $ids);
     }
 
+    /**
+     * Material de siembra solo desde inventario agrícola (nunca planta, mayorista ni PDV).
+     */
+    public static function aplicarFiltroMaterialSiembraInventario(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('almacen') || ! \Illuminate\Support\Facades\Schema::hasColumn('insumo', 'almacenid')) {
+            return $query;
+        }
+
+        $almacenesAgricolas = \App\Models\Almacen::query()
+            ->where('activo', true)
+            ->where(function ($q) {
+                \App\Support\AlmacenAmbito::scope($q, \App\Support\AlmacenAmbito::AGRICOLA);
+            })
+            ->pluck('almacenid')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->values()
+            ->all();
+
+        return $query->where(function ($q) use ($almacenesAgricolas) {
+            $q->whereNull('almacenid');
+            if ($almacenesAgricolas !== []) {
+                $q->orWhereIn('almacenid', $almacenesAgricolas);
+            }
+        });
+    }
+
     public static function tipoProductoTerminadoId(): ?int
     {
         $id = TipoInsumo::query()

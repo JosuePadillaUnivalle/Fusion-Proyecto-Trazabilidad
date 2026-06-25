@@ -7,6 +7,7 @@ use App\Models\EstadoLoteInsumo;
 use App\Models\Insumo;
 use App\Models\Lote;
 use App\Models\LoteInsumo;
+use App\Models\TipoInsumo;
 use App\Support\ActividadDetalleCatalogo;
 use App\Support\InsumoCatalogo;
 use App\Support\InsumoImagenCatalogo;
@@ -178,13 +179,12 @@ class ActividadInsumoService
      */
     public function listarInsumosParaModal(string $tipoSlug, ?Lote $lote = null): array
     {
-        InsumoCatalogo::asegurarInsumosCampo();
-
-        InsumoCatalogo::asegurarCatalogosBase();
-
-        $tipoIds = InsumoCatalogo::tiposOrdenados()
-            ->filter(fn ($t) => InsumoCatalogo::slugFromNombreTipo($t->nombre) === $tipoSlug)
+        $tipoIds = TipoInsumo::query()
+            ->get(['tipoinsumoid', 'nombre'])
+            ->filter(fn (TipoInsumo $t) => InsumoCatalogo::slugFromNombreTipo($t->nombre) === $tipoSlug)
             ->pluck('tipoinsumoid')
+            ->map(fn ($id) => (int) $id)
+            ->values()
             ->all();
 
         if ($tipoIds === []) {

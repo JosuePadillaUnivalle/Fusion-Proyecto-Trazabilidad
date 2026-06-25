@@ -49,19 +49,21 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        if (Auth::check()) {
-            return redirect()->route('dashboard');
-        }
+        $email = trim($credentials['email']);
+        $password = $credentials['password'];
 
-        if (! Auth::attempt(
-            ['email' => $credentials['email'], 'password' => $credentials['password']],
-            $request->boolean('remember', true)
-        )) {
+        $usuario = Usuario::query()
+            ->whereRaw('LOWER(TRIM(email)) = ?', [mb_strtolower($email)])
+            ->first();
+
+        if (! $usuario || ! Hash::check($password, $usuario->getAuthPassword())) {
             return back()
                 ->withErrors(['email' => 'Credenciales inválidas.'])
                 ->withInput($request->only('email'))
                 ->withCookie($this->cookieOlvidarRecordarme());
         }
+
+        Auth::login($usuario, $request->boolean('remember', true));
 
         $user = Auth::user();
         $estado = $user->estado_cuenta ?? CuentaEstado::APROBADO;

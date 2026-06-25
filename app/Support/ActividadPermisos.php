@@ -18,11 +18,14 @@ final class ActividadPermisos
         }
 
         if (UsuarioRol::esJefeAgricultor($user)) {
-            return in_array(
-                (int) $actividad->usuarioid,
-                UsuarioRol::idsEmpleadosOperativosDeJefeAgricultor($user),
-                true
-            );
+            $actividad->loadMissing('lote');
+
+            return $actividad->lote
+                && in_array(
+                    (int) $actividad->lote->usuarioid,
+                    UsuarioRol::idsUsuariosBajoJefeAgricultor($user),
+                    true
+                );
         }
 
         if (UsuarioRol::debeAcotarPorAsignacion($user)) {
@@ -38,16 +41,24 @@ final class ActividadPermisos
             return false;
         }
 
-        if (UsuarioRol::esAdminGlobal($user)) {
-            return true;
+        $secuencia = app(ActividadSecuenciaService::class);
+        if (! $secuencia->esSiguienteEnCola($actividad, false)) {
+            return false;
         }
 
-        if (UsuarioRol::esJefeAgricultor($user)) {
-            return in_array(
-                (int) $actividad->usuarioid,
-                UsuarioRol::idsEmpleadosOperativosDeJefeAgricultor($user),
-                true
-            );
+        if (UsuarioRol::gestionaCampo($user)) {
+            $actividad->loadMissing('lote');
+
+            if (UsuarioRol::esAdminGlobal($user)) {
+                return true;
+            }
+
+            return $actividad->lote
+                && in_array(
+                    (int) $actividad->lote->usuarioid,
+                    UsuarioRol::idsUsuariosBajoJefeAgricultor($user),
+                    true
+                );
         }
 
         if (UsuarioRol::debeAcotarPorAsignacion($user)) {

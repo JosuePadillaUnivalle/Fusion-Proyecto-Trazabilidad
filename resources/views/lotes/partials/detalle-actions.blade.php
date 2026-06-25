@@ -4,6 +4,7 @@
             <a href="{{ route('lotes.index') }}" class="btn btn-outline-secondary btn-action">
                 <i class="fas fa-arrow-left mr-1"></i> Volver al listado
             </a>
+            @if(empty($ocultarGestion))
             <div class="d-flex flex-wrap" style="gap:.4rem;">
                 @can('lotes.update')
                 <a href="{{ route('lotes.edit', $lote) }}" class="btn btn-outline-warning btn-action">
@@ -11,6 +12,7 @@
                 </a>
                 @endcan
                 @can('lotes.delete')
+                @if(\App\Support\EstadoLoteCatalogo::loteSePuedeEliminar($lote->estadoTipo->nombre ?? null))
                 <form action="{{ route('lotes.destroy', $lote) }}" method="POST" class="d-inline"
                     onsubmit="return confirm('¿Eliminar este lote?')">
                     @csrf
@@ -19,8 +21,10 @@
                         <i class="fas fa-trash mr-1"></i> Eliminar
                     </button>
                 </form>
+                @endif
                 @endcan
             </div>
+            @endif
         </div>
     </div>
 </div>

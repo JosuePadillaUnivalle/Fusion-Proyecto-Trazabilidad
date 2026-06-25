@@ -108,20 +108,20 @@
 
     <div id="planObjetivoUnidadesWrap" class="form-group mb-2 d-none">
         <label class="small font-weight-bold mb-1" for="planObjetivoUnidades">Unidades a cosechar</label>
-        <input type="number" step="1" min="1" id="planObjetivoUnidades" class="form-control" placeholder="Ej. 50000">
+        <input type="text" inputmode="numeric" id="planObjetivoUnidades" class="form-control" placeholder="Ej. 50000" autocomplete="off">
     </div>
 
     <div id="planObjetivoEmpaquesWrap" class="form-group mb-2 d-none">
         <label class="small font-weight-bold mb-1" for="planObjetivoEmpaques">Cajas a obtener</label>
-        <input type="number" step="1" min="1" id="planObjetivoEmpaques" class="form-control" placeholder="Ej. 1500">
+        <input type="text" inputmode="numeric" id="planObjetivoEmpaques" class="form-control" placeholder="Ej. 1500" autocomplete="off">
     </div>
 
     <div id="superficieWrap" class="form-group mb-2">
         <label class="small font-weight-bold mb-1" for="superficie">
             <i class="fas fa-ruler-combined mr-1"></i> Superficie (hectáreas) <span class="text-danger">*</span>
         </label>
-        <input type="number" step="0.001" name="superficie" id="superficie" class="form-control" min="0.01" required
-               placeholder="Ej. 5" value="{{ $superficieValor }}">
+        <input type="text" inputmode="decimal" name="superficie" id="superficie" class="form-control" required
+               placeholder="Ej. 5" value="{{ $superficieValor }}" autocomplete="off">
         <p class="campo-guia mb-0 small">Se refleja en el círculo del mapa.</p>
     </div>
 
@@ -135,10 +135,10 @@
             Kg a utilizar <span id="planInsumoUsoNombre" class="font-weight-normal text-muted"></span>
         </label>
         <div class="input-group input-group-sm">
-            <input type="number" step="0.001" min="0" name="cantidad_semilla_planificada"
+            <input type="text" inputmode="decimal" name="cantidad_semilla_planificada"
                    id="cantidad_semilla_planificada" class="form-control"
                    value="{{ $cantidadSemillaPlanificada !== '' && $cantidadSemillaPlanificada !== null ? $cantidadSemillaPlanificada : '' }}"
-                   placeholder="Automático">
+                   placeholder="Automático" autocomplete="off">
             <div class="input-group-append">
                 <span class="input-group-text" id="cantidadSemillaUnidad">{{ $cantidadSemillaUnidad }}</span>
             </div>
@@ -146,6 +146,11 @@
         <div id="dosisSiembraPreview" class="small text-muted mt-1 d-none">
             <span id="dosisSiembraTexto"></span>
         </div>
+    </div>
+
+    <div id="planLimiteAviso" class="alert alert-info small mb-2 d-none py-2 px-3">
+        <i class="fas fa-info-circle mr-1"></i>
+        <span id="planLimiteTexto"></span>
     </div>
 
     <div id="planErrorPreview" class="alert alert-warning small mb-0 d-none py-2 px-3">

@@ -107,7 +107,9 @@ class AuthController extends Controller
             'password' => 'required'
         ]);
 
-        $usuario = Usuario::where('email', $data['email'])->first();
+        $usuario = Usuario::query()
+            ->whereRaw('LOWER(TRIM(email)) = ?', [mb_strtolower(trim($data['email']))])
+            ->first();
 
         if (!$usuario || !Hash::check($data['password'], $usuario->passwordhash)) {
             return response()->json([

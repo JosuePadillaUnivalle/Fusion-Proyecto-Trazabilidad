@@ -24,11 +24,12 @@ class ProtegerBdLocalCommand extends Command
             $lotes = Schema::hasTable('lote') ? (int) DB::table('lote')->count() : 0;
             $this->warn('La base local estaba vacía. Se restauró desde database.snapshot.sqlite.');
             $this->info("Listo: {$total} usuarios, {$lotes} lotes.");
-            $this->line('  admin@agrofusion.com / 12345');
-            $this->line('  LuisGuerrero123@gmail.com / 12345');
-
-            return self::SUCCESS;
         }
+
+        LocalDatabaseGuard::normalizarTodasCredencialesLocales();
+        $this->info('Contraseñas locales reparadas: todas las cuentas usan 12345');
+        $this->line('  admin@agrofusion.com / 12345');
+        $this->line('  LuisGuerrero123@gmail.com / 12345');
 
         return self::SUCCESS;
     }

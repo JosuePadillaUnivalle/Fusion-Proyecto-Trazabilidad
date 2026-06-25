@@ -20,6 +20,7 @@ use App\Support\EstadoLoteCatalogo;
 use App\Support\InsumoCatalogo;
 use App\Support\LoteAgricolaNombre;
 use App\Support\LoteCultivoResolver;
+use App\Support\LoteAcceso;
 use App\Support\LoteDefaults;
 use App\Services\PlanificacionCosechaService;
 use App\Services\LoteEliminacionService;
@@ -29,6 +30,7 @@ use App\Support\SuperficieFormato;
 use App\Support\UbicacionGpsParser;
 use App\Support\LoteEstadoPorActividad;
 use App\Support\LoteTrazabilidadService;
+use App\Services\LoteSiembraService;
 use App\Services\NotificacionUsuarioService;
 use App\Support\UsuarioRol;
 use Illuminate\Http\Request;
@@ -40,7 +42,7 @@ use Illuminate\Validation\ValidationException;
 class LoteController extends Controller
 {
     /** Roles que pueden ser responsables de un lote (nunca admin). */
-    private const ROLES_RESPONSABLE_LOTE = ['agricultor'];
+    private const ROLES_RESPONSABLE_LOTE = ['agricultor', 'jefe_agricultor'];
 
     public function __construct(
         private LoteTrazabilidadService $trazabilidadService,
@@ -80,15 +82,14 @@ class LoteController extends Controller
             $query->where('usuarioid', (int) $request->usuarioid);
         }
 
+        $statsBase = Lote::query();
+        $this->aplicarScopeLotesVisibles($statsBase, $request->user());
         $stats = [
-            'total' => Lote::count(),
-            'en_produccion' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en crecimiento']))->count(),
-            'sembrados' => Lote::whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['sembrado']))->count(),
-            'hectareas' => round((float) (Lote::sum('superficie') ?? 0), 2),
-            'con_mapa' => Lote::whereNotNull('latitud')->whereNotNull('longitud')->count(),
-            'sin_gps' => Lote::where(function ($q) {
-                $q->whereNull('latitud')->orWhereNull('longitud');
-            })->count(),
+            'total' => (clone $statsBase)->count(),
+            'planificados' => (clone $statsBase)->whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['planificado']))->count(),
+            'en_produccion' => (clone $statsBase)->whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en crecimiento']))->count(),
+            'sembrados' => (clone $statsBase)->whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['sembrado']))->count(),
+            'hectareas' => round((float) ((clone $statsBase)->sum('superficie') ?? 0), 2),
         ];
 
         $lotes = $query->orderByDesc('loteid')->paginate(15)->withQueryString();
@@ -171,9 +172,10 @@ class LoteController extends Controller
     public function create()
     {
         $user = auth()->user();
-        $mostrarSelectorPropietario = $this->puedeDesignarResponsableLote($user);
+        $esJefeSolo = $user && UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user);
+        $mostrarSelectorPropietario = $this->puedeDesignarResponsableLote($user) && ! $esJefeSolo;
         $responsableSelectorParams = $this->paramsSelectorResponsable($user);
-        $esJefeAgricultorDesignando = $user && UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user);
+        $esJefeAgricultorDesignando = $esJefeSolo;
 
         $propietarioPorDefecto = $this->responsableLotePorDefecto($user);
         $usuarioidInicial = (int) old('usuarioid', $propietarioPorDefecto ?? 0);
@@ -347,6 +349,7 @@ class LoteController extends Controller
         $data = LoteDefaults::enrich($data, true);
         $lote = Lote::create($data);
         LoteDefaults::registrarHistorialInicial($lote);
+        $this->asignarSiembraInicialSiCorresponde($lote, (int) $request->user()->usuarioid);
         $this->notificaciones->loteAsignado($lote);
 
         return redirect()
@@ -360,9 +363,12 @@ class LoteController extends Controller
 
     public function show(Lote $lote, Request $request)
     {
-        $this->autorizarLoteAsignado($request, $lote);
+        $this->autorizarLoteVisible($request, $lote);
 
-        return view('lotes.show', $this->trazabilidadService->buildLoteDetalleBase($lote));
+        return view('lotes.show', array_merge(
+            $this->trazabilidadService->buildLoteDetalleBase($lote),
+            ['solo_lectura_lote' => LoteAcceso::soloLectura($request->user(), $lote)],
+        ));
     }
 
     public function cambiarEstadoForm(Lote $lote, Request $request)
@@ -413,12 +419,21 @@ class LoteController extends Controller
 
     public function trazabilidad(Lote $lote, Request $request)
     {
+        $this->autorizarLoteVisible($request, $lote);
+
         $user = $request->user();
         $lote->loadMissing('usuario');
         $data = $this->trazabilidadService->dashboardLote($lote, $request);
 
         if ($data['puede_enviar_almacen'] ?? false) {
-            $data = array_merge($data, $this->trazabilidadService->datosFormularioEnvioAlmacen($lote));
+            $data = array_merge($data, $this->trazabilidadService->datosFormularioEnvioAlmacen($lote, $user));
+        }
+
+        if (LoteAcceso::soloLectura($user, $lote)) {
+            $data['puede_asignar_siembra'] = false;
+            $data['puede_completar_siembra_directa'] = false;
+            $data['url_completar_siembra'] = null;
+            $data['url_asignar_actividad'] = null;
         }
 
         $puedeDesignar = $this->puedeDesignarResponsableLote($user);
@@ -441,12 +456,19 @@ class LoteController extends Controller
             'responsable_siembra_params' => $this->paramsSelectorResponsable($user),
             'responsable_siembra_inicial' => $responsableInicial,
             'responsable_siembra_label' => $responsableLabel,
+            'solo_lectura_lote' => LoteAcceso::soloLectura($user, $lote),
+            'puede_ver_almacen_historial' => AlmacenAmbito::puedeVerAlmacenDesdeHistorial($user),
         ]));
     }
 
     public function enviarAlmacen(Request $request, Lote $lote)
     {
-        $this->autorizarLoteAsignado($request, $lote);
+        $user = $request->user();
+        if (! $user || ! UsuarioRol::gestionaCampo($user)) {
+            abort(403, 'Solo el jefe agrícola o administrador puede enviar la cosecha al almacén.');
+        }
+
+        $this->autorizarLoteGestion($request, $lote);
 
         if (! $this->trazabilidadService->puedeEnviarAlmacenCampo($lote)) {
             $bloqueo = $this->certificacionCampo->mensajeBloqueoAlmacen($lote);
@@ -480,6 +502,12 @@ class LoteController extends Controller
             $almacen = AlmacenAmbito::scope(Almacen::query(), AlmacenAmbito::AGRICOLA)
                 ->where('almacenid', $data['almacenid'])
                 ->firstOrFail();
+
+            if (! AlmacenAmbito::puedeUsarAlmacenEnvioCampo($almacen, $lote, $user)) {
+                throw ValidationException::withMessages([
+                    'almacenid' => 'No puede enviar la cosecha a ese almacén agrícola.',
+                ]);
+            }
 
             $cantidadBaseKg = (float) ($produccion->cantidad_base ?? $this->capacidadService->convertirAKg(
                 (float) $produccion->cantidad,
@@ -544,7 +572,7 @@ class LoteController extends Controller
     public function edit(Lote $lote, Request $request)
     {
         $user = $request->user();
-        $this->autorizarLoteAsignado($request, $lote);
+        $this->autorizarLoteGestion($request, $lote);
 
         $lote->load(['usuario', 'cultivo', 'insumoSemilla', 'estadoTipo']);
 
@@ -587,7 +615,7 @@ class LoteController extends Controller
 
     public function update(Request $request, Lote $lote)
     {
-        $this->autorizarLoteAsignado($request, $lote);
+        $this->autorizarLoteGestion($request, $lote);
         $lote->loadMissing('estadoTipo');
 
         if (EstadoLoteCatalogo::loteEsCerrado($lote->estadoTipo?->nombre)) {
@@ -628,6 +656,7 @@ class LoteController extends Controller
         );
         $lote->update(LoteDefaults::enrich($data, false));
         $lote->refresh();
+        $this->asignarSiembraInicialSiCorresponde($lote, (int) $request->user()->usuarioid);
         $this->notificaciones->loteAsignado($lote, $anteriorUsuarioid);
 
         return redirect()->route('lotes.index')->with('success', 'Lote actualizado.');
@@ -635,7 +664,23 @@ class LoteController extends Controller
 
     public function destroy(Lote $lote, LoteEliminacionService $eliminacion)
     {
-        $eliminacion->eliminar($lote);
+        $lote->loadMissing('estadoTipo');
+
+        if (! EstadoLoteCatalogo::loteSePuedeEliminar($lote->estadoTipo?->nombre)) {
+            return redirect()->route('lotes.index')
+                ->with('error_modal', true)
+                ->with('error_modal_titulo', 'No se puede eliminar')
+                ->with('error', 'Solo se pueden eliminar lotes en estado Planificado.');
+        }
+
+        try {
+            $eliminacion->eliminar($lote);
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->route('lotes.index')
+                ->with('error_modal', true)
+                ->with('error_modal_titulo', 'No se puede eliminar')
+                ->with('error', $e->getMessage());
+        }
 
         return redirect()->route('lotes.index')->with('success', 'Lote eliminado.');
     }
@@ -665,7 +710,7 @@ class LoteController extends Controller
             return false;
         }
 
-        if ($usuario->hasRole('agricultor')) {
+        if ($usuario->hasRole('agricultor') || $usuario->hasRole('jefe_agricultor')) {
             return true;
         }
 
@@ -680,38 +725,23 @@ class LoteController extends Controller
 
     private function aplicarScopeLotesVisibles($query, ?Usuario $user): void
     {
-        if (! $user) {
-            return;
-        }
+        LoteAcceso::aplicarScopeVisibles($query, $user);
+    }
 
-        if (UsuarioRol::debeAcotarPorAsignacion($user)) {
-            $query->where('usuarioid', (int) $user->usuarioid);
-        } elseif (UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
-            $query->whereIn('usuarioid', UsuarioRol::idsUsuariosBajoJefeAgricultor($user));
+    private function autorizarLoteVisible(Request $request, Lote $lote): void
+    {
+        if (! LoteAcceso::puedeVer($request->user(), $lote)) {
+            LoteAcceso::denegarConModal($request);
         }
     }
 
-    private function autorizarLoteAsignado(Request $request, Lote $lote): void
+    private function autorizarLoteGestion(Request $request, Lote $lote): void
     {
-        $user = $request->user();
-        if (! $user) {
-            abort(403);
-        }
-
-        if (UsuarioRol::esJefeAgricultor($user) && ! UsuarioRol::esAdminGlobal($user)) {
-            if (! in_array((int) $lote->usuarioid, UsuarioRol::idsUsuariosBajoJefeAgricultor($user), true)) {
-                abort(403, 'No tienes acceso a este lote.');
-            }
-
-            return;
-        }
-
-        if (! UsuarioRol::debeAcotarPorAsignacion($user)) {
-            return;
-        }
-
-        if ((int) $lote->usuarioid !== (int) $user->usuarioid) {
-            abort(403, 'No tienes acceso a este lote.');
+        if (! LoteAcceso::puedeGestionar($request->user(), $lote)) {
+            LoteAcceso::denegarConModal(
+                $request,
+                'No tienes permiso para modificar este lote. Solo puedes consultarlo si participaste en él.'
+            );
         }
     }
 
@@ -745,6 +775,10 @@ class LoteController extends Controller
         }
 
         if (UsuarioRol::esJefeAgricultor($actor)) {
+            if ((int) $usuarioid === (int) $actor->usuarioid) {
+                return true;
+            }
+
             $empleado = Usuario::find($usuarioid);
 
             return $empleado
@@ -758,6 +792,10 @@ class LoteController extends Controller
     {
         if (! $user || $this->usuarioEsAdmin($user)) {
             return null;
+        }
+
+        if (UsuarioRol::esJefeAgricultor($user)) {
+            return (int) $user->usuarioid;
         }
 
         $role = strtolower((string) ($user->role ?? ''));
@@ -965,5 +1003,30 @@ class LoteController extends Controller
             'unidad' => $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? 'ud',
             'sin_stock' => $stock <= 0,
         ];
+    }
+
+    private function asignarSiembraInicialSiCorresponde(Lote $lote, ?int $asignadoPorId): void
+    {
+        if (! $lote->usuarioid) {
+            return;
+        }
+
+        if ($this->trazabilidadService->actividadSiembraPendiente($lote) !== null) {
+            return;
+        }
+
+        if ($this->trazabilidadService->siembraCompletada($lote)) {
+            return;
+        }
+
+        try {
+            app(LoteSiembraService::class)->asignar(
+                $lote,
+                (int) $lote->usuarioid,
+                $asignadoPorId && (int) $asignadoPorId !== (int) $lote->usuarioid ? $asignadoPorId : null
+            );
+        } catch (ValidationException) {
+            // El lote aún no está en fase de siembra o ya tiene siembra registrada.
+        }
     }
 }
