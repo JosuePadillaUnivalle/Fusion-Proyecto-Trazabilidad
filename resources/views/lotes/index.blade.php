@@ -247,7 +247,7 @@
                                 <option value="{{ $e->estadolotetipoid }}"
                                     @selected(($filtros['estadolotetipoid'] ?? '') == $e->estadolotetipoid)
                                     title="{{ $slug ? \App\Support\EstadoLoteCatalogo::descripcion($slug) : '' }}">
-                                    {{ $e->nombre }}
+                                    {{ $slug ? \App\Support\EstadoLoteCatalogo::label($slug) : $e->nombre }}
                                 </option>
                             @endforeach
                         </select>
@@ -300,6 +300,8 @@
                     @forelse($lotes as $l)
                         @php
                             $estadoNombre = $l->estadoTipo->nombre ?? 'Sin estado';
+                            $estadoSlug = EstadoLoteCatalogo::slugFromNombre($estadoNombre);
+                            $estadoEtiqueta = $estadoSlug ? EstadoLoteCatalogo::label($estadoSlug) : ucfirst($estadoNombre);
                             $badge = $estadoBadge($estadoNombre);
                             $loteCerrado = \App\Support\EstadoLoteCatalogo::loteEsCerrado($estadoNombre);
                             $puedeEliminarLote = \App\Support\EstadoLoteCatalogo::loteSePuedeEliminar($estadoNombre);
@@ -314,7 +316,7 @@
                             <td class="text-muted">{{ $l->usuario->nombre ?? '—' }}</td>
                             <td>{{ $l->cultivo_etiqueta ?? '—' }}</td>
                             <td>
-                                <span class="badge {{ $badge }}">{{ ucfirst($l->estadoTipo->nombre ?? '—') }}</span>
+                                <span class="badge {{ $badge }}">{{ $estadoEtiqueta }}</span>
                             </td>
                             <td class="text-right font-weight-bold">@superficie($l->superficie, 1)</td>
                             <td class="text-muted small">{{ Str::limit($l->ubicacion_visible, 28) }}</td>
@@ -358,6 +360,8 @@
                     @forelse($lotes as $l)
                         @php
                             $estadoNombre = $l->estadoTipo->nombre ?? 'Sin estado';
+                            $estadoSlug = EstadoLoteCatalogo::slugFromNombre($estadoNombre);
+                            $estadoEtiqueta = $estadoSlug ? EstadoLoteCatalogo::label($estadoSlug) : ucfirst($estadoNombre);
                             $badge = $estadoBadge($estadoNombre);
                             $loteCerrado = \App\Support\EstadoLoteCatalogo::loteEsCerrado($estadoNombre);
                             $puedeEliminarLote = \App\Support\EstadoLoteCatalogo::loteSePuedeEliminar($estadoNombre);
@@ -380,7 +384,7 @@
                             @endif
                         </div>
                     </div>
-                    <span class="badge {{ $badge }} mr-2 d-none d-md-inline">{{ ucfirst($estadoNombre) }}</span>
+                    <span class="badge {{ $badge }} mr-2 d-none d-md-inline">{{ $estadoEtiqueta }}</span>
                     <div class="lote-acciones flex-shrink-0">
                         <a href="{{ route('lotes.trazabilidad', $l) }}" class="btn btn-outline-success" title="Trazabilidad"><i class="fas fa-route"></i></a>
                         <a href="{{ route('lotes.show', $l) }}" class="btn btn-outline-info" title="Ver"><i class="fas fa-eye"></i></a>

@@ -257,8 +257,11 @@ final class DashboardCharts
     /**
      * @return array<string, mixed>
      */
-    public static function paraJefeAgricola(DashboardFiltros $filtros, ?int $usuarioId = null, bool $todos = false): array
+    public static function paraJefeAgricola(DashboardFiltros $filtros, ?int $usuarioId = null, bool $todos = false, ?Usuario $viewer = null): array
     {
+        $viewer ??= auth()->user();
+        $acotarEquipo = CampoJefeScope::debeAcotar($viewer) && ! $todos && ! $usuarioId;
+
         $meses = $filtros->mesesParaGrafico();
         $labels = array_column($meses, 'nombre');
 
@@ -270,6 +273,8 @@ final class DashboardCharts
             $filtros->aplicarCultivoEnLote($q);
             if ($usuarioId && ! $todos) {
                 $q->whereHas('lote', fn ($l) => $l->where('usuarioid', $usuarioId));
+            } elseif ($acotarEquipo) {
+                CampoJefeScope::aplicarEnRelacionLote($q, $viewer);
             }
             if ($filtros->tieneRango()) {
                 $filtros->aplicarFecha($q, 'fechacosecha');
@@ -277,10 +282,12 @@ final class DashboardCharts
             $cosechasMes[] = (float) $q->sum('cantidad');
         }
 
-        $actividadesMes = self::conteoPorMes(Actividad::query(), 'fechainicio', $meses, $filtros, function ($q) use ($filtros, $usuarioId, $todos) {
+        $actividadesMes = self::conteoPorMes(Actividad::query(), 'fechainicio', $meses, $filtros, function ($q) use ($filtros, $usuarioId, $todos, $acotarEquipo, $viewer) {
             $filtros->aplicarCultivoEnLote($q);
             if ($usuarioId && ! $todos) {
-                $q->where('usuarioid', $usuarioId);
+                $q->whereHas('lote', fn ($l) => $l->where('usuarioid', $usuarioId));
+            } elseif ($acotarEquipo) {
+                CampoJefeScope::aplicarEnRelacionLote($q, $viewer);
             }
         });
 
@@ -291,6 +298,7 @@ final class DashboardCharts
             ->when($filtros->loteId, fn ($q) => $q->where('lote.loteid', $filtros->loteId))
             ->when($filtros->estadoLoteId, fn ($q) => $q->where('lote.estadolotetipoid', $filtros->estadoLoteId))
             ->when($usuarioId && ! $todos, fn ($q) => $q->where('lote.usuarioid', $usuarioId))
+            ->when($acotarEquipo, fn ($q) => CampoJefeScope::aplicarEnLote($q, $viewer))
             ->groupBy('estadolote_tipo.nombre')
             ->orderByDesc('total')
             ->get();
@@ -304,6 +312,8 @@ final class DashboardCharts
         }
         if ($usuarioId && ! $todos) {
             $topCultivos->where('lote.usuarioid', $usuarioId);
+        } elseif ($acotarEquipo) {
+            $topCultivos->whereIn('lote.usuarioid', CampoJefeScope::idsEquipo($viewer));
         }
         $topCultivos = $topCultivos->groupBy('cultivo.nombre')->orderByDesc('total')->limit(6)->get();
 

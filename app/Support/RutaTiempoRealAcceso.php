@@ -166,7 +166,8 @@ final class RutaTiempoRealAcceso
         }
 
         if (UsuarioRol::esJefeAgricultor($user)) {
-            return self::envioEsAgricola($envio);
+            return CampoJefeScope::envioPerteneceAJefe($envio, $user)
+                && self::envioEsAgricola($envio);
         }
 
         return false;

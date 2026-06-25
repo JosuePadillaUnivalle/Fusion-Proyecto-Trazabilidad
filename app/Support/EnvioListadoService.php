@@ -114,18 +114,29 @@ final class EnvioListadoService
             $query->whereDate('fechapedido', '<=', $request->string('hasta')->toString());
         }
 
+        if ($user && CampoJefeScope::debeAcotar($user) && ! $esTransportista) {
+            $query->whereHas('envioAsignacion', function (Builder $envio) use ($user) {
+                CampoJefeScope::aplicarEnEnvioAgricola($envio, $user);
+            });
+        }
+
         return $query;
     }
 
     /**
      * @return array<string, int>
      */
-    public static function resumenDesdePedidos(): array
+    public static function resumenDesdePedidos(?Usuario $user = null): array
     {
+        $user ??= auth()->user();
         $base = EnvioAsignacionMultiple::query()
             ->whereHas('pedido', function (Builder $p) {
                 PedidoCatalogo::aplicarFiltroLogistica($p);
             });
+
+        if (CampoJefeScope::debeAcotar($user)) {
+            CampoJefeScope::aplicarEnEnvioAgricola($base, $user);
+        }
 
         return [
             'total' => (clone $base)->count(),

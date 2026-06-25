@@ -62,6 +62,12 @@ class PuntoVentaController extends Controller
         $user = $request->user();
         $esAdmin = UsuarioRol::esAdminGlobal($user);
 
+        if ($esAdmin && $this->minoristasParaSelector($user)->isEmpty()) {
+            return back()
+                ->withInput()
+                ->withErrors(['usuarioid' => 'Debe existir al menos un minorista aprobado para registrar un punto de venta.']);
+        }
+
         if ($esAdmin && $request->input('usuarioid') === '') {
             $request->merge(['usuarioid' => null]);
         }
@@ -184,9 +190,13 @@ class PuntoVentaController extends Controller
 
         if ($punto->almacen) {
             app(PuntoVentaAlmacenService::class)->sincronizarNombreAlmacen($punto, $punto->almacen);
-            $punto->almacen->update([
+            $almacenUpdate = [
                 'ubicacion' => $punto->direccion,
-            ]);
+            ];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('almacen', 'responsable_usuarioid')) {
+                $almacenUpdate['responsable_usuarioid'] = $usuarioidResponsable;
+            }
+            $punto->almacen->update($almacenUpdate);
         }
 
         return redirect()

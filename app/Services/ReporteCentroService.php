@@ -9,6 +9,7 @@ use App\Models\RutaDistribucion;
 use App\Models\Usuario;
 use App\Models\Almacen;
 use App\Support\AlmacenAmbito;
+use App\Support\CampoJefeScope;
 use App\Support\EnvioAsignacionEstadoCatalogo;
 use App\Support\EtiquetaDemo;
 use App\Support\InsumoCatalogo;
@@ -557,13 +558,20 @@ class ReporteCentroService
     private function filasEnvioPeriodo(string $desde, string $hasta): array
     {
         $filas = [];
+        $user = auth()->user();
+        $soloAgricolaJefe = CampoJefeScope::debeAcotar($user);
 
-        $asignaciones = EnvioAsignacionMultiple::query()
+        $asignacionesQuery = EnvioAsignacionMultiple::query()
             ->with(['pedido', 'transportista', 'almacen'])
             ->whereHas('pedido', fn ($p) => PedidoCatalogo::aplicarFiltroLogistica($p))
             ->whereDate('fecha_asignacion', '>=', $desde)
-            ->whereDate('fecha_asignacion', '<=', $hasta)
-            ->get();
+            ->whereDate('fecha_asignacion', '<=', $hasta);
+
+        if ($soloAgricolaJefe) {
+            CampoJefeScope::aplicarEnEnvioAgricola($asignacionesQuery, $user);
+        }
+
+        $asignaciones = $asignacionesQuery->get();
 
         foreach ($asignaciones as $a) {
             if ($this->esDemoAsignacion($a)) {
@@ -578,6 +586,10 @@ class ReporteCentroService
                 'cancelado' => $estado === 'cancelado',
                 'completado' => in_array($estado, ['recibido_planta', 'entregado', 'completada'], true),
             ];
+        }
+
+        if ($soloAgricolaJefe) {
+            return $filas;
         }
 
         $rutas = RutaDistribucion::query()

@@ -107,12 +107,13 @@ class DemoCatalogosBaseSeeder extends Seeder
 
         $hasDescripcion = Schema::hasColumn('estadolote_tipo', 'descripcion');
         $items = [
-            ['nombre' => 'Planificado', 'descripcion' => 'El lote fue creado pero aún no se ha sembrado.'],
+            ['nombre' => 'Planificación', 'descripcion' => 'El lote fue creado; aún no inicia el ciclo productivo en campo.'],
             ['nombre' => 'Sembrado', 'descripcion' => 'La siembra ya fue realizada.'],
-            ['nombre' => 'En crecimiento', 'descripcion' => 'El cultivo está desarrollándose.'],
-            ['nombre' => 'Listo para cosecha', 'descripcion' => 'El cultivo alcanzó las condiciones para ser cosechado.'],
-            ['nombre' => 'Cosechado', 'descripcion' => 'La producción fue recolectada.'],
-            ['nombre' => 'Finalizado', 'descripcion' => 'El ciclo del lote terminó y ya no se realizarán más actividades.'],
+            ['nombre' => 'En crecimiento', 'descripcion' => 'El cultivo se desarrolla con actividades de manejo en campo.'],
+            ['nombre' => 'Listo para cosecha', 'descripcion' => 'Se completó al menos una actividad de cada tipo requerida.'],
+            ['nombre' => 'Cosechado', 'descripcion' => 'La producción fue recolectada; pendiente de certificación.'],
+            ['nombre' => 'Certificado', 'descripcion' => 'El lote fue certificado en campo después de la cosecha.'],
+            ['nombre' => 'Finalizado', 'descripcion' => 'El producto ya fue enviado al almacén; ciclo cerrado.'],
         ];
 
         foreach ($items as $item) {

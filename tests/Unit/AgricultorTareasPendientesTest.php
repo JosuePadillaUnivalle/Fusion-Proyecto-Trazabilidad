@@ -47,8 +47,8 @@ class AgricultorTareasPendientesTest extends TestCase
     private function crearLotePlanificado(Usuario $agricultor, string $nombre): Lote
     {
         $planificado = EstadoLoteTipo::query()->firstOrCreate(
-            ['nombre' => 'Planificado'],
-            ['nombre' => 'Planificado']
+            ['nombre' => 'Planificación'],
+            ['nombre' => 'Planificación']
         );
         $unidad = UnidadMedida::query()->firstOrCreate(
             ['abreviatura' => 'ha'],

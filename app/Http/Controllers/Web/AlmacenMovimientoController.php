@@ -13,6 +13,7 @@ use App\Services\AlmacenCapacidadService;
 use App\Services\DestinosMotivoAlmacenService;
 use App\Services\ReferenciasAlmacenDisponiblesService;
 use App\Support\AlmacenAmbito;
+use App\Support\CampoJefeScope;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -37,7 +38,7 @@ class AlmacenMovimientoController extends Controller
             $filtroNaturaleza = '';
         }
 
-        $lineas = $this->construirLineasMovimientos($ambito, $prefijo, $filtroNaturaleza);
+        $lineas = $this->construirLineasMovimientos($ambito, $prefijo, $filtroNaturaleza, $request->user());
 
         $totalIngresos = $lineas->where('naturaleza', 'ingreso')->count();
         $totalSalidas = $lineas->where('naturaleza', 'salida')->count();
@@ -97,13 +98,17 @@ class AlmacenMovimientoController extends Controller
     /**
      * @return Collection<int, object>
      */
-    private function construirLineasMovimientos(string $ambito, string $prefijo, string $filtroNaturaleza): Collection
+    private function construirLineasMovimientos(string $ambito, string $prefijo, string $filtroNaturaleza, $user = null): Collection
     {
         $lineas = collect();
 
         $baseInsumo = AlmacenMovimiento::query()
             ->with(['almacen', 'insumo.unidadMedida', 'tipo', 'usuario'])
             ->whereHas('almacen', fn ($a) => AlmacenAmbito::scope($a, $ambito));
+
+        if ($ambito === AlmacenAmbito::AGRICOLA) {
+            CampoJefeScope::aplicarEnMovimientoPorUsuario($baseInsumo, $user);
+        }
 
         if ($filtroNaturaleza !== '') {
             $baseInsumo->whereHas('tipo', fn ($t) => $t->where('naturaleza', $filtroNaturaleza));
@@ -138,7 +143,9 @@ class AlmacenMovimientoController extends Controller
         if ($ambito === AlmacenAmbito::AGRICOLA && $filtroNaturaleza !== 'salida') {
             $cosechas = ProduccionAlmacenamiento::query()
                 ->with(['almacen', 'produccion.lote.cultivo', 'unidadMedida'])
-                ->whereHas('almacen', fn ($a) => AlmacenAmbito::scope($a, AlmacenAmbito::AGRICOLA))
+                ->whereHas('almacen', fn ($a) => AlmacenAmbito::scope($a, AlmacenAmbito::AGRICOLA));
+            CampoJefeScope::aplicarEnProduccionAlmacenamiento($cosechas, $user);
+            $cosechas = $cosechas
                 ->orderByDesc('fechaentrada')
                 ->orderByDesc('produccionalmacenamientoid')
                 ->get();
@@ -545,6 +552,10 @@ class AlmacenMovimientoController extends Controller
             ->whereDate('fecha', '>=', $fechaDesde)
             ->whereDate('fecha', '<=', $fechaHasta);
 
+        if ($ambito === AlmacenAmbito::AGRICOLA) {
+            CampoJefeScope::aplicarEnMovimientoPorUsuario($base, $user);
+        }
+
         $movimientos = (clone $base)->orderByDesc('fecha')->limit(200)->get();
 
         $totalIngresos = (clone $base)
@@ -561,6 +572,7 @@ class AlmacenMovimientoController extends Controller
                 ->when($almacenId, fn ($q) => $q->where('almacenid', $almacenId))
                 ->whereDate('fechaentrada', '>=', $fechaDesde)
                 ->whereDate('fechaentrada', '<=', $fechaHasta);
+            CampoJefeScope::aplicarEnProduccionAlmacenamiento($cosechasQ, $user);
             $totalIngresos += $cosechasQ->count();
         }
 

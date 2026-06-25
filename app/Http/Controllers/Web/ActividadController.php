@@ -63,11 +63,12 @@ class ActividadController extends Controller
             $query->where('tipoactividadid', (int) $request->tipoactividadid);
         }
 
+        $baseStats = $this->queryActividadesVisibles($request);
         $stats = [
-            'total' => Actividad::count(),
-            'pendientes' => Actividad::whereNull('fechafin')->count(),
-            'completadas' => Actividad::whereNotNull('fechafin')->count(),
-            'hoy' => Actividad::whereDate('fechainicio', now()->toDateString())->count(),
+            'total' => (clone $baseStats)->count(),
+            'pendientes' => (clone $baseStats)->whereNull('fechafin')->count(),
+            'completadas' => (clone $baseStats)->whereNotNull('fechafin')->count(),
+            'hoy' => (clone $baseStats)->whereDate('fechainicio', now()->toDateString())->count(),
         ];
 
         $actividades = $query->orderByDesc('actividadid')->paginate(15)->withQueryString();

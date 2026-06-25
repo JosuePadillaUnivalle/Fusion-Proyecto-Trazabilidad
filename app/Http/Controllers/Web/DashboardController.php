@@ -8,6 +8,7 @@ use App\Models\Lote;
 use App\Models\Produccion;
 use App\Models\Almacen;
 use App\Support\AlmacenAmbito;
+use App\Support\CampoJefeScope;
 use App\Support\DashboardCharts;
 use App\Support\DashboardFiltros;
 use App\Support\DashboardPanelUsuario;
@@ -104,7 +105,7 @@ class DashboardController extends Controller
         if (! $this->isAdmin($user) && $user?->can('panel_agricultor.view') && UsuarioRol::esJefeAgricultor($user)) {
             return view('dashboard.inicio.agricola', array_merge(
                 $this->buildJefeAgricolaInicioData($user, $filtros),
-                $this->filtrosContextoCampo(),
+                $this->filtrosContextoCampo($user),
                 $extras,
             ));
         }
@@ -211,14 +212,15 @@ class DashboardController extends Controller
         $totalAlertas = $notificaciones->contarNoLeidas((int) $user->usuarioid, $user);
 
         return view('dashboard.roles.agricola', array_merge(
-            $this->buildJefeAgricolaData($filtros, $ctxPanel['usuarioFiltrado'], $ctxPanel['vistaTodosUsuarios']),
-            $this->filtrosContextoCampo(),
+            $this->buildJefeAgricolaData($filtros, $ctxPanel['usuarioFiltrado'], $ctxPanel['vistaTodosUsuarios'], $user),
+            $this->filtrosContextoCampo($user),
             $ctxPanel,
             [
                 'charts' => DashboardCharts::paraJefeAgricola(
                     $filtros,
                     $ctxPanel['usuarioFiltrado']?->usuarioid,
                     $ctxPanel['vistaTodosUsuarios'],
+                    $user,
                 ),
                 'etiquetaGrafico' => $filtros->etiquetaGrafico(),
             ],
@@ -526,11 +528,15 @@ class DashboardController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function filtrosContextoCampo(): array
+    private function filtrosContextoCampo(?Usuario $user = null): array
     {
+        $user ??= auth()->user();
+        $lotesQuery = Lote::query()->orderBy('nombre');
+        CampoJefeScope::aplicarEnLote($lotesQuery, $user);
+
         return [
             'cultivos' => Cultivo::orderBy('nombre')->get(['cultivoid', 'nombre']),
-            'lotes' => Lote::query()->orderBy('nombre')->get(['loteid', 'nombre', 'cultivoid']),
+            'lotes' => $lotesQuery->get(['loteid', 'nombre', 'cultivoid']),
             'mostrarCultivo' => true,
             'mostrarLote' => true,
         ];
@@ -560,9 +566,10 @@ class DashboardController extends Controller
     private function buildJefeAgricolaInicioData($user = null, ?DashboardFiltros $filtros = null): array
     {
         $filtros ??= DashboardFiltros::desdeRequest(request());
+        $user = $user ?? auth()->user();
 
-        return array_merge($this->buildJefeAgricolaData($filtros), [
-            'charts' => DashboardCharts::paraJefeAgricola($filtros),
+        return array_merge($this->buildJefeAgricolaData($filtros, null, false, $user), [
+            'charts' => DashboardCharts::paraJefeAgricola($filtros, null, false, $user),
             'etiquetaGrafico' => $filtros->etiquetaGrafico(),
         ]);
     }
@@ -777,9 +784,10 @@ class DashboardController extends Controller
         ];
     }
 
-    private function buildJefeAgricolaData(?DashboardFiltros $filtros = null, ?Usuario $sujeto = null, bool $todos = false): array
+    private function buildJefeAgricolaData(?DashboardFiltros $filtros = null, ?Usuario $sujeto = null, bool $todos = false, ?Usuario $viewer = null): array
     {
         $filtros ??= DashboardFiltros::desdeRequest(request());
+        $viewer ??= auth()->user();
 
         $lotes = Lote::query();
         if ($filtros->cultivoId) {
@@ -787,12 +795,16 @@ class DashboardController extends Controller
         }
         if ($sujeto && ! $todos) {
             $lotes->where('usuarioid', $sujeto->usuarioid);
+        } elseif (CampoJefeScope::debeAcotar($viewer) && ! $todos) {
+            CampoJefeScope::aplicarEnLote($lotes, $viewer);
         }
 
         $actividades = Actividad::query()->whereNull('fechafin');
         $filtros->aplicarCultivoEnLote($actividades);
         if ($sujeto && ! $todos) {
-            $actividades->where('usuarioid', $sujeto->usuarioid);
+            $actividades->whereHas('lote', fn ($q) => $q->where('usuarioid', $sujeto->usuarioid));
+        } elseif (CampoJefeScope::debeAcotar($viewer) && ! $todos) {
+            CampoJefeScope::aplicarEnRelacionLote($actividades, $viewer);
         }
 
         $cosechas = Produccion::query();
@@ -800,13 +812,28 @@ class DashboardController extends Controller
         $filtros->aplicarCultivoEnLote($cosechas);
         if ($sujeto && ! $todos) {
             $cosechas->whereHas('lote', fn ($q) => $q->where('usuarioid', $sujeto->usuarioid));
+        } elseif (CampoJefeScope::debeAcotar($viewer) && ! $todos) {
+            CampoJefeScope::aplicarEnRelacionLote($cosechas, $viewer);
         }
 
         $pedidosPendientes = PedidoCatalogo::contarPendientesAgricola();
+        if (CampoJefeScope::debeAcotar($viewer) && ! $todos) {
+            $pedidosPendientes = EnvioAsignacionMultiple::query()
+                ->whereHas('pedido', fn ($p) => PedidoCatalogo::aplicarFiltroLogistica($p))
+                ->where(function ($q) {
+                    $q->whereIn('estado', ['asignado', 'asignada', 'pendiente', 'creada', 'en_transporte_planta', 'en_ruta', 'en_transito'])
+                        ->whereNull('fecha_recepcion_planta');
+                })
+                ->tap(fn ($q) => CampoJefeScope::aplicarEnEnvioAgricola($q, $viewer))
+                ->count();
+        }
 
         $lotesRecientes = Lote::query()
             ->with(['cultivo', 'estadoTipo'])
             ->when($sujeto && ! $todos, fn ($q) => $q->where('usuarioid', $sujeto->usuarioid))
+            ->when(CampoJefeScope::debeAcotar($viewer) && ! $todos && ! $sujeto, function ($q) use ($viewer) {
+                CampoJefeScope::aplicarEnLote($q, $viewer);
+            })
             ->orderByDesc('loteid')
             ->limit(5)
             ->get();

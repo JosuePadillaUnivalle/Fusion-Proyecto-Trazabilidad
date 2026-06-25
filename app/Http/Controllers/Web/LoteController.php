@@ -21,6 +21,7 @@ use App\Support\InsumoCatalogo;
 use App\Support\LoteAgricolaNombre;
 use App\Support\LoteCultivoResolver;
 use App\Support\LoteAcceso;
+use App\Support\LoteKpiStats;
 use App\Support\LoteDefaults;
 use App\Services\PlanificacionCosechaService;
 use App\Services\LoteEliminacionService;
@@ -84,13 +85,9 @@ class LoteController extends Controller
 
         $statsBase = Lote::query();
         $this->aplicarScopeLotesVisibles($statsBase, $request->user());
-        $stats = [
-            'total' => (clone $statsBase)->count(),
-            'planificados' => (clone $statsBase)->whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['planificado']))->count(),
-            'en_produccion' => (clone $statsBase)->whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en crecimiento']))->count(),
-            'sembrados' => (clone $statsBase)->whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['sembrado']))->count(),
-            'hectareas' => round((float) ((clone $statsBase)->sum('superficie') ?? 0), 2),
-        ];
+        $stats = LoteKpiStats::desdeQuery($statsBase);
+        $stats['planificados'] = (clone $statsBase)->whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['planificado']))->count();
+        $stats['sembrados'] = (clone $statsBase)->whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['sembrado']))->count();
 
         $lotes = $query->orderByDesc('loteid')->paginate(15)->withQueryString();
 
@@ -113,13 +110,7 @@ class LoteController extends Controller
         $baseQuery = Lote::query();
         $this->aplicarScopeLotesVisibles($baseQuery, $request->user());
 
-        $stats = [
-            'total' => (clone $baseQuery)->count(),
-            'en_produccion' => (clone $baseQuery)->whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['en crecimiento']))->count(),
-            'cosechados' => (clone $baseQuery)->whereHas('estadoTipo', fn ($q) => $q->whereRaw('LOWER(TRIM(nombre)) = ?', ['cosechado']))->count(),
-            'hectareas' => (float) ((clone $baseQuery)->sum('superficie') ?? 0),
-            'en_mapa' => (clone $baseQuery)->whereNotNull('latitud')->whereNotNull('longitud')->count(),
-        ];
+        $stats = LoteKpiStats::desdeQuery($baseQuery, incluirEnMapa: true);
 
         $lotesConCoordenadas = (clone $baseQuery)
             ->with(['usuario', 'cultivo', 'insumoSemilla', 'estadoTipo'])
@@ -138,7 +129,11 @@ class LoteController extends Controller
                     'ubicacion_visible' => $lote->ubicacion_visible,
                     'propietario' => ($lote->usuario->nombre ?? '') . ' ' . ($lote->usuario->apellido ?? ''),
                     'cultivo' => $lote->cultivo_etiqueta,
-                    'estado' => $lote->estadoTipo->nombre ?? 'disponible',
+                    'estado' => $lote->estadoTipo->nombre ?? 'Planificación',
+                    'estado_slug' => EstadoLoteCatalogo::slugFromNombre($lote->estadoTipo->nombre ?? null) ?? 'planificado',
+                    'estado_color' => EstadoLoteCatalogo::colorMapaPorSlug(
+                        EstadoLoteCatalogo::slugFromNombre($lote->estadoTipo->nombre ?? null) ?? 'planificado'
+                    ),
                     'usuarioid' => $lote->usuarioid,
                     'cultivoid' => $lote->cultivoid,
                     'insumosemillaid' => $lote->insumosemillaid,
@@ -166,7 +161,11 @@ class LoteController extends Controller
             'lotesConCoordenadas',
             'topLotes',
             'estados'
-        ));
+        ) + [
+            'leyendaMapa' => EstadoLoteCatalogo::leyendaMapa(),
+            'coloresEstadoMapa' => EstadoLoteCatalogo::coloresMapa(),
+            'slugEstadoPorNombre' => EstadoLoteCatalogo::mapaSlugPorNombreJs(),
+        ]);
     }
 
     public function create()

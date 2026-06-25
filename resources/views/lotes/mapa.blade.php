@@ -110,12 +110,6 @@
         border: 2px solid white;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
-    .legend-color.disponible { background: #6c757d; }
-    .legend-color.preparacion { background: var(--info-color); }
-    .legend-color.sembrado { background: #007bff; }
-    .legend-color.produccion { background: var(--success-color); }
-    .legend-color.cosechado { background: var(--warning-color); }
-    .legend-color.descanso { background: #343a40; }
     .legend-text { font-size: 13px; color: var(--text-dark); }
 
     .lot-info-panel {
@@ -189,14 +183,8 @@
         border-radius: 20px;
         font-size: 11px;
         font-weight: 600;
-        text-transform: uppercase;
+        color: #fff;
     }
-    .status-disponible { background: rgba(108, 117, 125, 0.2); color: #6c757d; }
-    .status-preparacion { background: rgba(23, 162, 184, 0.2); color: var(--info-color); }
-    .status-sembrado { background: rgba(0, 123, 255, 0.2); color: #007bff; }
-    .status-produccion { background: rgba(92, 122, 82, 0.18); color: var(--success-color); }
-    .status-cosechado { background: rgba(255, 193, 7, 0.2); color: #d39e00; }
-    .status-descanso { background: rgba(52, 58, 64, 0.2); color: #343a40; }
 
     .lot-actions {
         display: flex;
@@ -668,7 +656,7 @@
             <div class="mapa-kpi-card__icon"><i class="fas fa-seedling"></i></div>
             <div class="mapa-kpi-card__body">
                 <span class="mapa-kpi-card__value">{{ $stats['en_produccion'] }}</span>
-                <span class="mapa-kpi-card__label">En producción</span>
+                <span class="mapa-kpi-card__label">En crecimiento</span>
             </div>
         </div>
         <div class="mapa-kpi-card mapa-kpi-card--cosecha">
@@ -681,7 +669,7 @@
         <div class="mapa-kpi-card mapa-kpi-card--hectareas">
             <div class="mapa-kpi-card__icon"><i class="fas fa-ruler-combined"></i></div>
             <div class="mapa-kpi-card__body">
-                <span class="mapa-kpi-card__value">{{ number_format((int) round($stats['hectareas']), 0, ',', '.') }}</span>
+                <span class="mapa-kpi-card__value">{{ number_format($stats['hectareas'], 2, ',', '.') }}</span>
                 <span class="mapa-kpi-card__label">Hectáreas total</span>
             </div>
         </div>
@@ -771,7 +759,8 @@
                             <select class="form-control form-control-sm" id="filtroEstado">
                                 <option value="">Todos</option>
                                 @foreach($estados as $e)
-                                    <option value="{{ $e->estadolotetipoid }}">{{ ucfirst($e->nombre) }}</option>
+                                    @php $slugOpt = \App\Support\EstadoLoteCatalogo::slugFromNombre($e->nombre); @endphp
+                                    <option value="{{ $e->estadolotetipoid }}">{{ $slugOpt ? \App\Support\EstadoLoteCatalogo::label($slugOpt) : ucfirst($e->nombre) }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -792,30 +781,12 @@
                     <!-- Leyenda -->
                     <div class="legend-container">
                         <div class="legend-title"><i class="fas fa-info-circle mr-1"></i> Estados</div>
+                        @foreach($leyendaMapa ?? [] as $item)
                         <div class="legend-item">
-                            <div class="legend-color disponible"></div>
-                            <span class="legend-text">Disponible</span>
+                            <div class="legend-color" style="background: {{ $item['color'] }}"></div>
+                            <span class="legend-text">{{ $item['label'] }}</span>
                         </div>
-                        <div class="legend-item">
-                            <div class="legend-color preparacion"></div>
-                            <span class="legend-text">En Preparacion</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color sembrado"></div>
-                            <span class="legend-text">Sembrado</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color produccion"></div>
-                            <span class="legend-text">En Produccion</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color cosechado"></div>
-                            <span class="legend-text">Cosechado</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color descanso"></div>
-                            <span class="legend-text">En Descanso</span>
-                        </div>
+                        @endforeach
                     </div>
 
                     <!-- Panel de Info del Lote -->
@@ -1013,16 +984,9 @@ var rutasLote = {
     trazabilidad: @json(route('lotes.trazabilidad', ['lote' => '__ID__']))
 };
 
-var coloresEstado = {
-    'disponible': '#8b9099',
-    'en preparación': '#5a8a96',
-    'en preparacion': '#5a8a96',
-    'sembrado': '#4a6fa5',
-    'en producción': '#5c7a52',
-    'en produccion': '#5c7a52',
-    'cosechado': '#b8933a',
-    'en descanso': '#4a4f54'
-};
+var coloresEstado = @json($coloresEstadoMapa ?? []);
+var slugEstadoPorNombre = @json($slugEstadoPorNombre ?? []);
+var leyendaMapaPdf = @json($leyendaMapa ?? []);
 
 var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
@@ -1060,8 +1024,29 @@ function escapeHtml(texto) {
 }
 
 function normalizarEstado(estado) {
-    return String(estado || 'disponible').toLowerCase().trim()
+    return String(estado || 'planificacion').toLowerCase().trim()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function slugEstadoLote(lote) {
+    if (lote && lote.estado_slug) {
+        return lote.estado_slug;
+    }
+    var nombre = typeof lote === 'object' ? (lote.estado || '') : String(lote || '');
+    var norm = normalizarEstado(nombre);
+    return slugEstadoPorNombre[norm] || slugEstadoPorNombre[nombre.toLowerCase().trim()] || 'planificado';
+}
+
+function colorEstadoLote(lote) {
+    if (lote && lote.estado_color) {
+        return lote.estado_color;
+    }
+    return coloresEstado[slugEstadoLote(lote)] || '#6c757d';
+}
+
+function etiquetaEstadoLote(lote) {
+    if (!lote) return '—';
+    return lote.estado || 'Planificación';
 }
 
 function valorSelectorFiltro(id) {
@@ -1122,7 +1107,7 @@ function htmlTooltipGrupo(grupo) {
 
 function crearIconoMarcador(grupo) {
     var lote = grupo[0];
-    var color = coloresEstado[normalizarEstado(lote.estado)] || '#6c757d';
+    var color = colorEstadoLote(lote);
 
     if (grupo.length > 1) {
         return L.divIcon({
@@ -1170,8 +1155,7 @@ function cargarLotes(lotes) {
     cerrarPanel();
 
     lotes.forEach(function (lote) {
-        var estado = normalizarEstado(lote.estado);
-        var color = coloresEstado[estado] || '#6c757d';
+        var color = colorEstadoLote(lote);
         var circle = L.circle([lote.latitud, lote.longitud], {
             color: color,
             fillColor: color,
@@ -1205,14 +1189,17 @@ function cargarLotes(lotes) {
     }
 }
 
-function claseEstadoBadge(estado) {
-    var norm = normalizarEstado(estado);
-    if (norm.indexOf('prepar') >= 0) return 'status-preparacion';
-    if (norm.indexOf('producc') >= 0) return 'status-produccion';
-    if (norm.indexOf('cosech') >= 0) return 'status-cosechado';
-    if (norm.indexOf('descans') >= 0) return 'status-descanso';
-    if (norm.indexOf('sembr') >= 0) return 'status-sembrado';
-    return 'status-disponible';
+function claseEstadoBadge(lote) {
+    return 'lot-status-badge';
+}
+
+function aplicarBadgeEstado(el, lote) {
+    if (!el) return;
+    var color = colorEstadoLote(lote);
+    el.className = 'lot-status-badge';
+    el.style.background = color;
+    el.style.color = slugEstadoLote(lote) === 'cosechado' ? '#1f2937' : '#fff';
+    el.textContent = etiquetaEstadoLote(lote);
 }
 
 function mostrarPanelGrupo(grupo) {
@@ -1260,8 +1247,7 @@ function mostrarPanelLote(lote, desdeGrupo) {
     document.getElementById('panelUbicacion').textContent = lote.ubicacion_visible || lote.ubicacion || 'Sin ubicación';
 
     var panelEstado = document.getElementById('panelEstado');
-    panelEstado.className = 'lot-status-badge ' + claseEstadoBadge(lote.estado);
-    panelEstado.textContent = lote.estado || 'Disponible';
+    aplicarBadgeEstado(panelEstado, lote);
 
     var codigoRow = document.getElementById('panelCodigoRow');
     if (lote.codigo_trazabilidad) {
@@ -1543,11 +1529,11 @@ function resumenLotesPdf(lotes) {
         hectareas: 0
     };
     lotes.forEach(function (lote) {
-        var estado = normalizarEstado(lote.estado);
-        if (estado.indexOf('producc') >= 0 || estado.indexOf('crecim') >= 0) {
+        var slug = slugEstadoLote(lote);
+        if (slug === 'en_crecimiento' || slug === 'sembrado' || slug === 'listo_para_cosecha') {
             resumen.enProduccion++;
         }
-        if (estado.indexOf('cosech') >= 0) {
+        if (slug === 'cosechado' || slug === 'certificado' || slug === 'finalizado') {
             resumen.cosechados++;
         }
         resumen.hectareas += parseFloat(lote.superficie) || 0;
@@ -1645,13 +1631,13 @@ function dibujarMarcoImagenPdf(pdf, x, y, w, h) {
 
 function dibujarLeyendaEstadosPdf(pdf, y) {
     var margen = 12;
-    var items = [
-        { label: 'Disponible', color: '#6c757d' },
-        { label: 'En preparación', color: '#17a2b8' },
-        { label: 'Sembrado', color: '#007bff' },
-        { label: 'En producción', color: '#28a745' },
-        { label: 'Cosechado', color: '#ffc107' },
-        { label: 'En descanso', color: '#343a40' }
+    var items = leyendaMapaPdf.length ? leyendaMapaPdf : [
+        { label: 'Planificación', color: '#6366f1' },
+        { label: 'En crecimiento', color: '#22c55e' },
+        { label: 'Listo para cosecha', color: '#14b8a6' },
+        { label: 'Cosechado', color: '#f59e0b' },
+        { label: 'Certificado', color: '#7c3aed' },
+        { label: 'Finalizado', color: '#475569' }
     ];
 
     pdf.setFont('helvetica', 'bold');
@@ -1756,7 +1742,7 @@ function dibujarTablaLotesPdf(pdf, lotes, startY) {
         pdf.text(String(lote.cultivo || '—').substring(0, 18), cx, y + 6);
         cx += cols[2].w;
 
-        var estadoRgb = hexToRgb(coloresEstado[normalizarEstado(lote.estado)] || '#6c757d');
+        var estadoRgb = hexToRgb(colorEstadoLote(lote));
         pdf.setFillColor(estadoRgb.r, estadoRgb.g, estadoRgb.b);
         pdf.circle(cx + 1.5, y + 4.8, 1.1, 'F');
         pdf.setFont('helvetica', 'bold');

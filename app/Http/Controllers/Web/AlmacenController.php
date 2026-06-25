@@ -24,6 +24,8 @@ use App\Models\TipoAlmacen;
 
 use App\Models\UnidadMedida;
 
+use App\Models\Usuario;
+
 use App\Services\AlmacenCapacidadService;
 
 use App\Services\InventarioPresentacionService;
@@ -36,6 +38,8 @@ use App\Support\AlmacenAmbito;
 
 use App\Support\AlmacenPlantaCosechaCatalogo;
 
+use App\Support\AlmacenResponsableCatalogo;
+
 use App\Support\InsumoCatalogo;
 
 use App\Support\MayoristaAccess;
@@ -47,6 +51,8 @@ use App\Support\UsuarioRol;
 use Illuminate\Http\Request;
 
 use Illuminate\Support\Facades\Schema;
+
+use Illuminate\Validation\ValidationException;
 
 
 
@@ -146,7 +152,7 @@ class AlmacenController extends Controller
 
         return view('almacenes.create', array_merge(
 
-            $this->datosFormulario(null),
+            $this->datosFormulario(null, $ctx['ambito'], $request),
 
             $ctx
 
@@ -196,8 +202,19 @@ class AlmacenController extends Controller
 
         $data['tipoalmacenid'] = $this->tipoAlmacenPorDefecto();
 
-        if (Schema::hasColumn('almacen', 'responsable_usuarioid') && $request->user()) {
-            $data['responsable_usuarioid'] = (int) $request->user()->usuarioid;
+        if (Schema::hasColumn('almacen', 'responsable_usuarioid')) {
+            if (
+                UsuarioRol::esAdminGlobal($request->user())
+                && AlmacenResponsableCatalogo::usuariosParaSelector($ctx['ambito'])->isEmpty()
+            ) {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        'responsable_usuarioid' => 'No hay usuarios con rol válido para este almacén. Cree el responsable en Gestión de usuarios.',
+                    ]);
+            }
+
+            $data['responsable_usuarioid'] = $this->resolverResponsableAlmacen($request, $ctx['ambito'], $data);
         }
 
 
@@ -265,7 +282,7 @@ class AlmacenController extends Controller
 
         return view('almacenes.edit', array_merge(
 
-            $this->datosFormulario($almacen),
+            $this->datosFormulario($almacen, $ctx['ambito'], $request),
 
             $ctx,
 
@@ -299,6 +316,10 @@ class AlmacenController extends Controller
             $data['tipoalmacenid'] = $this->tipoAlmacenPorDefecto();
         } else {
             unset($data['tipoalmacenid']);
+        }
+
+        if (Schema::hasColumn('almacen', 'responsable_usuarioid')) {
+            $data['responsable_usuarioid'] = $this->resolverResponsableAlmacen($request, $ctx['ambito'], $data);
         }
 
 
@@ -368,15 +389,33 @@ class AlmacenController extends Controller
 
      */
 
-    private function datosFormulario(?Almacen $almacen = null): array
+    private function datosFormulario(?Almacen $almacen = null, ?string $ambito = null, ?Request $request = null): array
 
     {
+
+        $request ??= request();
+
+        $ambito ??= $almacen !== null && Schema::hasColumn('almacen', 'ambito')
+
+            ? (string) ($almacen->ambito ?? AlmacenAmbito::AGRICOLA)
+
+            : AlmacenAmbito::fromRequest($request);
+
+        $esAdmin = UsuarioRol::esAdminGlobal($request->user());
+
+
 
         return [
 
             'almacen' => $almacen,
 
             'guias' => config('almacenes', []),
+
+            'esAdmin' => $esAdmin,
+
+            'responsables' => $esAdmin ? AlmacenResponsableCatalogo::usuariosParaSelector($ambito) : collect(),
+
+            'etiquetaResponsable' => AlmacenResponsableCatalogo::etiquetaResponsable($ambito),
 
         ];
 
@@ -414,6 +453,13 @@ class AlmacenController extends Controller
 
         }
 
+        if (
+            Schema::hasColumn('almacen', 'responsable_usuarioid')
+            && UsuarioRol::esAdminGlobal($request->user())
+        ) {
+            $reglas['responsable_usuarioid'] = 'required|integer|exists:usuario,usuarioid';
+        }
+
 
 
         $data = $request->validate($reglas);
@@ -434,6 +480,28 @@ class AlmacenController extends Controller
 
         return $data;
 
+    }
+
+
+
+    /** @param  array<string, mixed>  $validated */
+    private function resolverResponsableAlmacen(Request $request, string $ambito, array $validated): int
+    {
+        $user = $request->user();
+        abort_if($user === null, 403);
+
+        if (UsuarioRol::esAdminGlobal($user)) {
+            $responsable = Usuario::query()->findOrFail((int) ($validated['responsable_usuarioid'] ?? 0));
+            if (! AlmacenResponsableCatalogo::usuarioValidoParaAmbito($responsable, $ambito)) {
+                throw ValidationException::withMessages([
+                    'responsable_usuarioid' => 'Debe asignar un responsable válido para este tipo de almacén. El administrador no puede ser dueño del almacén.',
+                ]);
+            }
+
+            return (int) $responsable->usuarioid;
+        }
+
+        return (int) $user->usuarioid;
     }
 
 

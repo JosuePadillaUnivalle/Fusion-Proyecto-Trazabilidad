@@ -80,7 +80,7 @@ final class TransporteListadoUnificadoService
         }
 
         $resumenEnvios = (! $esTransportista && $user?->can('asignaciones.create'))
-            ? self::resumenUnificado()
+            ? self::resumenUnificado($user)
             : null;
 
         return [
@@ -108,6 +108,10 @@ final class TransporteListadoUnificadoService
         Request $request,
         int $filtroTransportista = 0
     ): Builder {
+        if (CampoJefeScope::debeAcotar($user)) {
+            return RutaDistribucion::query()->whereRaw('0 = 1');
+        }
+
         $query = RutaDistribucion::query()
             ->orderByDesc('fecha_salida')
             ->orderByDesc('rutadistribucionid');
@@ -363,9 +367,15 @@ final class TransporteListadoUnificadoService
     }
 
     /** @return array<string, int> */
-    public static function resumenUnificado(): array
+    public static function resumenUnificado(?Usuario $user = null): array
     {
-        $agricola = EnvioListadoService::resumenDesdePedidos();
+        $user ??= auth()->user();
+        $agricola = EnvioListadoService::resumenDesdePedidos($user);
+
+        if (CampoJefeScope::debeAcotar($user)) {
+            return $agricola;
+        }
+
         $distribucionBase = RutaDistribucion::query();
 
         $distribucion = [

@@ -45,7 +45,13 @@ final class DocumentoEntregaAcceso
         }
 
         if (UsuarioRol::esJefeAgricultor($user)) {
-            return $query->where('metadata->envio_cierre_agricola', true);
+            $envioIds = CampoJefeScope::idsEnviosAgricolasVisibles($user);
+            if ($envioIds === []) {
+                return $query->where('metadata->envio_cierre_agricola', true)->whereRaw('0 = 1');
+            }
+
+            return $query->where('metadata->envio_cierre_agricola', true)
+                ->whereIn('metadata->envioasignacionmultipleid', $envioIds);
         }
 
         if (UsuarioRol::esJefePlanta($user)) {
@@ -76,7 +82,16 @@ final class DocumentoEntregaAcceso
         $metadata = is_array($documento->metadata) ? $documento->metadata : [];
 
         if (UsuarioRol::esJefeAgricultor($user)) {
-            return ! empty($metadata['envio_cierre_agricola']);
+            if (empty($metadata['envio_cierre_agricola'])) {
+                return false;
+            }
+            $envioId = (int) ($metadata['envioasignacionmultipleid'] ?? 0);
+            if ($envioId <= 0) {
+                return false;
+            }
+            $envio = EnvioAsignacionMultiple::query()->find($envioId);
+
+            return $envio !== null && CampoJefeScope::envioPerteneceAJefe($envio, $user);
         }
 
         if (UsuarioRol::esJefePlanta($user)) {

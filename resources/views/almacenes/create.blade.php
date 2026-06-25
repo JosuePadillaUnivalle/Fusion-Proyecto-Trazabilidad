@@ -23,7 +23,7 @@
                         <a href="{{ route(($rutaPrefijo ?? 'almacen-agricola').'.index') }}" class="btn btn-secondary">
                             <i class="fas fa-arrow-left mr-1"></i> Cancelar
                         </a>
-                        <button type="submit" class="btn btn-success">
+                        <button type="submit" class="btn btn-success" @if(($esAdmin ?? false) && ($responsables ?? collect())->isEmpty()) disabled @endif>
                             <i class="fas fa-save mr-1"></i> Guardar almacén
                         </button>
                     </div>

@@ -7,6 +7,7 @@
     $nombreValor = old('nombre', $almacen->nombre ?? '');
     $descValor = old('descripcion', $almacen->descripcion ?? '');
     $capValor = old('capacidad', $almacen->capacidad ?? '');
+    $responsableId = old('responsable_usuarioid', $almacen->responsable_usuarioid ?? '');
     $coordsInicial = \App\Support\UbicacionGpsParser::fromTexto($ubicacionRaw);
     $tieneGps = $coordsInicial !== null;
 @endphp
@@ -200,6 +201,35 @@
             Las cosechas que envíes aquí se verán en <strong>Movimientos</strong> y descontarán espacio disponible.
         @endif
     </div>
+
+    @if($esAdmin ?? false)
+    <div class="form-group">
+        <label for="responsable_usuarioid">
+            <i class="fas fa-user-check mr-1"></i>{{ $etiquetaResponsable ?? 'Responsable del almacén' }}
+            <span class="text-danger">*</span>
+        </label>
+        @if(($responsables ?? collect())->isNotEmpty())
+            <select name="responsable_usuarioid" id="responsable_usuarioid"
+                    class="form-control @error('responsable_usuarioid') is-invalid @enderror" required>
+                <option value="" disabled @selected(! $responsableId)>— Seleccione responsable —</option>
+                @foreach($responsables as $responsable)
+                    <option value="{{ $responsable->usuarioid }}" @selected((int) $responsableId === (int) $responsable->usuarioid)>
+                        {{ trim($responsable->nombre.' '.($responsable->apellido ?? '')) }} — {{ $responsable->email }}
+                    </option>
+                @endforeach
+            </select>
+            <div class="guia-campo">
+                El almacén queda bajo el usuario seleccionado. No se asigna al administrador para evitar datos mezclados entre roles.
+            </div>
+        @else
+            <div class="alert alert-warning mb-0">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                No hay usuarios con rol válido para este tipo de almacén. Cree primero el responsable en Gestión de usuarios.
+            </div>
+        @endif
+        @error('responsable_usuarioid')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+    </div>
+    @endif
 
     <div class="form-group">
         <label for="nombre">Nombre <span class="text-danger">*</span></label>

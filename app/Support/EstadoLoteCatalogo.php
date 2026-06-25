@@ -10,8 +10,8 @@ class EstadoLoteCatalogo
     /** @var array<string, array{label: string, descripcion: string, orden: int}> */
     public const ESTADOS = [
         'planificado' => [
-            'label' => 'Planificado',
-            'descripcion' => 'El lote fue creado pero aún no se ha sembrado.',
+            'label' => 'Planificación',
+            'descripcion' => 'El lote fue creado; aún no inicia el ciclo productivo en campo.',
             'orden' => 1,
         ],
         'sembrado' => [
@@ -21,27 +21,27 @@ class EstadoLoteCatalogo
         ],
         'en_crecimiento' => [
             'label' => 'En crecimiento',
-            'descripcion' => 'El cultivo está desarrollándose (germinación, crecimiento vegetativo, floración y maduración).',
+            'descripcion' => 'El cultivo se desarrolla con actividades de manejo en campo.',
             'orden' => 3,
         ],
         'listo_para_cosecha' => [
             'label' => 'Listo para cosecha',
-            'descripcion' => 'El cultivo alcanzó las condiciones para ser cosechado.',
+            'descripcion' => 'Se completó al menos una actividad de cada tipo requerida; listo para cosechar.',
             'orden' => 4,
-        ],
-        'certificado' => [
-            'label' => 'Certificado',
-            'descripcion' => 'El lote fue certificado en campo.',
-            'orden' => 5,
         ],
         'cosechado' => [
             'label' => 'Cosechado',
-            'descripcion' => 'La producción fue recolectada.',
+            'descripcion' => 'La producción fue recolectada; pendiente de certificación.',
+            'orden' => 5,
+        ],
+        'certificado' => [
+            'label' => 'Certificado',
+            'descripcion' => 'El lote fue certificado en campo después de la cosecha.',
             'orden' => 6,
         ],
         'finalizado' => [
             'label' => 'Finalizado',
-            'descripcion' => 'El ciclo del lote terminó y ya no se realizarán más actividades.',
+            'descripcion' => 'El producto ya fue enviado al almacén; ciclo cerrado.',
             'orden' => 7,
         ],
     ];
@@ -52,6 +52,8 @@ class EstadoLoteCatalogo
         'en preparación' => 'planificado',
         'en preparacion' => 'planificado',
         'planificado' => 'planificado',
+        'planificación' => 'planificado',
+        'planificacion' => 'planificado',
         'sembrado' => 'sembrado',
         'en producción' => 'en_crecimiento',
         'en produccion' => 'en_crecimiento',
@@ -123,8 +125,23 @@ class EstadoLoteCatalogo
         $label = self::label($slug);
 
         $id = EstadoLoteTipo::whereRaw('LOWER(TRIM(nombre)) = ?', [mb_strtolower($label)])->value('estadolotetipoid');
+        if ($id) {
+            return (int) $id;
+        }
 
-        return $id ? (int) $id : null;
+        foreach (self::LEGACY_MAP as $nombre => $mapped) {
+            if ($mapped !== $slug) {
+                continue;
+            }
+            $legacyId = EstadoLoteTipo::whereRaw('LOWER(TRIM(nombre)) = ?', [mb_strtolower($nombre)])->value('estadolotetipoid');
+            if ($legacyId) {
+                return (int) $legacyId;
+            }
+        }
+
+        $slugAsNombre = str_replace('_', ' ', $slug);
+
+        return (int) (EstadoLoteTipo::whereRaw('LOWER(TRIM(nombre)) = ?', [mb_strtolower($slugAsNombre)])->value('estadolotetipoid') ?: 0) ?: null;
     }
 
     /** @return array<int> */
@@ -136,6 +153,33 @@ class EstadoLoteCatalogo
             ->unique()
             ->values()
             ->all();
+    }
+
+    /** Lotes con ciclo de cosecha completado (KPI mapa / listados). */
+    /** @return array<int> */
+    public static function idsKpiCosechados(): array
+    {
+        return self::idsPorSlugs(['cosechado', 'certificado', 'finalizado']);
+    }
+
+    /** @param  \Illuminate\Database\Eloquent\Builder<\App\Models\Lote>  $query */
+    public static function scopeKpiCosechados($query)
+    {
+        $ids = self::idsKpiCosechados();
+
+        return $ids !== []
+            ? $query->whereIn('estadolotetipoid', $ids)
+            : $query->whereRaw('0 = 1');
+    }
+
+    /** @param  \Illuminate\Database\Eloquent\Builder<\App\Models\Lote>  $query */
+    public static function scopeKpiEnProduccion($query)
+    {
+        $ids = self::idsPorSlugs(['en_crecimiento']);
+
+        return $ids !== []
+            ? $query->whereIn('estadolotetipoid', $ids)
+            : $query->whereRaw('0 = 1');
     }
 
     public static function loteEnSlug(?string $nombreEstado, string $slugEsperado): bool
@@ -192,6 +236,88 @@ class EstadoLoteCatalogo
     public static function filtrosPanelAbierto(\Illuminate\Http\Request $request, bool $tieneFiltrosActivos): bool
     {
         return $request->boolean('filtros_abiertos') || $tieneFiltrosActivos;
+    }
+
+    /** @return array<string, string> slug => color hex para marcadores del mapa */
+    public static function coloresMapa(): array
+    {
+        return [
+            'planificado' => '#6366f1',
+            'sembrado' => '#0ea5e9',
+            'en_crecimiento' => '#22c55e',
+            'listo_para_cosecha' => '#14b8a6',
+            'cosechado' => '#f59e0b',
+            'certificado' => '#7c3aed',
+            'finalizado' => '#475569',
+        ];
+    }
+
+    public static function colorMapaPorSlug(?string $slug): string
+    {
+        if ($slug === null || $slug === '') {
+            return '#6c757d';
+        }
+
+        return self::coloresMapa()[$slug] ?? '#6c757d';
+    }
+
+    /** @return list<array{slug: string, label: string, color: string}> */
+    public static function leyendaMapa(): array
+    {
+        $slugsLeyenda = [
+            'planificado',
+            'en_crecimiento',
+            'listo_para_cosecha',
+            'cosechado',
+            'certificado',
+            'finalizado',
+        ];
+
+        return collect($slugsLeyenda)
+            ->map(function (string $slug) {
+                return [
+                    'slug' => $slug,
+                    'label' => self::label($slug),
+                    'color' => self::colorMapaPorSlug($slug),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /** Clave JS normalizada (sin tildes) → slug, para lotes sin estado_slug. */
+    /** @return array<string, string> */
+    public static function mapaSlugPorNombreJs(): array
+    {
+        $map = [];
+
+        $agregar = function (string $nombre, string $slug) use (&$map): void {
+            $map[mb_strtolower(trim($nombre))] = $slug;
+            $norm = self::normalizarClaveJs($nombre);
+            if ($norm !== '') {
+                $map[$norm] = $slug;
+            }
+        };
+
+        foreach (self::LEGACY_MAP as $nombre => $slug) {
+            $agregar($nombre, $slug);
+        }
+
+        foreach (self::ESTADOS as $slug => $meta) {
+            $agregar($meta['label'], $slug);
+            $agregar(str_replace('_', ' ', $slug), $slug);
+        }
+
+        return $map;
+    }
+
+    private static function normalizarClaveJs(string $texto): string
+    {
+        $t = mb_strtolower(trim($texto));
+        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $t);
+        $t = is_string($ascii) && $ascii !== '' ? $ascii : $t;
+
+        return preg_replace('/\s+/', ' ', $t) ?? $t;
     }
 
     public static function urlCambioEstado(\App\Models\Lote $lote, string $slug): string

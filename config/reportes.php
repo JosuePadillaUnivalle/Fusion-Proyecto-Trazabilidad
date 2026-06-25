@@ -36,6 +36,8 @@ return [
 
             'route' => 'reportes.envios-estado',
 
+            'permission' => 'reportes.view',
+
             'title' => 'Envíos por estado',
 
             'subtitle' => 'Agrícola, rutas logísticas y pedidos PDV',

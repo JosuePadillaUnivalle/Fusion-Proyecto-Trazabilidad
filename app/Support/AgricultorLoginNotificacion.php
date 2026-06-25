@@ -78,6 +78,7 @@ final class AgricultorLoginNotificacion
                 fn ($q) => $q->whereHas(
                     'estadoTipo',
                     fn ($e) => $e->whereRaw('LOWER(TRIM(nombre)) = ?', ['planificado'])
+                        ->orWhereRaw('LOWER(TRIM(nombre)) IN (?, ?)', ['planificación', 'planificacion'])
                 )
             )
             ->orderByDesc('fechacreacion')

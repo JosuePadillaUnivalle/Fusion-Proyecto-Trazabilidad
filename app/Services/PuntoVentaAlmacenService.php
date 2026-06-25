@@ -9,6 +9,7 @@ use App\Models\TipoAlmacen;
 use App\Models\UnidadMedida;
 use App\Support\AlmacenAmbito;
 use App\Support\AlmacenNombreCatalogo;
+use Illuminate\Support\Facades\Schema;
 
 class PuntoVentaAlmacenService
 {
@@ -27,7 +28,7 @@ class PuntoVentaAlmacenService
             ->value('unidadmedidaid')
             ?? UnidadMedida::query()->value('unidadmedidaid');
 
-        $almacen = Almacen::create([
+        $payload = [
             'nombre' => AlmacenNombreCatalogo::nombreParaPuntoVenta($puntoVenta),
             'descripcion' => 'Inventario del punto de venta '.$puntoVenta->nombre,
             'ubicacion' => $puntoVenta->direccion,
@@ -36,7 +37,13 @@ class PuntoVentaAlmacenService
             'tipoalmacenid' => $tipoAlmacenId,
             'ambito' => AlmacenAmbito::PUNTO_VENTA,
             'activo' => true,
-        ]);
+        ];
+
+        if (Schema::hasColumn('almacen', 'responsable_usuarioid') && $puntoVenta->usuarioid) {
+            $payload['responsable_usuarioid'] = (int) $puntoVenta->usuarioid;
+        }
+
+        $almacen = Almacen::create($payload);
 
         $puntoVenta->update(['almacenid' => $almacen->almacenid]);
 

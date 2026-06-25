@@ -34,13 +34,15 @@
                 </select>
                 <p class="pdv-campo-guia mb-0">El punto de venta siempre pertenece a un minorista.</p>
             @else
-                <input type="hidden" name="usuarioid" value="{{ auth()->id() }}">
                 <div class="alert alert-warning py-2 mb-0 small">
                     <i class="fas fa-exclamation-triangle mr-1"></i>
-                    No hay minoristas aprobados. Este punto se registrará bajo su cuenta de administrador.
+                    No hay minoristas aprobados. Cree un minorista en
                     @can('usuarios.view')
-                        <a href="{{ route('gestion.index') }}" class="alert-link">Gestionar usuarios</a>
+                        <a href="{{ route('gestion.index') }}" class="alert-link">Gestión de usuarios</a>
+                    @else
+                        Gestión de usuarios
                     @endcan
+                    antes de registrar puntos de venta.
                 </div>
             @endif
             @error('usuarioid')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
