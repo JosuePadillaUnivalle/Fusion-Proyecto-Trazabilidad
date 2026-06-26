@@ -122,7 +122,8 @@
 @php
     $badge = \App\Support\RutaDistribucionCatalogo::badgeEstado($ruta);
     $origen = $ruta->almacenPlantaOrigen?->nombre;
-    $destino = $ruta->almacenMayoristaDestino?->nombre;
+    $destino = $nombreDestinoMayorista ?? \App\Support\TrasladoPlantaMayoristaPresentacion::nombreDestinoMayorista($ruta);
+    $lineasProducto = $lineasProducto ?? \App\Support\TrasladoPlantaMayoristaPresentacion::lineasProducto($ruta);
     $rutaPrefijo = $rutaPrefijo ?? 'logistica.traslados-planta';
 @endphp
 
@@ -183,15 +184,20 @@
                 </div>
                 <div class="tpm-info">
                     <div class="tpm-info__label">Productos</div>
-                    <div class="tpm-info__value">{{ $ruta->detallesTraslado->count() }} ítem(s)</div>
+                    <div class="tpm-info__value">{{ $lineasProducto->count() }} ítem(s)</div>
                 </div>
             </div>
 
             <div class="tpm-panel">
                 <div class="tpm-panel__head">Productos del traslado</div>
                 <div class="card-body pt-0 pb-2 px-0">
-                    @if($ruta->detallesTraslado->isEmpty())
-                        <p class="text-muted small mb-0 px-3 py-3">Sin productos registrados.</p>
+                    @if($lineasProducto->isEmpty())
+                        <p class="text-muted small mb-0 px-3 py-3">
+                            Sin productos en el detalle del traslado.
+                            @if(!empty($documentoEntrega))
+                                Consulte el comprobante en <a href="{{ route('logistica.documentos.show', $documentoEntrega) }}">Documentos de entrega</a>.
+                            @endif
+                        </p>
                     @else
                         <div class="table-responsive">
                             <table class="table table-sm tpm-table mb-0">
@@ -205,24 +211,24 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($ruta->detallesTraslado as $detalle)
+                                    @foreach($lineasProducto as $detalle)
                                     <tr>
                                         <td class="pl-3">
-                                            <span class="tpm-producto">{{ $detalle->producto_nombre }}</span>
+                                            <span class="tpm-producto">{{ $detalle['producto'] }}</span>
                                         </td>
-                                        <td class="text-muted small">{{ $detalle->presentacion_nombre ?: '—' }}</td>
+                                        <td class="text-muted small">{{ $detalle['presentacion'] ?: '—' }}</td>
                                         <td class="text-right text-nowrap">
-                                            @if($detalle->cantidad_unidades)
-                                                {{ number_format((float) $detalle->cantidad_unidades, 0) }}
+                                            @if(!empty($detalle['cantidad_unidades']))
+                                                {{ number_format((float) $detalle['cantidad_unidades'], 0) }}
                                             @else
                                                 —
                                             @endif
                                         </td>
                                         <td class="text-right font-weight-bold text-nowrap">
-                                            {{ number_format((float) $detalle->cantidad, 2) }}
-                                            {{ $detalle->insumo?->unidadMedida?->abreviatura ?? 'kg' }}
+                                            {{ number_format((float) $detalle['cantidad'], 2) }}
+                                            {{ $detalle['unidad'] ?? 'kg' }}
                                         </td>
-                                        <td class="text-muted small">{{ $detalle->observaciones ?: '—' }}</td>
+                                        <td class="text-muted small">{{ $detalle['observaciones'] ?: '—' }}</td>
                                     </tr>
                                     @endforeach
                                 </tbody>

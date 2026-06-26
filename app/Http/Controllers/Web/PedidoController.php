@@ -26,6 +26,8 @@ use App\Support\EnvioTrayectoCatalogo;
 use App\Support\PedidoCatalogo;
 use App\Support\RutaDistribucionCatalogo;
 use App\Support\RutaPorCallesService;
+use App\Support\RutaTiempoRealAcceso;
+use App\Support\SimulacionRutaCatalogo;
 use App\Support\UbicacionGpsParser;
 use App\Support\UsuarioRol;
 use Illuminate\View\View;
@@ -403,15 +405,43 @@ class PedidoController extends Controller
             'aceptadoPor',
         ])->findOrFail($id);
 
-        $trayectoPartes = EnvioPedidoService::trayectoPartesPedido($pedido);
-        if ($pedido->envioAsignacion) {
-            $pedido->envioAsignacion->setRelation('pedido', $pedido);
-            $paradasMapa = EnvioPedidoService::paradasMapaEnvio($pedido->envioAsignacion);
-        } else {
-            $paradasMapa = [];
+        $envio = $pedido->envioAsignacion
+            ?? EnvioAsignacionMultiple::query()
+                ->with([
+                    'transportista.perfilTransportista.vehiculo.tipoVehiculo',
+                    'asignadoPor',
+                    'ruta.paradas',
+                ])
+                ->where('externo_envio_id', $pedido->numero_solicitud)
+                ->first();
+
+        if ($envio !== null) {
+            $pedido->setRelation('envioAsignacion', $envio);
         }
 
-        return view('pedidos.show', compact('pedido', 'trayectoPartes', 'paradasMapa'));
+        $trayectoPartes = EnvioPedidoService::trayectoPartesPedido($pedido);
+        if ($envio !== null) {
+            $envio->setRelation('pedido', $pedido);
+            $paradasMapa = EnvioPedidoService::paradasMapaEnvio($envio);
+            $simulacionActiva = SimulacionRutaCatalogo::simulacionActivaAgricola($envio);
+            $urlTiempoReal = ($simulacionActiva && auth()->user() !== null
+                && ! UsuarioRol::esTransportista(auth()->user())
+                && RutaTiempoRealAcceso::puedeVerEnvioAgricola(auth()->user(), (int) $envio->envioasignacionmultipleid))
+                ? route('logistica.rutas-tiempo-real.show', ['tipo' => 'agricola', 'id' => $envio->envioasignacionmultipleid])
+                : null;
+        } else {
+            $paradasMapa = [];
+            $simulacionActiva = false;
+            $urlTiempoReal = null;
+        }
+
+        return view('pedidos.show', compact(
+            'pedido',
+            'trayectoPartes',
+            'paradasMapa',
+            'simulacionActiva',
+            'urlTiempoReal',
+        ));
     }
 
     public function edit(Pedido $pedido)

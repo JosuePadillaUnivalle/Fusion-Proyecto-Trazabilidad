@@ -80,7 +80,7 @@
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-orange">
                 <div class="inner">
-                    <h3>{{ number_format($stats['capacidad_total'], 0) }}</h3>
+                    <h3>{{ number_format($stats['capacidad_total'], 0, ',', '.') }}</h3>
                     <p>Capacidad combinada</p>
                 </div>
                 <div class="icon"><i class="fas fa-balance-scale"></i></div>
@@ -90,8 +90,12 @@
         <div class="col-lg-3 col-6">
             <div class="small-box small-box-blue">
                 <div class="inner">
-                    <h3>{{ number_format($stats['ocupado_total'] ?? 0, 0) }}</h3>
-                    <p>kg ocupados{{ ($ambito ?? '') === 'planta' ? ' (planta)' : ' (cosecha)' }}</p>
+                    <h3>{{ number_format($stats['ocupado_total'] ?? 0, 0, ',', '.') }}</h3>
+                    <p>kg en stock{{ match($ambito ?? '') {
+                        'planta' => ' (planta)',
+                        'mayorista' => ' (mayorista)',
+                        default => ' (cosecha)',
+                    } }}</p>
                 </div>
                 <div class="icon"><i class="fas {{ ($ambito ?? '') === 'planta' ? 'fa-industry' : 'fa-seedling' }}"></i></div>
                 <span class="small-box-footer">En esta página</span>
@@ -184,12 +188,12 @@
                                 @endif
                             </td>
                             <td>{{ $direccionAlmacen ?: '—' }}</td>
-                            <td>{{ number_format((float) $a->capacidad, 0) }} kg</td>
+                            <td>{{ number_format((float) ($oc['capacidad_kg'] ?? $a->capacidad), 0, ',', '.') }} kg</td>
                             <td>
                                 <div class="ocupacion-bar mb-1" style="max-width:120px">
                                     <div class="fill" style="width:{{ min(100, $pct) }}%"></div>
                                 </div>
-                                <small>{{ number_format($oc['ocupado_kg'], 0) }} / {{ number_format($oc['capacidad_kg'], 0) }} kg ({{ $pct }}%)</small>
+                                <small>{{ number_format($oc['ocupado_kg'], 0, ',', '.') }} / {{ number_format($oc['capacidad_kg'], 0, ',', '.') }} kg ({{ $pct }}%)</small>
                             </td>
                             <td class="text-center">
                                 <div class="almacen-acciones">

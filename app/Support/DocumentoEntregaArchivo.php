@@ -211,8 +211,8 @@ final class DocumentoEntregaArchivo
             }
             $firmaRecepcionEtiqueta = 'Firma recepción en punto de venta';
         } elseif ($rutaOperacion !== null && ! $esRutaPdv) {
-            $destinoCliente = $rutaOperacion->almacenMayoristaDestino?->nombre ?? '—';
-            $direccionEntrega = trim((string) ($rutaOperacion->almacenMayoristaDestino?->direccion ?? ''));
+            $destinoCliente = \App\Support\TrasladoPlantaMayoristaPresentacion::nombreDestinoMayorista($rutaOperacion) ?? '—';
+            $direccionEntrega = trim((string) ($rutaOperacion->almacenMayoristaDestino?->ubicacion ?? ''));
             if ($direccionEntrega === '' && $destinoCliente !== '—') {
                 $direccionEntrega = $destinoCliente;
             }
@@ -253,6 +253,22 @@ final class DocumentoEntregaArchivo
                     'empaquetaje' => $empaque ?? ($detalle->presentacion?->nombre ?? '—'),
                     'observaciones' => $obsUsuario ?: '—',
                 ];
+            }
+        }
+
+        if ($lineasProducto === [] && $rutaOperacion !== null && ! $esRutaPdv) {
+            $snap = $documento->metadata['lineas_producto'] ?? null;
+            if (is_array($snap) && $snap !== []) {
+                foreach ($snap as $linea) {
+                    $lineasProducto[] = [
+                        'producto' => $linea['producto'] ?? 'Producto',
+                        'cantidad' => isset($linea['cantidad'], $linea['unidad'])
+                            ? number_format((float) $linea['cantidad'], 2, '.', '').' '.$linea['unidad']
+                            : (string) ($linea['cantidad'] ?? '—'),
+                        'empaquetaje' => $linea['empaquetaje'] ?? $linea['presentacion'] ?? '—',
+                        'observaciones' => $linea['observaciones'] ?? '—',
+                    ];
+                }
             }
         }
 
@@ -340,7 +356,7 @@ final class DocumentoEntregaArchivo
                 $rutaLogistica = $origen.' → '.$destino;
             } else {
                 $origen = $rutaOperacion->almacenPlantaOrigen?->nombre ?? 'Planta';
-                $destino = $rutaOperacion->almacenMayoristaDestino?->nombre ?? 'Mayorista';
+                $destino = \App\Support\TrasladoPlantaMayoristaPresentacion::nombreDestinoMayorista($rutaOperacion) ?? 'Mayorista';
                 $rutaLogistica = $origen.' → '.$destino;
             }
         }

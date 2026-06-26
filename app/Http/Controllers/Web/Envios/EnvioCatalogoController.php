@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Envios;
 
 use App\Http\Controllers\Controller;
 use App\Support\EliminacionSegura;
+use App\Support\LogisticaCatalogoAcceso;
 use App\Support\LogisticaCatalogoRegistry;
 use App\Exceptions\EliminacionBloqueadaException;
 use Illuminate\Http\RedirectResponse;
@@ -14,10 +15,23 @@ class EnvioCatalogoController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('action.permission:envios,read')->only(['index']);
-        $this->middleware('action.permission:envios,create')->only(['create', 'store']);
-        $this->middleware('action.permission:envios,update')->only(['edit', 'update']);
-        $this->middleware('action.permission:envios,delete')->only(['destroy']);
+        $this->middleware(function ($request, $next) {
+            $tipo = $request->route('tipo');
+            $user = $request->user();
+            $action = $request->route()?->getActionMethod();
+
+            if ($action === 'index') {
+                abort_unless(LogisticaCatalogoAcceso::puedeVer($user), 403);
+            } elseif (in_array($action, ['create', 'store'], true)) {
+                abort_unless(is_string($tipo) && LogisticaCatalogoAcceso::puedeCrear($user, $tipo), 403);
+            } elseif (in_array($action, ['edit', 'update'], true)) {
+                abort_unless(is_string($tipo) && LogisticaCatalogoAcceso::puedeEditar($user, $tipo), 403);
+            } elseif ($action === 'destroy') {
+                abort_unless(is_string($tipo) && LogisticaCatalogoAcceso::puedeEliminar($user, $tipo), 403);
+            }
+
+            return $next($request);
+        });
     }
 
     public function index(string $tipo): View

@@ -81,7 +81,7 @@
             </div>
         @else
             <p class="small text-muted mb-3">
-                Escanee desde el móvil en la misma red y firme para confirmar la recepción de la carga.
+                Indique su nombre y firme para confirmar la recepción de la carga.
             </p>
             <form method="POST" action="{{ route('recepcion.publica.firmar', $token) }}" id="form-recepcion-publica">
                 @csrf
@@ -170,7 +170,7 @@
                 }
             })
             .catch(function () {
-                alert('Error de conexión. Verifique que está en la misma red Wi‑Fi.');
+                alert('No se pudo conectar con el servidor. Intente de nuevo en unos segundos.');
                 btn.disabled = false;
             });
     });

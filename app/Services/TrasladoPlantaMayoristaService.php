@@ -37,6 +37,8 @@ use App\Support\PlantaAccess;
 
 use App\Support\RutaDistribucionCatalogo;
 
+use App\Support\TrasladoPlantaMayoristaPresentacion;
+
 use App\Support\TransportistaFlotaCatalogo;
 
 use App\Support\UbicacionGpsParser;
@@ -439,7 +441,7 @@ class TrasladoPlantaMayoristaService
 
         $origen = $ruta->almacenPlantaOrigen?->nombre ?? 'Planta';
 
-        $destino = $ruta->almacenMayoristaDestino?->nombre ?? 'Almacén mayorista';
+        $destino = TrasladoPlantaMayoristaPresentacion::nombreDestinoMayorista($ruta) ?? 'Almacén mayorista';
 
 
 

@@ -19,7 +19,12 @@
 @section('content')
 @php $tema = $config['tema'] ?? \App\Support\PlantaCatalogoRegistry::tema($tipo); @endphp
 <div class="modulo-env page-cat-log" style="--cat-accent: {{ $tema['accent'] }}; --cat-soft: {{ $tema['soft'] }}; --cat-mid: {{ $tema['mid'] ?? $tema['accent'] }};">
-    @include('envios.partials.alertas')
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show">
+            <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
+            <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
+        </div>
+    @endif
 
     <div class="card card-modulo-main cat-log-card mb-0">
         <div class="cat-log-header">
@@ -35,7 +40,7 @@
         </div>
 
         <div class="card-body cat-log-form">
-            <form method="POST" action="{{ $registro ? route('produccion-planta.catalogos.update', [$tipo, $registro->{$config['pk']}]) : route('produccion-planta.catalogos.store', $tipo) }}">
+            <form method="POST" id="formCatalogoPlanta" action="{{ $registro ? route('produccion-planta.catalogos.update', [$tipo, $registro->{$config['pk']}]) : route('produccion-planta.catalogos.store', $tipo) }}">
                 @csrf
                 @if($registro) @method('PUT') @endif
 
@@ -52,7 +57,7 @@
                                         <label class="custom-control-label" for="campo_{{ $campo }}">{{ $meta['checkbox_label'] ?? 'Activo' }}</label>
                                     </div>
                                 @elseif(($meta['tipo'] ?? '') === 'select')
-                                    <select name="{{ $campo }}" id="campo_{{ $campo }}" class="form-control @error($campo) is-invalid @enderror">
+                                    <select name="{{ $campo }}" id="campo_{{ $campo }}" class="form-control">
                                         <option value="">Seleccione…</option>
                                         @foreach(($meta['opciones'] ?? [])() as $val => $label)
                                             <option value="{{ $val }}" @selected((string) old($campo, $registro?->{$campo}) === (string) $val)>{{ $label }}</option>
@@ -63,7 +68,7 @@
                                            step="any"
                                            name="{{ $campo }}"
                                            id="campo_{{ $campo }}"
-                                           class="form-control @error($campo) is-invalid @enderror"
+                                           class="form-control"
                                            value="{{ old($campo, $registro?->{$campo}) }}"
                                            @if(!empty($meta['placeholder'])) placeholder="{{ $meta['placeholder'] }}" @endif>
                                 @endif
@@ -71,8 +76,6 @@
                                 @if(!empty($meta['ayuda']))
                                     <small class="form-text text-muted">{{ $meta['ayuda'] }}</small>
                                 @endif
-
-                                @error($campo)<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                             </div>
                         </div>
                     @endforeach
@@ -89,3 +92,51 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const form = document.getElementById('formCatalogoPlanta');
+    const mensajeServidor = @json($errors->first() ?? '');
+    const camposRequeridos = @json(collect($config['campos'] ?? [])->filter(fn ($meta) => str_contains($meta['rules'] ?? '', 'required'))->keys()->values()->all());
+
+    function aviso(mensaje) {
+        if (window.ModalConfirmar && typeof ModalConfirmar.aviso === 'function') {
+            ModalConfirmar.aviso({ titulo: 'Revise el formulario', mensaje: mensaje, tono: 'warning' });
+            return;
+        }
+        alert(mensaje);
+    }
+
+    form?.addEventListener('submit', function (e) {
+        for (const campo of camposRequeridos) {
+            const input = form.querySelector('#campo_' + campo);
+            if (!input) continue;
+            if (input.type === 'checkbox') {
+                if (!input.checked) {
+                    e.preventDefault();
+                    aviso('Complete los campos obligatorios antes de guardar.');
+                    input.focus();
+                    return;
+                }
+                continue;
+            }
+            if (!String(input.value || '').trim()) {
+                e.preventDefault();
+                const label = form.querySelector('label[for="campo_' + campo + '"]');
+                const nombre = label ? label.textContent.trim().toLowerCase() : campo.replace(/_/g, ' ');
+                aviso('El campo ' + nombre + ' es obligatorio.');
+                input.focus();
+                return;
+            }
+        }
+    });
+
+    if (mensajeServidor) {
+        document.addEventListener('DOMContentLoaded', function () {
+            aviso(mensajeServidor);
+        });
+    }
+})();
+</script>
+@endpush

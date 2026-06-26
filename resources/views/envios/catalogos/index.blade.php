@@ -36,13 +36,13 @@
                             <div class="cat-log-header__sub">{{ $config['subtitulo'] ?? 'Catálogos de logística — verduras y transporte' }}</div>
                         </div>
                     </div>
-                    @can('envios.create')
+                    @if(\App\Support\LogisticaCatalogoAcceso::puedeCrear(auth()->user(), $tipo))
                         @empty($config['solo_edicion'])
                         <a href="{{ route('envios.catalogos.create', $tipo) }}" class="btn btn-success btn-sm">
                             <i class="fas fa-plus mr-1"></i> Nuevo
                         </a>
                         @endempty
-                    @endcan
+                    @endif
                 </div>
 
                 <div class="table-responsive">
@@ -75,12 +75,12 @@
                                         <td @class(['cat-log-cell--primary' => $i === 0])>{{ $display }}</td>
                                     @endforeach
                                     <td class="text-right text-nowrap">
-                                        @can('envios.update')
+                                        @if(\App\Support\LogisticaCatalogoAcceso::puedeEditar(auth()->user(), $tipo))
                                             <a href="{{ route('envios.catalogos.edit', [$tipo, $row->{$config['pk']}]) }}" class="btn btn-outline-primary btn-sm" title="Editar">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                        @endcan
-                                        @can('envios.delete')
+                                        @endif
+                                        @if(\App\Support\LogisticaCatalogoAcceso::puedeEliminar(auth()->user(), $tipo))
                                             @empty($config['solo_edicion'])
                                             <form action="{{ route('envios.catalogos.destroy', [$tipo, $row->{$config['pk']}]) }}" method="POST" class="d-inline"
                                                   onsubmit="return confirm('¿Eliminar este registro?')">
@@ -88,7 +88,7 @@
                                                 <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar"><i class="fas fa-trash"></i></button>
                                             </form>
                                             @endempty
-                                        @endcan
+                                        @endif
                                     </td>
                                 </tr>
                             @empty

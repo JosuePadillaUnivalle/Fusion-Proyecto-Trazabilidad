@@ -15,7 +15,7 @@
         <div class="w-100">
             <strong class="d-block">Firma de recepción desde móvil</strong>
             <span class="small text-muted d-block mb-2">
-                Escanee el código QR con el teléfono del receptor (misma red Wi‑Fi). La pantalla se actualizará al firmar.
+                El receptor debe escanear el código QR con su teléfono y firmar. Esta pantalla se actualizará automáticamente.
             </span>
             <div id="cierre-qr-canvas" class="d-inline-block p-2 bg-white border rounded" style="line-height:0;"></div>
             <p class="small text-muted mt-2 mb-0">

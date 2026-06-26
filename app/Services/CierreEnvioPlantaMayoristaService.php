@@ -18,6 +18,7 @@ use App\Support\EnvioCierreAgricolaCatalogo;
 use App\Support\MayoristaAccess;
 use App\Support\RutaDistribucionCatalogo;
 use App\Support\SimulacionRutaCatalogo;
+use App\Support\TrasladoPlantaMayoristaPresentacion;
 use App\Support\UsuarioRol;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -48,6 +49,68 @@ class CierreEnvioPlantaMayoristaService
             ->where('metadata->envio_cierre_planta_mayorista', true)
             ->orderByDesc('documentoentregaid')
             ->first();
+    }
+
+    public function repararMetadataDocumento(RutaDistribucion $ruta): bool
+    {
+        if (! $ruta->esTrasladoPlantaMayorista()) {
+            return false;
+        }
+
+        $documento = $this->documentoEntrega($ruta);
+        if ($documento === null) {
+            return false;
+        }
+
+        $meta = $documento->metadata ?? [];
+        $actualizaciones = [];
+
+        if (trim((string) ($meta['destino_mayorista_nombre'] ?? '')) === '') {
+            $nombre = TrasladoPlantaMayoristaPresentacion::nombreDestinoMayorista($ruta);
+            if ($nombre !== null && $nombre !== '') {
+                $actualizaciones['destino_mayorista_nombre'] = $nombre;
+            }
+        }
+
+        $lineas = $meta['lineas_producto'] ?? null;
+        if (! is_array($lineas) || $lineas === []) {
+            $snap = TrasladoPlantaMayoristaPresentacion::snapshotLineasParaMetadata($ruta);
+            if ($snap !== []) {
+                $actualizaciones['lineas_producto'] = $snap;
+            }
+        }
+
+        if ($actualizaciones === []) {
+            return false;
+        }
+
+        $documento->update([
+            'metadata' => array_merge($meta, $actualizaciones),
+        ]);
+
+        return true;
+    }
+
+    /** @return array{revisados: int, actualizados: int} */
+    public function repararMetadataDocumentos(): array
+    {
+        $revisados = 0;
+        $actualizados = 0;
+
+        RutaDistribucion::query()
+            ->where('tipo_ruta', RutaDistribucionCatalogo::TIPO_RUTA_PLANTA_MAYORISTA)
+            ->with(['almacenMayoristaDestino', 'paradas', 'detallesTraslado.insumo.unidadMedida'])
+            ->orderBy('rutadistribucionid')
+            ->chunkById(50, function ($rutas) use (&$revisados, &$actualizados) {
+                foreach ($rutas as $ruta) {
+                    $revisados++;
+                    if ($this->repararMetadataDocumento($ruta)) {
+                        $actualizados++;
+                    }
+                }
+            }, 'rutadistribucionid');
+
+        return ['revisados' => $revisados, 'actualizados' => $actualizados];
     }
 
     /** @return array<string, mixed> */
@@ -426,6 +489,12 @@ class CierreEnvioPlantaMayoristaService
             ->first();
 
         if ($existente) {
+            $existente->update([
+                'metadata' => array_merge($existente->metadata ?? [], [
+                    'destino_mayorista_nombre' => TrasladoPlantaMayoristaPresentacion::nombreDestinoMayorista($ruta),
+                    'lineas_producto' => TrasladoPlantaMayoristaPresentacion::snapshotLineasParaMetadata($ruta),
+                ]),
+            ]);
             DocumentoEntregaArchivo::generarPdfOperativo($existente);
 
             return $existente;
@@ -442,6 +511,8 @@ class CierreEnvioPlantaMayoristaService
             'metadata' => [
                 'envio_cierre_planta_mayorista' => true,
                 'rutadistribucionid' => $ruta->rutadistribucionid,
+                'destino_mayorista_nombre' => TrasladoPlantaMayoristaPresentacion::nombreDestinoMayorista($ruta),
+                'lineas_producto' => TrasladoPlantaMayoristaPresentacion::snapshotLineasParaMetadata($ruta),
             ],
         ]);
 

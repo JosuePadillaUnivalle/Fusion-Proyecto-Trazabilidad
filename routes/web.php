@@ -308,6 +308,7 @@ Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
                 Route::get('/', [AlmacenController::class, 'index'])->name('index')->middleware('action.permission:inventario,read');
                 Route::get('/create', [AlmacenController::class, 'create'])->name('create')->middleware('action.permission:inventario,create');
                 Route::get('/selector-ubicacion', [AlmacenController::class, 'selectorUbicacion'])->name('selector-ubicacion')->middleware('action.permission:inventario,read');
+                Route::get('/sugerir-nombre', [AlmacenController::class, 'sugerirNombre'])->name('sugerir-nombre')->middleware('action.permission:inventario,read');
                 Route::post('/', [AlmacenController::class, 'store'])->name('store')->middleware('action.permission:inventario,create');
 
                 Route::get('/movimientos/referencias-disponibles', [AlmacenMovimientoController::class, 'referenciasDisponibles'])

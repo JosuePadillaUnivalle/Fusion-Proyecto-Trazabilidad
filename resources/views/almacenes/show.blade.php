@@ -208,7 +208,7 @@
 
                                     <span class="h4 font-weight-bold mb-0 text-primary">
 
-                                        {{ number_format($almacen->capacidad, 0) }} <span class="h6 text-muted">kg</span>
+                                        {{ number_format($almacen->capacidad, 0, ',', '.') }} <span class="h6 text-muted">kg</span>
 
                                     </span>
 
@@ -218,9 +218,9 @@
 
                                 <p class="small text-muted mb-0 mt-2 pl-4">
 
-                                    Ocupado: {{ number_format($resumenCapacidad['ocupado_kg'], 0) }} kg ·
+                                    Ocupado: {{ number_format($resumenCapacidad['ocupado_kg'], 0, ',', '.') }} kg ·
 
-                                    Disponible: {{ number_format($resumenCapacidad['disponible_kg'], 0) }} kg
+                                    Disponible: {{ number_format($resumenCapacidad['disponible_kg'], 0, ',', '.') }} kg
 
                                 </p>
 
@@ -306,9 +306,15 @@
 
                                 @if(isset($resumenCapacidad))
 
-                                    {{ number_format($resumenCapacidad['ocupado_kg'], 0) }} kg
+                                    {{ number_format($resumenCapacidad['ocupado_kg'], 0, ',', '.') }} kg
 
-                                    <small class="text-muted d-block font-weight-normal" style="font-size:.75rem">Insumos, cosecha y producto de planta</small>
+                                    <small class="text-muted d-block font-weight-normal" style="font-size:.75rem">
+                                        @if(($ambitoActual ?? '') === 'mayorista')
+                                            Producto terminado en depósito
+                                        @else
+                                            Insumos, cosecha y producto de planta
+                                        @endif
+                                    </small>
 
                                 @else — @endif
 

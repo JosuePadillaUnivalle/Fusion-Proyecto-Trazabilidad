@@ -1727,7 +1727,13 @@
                     const cant = fila.querySelector('[data-field="cantidad"]');
                     const obs = fila.querySelector('[data-field="observaciones"]');
                     if (cant && d.cantidad) cant.value = d.cantidad;
-                    if (obs && d.observaciones) obs.value = d.observaciones;
+                    if (obs && d.observaciones) {
+                        let obsVal = d.observaciones;
+                        if (obsVal.includes('@carga:')) {
+                            obsVal = obsVal.replace(/@carga:.+?@\s*/s, '').trim();
+                        }
+                        obs.value = obsVal;
+                    }
                 });
             })();
             @endif

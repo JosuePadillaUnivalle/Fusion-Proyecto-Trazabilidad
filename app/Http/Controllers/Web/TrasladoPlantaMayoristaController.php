@@ -41,7 +41,7 @@ class TrasladoPlantaMayoristaController extends Controller
         $filtro = (string) $request->query('filtro', RecepcionPlantaMayoristaService::FILTRO_TODOS);
 
         $query = $this->recepcion->queryListado($user, $esVistaMayorista ? $filtro : null)
-            ->with(['almacenPlantaOrigen', 'almacenMayoristaDestino', 'transportista', 'detallesTraslado', 'firmaTransportista', 'firmaRecepcion']);
+            ->with(['almacenPlantaOrigen', 'almacenMayoristaDestino', 'paradas', 'transportista', 'detallesTraslado', 'firmaTransportista', 'firmaRecepcion']);
 
         $traslados = $query->paginate(15)->withQueryString();
         $pendientesCount = RutaDistribucion::query()
@@ -139,6 +139,9 @@ class TrasladoPlantaMayoristaController extends Controller
             'checklistCondicionVehiculo',
         ]);
 
+        $lineasProducto = \App\Support\TrasladoPlantaMayoristaPresentacion::lineasProducto($ruta);
+        $nombreDestinoMayorista = \App\Support\TrasladoPlantaMayoristaPresentacion::nombreDestinoMayorista($ruta);
+
         $esVistaMayorista = $request->routeIs('almacen-mayorista.traslados-planta.*');
         $user = auth()->user();
         $pendienteAprobacion = RutaDistribucionCatalogo::pendienteAprobacionPlanta($ruta);
@@ -162,6 +165,8 @@ class TrasladoPlantaMayoristaController extends Controller
             'esVistaMayorista' => $esVistaMayorista,
             'estadoRecepcion' => $estadoRecepcion,
             'resumenCierre' => $resumenCierre,
+            'lineasProducto' => $lineasProducto,
+            'nombreDestinoMayorista' => $nombreDestinoMayorista,
         ]);
     }
 

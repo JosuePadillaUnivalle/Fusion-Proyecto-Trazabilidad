@@ -8,15 +8,31 @@ use Tests\TestCase;
 
 class PublicUrlHelperTest extends TestCase
 {
-    public function test_qr_usa_app_public_url_aunque_el_navegador_este_en_loopback(): void
+    public function test_qr_usa_app_public_url_cuando_el_host_no_es_loopback(): void
     {
         config(['app.public_url' => 'http://192.168.1.50:8001']);
-        $request = Request::create('http://127.0.0.1:8001/recepcion/demo', 'GET');
+        $request = Request::create('http://192.168.1.50:8001/recepcion/demo', 'GET');
         $this->app->instance('request', $request);
 
         $url = PublicUrlHelper::absoluteForQr('/recepcion/abc123');
 
         $this->assertSame('http://192.168.1.50:8001/recepcion/abc123', $url);
+    }
+
+    public function test_qr_desde_loopback_usa_ip_lan_detectada(): void
+    {
+        config(['app.public_url' => 'http://10.26.12.121:8001']);
+        $request = Request::create('http://127.0.0.1:8001/recepcion/demo', 'GET');
+        $this->app->instance('request', $request);
+
+        $detectada = \App\Support\LanNetworkResolver::detectIpv4();
+        if ($detectada === null) {
+            $this->markTestSkipped('No hay IP LAN detectable en este entorno.');
+        }
+
+        $url = PublicUrlHelper::absoluteForQr('/recepcion/abc123');
+
+        $this->assertStringContainsString($detectada, $url);
         $this->assertStringNotContainsString('127.0.0.1', $url);
     }
 }

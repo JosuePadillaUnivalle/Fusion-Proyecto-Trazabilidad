@@ -134,4 +134,93 @@ final class AlmacenNombreCatalogo
 
         return strtoupper($codigoAmbito).'_'.$sufijo;
     }
+
+    public static function identificadorDesdeCoordenadas(string $codigoAmbito, float $lat, float $lng): string
+    {
+        $latKey = number_format(abs($lat), 4, '.', '');
+        $lngKey = number_format(abs($lng), 4, '.', '');
+
+        return self::identificadorSemilla($codigoAmbito, $latKey.'#'.$lngKey);
+    }
+
+    public static function sugerirNombreNuevo(string $ambito, float $lat, float $lng, ?string $zona = null): string
+    {
+        $pref = self::prefijoAmbito($ambito);
+        $zonaTxt = trim((string) $zona);
+        if ($zonaTxt === '') {
+            $zonaTxt = 'Ubicación en mapa';
+        }
+        if (mb_strlen($zonaTxt) > 50) {
+            $zonaTxt = mb_substr($zonaTxt, 0, 47).'…';
+        }
+
+        $id = self::identificadorDesdeCoordenadas($pref['codigo'], $lat, $lng);
+
+        return self::formatear($pref['etiqueta'], $pref['codigo'], $lat, $lng, $zonaTxt, $id);
+    }
+
+    /** Etiqueta compacta para listados: ID · calle/zona · tipo de almacén. */
+    public static function etiquetaLista(Almacen $almacen): string
+    {
+        return self::etiquetaListaDesdeNombreCanonico(self::nombreDesdeRegistro($almacen));
+    }
+
+    public static function etiquetaListaDesdeTexto(string $texto, ?string $ambito = null): string
+    {
+        $texto = trim($texto);
+        if ($texto === '' || $texto === '—') {
+            return '—';
+        }
+
+        $convertido = self::etiquetaListaDesdeNombreCanonico($texto);
+        if (preg_match('/^[A-Z]{3}_[A-Z0-9]{5}\s+·\s+/', $convertido)) {
+            return $convertido;
+        }
+
+        $query = Almacen::query()->where('activo', true);
+        if ($ambito !== null && $ambito !== '') {
+            $query->where('ambito', $ambito);
+        }
+
+        $almacen = (clone $query)->where('nombre', $texto)->first()
+            ?? (clone $query)->where('nombre', 'like', '%'.$texto.'%')->first();
+
+        if ($almacen !== null) {
+            return self::etiquetaLista($almacen);
+        }
+
+        return $convertido;
+    }
+
+    public static function etiquetaListaDesdeNombreCanonico(string $nombre): string
+    {
+        $nombre = trim($nombre);
+        if ($nombre === '' || $nombre === '—') {
+            return '—';
+        }
+
+        if (preg_match('/^(?:Carga|Entrega|Recogida):\s*(.+)$/iu', $nombre, $coincidencia)) {
+            return self::etiquetaListaDesdeNombreCanonico(trim($coincidencia[1]));
+        }
+
+        if (preg_match('/^[A-Z]{3}_[A-Z0-9]{5}\s+·\s+.+$/', $nombre)) {
+            return $nombre;
+        }
+
+        if (preg_match('/^(.+?)\s+-\s+([A-Z]{3}_[A-Z0-9]{5})$/', $nombre, $coincidencia)) {
+            $cuerpo = trim($coincidencia[1]);
+            $id = $coincidencia[2];
+            $coma = strpos($cuerpo, ',');
+            if ($coma !== false) {
+                $tipo = trim(substr($cuerpo, 0, $coma));
+                $calle = trim(substr($cuerpo, $coma + 1));
+
+                return $id.' · '.$calle.' · '.$tipo;
+            }
+
+            return $id.' · '.$cuerpo;
+        }
+
+        return $nombre;
+    }
 }

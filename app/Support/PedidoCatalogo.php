@@ -29,6 +29,33 @@ final class PedidoCatalogo
 
     public const ESTADO_RECHAZADO = 'rechazado';
 
+    /** Evita «Cebolla — Cebolla - Lote 002» cuando el lote ya incluye el cultivo. */
+    public static function etiquetaCosechaSelector(string $cultivo, string $lote): string
+    {
+        $cultivo = trim($cultivo);
+        $lote = trim($lote);
+
+        if ($lote === '') {
+            return $cultivo !== '' ? $cultivo : 'Cosecha';
+        }
+
+        if ($cultivo === '') {
+            return $lote;
+        }
+
+        $cNorm = mb_strtolower($cultivo);
+        $lNorm = mb_strtolower($lote);
+
+        if ($lNorm === $cNorm
+            || str_starts_with($lNorm, $cNorm.' -')
+            || str_starts_with($lNorm, $cNorm.' ·')
+            || str_starts_with($lNorm, $cNorm.' —')) {
+            return $lote;
+        }
+
+        return $cultivo.' — '.$lote;
+    }
+
     /** Estados en los que logística puede asignar transportista o avanzar el envío. */
     public static function estadosListosParaLogistica(): array
     {

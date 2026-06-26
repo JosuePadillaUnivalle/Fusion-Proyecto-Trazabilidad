@@ -5,7 +5,9 @@ namespace App\Support;
 use App\Models\Almacen;
 use App\Models\EnvioAsignacionMultiple;
 use App\Models\Lote;
+use App\Models\Pedido;
 use App\Models\Usuario;
+use App\Support\UbicacionGpsParser;
 use Illuminate\Database\Eloquent\Builder;
 
 /** Acota datos de campo al jefe agrícola (su equipo, lotes y almacenes). Admin sin filtro. */
@@ -73,11 +75,18 @@ final class CampoJefeScope
 
         $almacenIds = self::idsAlmacenesAgricolas($user);
         $jefeId = (int) $user->usuarioid;
+        $idsEquipo = self::idsEquipo($user);
 
-        $query->where(function (Builder $q) use ($almacenIds, $jefeId) {
+        $query->where(function (Builder $q) use ($almacenIds, $jefeId, $idsEquipo) {
             $q->where('asignadopor_usuarioid', $jefeId);
             if ($almacenIds !== []) {
                 $q->orWhereIn('almacenid', $almacenIds);
+            }
+            if ($idsEquipo !== []) {
+                $q->orWhereHas('pedido', fn (Builder $p) => $p->whereIn('aceptado_por_usuarioid', $idsEquipo));
+            }
+            if ($almacenIds !== []) {
+                $q->orWhereHas('pedido', fn (Builder $p) => self::aplicarFiltroPedidoOrigenAlmacenes($p, $almacenIds));
             }
         });
     }
@@ -94,7 +103,73 @@ final class CampoJefeScope
 
         $almacenIds = self::idsAlmacenesAgricolas($user);
 
-        return $almacenIds !== [] && in_array((int) $envio->almacenid, $almacenIds, true);
+        if ($almacenIds !== [] && in_array((int) $envio->almacenid, $almacenIds, true)) {
+            return true;
+        }
+
+        $envio->loadMissing('pedido');
+
+        return self::pedidoPerteneceAJefe($envio->pedido, $user);
+    }
+
+    public static function pedidoPerteneceAJefe(?Pedido $pedido, ?Usuario $user): bool
+    {
+        if ($pedido === null || ! self::debeAcotar($user)) {
+            return $pedido !== null || ! self::debeAcotar($user);
+        }
+
+        $idsEquipo = self::idsEquipo($user);
+        if ($pedido->aceptado_por_usuarioid !== null
+            && in_array((int) $pedido->aceptado_por_usuarioid, $idsEquipo, true)) {
+            return true;
+        }
+
+        $almacenIds = self::idsAlmacenesAgricolas($user);
+        if ($almacenIds === []) {
+            return false;
+        }
+
+        $query = Pedido::query()->where('pedidoid', $pedido->pedidoid);
+        self::aplicarFiltroPedidoOrigenAlmacenes($query, $almacenIds);
+
+        return $query->exists();
+    }
+
+    /** @param  Builder<Pedido>  $query */
+    private static function aplicarFiltroPedidoOrigenAlmacenes(Builder $query, array $almacenIds): void
+    {
+        if ($almacenIds === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $almacenes = Almacen::query()
+            ->whereIn('almacenid', $almacenIds)
+            ->where('activo', true)
+            ->get(['almacenid', 'ubicacion']);
+
+        $query->where(function (Builder $outer) use ($almacenes) {
+            $coincidencia = false;
+            foreach ($almacenes as $almacen) {
+                $coords = UbicacionGpsParser::fromTexto($almacen->ubicacion);
+                if ($coords === null) {
+                    continue;
+                }
+                $coincidencia = true;
+                $lat = $coords['lat'];
+                $lng = $coords['lng'];
+                $outer->orWhere(function (Builder $q) use ($lat, $lng) {
+                    $q->whereNotNull('origen_latitud')
+                        ->whereNotNull('origen_longitud')
+                        ->whereBetween('origen_latitud', [$lat - 0.02, $lat + 0.02])
+                        ->whereBetween('origen_longitud', [$lng - 0.02, $lng + 0.02]);
+                });
+            }
+            if (! $coincidencia) {
+                $outer->whereRaw('1 = 0');
+            }
+        });
     }
 
     public static function almacenPerteneceAJefe(?int $almacenId, ?Usuario $user): bool

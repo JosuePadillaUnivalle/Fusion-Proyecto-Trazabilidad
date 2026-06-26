@@ -1132,9 +1132,9 @@
                         'logistica.documentos.*',
                         'logistica.rutas-tiempo-real.*'
                     ) || $logMasOpen || request()->routeIs('pedidos.index');
-                    $envPlantaOpen = $envOpen && ($esJefePlantaNav || $esPlantaOperativo);
-                    $envAgrOpen = $envOpen && $esJefeAgr;
-                    $envMayOpen = $envOpen && $esMayoristaOperativo;
+                    $envPlantaOpen = ($envOpen || $catalogoLogisticaOpen) && ($esJefePlantaNav || $esPlantaOperativo);
+                    $envAgrOpen = ($envOpen || $catalogoLogisticaOpen) && $esJefeAgr;
+                    $envMayOpen = ($envOpen || $catalogoLogisticaOpen) && $esMayoristaOperativo;
                     $puedeEnvios = $isAdmin || ($authUser && $authUser->hasAnyPermission($envPerm));
                     $showOperLogistica = $isAdmin || $esTransportistaOperativo || (
                         $puedeEnvios && ! $esPlantaOperativo && ! $esAgricultorOperativo && ! $usaEnviosEnSeccionRol
@@ -1239,6 +1239,7 @@
                     </a>
                     <ul class="ag-subnav {{ $envAgrOpen ? 'open' : '' }}" id="sub-env-agr">
                         @include('layouts.partials.submenu-envios-items', ['envListadoActivo' => $envListadoActivo])
+                        @include('layouts.partials.submenu-catalogos-logistica', ['catalogoSubId' => 'agr'])
                     </ul>
                 </li>
                 @endif
@@ -1269,22 +1270,7 @@
                         @if($isAdmin || auth()->user()?->can('vehiculos.view'))
                         <li class="ag-sub-li"><a href="{{ route('envios.vehiculos') }}" class="ag-sub-a {{ request()->routeIs('envios.vehiculos*') ? 'active' : '' }}">Vehículos</a></li>
                         @endif
-                        @if(($isAdmin || auth()->user()?->can('envios.view')) && ! auth()->user()?->hasRole('transportista'))
-                        <li class="ag-sub-li">
-                            <a href="#" class="ag-sub-a {{ $catalogoLogisticaOpen ? 'group-open active' : '' }}" data-toggle-sub="sub-env-catalogos">
-                                Catálogos logística
-                                <i class="fas fa-chevron-right ag-sub-arrow"></i>
-                            </a>
-                            <ul class="ag-subnav ag-subnav-nested {{ $catalogoLogisticaOpen ? 'open' : '' }}" id="sub-env-catalogos">
-                                <li class="ag-sub-li"><a href="{{ route('envios.catalogos.index', 'tipos-empaque') }}" class="ag-sub-a {{ $catalogoTipoActivo === 'tipos-empaque' ? 'active' : '' }}">Tipos de empaque</a></li>
-                                <li class="ag-sub-li"><a href="{{ route('envios.catalogos.index', 'tamano-conteo') }}" class="ag-sub-a {{ $catalogoTipoActivo === 'tamano-conteo' ? 'active' : '' }}">Tamaño / conteo</a></li>
-                                <li class="ag-sub-li"><a href="{{ route('envios.catalogos.index', 'tipos-vehiculo') }}" class="ag-sub-a {{ $catalogoTipoActivo === 'tipos-vehiculo' ? 'active' : '' }}">Tipos de vehículo</a></li>
-                                <li class="ag-sub-li"><a href="{{ route('envios.catalogos.index', 'tipos-transporte') }}" class="ag-sub-a {{ $catalogoTipoActivo === 'tipos-transporte' ? 'active' : '' }}">Tipos de transporte</a></li>
-                                <li class="ag-sub-li"><a href="{{ route('envios.catalogos.index', 'condiciones') }}" class="ag-sub-a {{ $catalogoTipoActivo === 'condiciones' ? 'active' : '' }}">Condiciones</a></li>
-                                <li class="ag-sub-li"><a href="{{ route('envios.catalogos.index', 'incidentes') }}" class="ag-sub-a {{ $catalogoTipoActivo === 'incidentes' ? 'active' : '' }}">Incidentes</a></li>
-                            </ul>
-                        </li>
-                        @endif
+                        @include('layouts.partials.submenu-catalogos-logistica', ['catalogoSubId' => 'admin'])
                         @endunless
                         @if($puedeReportesLogistica)
                         <li class="ag-sub-li">
@@ -1371,6 +1357,7 @@
                     </a>
                     <ul class="ag-subnav {{ $envPlantaOpen ? 'open' : '' }}" id="sub-env-planta">
                         @include('layouts.partials.submenu-envios-items', ['envListadoActivo' => $envListadoActivo])
+                        @include('layouts.partials.submenu-catalogos-logistica', ['catalogoSubId' => 'planta'])
                     </ul>
                 </li>
                 @endif
@@ -1438,6 +1425,7 @@
                     </a>
                     <ul class="ag-subnav {{ $envMayOpen ? 'open' : '' }}" id="sub-env-may">
                         @include('layouts.partials.submenu-envios-items', ['envListadoActivo' => $envListadoActivo])
+                        @include('layouts.partials.submenu-catalogos-logistica', ['catalogoSubId' => 'may'])
                     </ul>
                 </li>
                 @endif

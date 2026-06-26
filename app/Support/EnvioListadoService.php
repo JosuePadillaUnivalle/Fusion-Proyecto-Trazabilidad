@@ -45,7 +45,13 @@ final class EnvioListadoService
                 $q->where('transportista_usuarioid', $user?->usuarioid)
                     ->whereNotNull('transportista_usuarioid');
             });
-            $query->whereIn('estado', PedidoCatalogo::estadosListosParaLogistica());
+            $query->where(function (Builder $q) {
+                $q->whereIn('estado', PedidoCatalogo::estadosListosParaLogistica())
+                    ->orWhereHas('envioAsignacion', fn (Builder $envio) => $envio->whereIn('estado', [
+                        'asignado', 'asignada', 'pendiente', 'creada',
+                        'en_transporte_planta', 'en_ruta', 'en_transito',
+                    ]));
+            });
         } else {
             if ($filtroTransportista > 0) {
                 $query->whereHas('envioAsignacion', fn ($q) => $q->where('transportista_usuarioid', $filtroTransportista));

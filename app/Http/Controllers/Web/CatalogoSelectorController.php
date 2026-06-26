@@ -1223,7 +1223,7 @@ class CatalogoSelectorController extends Controller
             $refCosecha = 'cosecha:'.$cosecha->produccionalmacenamientoid;
             $stockKg = PedidoCatalogo::stockDisponibleProductoPedido($refCosecha, (int) $cosecha->almacenid) ?? 0.0;
             $cantidad = number_format($stockKg, 2);
-            $label = "{$cultivo} — {$lote}";
+            $label = PedidoCatalogo::etiquetaCosechaSelector($cultivo, $lote);
             $meta = "{$almacen} · {$cantidad} kg disponibles";
 
             if ($q !== '' && ! str_contains(mb_strtolower($label.' '.$meta), $q)) {
@@ -1339,7 +1339,7 @@ class CatalogoSelectorController extends Controller
 
             return [
                 'id' => $p->produccionid,
-                'label' => $cultivo.' · '.$lote.' · '.$almacen,
+                'label' => PedidoCatalogo::etiquetaCosechaSelector($cultivo, $lote).' · '.$almacen,
                 'meta' => number_format($stock, 2).' '.$unidad.' disponibles',
                 'extra' => [
                     'disponible' => $stock,

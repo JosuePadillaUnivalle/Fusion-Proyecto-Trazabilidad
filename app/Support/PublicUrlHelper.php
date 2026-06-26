@@ -17,7 +17,7 @@ final class PublicUrlHelper
     }
 
     /**
-     * URL absoluta para QR / celular en la misma WiFi.
+     * URL absoluta para QR / acceso desde móvil.
      * Usa APP_PUBLIC_URL o detecta la IP LAN aunque el PC use 127.0.0.1 en el navegador.
      */
     public static function absoluteForQr(string $path = ''): string
@@ -35,13 +35,7 @@ final class PublicUrlHelper
 
     private static function resolveBaseUrl(bool $preferPublic = false): string
     {
-        $publicUrl = trim((string) config('app.public_url', ''));
-
-        if ($publicUrl !== '') {
-            return rtrim($publicUrl, '/');
-        }
-
-        if ($preferPublic && ! app()->runningInConsole() && request()) {
+        if ($preferPublic && request()) {
             $host = strtolower(request()->getHost());
             $port = (int) request()->getPort();
 
@@ -51,6 +45,12 @@ final class PublicUrlHelper
                     return rtrim($lanUrl, '/');
                 }
             }
+        }
+
+        $publicUrl = trim((string) config('app.public_url', ''));
+
+        if ($publicUrl !== '') {
+            return rtrim($publicUrl, '/');
         }
 
         if (! app()->runningInConsole() && request()) {

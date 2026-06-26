@@ -25,6 +25,7 @@ class MaquinaProcesoCompatibilidad
         'SE-10' => ['Empaquetado'],
         'SE-11' => ['Empaquetado'],
         'BC-20' => ['Preparación de Materias Primas'],
+        'ONP-80' => ['Preparación de Materias Primas'],
         'BD-500' => [],
     ];
 
@@ -44,20 +45,15 @@ class MaquinaProcesoCompatibilidad
             return false;
         }
 
-        if (self::esProcesoTransformacion($proceso)) {
+        $codigo = strtoupper(trim((string) ($maquina->codigo ?? '')));
+        if ($codigo !== '' && array_key_exists($codigo, self::MAPA_CODIGO)) {
             return self::coincidePorCodigo($proceso, $maquina);
         }
 
-        $vinculo = ProcesoMaquinaPlanta::query()
+        return ProcesoMaquinaPlanta::query()
             ->where('procesoplantaid', $procesoplantaid)
             ->where('maquinaplantaid', $maquinaplantaid)
             ->exists();
-
-        if ($vinculo) {
-            return true;
-        }
-
-        return self::coincidePorCodigo($proceso, $maquina);
     }
 
     /**
@@ -145,12 +141,6 @@ class MaquinaProcesoCompatibilidad
     public static function mapaCodigoProcesos(): array
     {
         return self::MAPA_CODIGO;
-    }
-
-    private static function esProcesoTransformacion(ProcesoPlanta $proceso): bool
-    {
-        return ProcesoPlantaCatalogo::paraTransformacion()
-            ->contains(fn (ProcesoPlanta $p) => (int) $p->procesoplantaid === (int) $proceso->procesoplantaid);
     }
 
     private static function coincidePorCodigo(ProcesoPlanta $proceso, MaquinaPlanta $maquina): bool

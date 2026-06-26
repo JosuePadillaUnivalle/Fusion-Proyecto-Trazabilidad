@@ -3,6 +3,31 @@
  */
 (function () {
     const estadoUrlBase = document.querySelector('meta[name="simulacion-estado-base"]')?.content || '';
+    let paginaActiva = true;
+    const timersGlobales = [];
+    const cleanupsGlobales = [];
+
+    function registrarTimer(id) {
+        if (id) timersGlobales.push(id);
+        return id;
+    }
+
+    function registrarCleanup(fn) {
+        if (typeof fn === 'function') cleanupsGlobales.push(fn);
+    }
+
+    function destruirSimulacion() {
+        if (!paginaActiva) return;
+        paginaActiva = false;
+        timersGlobales.forEach((id) => clearInterval(id));
+        timersGlobales.length = 0;
+        cleanupsGlobales.forEach((fn) => {
+            try { fn(); } catch (e) { /* noop */ }
+        });
+        cleanupsGlobales.length = 0;
+    }
+
+    window.addEventListener('pagehide', destruirSimulacion);
 
     function urlEstado(tipo, id) {
         if (estadoUrlBase) {
@@ -280,9 +305,10 @@
     }
 
     function manejarCompletada(container, data) {
-        if (!data.completada) return;
+        if (!data.completada || !paginaActiva) return;
         actualizarPanelVivo(container, data);
         setTimeout(() => {
+            if (!paginaActiva) return;
             window.location.href = container.dataset.simVolverUrl || window.location.href;
         }, 1500);
     }
@@ -301,7 +327,11 @@
                 : formatearEta(vivo.segundos_restantes, pct, false);
         }
         if (vivo.completada) {
-            setTimeout(() => window.location.reload(), 1500);
+            if (paginaActiva) {
+                setTimeout(() => {
+                    if (paginaActiva) window.location.reload();
+                }, 1500);
+            }
         }
         return vivo;
     }
@@ -546,6 +576,7 @@
         }
 
         function poll() {
+            if (!paginaActiva) return;
             fetch(`${urlEstado(tipo, id)}?_=${Date.now()}`, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
@@ -553,28 +584,39 @@
             })
                 .then((r) => {
                     if (r.status === 419) {
-                        window.location.reload();
+                        if (paginaActiva) window.location.reload();
                         return null;
                     }
                     if (!r.ok) throw new Error(`estado ${r.status}`);
                     return r.json();
                 })
                 .then((data) => {
-                    if (data) aplicarEstadoServidor(data);
+                    if (data && paginaActiva) aplicarEstadoServidor(data);
                 })
-                .catch((e) => console.warn('Error actualizando simulación', e));
+                .catch((e) => {
+                    if (paginaActiva) console.warn('Error actualizando simulación', e);
+                });
         }
 
         const estadoInicial = leerEstadoInicial();
         if (estadoInicial) aplicarEstadoServidor(estadoInicial);
 
         poll();
-        pollTimer = setInterval(poll, 2000);
-        tickPanelTimer = setInterval(tickPanel, 200);
-        tickMapaTimer = setInterval(tickMapa, 350);
+        pollTimer = registrarTimer(setInterval(poll, 2000));
+        tickPanelTimer = registrarTimer(setInterval(tickPanel, 200));
+        tickMapaTimer = registrarTimer(setInterval(tickMapa, 350));
+
+        registrarCleanup(() => {
+            detenerTimers();
+            if (mapa) {
+                mapa.remove();
+                mapa = null;
+            }
+        });
 
         window.addEventListener('pageshow', () => {
-            if (mapa) mapa.invalidateSize();
+            if (!paginaActiva || !mapa) return;
+            mapa.invalidateSize();
             poll();
         });
 
@@ -652,6 +694,7 @@
             }
 
             const pollFila = () => {
+                if (!paginaActiva) return;
                 fetch(`${urlEstado(tipo, id)}?_=${Date.now()}`, {
                     headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     credentials: 'same-origin',
@@ -659,13 +702,13 @@
                 })
                     .then((r) => {
                         if (r.status === 419) {
-                            window.location.reload();
+                            if (paginaActiva) window.location.reload();
                             return null;
                         }
                         return r.json();
                     })
                     .then((data) => {
-                        if (!data) return;
+                        if (!data || !paginaActiva) return;
                         estadoBase = anclarTiempoCliente(data);
                         actualizarFila(estadoBase);
                     })
@@ -673,10 +716,14 @@
             };
 
             pollFila();
-            setInterval(pollFila, 2000);
-            setInterval(() => {
-                if (estadoBase && !completadaLocal) actualizarFila(estadoBase);
-            }, 200);
+            const pollId = registrarTimer(setInterval(pollFila, 2000));
+            const tickId = registrarTimer(setInterval(() => {
+                if (estadoBase && !completadaLocal && paginaActiva) actualizarFila(estadoBase);
+            }, 200));
+            registrarCleanup(() => {
+                clearInterval(pollId);
+                clearInterval(tickId);
+            });
         });
     }
 
@@ -687,6 +734,7 @@
             let estadoBase = null;
 
             const pollTrans = () => {
+                if (!paginaActiva) return;
                 fetch(`${urlEstado(tipo, id)}?_=${Date.now()}`, {
                     headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     credentials: 'same-origin',
@@ -694,6 +742,7 @@
                 })
                     .then((r) => r.json())
                     .then((data) => {
+                        if (!paginaActiva) return;
                         estadoBase = anclarTiempoCliente(data);
                         actualizarProgresoTransportista(el, estadoBase);
                     })
@@ -701,10 +750,10 @@
             };
 
             pollTrans();
-            setInterval(pollTrans, 2000);
-            setInterval(() => {
-                if (estadoBase) actualizarProgresoTransportista(el, estadoBase);
-            }, 200);
+            registrarTimer(setInterval(pollTrans, 2000));
+            registrarTimer(setInterval(() => {
+                if (estadoBase && paginaActiva) actualizarProgresoTransportista(el, estadoBase);
+            }, 200));
         });
 
         document.querySelectorAll('[data-sim-mapa-vivo]').forEach(initMapaVivo);

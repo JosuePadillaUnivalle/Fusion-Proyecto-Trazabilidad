@@ -685,20 +685,28 @@ final class EnvioPedidoService
         }
 
         $recogidas = array_values(array_filter(array_map(
-            fn (string $rec) => self::acortarEtiquetaLista($rec),
+            fn (string $rec) => AlmacenNombreCatalogo::etiquetaListaDesdeTexto($rec, 'agricola'),
             $partes['recogidas']
-        )));
+        ), fn (string $etiqueta) => $etiqueta !== '—'));
 
-        $destino = self::etiquetaPlantaDestinoLista($pedido)
-            ?? self::acortarEtiquetaLista($partes['destino'] ?? null);
+        $destinoAlmacen = self::buscarAlmacenPorCoordenadas(
+            $pedido->latitud !== null ? (float) $pedido->latitud : null,
+            $pedido->longitud !== null ? (float) $pedido->longitud : null,
+            'planta'
+        );
+        $destino = $destinoAlmacen !== null
+            ? AlmacenNombreCatalogo::etiquetaLista($destinoAlmacen)
+            : ($partes['destino'] !== null
+                ? AlmacenNombreCatalogo::etiquetaListaDesdeTexto((string) $partes['destino'], 'planta')
+                : null);
 
-        if ($recogidas === [] && $destino === null) {
+        if ($recogidas === [] && ($destino === null || $destino === '—')) {
             return null;
         }
 
         return [
             'recogidas' => $recogidas,
-            'destino' => $destino,
+            'destino' => $destino !== '—' ? $destino : null,
         ];
     }
 

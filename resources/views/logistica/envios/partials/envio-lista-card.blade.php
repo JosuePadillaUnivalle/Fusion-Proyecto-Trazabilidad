@@ -67,6 +67,12 @@
                 </div>
                 @endunless
             </div>
+
+            @if(!empty($item['carga_resumen']))
+                <p class="envio-lista-card__carga-resumen" title="Detalle de la carga">
+                    <i class="fas fa-box-open"></i> {{ $item['carga_resumen'] }}
+                </p>
+            @endif
         </div>
 
         <div class="envio-lista-card__foot">

@@ -233,6 +233,21 @@
     color: #64748b;
 }
 
+.envio-lista-card__carga-resumen {
+    margin: .65rem 0 0;
+    padding: .5rem .65rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: .78rem;
+    color: #475569;
+    line-height: 1.4;
+}
+.envio-lista-card__carga-resumen i {
+    color: #94a3b8;
+    margin-right: .35rem;
+}
+
 .envio-lista-card__foot {
     display: flex;
     align-items: center;

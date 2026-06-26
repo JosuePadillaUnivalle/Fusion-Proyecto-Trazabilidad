@@ -36,6 +36,8 @@ use App\Services\UbicacionesAlmacenService;
 
 use App\Support\AlmacenAmbito;
 
+use App\Support\AlmacenNombreCatalogo;
+
 use App\Support\AlmacenPlantaCosechaCatalogo;
 
 use App\Support\AlmacenResponsableCatalogo;
@@ -182,6 +184,25 @@ class AlmacenController extends Controller
 
         ], $ctx));
 
+    }
+
+    public function sugerirNombre(Request $request)
+    {
+        $ctx = AlmacenAmbito::contexto($request);
+        $data = $request->validate([
+            'lat' => 'required|numeric|between:-90,90',
+            'lng' => 'required|numeric|between:-180,180',
+            'zona' => 'nullable|string|max:120',
+        ]);
+
+        return response()->json([
+            'nombre' => AlmacenNombreCatalogo::sugerirNombreNuevo(
+                $ctx['ambito'],
+                (float) $data['lat'],
+                (float) $data['lng'],
+                isset($data['zona']) ? trim((string) $data['zona']) : null
+            ),
+        ]);
     }
 
 
@@ -355,9 +376,25 @@ class AlmacenController extends Controller
             ]);
         }
 
-        $almacen->delete();
+        try {
+            \App\Support\AlmacenEliminacionCatalogo::eliminar($almacen);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (\App\Support\EliminacionSegura::esViolacionFk($e)) {
+                return back()->with([
+                    'error' => \App\Support\EliminacionSegura::mensajeGenerico(),
+                    'error_modal' => true,
+                    'error_modal_titulo' => 'No se puede eliminar',
+                ]);
+            }
 
-
+            throw $e;
+        } catch (\RuntimeException $e) {
+            return back()->with([
+                'error' => $e->getMessage(),
+                'error_modal' => true,
+                'error_modal_titulo' => 'No se puede eliminar',
+            ]);
+        }
 
         return redirect()
 
@@ -617,7 +654,7 @@ class AlmacenController extends Controller
             $esRecepcionPedido = ! $esMayorista && AlmacenPlantaCosechaCatalogo::esRecepcionPedidoInsumo($insumo);
             $kg = $this->capacidadService->convertirAKg((float) $insumo->stock, $insumo->unidadMedida);
             $claveCultivo = AlmacenPlantaCosechaCatalogo::claveCultivo($insumo->nombre);
-            if ($esAgricola && $esRecepcionPedido) {
+            if ($esRecepcionPedido) {
                 $metricas = AlmacenPlantaCosechaCatalogo::metricasInsumoRecepcion($insumo, $this->capacidadService);
                 $cantidad = $metricas['cantidad'];
                 $unidad = $metricas['unidad'];
@@ -660,7 +697,7 @@ class AlmacenController extends Controller
             $lote = $c->produccion?->lote;
             $cultivo = $lote?->cultivo?->nombre ?? 'Cultivo';
             $nombre = $cultivo.' · '.($lote?->nombre ?? 'Producción #'.$c->produccionid);
-            if ($esAgricola) {
+            if ($esAgricola || $esPlanta) {
                 $metricas = AlmacenPlantaCosechaCatalogo::metricasProduccionAlmacenamiento($c, $this->capacidadService);
                 $cantidad = $metricas['cantidad'];
                 $unidad = $metricas['unidad'];

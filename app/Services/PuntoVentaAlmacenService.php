@@ -29,9 +29,9 @@ class PuntoVentaAlmacenService
             ?? UnidadMedida::query()->value('unidadmedidaid');
 
         $payload = [
-            'nombre' => AlmacenNombreCatalogo::nombreParaPuntoVenta($puntoVenta),
+            'nombre' => $this->nombreAlmacenParaPuntoVenta($puntoVenta),
             'descripcion' => 'Inventario del punto de venta '.$puntoVenta->nombre,
-            'ubicacion' => $puntoVenta->direccion,
+            'ubicacion' => $this->ubicacionAlmacenParaPuntoVenta($puntoVenta),
             'capacidad' => 500,
             'unidadmedidaid' => $unidadId,
             'tipoalmacenid' => $tipoAlmacenId,
@@ -57,10 +57,42 @@ class PuntoVentaAlmacenService
             return;
         }
 
-        $nombre = AlmacenNombreCatalogo::nombreParaPuntoVenta($puntoVenta);
+        $nombre = $this->nombreAlmacenParaPuntoVenta($puntoVenta);
         if (trim((string) $almacen->nombre) !== $nombre) {
             $almacen->update(['nombre' => $nombre]);
         }
+    }
+
+    private function nombreAlmacenParaPuntoVenta(PuntoVenta $puntoVenta): string
+    {
+        if ($puntoVenta->latitud !== null && $puntoVenta->longitud !== null) {
+            $zona = trim((string) $puntoVenta->direccion);
+            if ($zona === '') {
+                $zona = trim((string) $puntoVenta->nombre) ?: 'Ubicación en mapa';
+            }
+
+            return AlmacenNombreCatalogo::sugerirNombreNuevo(
+                AlmacenAmbito::PUNTO_VENTA,
+                (float) $puntoVenta->latitud,
+                (float) $puntoVenta->longitud,
+                $zona
+            );
+        }
+
+        return AlmacenNombreCatalogo::nombreParaPuntoVenta($puntoVenta);
+    }
+
+    private function ubicacionAlmacenParaPuntoVenta(PuntoVenta $puntoVenta): ?string
+    {
+        $direccion = trim((string) $puntoVenta->direccion);
+        if ($puntoVenta->latitud === null || $puntoVenta->longitud === null) {
+            return $direccion !== '' ? $direccion : null;
+        }
+
+        $gps = 'GPS '.number_format((float) $puntoVenta->latitud, 5, '.', '')
+            .', '.number_format((float) $puntoVenta->longitud, 5, '.', '');
+
+        return $direccion !== '' ? ($direccion.' · '.$gps) : $gps;
     }
 
     /** Normaliza nombres de almacén PDV ya existentes (p. ej. tras renombrado automático). */

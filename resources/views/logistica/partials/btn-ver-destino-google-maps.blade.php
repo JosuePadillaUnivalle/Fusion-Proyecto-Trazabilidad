@@ -10,6 +10,6 @@
    target="_blank"
    rel="noopener noreferrer"
    title="Abrir el destino en Google Maps">
-    <i class="fas fa-map-marker-alt mr-1"></i> Ver destino en Google Maps
+    <i class="fas fa-map-marker-alt mr-1"></i> {{ $etiqueta ?? 'Ver destino en Google Maps' }}
 </a>
 @endif

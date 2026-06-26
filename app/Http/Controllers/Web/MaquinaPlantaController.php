@@ -9,6 +9,7 @@ use App\Models\MaquinaVariablePlanta;
 use App\Models\ProcesoPlanta;
 use App\Models\VariableEstandar;
 use App\Support\MaquinaPlantaCodigo;
+use App\Support\ParametroRangoPlanta;
 use App\Support\PlantillaTransformacionDisponibilidad;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class MaquinaPlantaController extends Controller
@@ -130,6 +132,8 @@ class MaquinaPlantaController extends Controller
             $data['imagenurl'] = $this->procesarImagen($request) ?? $data['imagenurl'] ?? null;
         }
 
+        $this->validarVariablesSugeridasEntrada($request);
+
         $maquina = MaquinaPlanta::create($data);
         $this->syncVariablesSugeridas($maquina, $request->input('variables_sugeridas', []));
 
@@ -169,6 +173,7 @@ class MaquinaPlantaController extends Controller
         }
 
         unset($data['imagen'], $data['quitar_imagen']);
+        $this->validarVariablesSugeridasEntrada($request);
         $maquinas_plantum->update($data);
         $this->syncVariablesSugeridas($maquinas_plantum, $request->input('variables_sugeridas', []));
 
@@ -241,16 +246,6 @@ class MaquinaPlantaController extends Controller
             return;
         }
 
-        $request = request();
-        $request->validate([
-            'variables_sugeridas' => ['nullable', 'array'],
-            'variables_sugeridas.*.variableestandarid' => ['required', 'integer', 'exists:variable_estandar,variableestandarid'],
-            'variables_sugeridas.*.valor_minimo' => ['required', 'numeric'],
-            'variables_sugeridas.*.valor_maximo' => ['required', 'numeric'],
-            'variables_sugeridas.*.valor_objetivo' => ['nullable', 'numeric'],
-            'variables_sugeridas.*.obligatorio' => ['nullable'],
-        ]);
-
         $maquina->variablesSugeridas()->delete();
         $filas = $filas ?? [];
         $vistos = [];
@@ -277,6 +272,42 @@ class MaquinaPlantaController extends Controller
                     ? (float) $fila['valor_objetivo'] : null,
                 'obligatorio' => filter_var($fila['obligatorio'] ?? true, FILTER_VALIDATE_BOOLEAN),
             ]);
+        }
+    }
+
+    private function validarVariablesSugeridasEntrada(Request $request): void
+    {
+        $request->validate([
+            'variables_sugeridas' => ['nullable', 'array'],
+            'variables_sugeridas.*.variableestandarid' => ['required', 'integer', 'exists:variable_estandar,variableestandarid'],
+            'variables_sugeridas.*.valor_minimo' => ['required', 'numeric'],
+            'variables_sugeridas.*.valor_maximo' => ['required', 'numeric'],
+            'variables_sugeridas.*.valor_objetivo' => ['nullable', 'numeric'],
+            'variables_sugeridas.*.obligatorio' => ['nullable'],
+        ]);
+
+        $filas = $request->input('variables_sugeridas', []) ?? [];
+        $nombres = VariableEstandar::query()
+            ->whereIn('variableestandarid', collect($filas)->pluck('variableestandarid')->filter()->all())
+            ->pluck('nombre', 'variableestandarid');
+
+        foreach ($filas as $fila) {
+            $varId = (int) ($fila['variableestandarid'] ?? 0);
+            if ($varId <= 0) {
+                continue;
+            }
+
+            $error = ParametroRangoPlanta::validarRango(
+                null,
+                $varId,
+                (float) ($fila['valor_minimo'] ?? 0),
+                (float) ($fila['valor_maximo'] ?? 0),
+                $nombres[$varId] ?? null,
+            );
+
+            if ($error !== null) {
+                throw ValidationException::withMessages(['variables_sugeridas' => $error]);
+            }
         }
     }
 

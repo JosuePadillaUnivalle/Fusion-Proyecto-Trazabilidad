@@ -3,11 +3,14 @@
 namespace Tests\Unit;
 
 use App\Models\CatalogoTamanoConteo;
+use App\Models\DetallePedido;
+use App\Models\Insumo;
 use App\Models\Produccion;
 use App\Models\ProduccionAlmacenamiento;
 use App\Models\UnidadMedida;
 use App\Services\AlmacenCapacidadService;
 use App\Support\AlmacenPlantaCosechaCatalogo;
+use App\Support\PedidoCatalogo;
 use Tests\TestCase;
 
 class AlmacenCosechaMetricasTest extends TestCase
@@ -59,5 +62,36 @@ class AlmacenCosechaMetricasTest extends TestCase
         $this->assertTrue(AlmacenPlantaCosechaCatalogo::unidadEsConteo('und'));
         $this->assertTrue(AlmacenPlantaCosechaCatalogo::unidadEsConteo('Unidades'));
         $this->assertFalse(AlmacenPlantaCosechaCatalogo::unidadEsConteo('kg'));
+    }
+
+    public function test_metricas_recepcion_planta_usa_empaque_del_pedido_no_caja_agricola(): void
+    {
+        $kg = new UnidadMedida(['nombre' => 'Kilogramo', 'abreviatura' => 'kg', 'categoria' => 'peso']);
+
+        $insumo = new Insumo([
+            'nombre' => 'Cebolla',
+            'stock' => 4050,
+            'descripcion' => 'Recepción pedido PED-20260625-0001 · 25/06/2026',
+        ]);
+        $insumo->setRelation('unidadMedida', $kg);
+
+        $detalle = new DetallePedido([
+            'cultivo_personalizado' => 'Cebolla',
+            'cantidad' => 4050,
+            'observaciones' => PedidoCatalogo::construirMetaCargaObservaciones(
+                'empaques',
+                '450',
+                'Caja plástica',
+                'Pequeña (80-100 g)'
+            ),
+        ]);
+
+        $metricas = (new \ReflectionMethod(AlmacenPlantaCosechaCatalogo::class, 'metricasDesdeDetallePedidoRecepcion'))
+            ->invoke(null, $detalle, 4050.0);
+
+        $this->assertSame('empaques', $metricas['unidad']);
+        $this->assertSame(450.0, $metricas['cantidad']);
+        $this->assertSame(4050.0, $metricas['kg']);
+        $this->assertSame('450 Caja plástica', $metricas['empaque']);
     }
 }

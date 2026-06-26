@@ -74,9 +74,13 @@
                                 @endcanany
                                 @canany(['lote_produccion.delete', 'envios.delete'])
                                     <form action="{{ route('produccion-planta.catalogos.destroy', [$tipo, $row->{$config['pk']}]) }}" method="POST" class="d-inline"
-                                          onsubmit="return confirm('¿Eliminar este registro?')">
+                                          data-confirm-title="Eliminar registro"
+                                          data-confirm-message="¿Eliminar «{{ $row->nombre ?? 'este registro' }}»? Esta acción no se puede deshacer."
+                                          data-confirm-tone="danger"
+                                          data-confirm-btn="Eliminar">
                                         @csrf @method('DELETE')
-                                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar"><i class="fas fa-trash"></i></button>
+                                        <button type="button" class="btn btn-outline-danger btn-sm" title="Eliminar"
+                                                data-confirm-modal><i class="fas fa-trash"></i></button>
                                     </form>
                                 @endcanany
                             </td>

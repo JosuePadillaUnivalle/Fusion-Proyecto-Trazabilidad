@@ -135,6 +135,19 @@
                             @include('logistica.partials.trayecto-colores', ['trayectoPartes' => $trayectoPartes])
                         </div>
                     </div>
+                    @if($simulacionActiva ?? false)
+                    <div class="card-body border-bottom pb-3">
+                        @include('logistica.partials.progreso-simulacion-transportista', [
+                            'tipo' => 'agricola',
+                            'id' => $pedido->envioAsignacion->envioasignacionmultipleid,
+                        ])
+                        @if($urlTiempoReal ?? null)
+                        <a href="{{ $urlTiempoReal }}" class="btn btn-outline-primary btn-sm btn-block mt-2 font-weight-bold">
+                            <i class="fas fa-map-marked-alt mr-1"></i> Ver ruta en tiempo real
+                        </a>
+                        @endif
+                    </div>
+                    @endif
                     <div class="card-body p-0">
                         <div id="mapaPedido"></div>
                     </div>
@@ -202,6 +215,11 @@
                                         Pendiente de carga en almacén agrícola.
                                     @endif
                                 </p>
+                                @if(($simulacionActiva ?? false) && ($urlTiempoReal ?? null))
+                                <a href="{{ $urlTiempoReal }}" class="btn btn-sm btn-outline-info mt-1">
+                                    <i class="fas fa-satellite-dish mr-1"></i> Seguir transportista en mapa
+                                </a>
+                                @endif
                             </div>
                         </div>
                         <div class="ped-paso">

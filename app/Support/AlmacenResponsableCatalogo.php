@@ -13,7 +13,7 @@ final class AlmacenResponsableCatalogo
     {
         return match ($ambito) {
             AlmacenAmbito::AGRICOLA => ['jefe_agricultor', 'agricultor'],
-            AlmacenAmbito::PLANTA => ['jefe_planta', 'planta'],
+            AlmacenAmbito::PLANTA => ['jefe_planta'],
             AlmacenAmbito::MAYORISTA => ['jefe_mayorista', 'mayorista'],
             AlmacenAmbito::PUNTO_VENTA => ['minorista'],
             default => [],
@@ -40,7 +40,7 @@ final class AlmacenResponsableCatalogo
         $legacy = (string) ($user->role ?? '');
         $legacyValido = match ($ambito) {
             AlmacenAmbito::AGRICOLA => in_array($legacy, ['jefe_agricultor', 'agricultor'], true),
-            AlmacenAmbito::PLANTA => in_array($legacy, ['jefe_planta', 'planta'], true),
+            AlmacenAmbito::PLANTA => in_array($legacy, ['jefe_planta'], true),
             AlmacenAmbito::MAYORISTA => in_array($legacy, ['jefe_mayorista', 'mayorista'], true),
             AlmacenAmbito::PUNTO_VENTA => $legacy === 'minorista',
             default => false,

@@ -139,4 +139,16 @@ class PedidoCatalogoCalibresTest extends TestCase
         sort($nombres);
         $this->assertSame(['Mediana (120-150 g)', 'Pequeña (80-100 g)'], $nombres);
     }
+
+    public function test_etiqueta_cosecha_evita_cultivo_duplicado_en_lote(): void
+    {
+        $this->assertSame(
+            'Cebolla - Lote 002',
+            PedidoCatalogo::etiquetaCosechaSelector('Cebolla', 'Cebolla - Lote 002')
+        );
+        $this->assertSame(
+            'Papa — Lote Norte',
+            PedidoCatalogo::etiquetaCosechaSelector('Papa', 'Lote Norte')
+        );
+    }
 }

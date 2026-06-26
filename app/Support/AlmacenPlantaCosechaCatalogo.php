@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Almacen;
 use App\Models\AlmacenMovimiento;
+use App\Models\DetallePedido;
 use App\Models\EnvioAsignacionMultiple;
 use App\Models\Insumo;
 use App\Models\CatalogoTamanoConteo;
@@ -93,18 +94,166 @@ final class AlmacenPlantaCosechaCatalogo
             ];
         }
 
-        $calibre = self::resolverCalibrePorNombreCultivo($insumo->nombre);
+        $detallePedido = self::resolverDetallePedidoDesdeInsumoRecepcion($insumo);
+        if ($detallePedido !== null) {
+            $metricasPedido = self::metricasDesdeDetallePedidoRecepcion($detallePedido, $kg);
+            if ($metricasPedido !== null) {
+                return $metricasPedido;
+            }
+        }
+
+        $calibre = self::resolverCalibreDesdeInsumoRecepcion($insumo);
         $present = $presentacion->desdeKg($kg, $calibre);
+
+        return self::metricasDesdePresentacion($present, $kg);
+    }
+
+    /**
+     * Métricas de recepción en planta a partir del empaque declarado en el pedido (@carga:…),
+     * no del calibre/caja del almacén agrícola.
+     *
+     * @return array{cantidad: float, unidad: string, kg: float, empaque: ?string}|null
+     */
+    private static function metricasDesdeDetallePedidoRecepcion(DetallePedido $detalle, float $kg): ?array
+    {
+        $meta = PedidoCatalogo::descripcionEmpaqueDetalle($detalle->observaciones);
+        if ($meta === null || trim($meta) === '') {
+            return null;
+        }
+
+        if (preg_match('/^([\d][\d.,]*)\s+empaques?\b/iu', $meta, $coincidencias)) {
+            $empaques = (int) preg_replace('/[^\d]/', '', $coincidencias[1]);
+            $partes = array_values(array_filter(array_map('trim', preg_split('/\s*·\s*/u', $meta) ?: [])));
+            $tipoNombre = trim((string) ($partes[1] ?? ''));
+            $label = $tipoNombre !== '' ? $tipoNombre : 'Empaque';
+
+            return [
+                'cantidad' => (float) $empaques,
+                'unidad' => 'empaques',
+                'kg' => round($kg, 4),
+                'empaque' => number_format($empaques, 0, ',', '.').' '.$label,
+            ];
+        }
+
+        if (preg_match('/^([\d][\d.,]*)\s+unidades?\b/iu', $meta, $coincidencias)) {
+            $unidades = (int) preg_replace('/[^\d]/', '', $coincidencias[1]);
+
+            return [
+                'cantidad' => (float) $unidades,
+                'unidad' => 'unidades',
+                'kg' => round($kg, 4),
+                'empaque' => null,
+            ];
+        }
+
+        if (preg_match('/^([\d][\d.,]*)\s+kg\b/iu', $meta, $coincidencias)) {
+            $partes = array_values(array_filter(array_map('trim', preg_split('/\s*·\s*/u', $meta) ?: [])));
+            $tipoNombre = trim((string) ($partes[1] ?? ''));
+            $empaque = $tipoNombre !== '' ? $tipoNombre : null;
+
+            return [
+                'cantidad' => round($kg, 4),
+                'unidad' => 'kg',
+                'kg' => round($kg, 4),
+                'empaque' => $empaque,
+            ];
+        }
+
+        return null;
+    }
+
+    private static function resolverDetallePedidoDesdeInsumoRecepcion(Insumo $insumo): ?DetallePedido
+    {
+        $movimiento = self::ultimoMovimientoRecepcion($insumo);
+        $referencia = trim((string) ($movimiento?->referencia ?? ''));
+        if ($referencia === '') {
+            return null;
+        }
+
+        $asignacion = EnvioAsignacionMultiple::query()
+            ->with(['pedido.detalles'])
+            ->where('externo_envio_id', $referencia)
+            ->first();
+
+        $pedido = $asignacion?->pedido;
+        if ($pedido === null) {
+            return null;
+        }
+
+        $clave = self::claveCultivo($insumo->nombre);
+        foreach ($pedido->detalles as $detalle) {
+            $cultivo = trim((string) ($detalle->cultivo_personalizado ?? ''));
+            $detClave = self::claveCultivo($cultivo !== '' ? $cultivo : $insumo->nombre);
+            if ($detClave !== $clave && ! str_contains($clave, $detClave) && ! str_contains($detClave, $clave)) {
+                continue;
+            }
+
+            return $detalle;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $present
+     * @return array{cantidad: float, unidad: string, kg: float, empaque: ?string}
+     */
+    private static function metricasDesdePresentacion(array $present, float $kg): array
+    {
         $unidades = (int) ($present['unidades'] ?? 0);
+        $empaques = (int) ($present['empaques'] ?? 0);
+        $empaque = null;
+        if (($present['ok'] ?? false) && $empaques > 0) {
+            $empaque = number_format($empaques, 0, ',', '.')
+                .' '.($present['empaque_label'] ?? 'Cajas');
+        }
 
         return [
-            'cantidad' => $unidades > 0 ? (float) $unidades : (float) $insumo->stock,
-            'unidad' => $unidades > 0 ? 'unidades' : ($abbr ?: 'kg'),
+            'cantidad' => $unidades > 0 ? (float) $unidades : $kg,
+            'unidad' => $unidades > 0 ? 'unidades' : 'kg',
             'kg' => round($kg, 4),
-            'empaque' => ($present['ok'] ?? false) && (int) ($present['empaques'] ?? 0) > 0
-                ? number_format((int) $present['empaques'], 0, ',', '.').' '.($present['empaque_label'] ?? 'Cajas')
-                : null,
+            'empaque' => $empaque,
         ];
+    }
+
+    private static function resolverCalibreDesdeInsumoRecepcion(Insumo $insumo): ?CatalogoTamanoConteo
+    {
+        $movimiento = self::ultimoMovimientoRecepcion($insumo);
+        $referencia = trim((string) ($movimiento?->referencia ?? ''));
+        if ($referencia === '') {
+            return self::resolverCalibrePorNombreCultivo($insumo->nombre);
+        }
+
+        $asignacion = EnvioAsignacionMultiple::query()
+            ->with([
+                'pedido.detalles.cosechaAlmacen.catalogoTamanoConteo.tipoEmpaque',
+                'pedido.detalles.cosechaAlmacen.produccion.lote.catalogoTamanoConteo.tipoEmpaque',
+            ])
+            ->where('externo_envio_id', $referencia)
+            ->first();
+
+        $pedido = $asignacion?->pedido;
+        if ($pedido !== null) {
+            $clave = self::claveCultivo($insumo->nombre);
+            foreach ($pedido->detalles as $detalle) {
+                $cultivo = trim((string) ($detalle->cultivo_personalizado ?? ''));
+                $detClave = self::claveCultivo($cultivo !== '' ? $cultivo : $insumo->nombre);
+                if ($detClave !== $clave && ! str_contains($clave, $detClave) && ! str_contains($detClave, $clave)) {
+                    continue;
+                }
+
+                $cosecha = $detalle->cosechaAlmacen;
+                $calibre = $cosecha?->catalogoTamanoConteo
+                    ?? $cosecha?->produccion?->lote?->catalogoTamanoConteo;
+                if ($calibre !== null) {
+                    $calibre->loadMissing('tipoEmpaque');
+
+                    return $calibre;
+                }
+            }
+        }
+
+        return self::resolverCalibrePorNombreCultivo($insumo->nombre);
     }
 
     public static function unidadEsConteo(?string $unidad): bool
@@ -277,14 +426,7 @@ final class AlmacenPlantaCosechaCatalogo
             ->each(function (ProduccionAlmacenamiento $c) use ($lineas, $capacidad, $almacen, $rutaPrefijo, $clave) {
                 $lote = $c->produccion?->lote;
                 $cultivo = $lote?->cultivo?->nombre ?? 'Cultivo';
-                $metricas = ($almacen->ambito ?? '') === AlmacenAmbito::AGRICOLA
-                    ? self::metricasProduccionAlmacenamiento($c, $capacidad)
-                    : [
-                        'cantidad' => (float) $c->cantidad,
-                        'unidad' => $c->unidadMedida?->abreviatura ?? 'kg',
-                        'kg' => (float) $capacidad->convertirAKg((float) $c->cantidad, $c->unidadMedida),
-                        'empaque' => null,
-                    ];
+                $metricas = self::metricasProduccionAlmacenamiento($c, $capacidad);
                 $fecha = $c->fechaentrada ? \Carbon\Carbon::parse($c->fechaentrada) : null;
 
                 $lineas->push([
@@ -315,14 +457,7 @@ final class AlmacenPlantaCosechaCatalogo
             ->get()
             ->filter(fn (Insumo $insumo) => self::claveCultivo($insumo->nombre) === $clave)
             ->each(function (Insumo $insumo) use ($lineas, $almacen, $capacidad, $rutaPrefijo, $clave) {
-                $metricas = ($almacen->ambito ?? '') === AlmacenAmbito::AGRICOLA
-                    ? self::metricasInsumoRecepcion($insumo, $capacidad)
-                    : [
-                        'cantidad' => (float) $insumo->stock,
-                        'unidad' => $insumo->unidadMedida?->abreviatura ?? 'kg',
-                        'kg' => (float) $capacidad->convertirAKg((float) $insumo->stock, $insumo->unidadMedida),
-                        'empaque' => null,
-                    ];
+                $metricas = self::metricasInsumoRecepcion($insumo, $capacidad);
                 $movimiento = self::ultimoMovimientoRecepcion($insumo);
                 $origen = self::resolverOrigenRecepcion($movimiento);
                 $fecha = $movimiento?->fecha ?? self::fechaDesdeDescripcionRecepcion($insumo->descripcion);

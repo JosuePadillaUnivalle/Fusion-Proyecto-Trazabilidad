@@ -235,6 +235,9 @@
         <label for="nombre">Nombre <span class="text-danger">*</span></label>
         <input type="text" name="nombre" id="nombre" class="form-control @error('nombre') is-invalid @enderror"
                maxlength="100" value="{{ $nombreValor }}" required placeholder="Ej: Almacén Norte">
+        @if(! $esEdicion)
+        <small class="text-muted d-block mt-1">Se sugiere automáticamente al marcar el mapa (tipo + calle + código único). Podés editarlo.</small>
+        @endif
         @if(!empty($campos['nombre']))<div class="guia-campo">{{ $campos['nombre'] }}</div>@endif
         @error('nombre')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
@@ -314,7 +317,10 @@
 <script>
 $(function () {
     const inputUbic = document.getElementById('ubicacion');
+    const inputNombre = document.getElementById('nombre');
     const hint = document.getElementById('ubicacion_detalle_hint');
+    const esEdicion = @json($esEdicion);
+    const urlSugerirNombre = @json(route(($rutaPrefijo ?? 'almacen-agricola').'.sugerir-nombre'));
     const DEFAULT_LAT = -17.7833;
     const DEFAULT_LNG = -63.1821;
 
@@ -322,6 +328,7 @@ $(function () {
     let lngActual = DEFAULT_LNG;
     let mapaAlmacen = null;
     let marcadorAlmacen = null;
+    let nombreEditadoManual = esEdicion && ((inputNombre?.value || '').trim() !== '');
 
     const coordsInicial = @json($coordsInicial);
     if (coordsInicial) {
@@ -334,6 +341,40 @@ $(function () {
     }
 
     let geocodeTimer = null;
+
+    if (inputNombre) {
+        inputNombre.addEventListener('input', function () {
+            nombreEditadoManual = true;
+        });
+    }
+
+    function sugerirNombreAlmacen(lat, lng, calle) {
+        if (nombreEditadoManual || !inputNombre || !urlSugerirNombre) {
+            return;
+        }
+
+        const params = new URLSearchParams({
+            lat: String(lat),
+            lng: String(lng),
+        });
+        if (calle) {
+            params.set('zona', calle);
+        }
+
+        fetch(urlSugerirNombre + '?' + params.toString(), {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!nombreEditadoManual && data && data.nombre) {
+                    inputNombre.value = data.nombre;
+                }
+            })
+            .catch(function () { /* silencioso */ });
+    }
 
     function textoDireccionDesdeRespuesta(data) {
         const addr = data && data.address ? data.address : {};
@@ -354,6 +395,7 @@ $(function () {
     function actualizarCampo(lat, lng) {
         latActual = lat;
         lngActual = lng;
+        sugerirNombreAlmacen(lat, lng, '');
         if (inputUbic) {
             inputUbic.placeholder = 'Buscando dirección…';
         }
@@ -378,6 +420,7 @@ $(function () {
                             ? 'Dirección sugerida desde el mapa. Podés editar el texto si necesitás agregar una referencia.'
                             : 'Punto marcado en el mapa. Escribí una referencia si la calle no se detectó.';
                     }
+                    sugerirNombreAlmacen(lat, lng, calle);
                 })
                 .catch(function () {
                     if (inputUbic) {
@@ -386,6 +429,7 @@ $(function () {
                     if (hint) {
                         hint.textContent = 'Punto marcado en el mapa. Escribí la dirección o una referencia.';
                     }
+                    sugerirNombreAlmacen(lat, lng, '');
                 });
         }, 350);
     }

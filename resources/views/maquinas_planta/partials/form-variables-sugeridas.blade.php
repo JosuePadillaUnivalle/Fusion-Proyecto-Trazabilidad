@@ -95,6 +95,71 @@
         actualizarVacio();
     }
 
+    function limitesEscalaDesdeUnidad(unidad) {
+        if (!unidad) return null;
+        const m = String(unidad).toLowerCase().match(/escala\s*(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)/);
+        if (!m) return null;
+        return {
+            min: parseFloat(m[1].replace(',', '.')),
+            max: parseFloat(m[2].replace(',', '.')),
+        };
+    }
+
+    function acotarInputEscala(input, lim) {
+        if (!input || !lim) return;
+        let v = parseFloat(input.value);
+        if (!Number.isFinite(v)) return;
+        if (v < lim.min) input.value = String(lim.min);
+        if (v > lim.max) input.value = String(lim.max);
+    }
+
+    function aplicarLimitesEscalaFila(row) {
+        const sel = row.querySelector('.var-select');
+        const minIn = row.querySelector('.var-min');
+        const maxIn = row.querySelector('.var-max');
+        if (!sel || !minIn || !maxIn) return;
+
+        const refresh = () => {
+            const opt = sel.options[sel.selectedIndex];
+            const lim = limitesEscalaDesdeUnidad(opt?.dataset?.unidad || '');
+            if (lim) {
+                minIn.min = lim.min;
+                minIn.max = lim.max;
+                maxIn.min = lim.min;
+                maxIn.max = lim.max;
+                minIn.title = 'Rango permitido: ' + lim.min + ' – ' + lim.max;
+                maxIn.title = minIn.title;
+                if (document.activeElement !== minIn && document.activeElement !== maxIn) {
+                    acotarInputEscala(minIn, lim);
+                    acotarInputEscala(maxIn, lim);
+                    if (parseFloat(minIn.value) > parseFloat(maxIn.value)) {
+                        maxIn.value = minIn.value;
+                    }
+                }
+            } else {
+                ['min', 'max', 'title'].forEach(attr => {
+                    minIn.removeAttribute(attr);
+                    maxIn.removeAttribute(attr);
+                });
+            }
+        };
+
+        const acotarAlSalir = () => {
+            const lim = limitesEscalaDesdeUnidad(sel.options[sel.selectedIndex]?.dataset?.unidad || '');
+            if (!lim) return;
+            acotarInputEscala(minIn, lim);
+            acotarInputEscala(maxIn, lim);
+            if (parseFloat(minIn.value) > parseFloat(maxIn.value)) {
+                maxIn.value = minIn.value;
+            }
+        };
+
+        sel.addEventListener('change', refresh);
+        minIn.addEventListener('blur', acotarAlSalir);
+        maxIn.addEventListener('blur', acotarAlSalir);
+        refresh();
+    }
+
     function agregarFila(data) {
         const node = tpl.content.cloneNode(true);
         const row = node.querySelector('.maq-var-card');
@@ -104,6 +169,7 @@
         if (data?.valor_minimo != null) row.querySelector('.var-min').value = data.valor_minimo;
         if (data?.valor_maximo != null) row.querySelector('.var-max').value = data.valor_maximo;
         lista.appendChild(node);
+        aplicarLimitesEscalaFila(lista.lastElementChild);
         renumerarNombres();
     }
 

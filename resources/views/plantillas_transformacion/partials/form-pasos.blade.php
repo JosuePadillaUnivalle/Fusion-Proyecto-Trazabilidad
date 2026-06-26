@@ -17,7 +17,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap" style="gap:.5rem">
         <div>
             <label class="font-weight-bold mb-0 text-success"><i class="fas fa-stream mr-1"></i> Etapas de la línea</label>
-            <p class="small text-muted mb-0">Arrastre para reordenar · último paso = <strong>{{ $procesoCierreNombre }}</strong></p>
+            <p class="small text-muted mb-0">Arrastre para intercambiar pasos · último paso = <strong>{{ $procesoCierreNombre }}</strong> (fijo)</p>
         </div>
         <button type="button" class="btn btn-sm btn-success" id="btnAgregarPasoPlantilla">
             <i class="fas fa-plus mr-1"></i> Agregar paso
@@ -29,7 +29,7 @@
     @error('pasos')<div class="alert alert-danger mb-2"><i class="fas fa-times-circle mr-1"></i>{{ $message }}</div>@enderror
     <div id="listaPasosPlantilla" class="lista-pasos-plantilla"></div>
     <div id="zonaDropFinalPasos" class="paso-drop-final-zone" aria-hidden="true">
-        <i class="fas fa-arrow-down mr-1"></i> Suelte aquí para colocar al <strong>final</strong> de la línea
+        <i class="fas fa-arrow-down mr-1"></i> Suelte aquí para colocar antes de <strong>{{ $procesoCierreNombre }}</strong>
     </div>
 </div>
 
@@ -78,15 +78,12 @@
                         </div>
                     </div>
                     <div class="paso-variables-wrap">
-                        <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap" style="gap:.35rem">
+                        <div class="mb-1">
                             <span class="small font-weight-bold text-secondary"><i class="fas fa-sliders-h mr-1"></i>Rangos del paso</span>
-                            <button type="button" class="btn btn-sm btn-outline-success btn-agregar-var-paso">
-                                <i class="fas fa-plus mr-1"></i> Añadir variable
-                            </button>
                         </div>
                         <div class="paso-variables-lista"></div>
-                        <p class="small text-muted mb-0 paso-vars-vacio">Elija una máquina para precargar parámetros o use <strong>Añadir variable</strong>.</p>
-                        <p class="small text-muted mb-0 mt-1 paso-vars-leyenda">Todos los parámetros son <strong>obligatorios</strong> en planta. El rango del paso no puede superar el límite estándar de la máquina.</p>
+                        <p class="small text-muted mb-0 paso-vars-vacio">Elija una máquina para cargar los parámetros definidos en el equipo.</p>
+                        <p class="small text-muted mb-0 mt-1 paso-vars-leyenda">Solo se usan las variables de la máquina. Ajuste el rango del paso dentro del límite estándar del equipo.</p>
                     </div>
                 </div>
             </div>
@@ -96,16 +93,22 @@
 
 <template id="tplVarPaso">
     <div class="paso-var-row">
-        <select class="form-control form-control-sm paso-var-select" required>
+        <select class="form-control form-control-sm paso-var-select paso-var-select--fija" required disabled aria-readonly="true">
             <option value="">Variable…</option>
             @foreach($variablesCatalogo as $var)
                 <option value="{{ $var->variableestandarid }}">{{ $var->nombre }}@if($var->unidad) ({{ $var->unidad }})@endif</option>
             @endforeach
         </select>
-        <input type="number" step="0.01" class="form-control form-control-sm paso-var-min" placeholder="Mín" required>
-        <input type="number" step="0.01" class="form-control form-control-sm paso-var-max" placeholder="Máx" required>
+        <input type="hidden" class="paso-var-id-hidden" value="">
+        <div class="paso-var-campo">
+            <input type="number" step="0.01" class="form-control form-control-sm paso-var-min" placeholder="Mín" required>
+            <span class="paso-var-lim-maq paso-var-lim-min"></span>
+        </div>
+        <div class="paso-var-campo">
+            <input type="number" step="0.01" class="form-control form-control-sm paso-var-max" placeholder="Máx" required>
+            <span class="paso-var-lim-maq paso-var-lim-max"></span>
+        </div>
         <input type="hidden" class="paso-var-oblig" value="1">
-        <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-quitar-var-paso"><i class="fas fa-times"></i></button>
     </div>
 </template>
 
@@ -140,10 +143,15 @@
 .paso-card__fields { flex: 1; min-width: 240px; }
 .paso-variables-wrap { border-top: 1px dashed #e2ebe3; padding-top: .65rem; margin-top: .35rem; }
 .paso-var-row {
-    display: grid; grid-template-columns: 1.5fr .75fr .75fr auto; gap: .4rem; align-items: center;
+    display: grid; grid-template-columns: 1.5fr .85fr .85fr; gap: .4rem; align-items: start;
     background: #f8fbf8; border-radius: 8px; padding: .4rem .5rem; margin-bottom: .35rem;
 }
-.btn-agregar-var-paso { font-size: .78rem; font-weight: 600; white-space: nowrap; }
+.paso-var-select--fija:disabled { background: #f1f5f9; color: #334155; cursor: default; opacity: 1; -webkit-text-fill-color: #334155; }
+.paso-var-campo { display: flex; flex-direction: column; gap: .12rem; min-width: 0; }
+.paso-var-lim-maq { font-size: .67rem; line-height: 1.2; color: #64748b; min-height: .8rem; }
+.paso-plantilla-row.paso-fijo-empaque .paso-drag-handle { cursor: not-allowed; opacity: .55; }
+.paso-plantilla-row.paso-fijo-empaque .paso-card { border-color: #93c5fd; }
+.paso-plantilla-row.paso-drag-over-swap .paso-card { border-color: #28a745 !important; border-width: 2px; background: #f0fdf4; }
 .paso-drop-final-zone {
     display: none; margin-top: .5rem; padding: .65rem 1rem; border: 2px dashed #94c9a8;
     border-radius: 10px; background: #f0fdf4; color: #166534; font-size: .82rem;
@@ -218,6 +226,41 @@
         const cierreId = idCierre();
         if (!cierreId) return [];
         return [...filas()].map((row, idx) => row.querySelector('.paso-proceso')?.value === cierreId ? idx : -1).filter(i => i >= 0);
+    }
+
+    function esPasoEmpaquetado(row) {
+        const cierreId = idCierre();
+        return !!(cierreId && row?.querySelector('.paso-proceso')?.value === cierreId);
+    }
+
+    function filaEmpaquetado() {
+        return [...filas()].find(esPasoEmpaquetado) || null;
+    }
+
+    function avisoEmpaquetadoFijo() {
+        mostrarAvisoGuardar(
+            '«' + procesoCierreNombre + '» siempre queda como último paso y no se puede mover.',
+            'Paso fijo'
+        );
+    }
+
+    function actualizarHintsMaquina(vr, row) {
+        const sel = vr.querySelector('.paso-var-select');
+        const limMin = vr.querySelector('.paso-var-lim-min');
+        const limMax = vr.querySelector('.paso-var-lim-max');
+        if (!sel || !limMin || !limMax) return;
+
+        const maqId = row?.querySelector('.paso-maquina')?.value;
+        const varId = sel.value;
+        const maqRaw = maqId && varId ? limitesMaquinaParaVar(maqId, varId) : null;
+
+        if (maqRaw) {
+            limMin.textContent = 'Máq. mín. ' + maqRaw.valor_minimo;
+            limMax.textContent = 'Máq. máx. ' + maqRaw.valor_maximo;
+        } else {
+            limMin.textContent = '';
+            limMax.textContent = '';
+        }
     }
 
     function mensajeEmpaquetadoError() {
@@ -306,6 +349,7 @@
 
         const refresh = () => {
             const lim = limitesPermitidosFila(vr, row);
+            actualizarHintsMaquina(vr, row);
             if (lim) {
                 minIn.min = lim.min;
                 minIn.max = lim.max;
@@ -316,10 +360,12 @@
                 const hintMaq = maqRaw ? ' (máquina ' + maqRaw.valor_minimo + '–' + maqRaw.valor_maximo + ')' : '';
                 minIn.title = 'Rango permitido: ' + lim.min + ' – ' + lim.max + hintMaq;
                 maxIn.title = minIn.title;
-                acotarInputRango(minIn, lim);
-                acotarInputRango(maxIn, lim);
-                if (parseFloat(minIn.value) > parseFloat(maxIn.value)) {
-                    maxIn.value = minIn.value;
+                if (document.activeElement !== minIn && document.activeElement !== maxIn) {
+                    acotarInputRango(minIn, lim);
+                    acotarInputRango(maxIn, lim);
+                    if (parseFloat(minIn.value) > parseFloat(maxIn.value)) {
+                        maxIn.value = minIn.value;
+                    }
                 }
             } else {
                 ['min', 'max', 'title'].forEach(attr => {
@@ -329,10 +375,29 @@
             }
         };
 
+        const acotarAlSalir = () => {
+            const lim = limitesPermitidosFila(vr, row);
+            if (!lim) return;
+            acotarInputRango(minIn, lim);
+            acotarInputRango(maxIn, lim);
+            if (parseFloat(minIn.value) > parseFloat(maxIn.value)) {
+                maxIn.value = minIn.value;
+            }
+        };
+
+        const acotarMaxAlSalir = () => {
+            const lim = limitesPermitidosFila(vr, row);
+            if (!lim) return;
+            acotarInputRango(maxIn, lim);
+            acotarInputRango(minIn, lim);
+            if (parseFloat(minIn.value) > parseFloat(maxIn.value)) {
+                minIn.value = maxIn.value;
+            }
+        };
+
         sel.addEventListener('change', refresh);
-        minIn.addEventListener('change', () => { refresh(); acotarInputRango(minIn, limitesPermitidosFila(vr, row)); });
-        maxIn.addEventListener('input', () => acotarInputRango(maxIn, limitesPermitidosFila(vr, row)));
-        minIn.addEventListener('input', () => acotarInputRango(minIn, limitesPermitidosFila(vr, row)));
+        minIn.addEventListener('blur', acotarAlSalir);
+        maxIn.addEventListener('blur', acotarMaxAlSalir);
         refresh();
     }
 
@@ -371,12 +436,28 @@
                 hint.classList.remove('d-none');
                 hint.classList.add('is-warning');
                 hint.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i>' + procesoCierreNombre + ' debe quedar al final de la línea.';
-            } else if (idx === rows.length - 1 && rows.length > 0) {
+            } else if (idx === rows.length - 1 && rows.length > 0 && cierreId && val === cierreId) {
                 hint.classList.remove('d-none');
                 hint.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Último paso: <strong>' + procesoCierreNombre + '</strong>.';
             }
         });
         if (btnGuardar) btnGuardar.disabled = false;
+        actualizarBloqueoEmpaquetado();
+    }
+
+    function actualizarBloqueoEmpaquetado() {
+        filas().forEach(row => {
+            const fijo = esPasoEmpaquetado(row);
+            row.classList.toggle('paso-fijo-empaque', fijo);
+            const handle = row.querySelector('.paso-drag-handle');
+            if (handle) {
+                handle.setAttribute('draggable', fijo ? 'false' : 'true');
+                handle.title = fijo ? procesoCierreNombre + ' — paso fijo al final' : 'Arrastrar para intercambiar posición';
+                handle.innerHTML = fijo
+                    ? '<i class="fas fa-lock"></i>'
+                    : '<i class="fas fa-grip-vertical"></i>';
+            }
+        });
     }
 
     function validarAlGuardar() {
@@ -408,7 +489,12 @@
         row.querySelector('.paso-notas').name = 'pasos[' + idx + '][notas]';
         row.querySelectorAll('.paso-var-row').forEach((vr, vi) => {
             const b = 'pasos[' + idx + '][variables][' + vi + ']';
-            vr.querySelector('.paso-var-select').name = b + '[variableestandarid]';
+            const sel = vr.querySelector('.paso-var-select');
+            const hid = vr.querySelector('.paso-var-id-hidden');
+            if (hid) {
+                hid.name = b + '[variableestandarid]';
+                hid.value = sel?.value || '';
+            }
             vr.querySelector('.paso-var-min').name = b + '[valor_minimo]';
             vr.querySelector('.paso-var-max').name = b + '[valor_maximo]';
             const o = vr.querySelector('.paso-var-oblig');
@@ -448,6 +534,20 @@
         if (cargarVars && maquinaId) cargarVariablesMaquina(row, maquinaId, true);
     }
 
+    function fijarSelectVariable(vr) {
+        const sel = vr.querySelector('.paso-var-select');
+        const hid = vr.querySelector('.paso-var-id-hidden');
+        if (!sel || !sel.value) return;
+        const opt = sel.querySelector('option[value="' + sel.value + '"]');
+        if (opt) {
+            sel.innerHTML = '';
+            sel.appendChild(opt.cloneNode(true));
+            sel.value = opt.value;
+        }
+        sel.disabled = true;
+        if (hid) hid.value = sel.value;
+    }
+
     function agregarVarPaso(row, data) {
         if (!tplVar) return;
         const node = tplVar.content.cloneNode(true);
@@ -455,6 +555,7 @@
         if (data?.variableestandarid) vr.querySelector('.paso-var-select').value = String(data.variableestandarid);
         if (data?.valor_minimo != null) vr.querySelector('.paso-var-min').value = data.valor_minimo;
         if (data?.valor_maximo != null) vr.querySelector('.paso-var-max').value = data.valor_maximo;
+        fijarSelectVariable(vr);
         row.querySelector('.paso-variables-lista').appendChild(node);
         aplicarLimitesVarFila(vr, row);
         renumerar();
@@ -551,6 +652,59 @@
     function setDragActivo(activo) {
         lista?.classList.toggle('is-dragging-pasos', activo);
         zonaDropFinal?.classList.toggle('is-active', activo);
+        if (activo) {
+            document.addEventListener('dragover', autoScrollDuranteDrag);
+        } else {
+            document.removeEventListener('dragover', autoScrollDuranteDrag);
+        }
+    }
+
+    function autoScrollDuranteDrag(e) {
+        if (!dragSrc) return;
+        e.preventDefault();
+        const margen = 90;
+        const velocidad = 18;
+        const y = e.clientY;
+        const alto = window.innerHeight;
+        if (y < margen) {
+            window.scrollBy(0, -velocidad);
+        } else if (y > alto - margen) {
+            window.scrollBy(0, velocidad);
+        }
+    }
+
+    function intercambiarPasos(fromRow, targetRow) {
+        if (!fromRow || !targetRow || fromRow === targetRow) return false;
+        if (esPasoEmpaquetado(fromRow) || esPasoEmpaquetado(targetRow)) {
+            avisoEmpaquetadoFijo();
+            return false;
+        }
+
+        const rows = [...filas()];
+        const fromIndex = rows.indexOf(fromRow);
+        const toIndex = rows.indexOf(targetRow);
+        if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return false;
+
+        rows[fromIndex] = targetRow;
+        rows[toIndex] = fromRow;
+        rows.forEach(r => lista.appendChild(r));
+        renumerar();
+        return true;
+    }
+
+    function moverAntesDeEmpaquetado(fromRow) {
+        if (!fromRow || esPasoEmpaquetado(fromRow)) {
+            avisoEmpaquetadoFijo();
+            return false;
+        }
+        const emp = filaEmpaquetado();
+        if (!emp) {
+            lista.appendChild(fromRow);
+        } else if (fromRow !== emp) {
+            lista.insertBefore(fromRow, emp);
+        }
+        renumerar();
+        return true;
     }
 
     function wireDrag(row) {
@@ -559,6 +713,11 @@
 
         handle.setAttribute('draggable', 'true');
         handle.addEventListener('dragstart', e => {
+            if (esPasoEmpaquetado(row)) {
+                e.preventDefault();
+                avisoEmpaquetadoFijo();
+                return;
+            }
             dragSrc = row;
             row.classList.add('paso-dragging');
             setDragActivo(true);
@@ -569,7 +728,7 @@
 
         row.addEventListener('dragend', () => {
             row.classList.remove('paso-dragging');
-            filas().forEach(r => r.classList.remove('paso-drag-over'));
+            filas().forEach(r => r.classList.remove('paso-drag-over', 'paso-drag-over-swap'));
             zonaDropFinal?.classList.remove('is-hover');
             setDragActivo(false);
             dragSrc = null;
@@ -577,29 +736,25 @@
 
         row.addEventListener('dragover', e => {
             if (!dragSrc || dragSrc === row) return;
+            if (esPasoEmpaquetado(row)) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            row.classList.add('paso-drag-over');
+            filas().forEach(r => r.classList.remove('paso-drag-over', 'paso-drag-over-swap'));
+            row.classList.add('paso-drag-over', 'paso-drag-over-swap');
         });
 
         row.addEventListener('dragleave', e => {
             if (!row.contains(e.relatedTarget)) {
-                row.classList.remove('paso-drag-over');
+                row.classList.remove('paso-drag-over', 'paso-drag-over-swap');
             }
         });
 
         row.addEventListener('drop', e => {
             e.preventDefault();
             e.stopPropagation();
-            row.classList.remove('paso-drag-over');
+            row.classList.remove('paso-drag-over', 'paso-drag-over-swap');
             if (!dragSrc || dragSrc === row) return;
-            const rect = row.getBoundingClientRect();
-            if (e.clientY > rect.top + rect.height / 2) {
-                row.after(dragSrc);
-            } else {
-                row.before(dragSrc);
-            }
-            renumerar();
+            intercambiarPasos(dragSrc, row);
         });
     }
 
@@ -615,8 +770,7 @@
             e.preventDefault();
             zonaDropFinal.classList.remove('is-hover');
             if (!dragSrc) return;
-            lista.appendChild(dragSrc);
-            renumerar();
+            moverAntesDeEmpaquetado(dragSrc);
         });
     }
 
@@ -647,7 +801,15 @@
         const row = node.querySelector('.paso-plantilla-row');
         if (data?.procesoplantaid) row.querySelector('.paso-proceso').value = data.procesoplantaid;
         if (data?.notas) row.querySelector('.paso-notas').value = data.notas;
-        lista.appendChild(node);
+
+        const empRow = filaEmpaquetado();
+        const esNuevoEmpaquetado = idCierre() && String(data?.procesoplantaid || '') === idCierre();
+        if (esNuevoEmpaquetado || !empRow) {
+            lista.appendChild(row);
+        } else {
+            lista.insertBefore(row, empRow);
+        }
+
         wireDrag(row);
         syncPickerPaso(row);
         if (data?.maquinaplantaid) setMaquinaEnPaso(row, data.maquinaplantaid, false);
@@ -667,10 +829,12 @@
         if (!row) return;
         if (e.target.closest('.btn-quitar-paso')) {
             if (filas().length <= 1) { alert('Debe haber al menos un paso.'); return; }
+            if (esPasoEmpaquetado(row)) {
+                mostrarAvisoGuardar('«' + procesoCierreNombre + '» es obligatorio como último paso de la línea.', 'Paso fijo');
+                return;
+            }
             row.remove(); renumerar(); return;
         }
-        if (e.target.closest('.btn-agregar-var-paso')) { agregarVarPaso(row, null); return; }
-        if (e.target.closest('.btn-quitar-var-paso')) { e.target.closest('.paso-var-row')?.remove(); renumerar(); return; }
         if (e.target.closest('.btn-elegir-maquina-paso') || e.target.closest('.paso-card__media')) {
             if (row.querySelector('.paso-proceso')?.value) abrirModalMaquinas(row);
             else alert('Primero seleccione el proceso de este paso.');
@@ -700,6 +864,8 @@
                 } else {
                     alert('Ya existe un paso de Empaquetado. No puede empaquetar dos veces.');
                 }
+            } else {
+                lista.appendChild(row);
             }
         }
 

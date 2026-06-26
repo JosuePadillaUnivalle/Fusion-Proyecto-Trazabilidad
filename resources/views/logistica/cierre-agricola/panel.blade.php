@@ -411,10 +411,36 @@
                         @endif
                     </div>
                 </div>
+                @if(count($paradasMapa ?? []) >= 1)
+                <div class="mt-2">
+                    @include('logistica.partials.btn-ver-recorrido-mapa', [
+                        'paradasMapa' => $paradasMapa ?? [],
+                        'bloque' => true,
+                        'clase' => 'btn-outline-primary btn-sm',
+                        'etiqueta' => 'Ver ruta',
+                    ])
+                    @include('logistica.partials.btn-ver-destino-google-maps', [
+                        'paradasMapa' => $paradasMapa ?? [],
+                        'bloque' => true,
+                        'etiqueta' => 'Abrir en Google Maps',
+                    ])
+                </div>
+                @endif
             @elseif(($resumen['puede_empezar_ruta'] ?? false) && ! $modoConsulta)
                 <p class="small text-muted mb-3">Condiciones registradas. Inicie el recorrido hacia planta cuando salga del almacén.</p>
                 <div class="cierre-ag-ruta-actions">
                     @include('logistica.partials.accion-empezar-ruta', ['asignacion' => $asignacion, 'bloque' => true])
+                    @include('logistica.partials.btn-ver-recorrido-mapa', [
+                        'paradasMapa' => $paradasMapa ?? [],
+                        'bloque' => true,
+                        'clase' => 'btn-outline-primary font-weight-bold',
+                        'etiqueta' => 'Ver ruta',
+                    ])
+                    @include('logistica.partials.btn-ver-destino-google-maps', [
+                        'paradasMapa' => $paradasMapa ?? [],
+                        'bloque' => true,
+                        'etiqueta' => 'Abrir en Google Maps',
+                    ])
                 </div>
             @elseif(in_array(CierreCat::PASO_EN_RUTA, $pasosCompletados, true))
                 <div class="cierre-ag-status cierre-ag-status--ruta">
@@ -670,6 +696,13 @@
 </div>
 
 @include('partials.modal-confirmar-accion')
+
+@if(count($paradasMapa ?? []) >= 1)
+@include('logistica.partials.mapa-recorrido-modal', [
+    'paradasMapa' => $paradasMapa,
+    'trayectoPartes' => null,
+])
+@endif
 @endsection
 
 @push('scripts')

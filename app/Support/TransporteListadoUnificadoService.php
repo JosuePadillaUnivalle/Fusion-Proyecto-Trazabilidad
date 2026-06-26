@@ -46,6 +46,9 @@ final class TransporteListadoUnificadoService
             $items->push($this->mapearPedido($pedido));
         }
         foreach ($rutas as $ruta) {
+            if ($ruta->esTrasladoPlantaMayorista() && ! TrasladoPlantaMayoristaPresentacion::tieneCargaRegistrada($ruta)) {
+                continue;
+            }
             $items->push($this->mapearRuta($ruta));
         }
 
@@ -182,11 +185,6 @@ final class TransporteListadoUnificadoService
             $query->whereDate('fecha_salida', '<=', $request->string('hasta')->toString());
         }
 
-        $query->where(function (Builder $w) {
-            $w->where('tipo_ruta', '!=', RutaDistribucionCatalogo::TIPO_RUTA_PLANTA_MAYORISTA)
-                ->orWhereHas('detallesTraslado');
-        });
-
         return $query;
     }
 
@@ -211,12 +209,13 @@ final class TransporteListadoUnificadoService
             'producto_label' => $pedido->detalles->first()?->cultivo_personalizado ?? '—',
             'producto_extra' => $itemsCount > 1 ? '+'.($itemsCount - 1).' ítem(s) más' : null,
             'total_kg' => $totalKg,
+            'carga_resumen' => EnvioListaCargaResumen::desdePedido($pedido),
             'destino_label' => EnvioPedidoService::etiquetaPlantaDestinoLista($pedido),
             'chofer_nombre' => $transportistaAsignado
                 ? trim($transportistaAsignado->nombre.' '.($transportistaAsignado->apellido ?? ''))
                 : null,
             'vehiculo_placa' => $asignacion?->vehiculo_ref,
-            'trayecto_partes' => EnvioPedidoService::trayectoPartesPedido($pedido),
+            'trayecto_partes' => EnvioPedidoService::trayectoPartesListaPedido($pedido),
             'estado_badge' => $estadoVisual,
             'fecha' => $fecha,
             'fecha_orden' => $fecha->timestamp,
@@ -260,11 +259,14 @@ final class TransporteListadoUnificadoService
         if ($trayecto) {
             $destinos = $trayecto['destinos'] ?? [];
             $destinoResumen = count($destinos) > 1
-                ? $destinos[0].' +'.(count($destinos) - 1).' más'
-                : ($destinos[0] ?? null);
+                ? AlmacenNombreCatalogo::etiquetaListaDesdeTexto($destinos[0] ?? '', null).' +'.(count($destinos) - 1).' más'
+                : AlmacenNombreCatalogo::etiquetaListaDesdeTexto($destinos[0] ?? '', null);
+            $origenEtiqueta = $ruta->almacenOrigen
+                ? AlmacenNombreCatalogo::etiquetaLista($ruta->almacenOrigen)
+                : AlmacenNombreCatalogo::etiquetaListaDesdeTexto($trayecto['origen'] ?? 'Planta', 'planta');
             $trayectoPartes = [
-                'recogidas' => [$trayecto['origen'] ?? 'Planta'],
-                'destino' => $destinoResumen,
+                'recogidas' => [$origenEtiqueta],
+                'destino' => $destinoResumen !== '—' ? $destinoResumen : null,
             ];
         }
 
@@ -276,6 +278,7 @@ final class TransporteListadoUnificadoService
             'producto_label' => $primerProducto,
             'producto_extra' => $paradasEntrega > 1 ? $paradasEntrega.' punto(s) de venta' : null,
             'total_kg' => $totalKg > 0 ? $totalKg : null,
+            'carga_resumen' => EnvioListaCargaResumen::desdeRuta($ruta),
             'destino_label' => $paradasEntrega.' entrega(s)',
             'chofer_nombre' => $transportista
                 ? trim($transportista->nombre.' '.($transportista->apellido ?? ''))
@@ -316,22 +319,25 @@ final class TransporteListadoUnificadoService
             $badge = ['clase' => 'warning', 'etiqueta' => 'Pendiente de salida'];
         }
 
-        $detalles = $ruta->detallesTraslado ?? collect();
-        $totalKg = $detalles->sum('cantidad');
-        $primerProducto = $detalles->first()?->producto_nombre ?? 'Traslado';
-        $extraProductos = $detalles->count() > 1 ? '+'.($detalles->count() - 1).' producto(s)' : null;
-        $origen = $ruta->almacenPlantaOrigen?->nombre ?? 'Planta';
-        $destino = $ruta->almacenMayoristaDestino?->nombre ?? 'Mayorista';
+        $lineas = TrasladoPlantaMayoristaPresentacion::lineasProducto($ruta);
+        $totalKg = TrasladoPlantaMayoristaPresentacion::totalKg($ruta);
+        $primerProducto = $lineas->first()['producto'] ?? '—';
+        $extraProductos = $lineas->count() > 1 ? '+'.($lineas->count() - 1).' producto(s)' : null;
+        $origen = $ruta->almacenPlantaOrigen
+            ? AlmacenNombreCatalogo::etiquetaLista($ruta->almacenPlantaOrigen)
+            : AlmacenNombreCatalogo::etiquetaListaDesdeTexto('Planta', 'planta');
+        $destino = TrasladoPlantaMayoristaPresentacion::nombreDestinoMayorista($ruta) ?? '—';
         $fecha = $ruta->fecha_salida ?? $ruta->created_at;
 
         return [
             'tipo' => 'traslado_planta_mayorista',
             'tipo_etiqueta' => 'Planta → Mayorista',
             'codigo' => $ruta->codigo,
-            'subcodigo' => $ruta->nombre !== $ruta->codigo ? $ruta->nombre : null,
+            'subcodigo' => null,
             'producto_label' => $primerProducto,
             'producto_extra' => $extraProductos,
             'total_kg' => $totalKg > 0 ? $totalKg : null,
+            'carga_resumen' => TrasladoPlantaMayoristaPresentacion::resumenCargaLista($ruta),
             'destino_label' => $destino,
             'chofer_nombre' => $transportista
                 ? trim($transportista->nombre.' '.($transportista->apellido ?? ''))

@@ -736,21 +736,14 @@
             } else if (/^\d+[\d.,]*\s+(empaques?|unidades)\b/im.test((usuario.split('\n')[0] || ''))) {
                 usuario = usuario.split('\n').slice(1).join('\n').trim();
             }
-            if (forma === 'kg' || !cantPedido) {
-                if (forma === 'kg' && cantPedido && empaque) {
-                    let meta = cantPedido + ' kg · ' + empaque;
-                    if (calibre) meta += ' · ' + calibre;
-                    obs.value = '@carga:' + meta + '@' + (usuario ? ' ' + usuario : '');
-                    return;
-                }
-                obs.value = usuario;
-                return;
-            }
             let meta = '';
-            if (forma === 'empaques' && empaque) {
+            if (forma === 'kg' && cantPedido && empaque) {
+                meta = cantPedido + ' kg · ' + empaque;
+                if (calibre) meta += ' · ' + calibre;
+            } else if (forma === 'empaques' && cantPedido && empaque) {
                 meta = cantPedido + ' empaques · ' + empaque;
                 if (calibre) meta += ' · ' + calibre;
-            } else if (forma === 'unidades') {
+            } else if (forma === 'unidades' && cantPedido) {
                 meta = cantPedido + ' unidades';
                 if (calibre) meta += ' · ' + calibre;
             }
@@ -759,6 +752,24 @@
                 return;
             }
             obs.value = '@carga:' + meta + '@' + (usuario ? ' ' + usuario : '');
+        },
+
+        textoObservacionesUsuario(obs) {
+            if (!obs) return '';
+            let usuario = obs.value || '';
+            if (usuario.includes('@carga:')) {
+                usuario = usuario.replace(/@carga:.+?@\s*/s, '').trim();
+            } else if (/^\d+[\d.,]*\s+(empaques?|unidades)\b/im.test((usuario.split('\n')[0] || ''))) {
+                usuario = usuario.split('\n').slice(1).join('\n').trim();
+            }
+            return usuario;
+        },
+
+        mostrarObservacionesUsuario(fila) {
+            const obs = fila.querySelector('[data-field="observaciones"]');
+            if (!obs) return;
+            const usuario = this.textoObservacionesUsuario(obs);
+            obs.value = usuario;
         },
 
         mostrarResumenCarga(fila, d, forma) {
@@ -962,12 +973,10 @@
                 cantKgInput.addEventListener('input', () => {
                     this.actualizarSugerenciaKg(fila);
                     this.validarLimitesFila(fila);
-                    this.syncObservacionesCargaFila(fila);
                 });
                 cantKgInput.addEventListener('change', () => {
                     this.actualizarSugerenciaKg(fila);
                     this.validarLimitesFila(fila);
-                    this.syncObservacionesCargaFila(fila);
                 });
             }
 
@@ -991,9 +1000,6 @@
                     if (formaVal !== 'kg') {
                         this.limpiarResumenCarga(fila);
                         this.validarLimitesFila(fila);
-                    }
-                    if (formaVal === 'kg') {
-                        this.syncObservacionesCargaFila(fila);
                     }
                     return;
                 }
@@ -1023,7 +1029,6 @@
                     }
                     this.validarCapacidadVehiculo();
                     this.actualizarSugerenciaVehiculo();
-                    this.syncObservacionesCargaFila(fila);
                 } catch (e) {
                     console.warn('Cálculo carga', e);
                 }

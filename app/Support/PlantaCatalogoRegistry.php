@@ -21,6 +21,7 @@ final class PlantaCatalogoRegistry
             $config['defaults'] = [
                 'ambito' => TipoEmpaqueAmbito::PLANTA,
                 'capacidad_unidades' => 1,
+                'activo' => true,
             ];
             $config['campos'] = [
                 'nombre' => ['label' => 'Nombre', 'rules' => 'required|string|max:100'],
@@ -34,7 +35,6 @@ final class PlantaCatalogoRegistry
                     'rules' => 'nullable|integer|min:1',
                     'ayuda' => 'Cuántos empaques de este tipo caben estibados en un pallet (referencia logística).',
                 ],
-                'activo' => ['label' => 'Activo', 'rules' => 'boolean', 'tipo' => 'checkbox', 'checkbox_label' => 'Activo'],
             ];
             $config['columnas'] = ['nombre', 'largo_cm', 'ancho_cm', 'alto_cm', 'tara_kg', 'unidades_por_pallet'];
         }

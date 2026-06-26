@@ -32,4 +32,16 @@ class AlmacenResponsableCatalogoTest extends TestCase
         $this->assertContains('jefe_agricultor', $roles);
         $this->assertContains('agricultor', $roles);
     }
+
+    public function test_planta_solo_jefe_planta_en_selector(): void
+    {
+        $roles = AlmacenResponsableCatalogo::rolesSpatie(AlmacenAmbito::PLANTA);
+
+        $this->assertSame(['jefe_planta'], $roles);
+
+        $operario = new Usuario(['role' => 'planta', 'usuarioid' => 9]);
+        $operario->setRelation('roles', collect());
+
+        $this->assertFalse(AlmacenResponsableCatalogo::usuarioValidoParaAmbito($operario, AlmacenAmbito::PLANTA));
+    }
 }

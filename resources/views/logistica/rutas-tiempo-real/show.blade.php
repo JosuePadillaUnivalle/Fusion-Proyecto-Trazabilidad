@@ -208,5 +208,5 @@
 
 @push('scripts')
 @include('logistica.partials.mapa-ruta-libs')
-<script src="{{ asset('js/simulacion-ruta.js') }}?v=10"></script>
+<script src="{{ asset('js/simulacion-ruta.js') }}?v=11"></script>
 @endpush

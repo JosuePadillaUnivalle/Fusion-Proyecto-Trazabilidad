@@ -5,12 +5,14 @@ namespace App\Services;
 use App\Models\Almacen;
 use App\Models\AlmacenajeLoteProduccion;
 use App\Models\Insumo;
+use App\Models\InventarioPresentacionLote;
 use App\Models\LoteProduccionPedido;
 use App\Models\ProduccionAlmacenamiento;
 use App\Models\UnidadMedida;
 use App\Support\AlmacenAmbito;
 use App\Support\InsumoCatalogo;
 use App\Support\ProductoPlantaCatalogo;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class AlmacenCapacidadService
@@ -65,6 +67,13 @@ class AlmacenCapacidadService
     {
         $almacen->loadMissing('unidadMedida');
 
+        if (($almacen->ambito ?? '') === AlmacenAmbito::MAYORISTA) {
+            $presentacionKg = $this->inventarioPresentacionKg($almacen);
+            if ($presentacionKg > 0) {
+                return $presentacionKg;
+            }
+        }
+
         $cosechaKg = (float) ProduccionAlmacenamiento::query()
             ->with('unidadMedida')
             ->where('almacenid', $almacen->almacenid)
@@ -78,6 +87,21 @@ class AlmacenCapacidadService
         $productoPlantaKg = $this->productoPlantaKgEnAlmacen($almacen);
 
         return $cosechaKg + $insumoKg + $productoPlantaKg;
+    }
+
+    private function inventarioPresentacionKg(Almacen $almacen): float
+    {
+        if (! Schema::hasTable('inventario_presentacion_lote')) {
+            return 0.0;
+        }
+
+        return (float) InventarioPresentacionLote::query()
+            ->where('almacenid', $almacen->almacenid)
+            ->where(function ($q) {
+                $q->where('cantidad_kg', '>', 0)
+                    ->orWhere('cantidad_unidades', '>', 0);
+            })
+            ->sum('cantidad_kg');
     }
 
     public function productoPlantaKgEnAlmacen(Almacen $almacen): float

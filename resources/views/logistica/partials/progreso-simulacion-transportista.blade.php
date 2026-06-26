@@ -11,6 +11,6 @@
 
 @once
     @push('scripts')
-    <script src="{{ asset('js/simulacion-ruta.js') }}?v=7"></script>
+    <script src="{{ asset('js/simulacion-ruta.js') }}?v=11"></script>
     @endpush
 @endonce

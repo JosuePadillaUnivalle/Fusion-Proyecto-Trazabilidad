@@ -83,6 +83,14 @@
         oculto.click();
     }
 
+    function restaurarBotonConfirmar() {
+        const btnConfirmar = document.getElementById('btnConfirmarAccion');
+        if (btnConfirmar) {
+            btnConfirmar.dataset.submitting = '0';
+            btnConfirmar.disabled = false;
+        }
+    }
+
     function ejecutarConfirmacion() {
         if (state.modoAviso) {
             if (window.jQuery) window.jQuery('#modalConfirmarAccion').modal('hide');
@@ -99,6 +107,7 @@
         if (state.callbackPendiente) {
             const cb = state.callbackPendiente;
             state.callbackPendiente = null;
+            restaurarBotonConfirmar();
             if (window.jQuery) window.jQuery('#modalConfirmarAccion').modal('hide');
             cb(true);
             return;
@@ -198,12 +207,22 @@
             state.modoAviso = false;
             const cancelBtn = document.getElementById('btnCancelarConfirmar');
             if (cancelBtn) cancelBtn.style.display = '';
-            const btnConfirmar = document.getElementById('btnConfirmarAccion');
-            if (btnConfirmar) {
-                btnConfirmar.dataset.submitting = '0';
-                btnConfirmar.disabled = false;
-            }
+            restaurarBotonConfirmar();
         });
+
+        if (window.jQuery) {
+            window.jQuery('#modalConfirmarAccion').on('hidden.bs.modal', function () {
+                if (state.callbackPendiente) {
+                    state.callbackPendiente(false);
+                    state.callbackPendiente = null;
+                }
+                state.formPendiente = null;
+                state.modoAviso = false;
+                const cancelBtn = document.getElementById('btnCancelarConfirmar');
+                if (cancelBtn) cancelBtn.style.display = '';
+                restaurarBotonConfirmar();
+            });
+        }
     }
 })();
 </script>
