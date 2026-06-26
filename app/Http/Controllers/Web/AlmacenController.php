@@ -734,6 +734,7 @@ class AlmacenController extends Controller
         }
 
         if ($esPlanta) {
+            $this->inventarioPlanta->sincronizarAlmacenajeDesdeInventario((int) $almacen->almacenid);
             $this->inventarioPlanta->sincronizarDesdeAlmacenajes((int) $almacen->almacenid);
         }
 
@@ -759,10 +760,6 @@ class AlmacenController extends Controller
             $invRows = InventarioPresentacionLote::query()
                 ->where('almacenid', $almacen->almacenid)
                 ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
-                ->where(function ($q) {
-                    $q->where('cantidad_unidades', '>', 0)
-                        ->orWhere('cantidad_kg', '>', 0);
-                })
                 ->with('presentacion')
                 ->get();
 
@@ -771,14 +768,17 @@ class AlmacenController extends Controller
                     $presentacion = $inv->presentacion;
                     $cantidad = (float) $inv->cantidad_unidades;
                     $kg = (float) $inv->cantidad_kg;
+                    $sinStock = $cantidad <= 0 && $kg <= 0;
                     $unidad = $presentacion
                         ? \App\Support\EmpaquePlantaCatalogo::etiquetaUnidad(null, $presentacion->tipo_envase)
                         : \App\Support\ProductoPlantaCatalogo::unidadEtiqueta($producto, $lote->unidadMedida, $lote);
                     $empaqueLabel = $presentacion?->nombre;
-                    $detalleEmpaque = $cantidad > 0 && $empaqueLabel
-                        ? number_format($cantidad, 0, ',', '.').' '.$unidad.' · '.$empaqueLabel
-                            .($kg > 0 ? ' · '.number_format($kg, 2, ',', '.').' kg producto' : '')
-                        : '';
+                    $detalleEmpaque = $sinStock
+                        ? 'Sin stock en almacén'
+                        : ($cantidad > 0 && $empaqueLabel
+                            ? number_format($cantidad, 0, ',', '.').' '.$unidad.' · '.$empaqueLabel
+                                .($kg > 0 ? ' · '.number_format($kg, 2, ',', '.').' kg producto' : '')
+                            : '');
 
                     $insumoId = Insumo::query()
                         ->where('almacenid', $almacen->almacenid)
@@ -791,10 +791,11 @@ class AlmacenController extends Controller
                         'tipo_filtro' => 'producto procesado',
                         'nombre' => $nombre,
                         'detalle' => $detalleEmpaque !== '' ? \Illuminate\Support\Str::limit($detalleEmpaque, 120) : ($lote->codigo_lote ?? '—'),
-                        'cantidad' => $cantidad > 0 ? $cantidad : (float) ($resumen['cantidad'] ?? $ingreso->cantidad),
+                        'cantidad' => $cantidad,
                         'unidad' => $unidad,
-                        'kg' => $kg > 0 ? $kg : (float) ($resumen['kg'] ?? 0),
+                        'kg' => $kg,
                         'empaque' => $empaqueLabel,
+                        'sin_stock' => $sinStock,
                         'fecha_orden' => $fechaAlm?->timestamp ?? 0,
                         'search' => strtolower(trim($nombre.' producto planta '.$producto.' '.$lote->codigo_lote.' '.($empaqueLabel ?? ''))),
                         'lote_produccion_pedido_id' => $lote->loteproduccionpedidoid,
@@ -809,9 +810,15 @@ class AlmacenController extends Controller
             if ($kg <= 0) {
                 $kg = $this->capacidadService->convertirAKg((float) $ingreso->cantidad, $lote->unidadMedida);
             }
-            $cantidad = \App\Support\ProductoPlantaCatalogo::esProduccionPorUnidades($lote)
-                ? (float) \App\Support\ProductoPlantaCatalogo::unidadesProducidas($lote, $this->capacidadService)
-                : ((float) ($resumen['cantidad'] ?? 0) > 0 ? (float) $resumen['cantidad'] : (float) $ingreso->cantidad);
+            $cantidadAlmacenaje = (float) $ingreso->cantidad;
+            if ($cantidadAlmacenaje > 0) {
+                $cantidad = $cantidadAlmacenaje;
+            } elseif (\App\Support\ProductoPlantaCatalogo::esProduccionPorUnidades($lote)) {
+                $cantidad = (float) \App\Support\ProductoPlantaCatalogo::unidadesProducidas($lote, $this->capacidadService);
+            } else {
+                $cantidad = (float) ($resumen['cantidad'] ?? 0);
+            }
+            $sinStock = $cantidad <= 0 && $kg <= 0;
             $unidad = \App\Support\ProductoPlantaCatalogo::unidadEtiqueta($producto, $lote->unidadMedida, $lote);
             $empaqueLabel = \App\Support\ProductoPlantaCatalogo::loteTieneEmpaquePlanificado($lote)
                 ? \App\Support\EmpaquePlantaCatalogo::etiquetaEmpaquePlanificado(
@@ -841,6 +848,7 @@ class AlmacenController extends Controller
                 'unidad' => $unidad,
                 'kg' => $kg,
                 'empaque' => $empaqueLabel,
+                'sin_stock' => $sinStock,
                 'fecha_orden' => $fechaAlm?->timestamp ?? 0,
                 'search' => strtolower(trim($nombre.' producto planta '.$producto.' '.$lote->codigo_lote.' '.($empaqueLabel ?? ''))),
                 'lote_produccion_pedido_id' => $lote->loteproduccionpedidoid,

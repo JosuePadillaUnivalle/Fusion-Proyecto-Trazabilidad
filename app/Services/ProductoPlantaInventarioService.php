@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Almacen;
 use App\Models\AlmacenajeLoteProduccion;
 use App\Models\Insumo;
+use App\Models\InventarioPresentacionLote;
 use App\Models\LoteProduccionPedido;
 use App\Models\TipoInsumo;
 use App\Models\UnidadMedida;
@@ -118,6 +119,52 @@ class ProductoPlantaInventarioService
                 ]);
             }
         }
+    }
+
+    public function sincronizarAlmacenajeDesdeInventario(int $almacenId): void
+    {
+        $lotesConInventario = InventarioPresentacionLote::query()
+            ->where('almacenid', $almacenId)
+            ->whereNotNull('loteproduccionpedidoid')
+            ->pluck('loteproduccionpedidoid')
+            ->unique()
+            ->filter();
+
+        foreach ($lotesConInventario as $loteId) {
+            $unidades = (float) InventarioPresentacionLote::query()
+                ->where('almacenid', $almacenId)
+                ->where('loteproduccionpedidoid', $loteId)
+                ->sum('cantidad_unidades');
+
+            $alm = AlmacenajeLoteProduccion::query()
+                ->where('almacenid', $almacenId)
+                ->where('loteproduccionpedidoid', $loteId)
+                ->orderByDesc('fecha_almacenaje')
+                ->first();
+
+            if ($alm === null) {
+                continue;
+            }
+
+            $actual = (float) $alm->cantidad;
+            $target = max(0.0, $unidades);
+
+            if ($alm->fecha_retiro !== null) {
+                $alm->update([
+                    'fecha_retiro' => null,
+                    'cantidad' => $target,
+                ]);
+            } elseif ($unidades <= 0.0001 && $actual > 0.0001) {
+                $alm->update([
+                    'cantidad' => 0,
+                    'observaciones' => trim(($alm->observaciones ?? '').' · Ajuste automático: inventario en cero.'),
+                ]);
+            } elseif (abs($actual - $target) > 0.0001) {
+                $alm->update(['cantidad' => $target]);
+            }
+        }
+
+        $this->sincronizarDesdeAlmacenajes($almacenId);
     }
 
     private function resolverUnidadMedidaId(LoteProduccionPedido $lote, string $nombreProducto): int

@@ -990,7 +990,6 @@ class TrasladoPlantaMayoristaService
             if ($nueva <= 0.0001) {
                 $alm->update([
                     'cantidad' => 0,
-                    'fecha_retiro' => now(),
                     'observaciones' => trim(($alm->observaciones ?? '').' · Salida por traslado a mayorista.'),
                 ]);
             } else {

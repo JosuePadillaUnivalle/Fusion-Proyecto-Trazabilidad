@@ -1031,7 +1031,7 @@
         {{-- Logo --}}
         <a href="{{ route('dashboard') }}" class="ag-brand">
             <div class="ag-brand-icon">
-                <img src="{{ asset('images/agrofusion-logo.svg') }}" alt="AgroFusion">
+                <img src="{{ asset('images/agrofusion-logo.jpeg') }}" alt="AgroFusion">
             </div>
             <div class="ag-brand-text">
                 <span class="ag-brand-name">AgroFusion</span>

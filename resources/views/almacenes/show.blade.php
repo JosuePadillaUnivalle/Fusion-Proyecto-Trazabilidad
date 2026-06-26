@@ -458,7 +458,13 @@
 
                         <tr class="contenido-row" data-search="{{ $item->search }}" data-categoria="{{ $item->categoria }}" data-tipo="{{ strtolower($item->tipo_filtro ?? $item->tipo_label) }}" data-fecha="{{ (int) ($item->fecha_orden ?? 0) }}">
 
-                            <td><strong class="text-success">{{ $item->nombre }}</strong></td>
+                            @php
+                                $esProductoPlanta = in_array($item->categoria, ['producto_planta', 'producto_terminado'], true);
+                                $sinStock = ($item->sin_stock ?? false)
+                                    || ($esProductoPlanta && (float) ($item->cantidad ?? 0) <= 0 && (float) ($item->kg ?? 0) <= 0);
+                            @endphp
+
+                            <td><strong class="{{ $sinStock && $esProductoPlanta ? 'text-danger' : 'text-success' }}">{{ $item->nombre }}</strong></td>
 
                             <td><span class="badge badge-{{ match($item->categoria) { 'cosecha', 'cosecha_consolidada' => 'info', 'producto_planta', 'producto_terminado' => 'warning', default => 'secondary' } }}">{{ match($item->categoria) { 'cosecha', 'cosecha_consolidada' => 'Cosecha', 'producto_planta', 'producto_terminado' => 'Producto procesado', default => 'Insumo' } }}</span></td>
 
@@ -466,17 +472,17 @@
 
                             <td class="small text-muted">{{ $item->empaque ?? '—' }}</td>
 
-                            <td class="text-right">
+                            <td class="text-right {{ $sinStock && $esProductoPlanta ? 'text-danger font-weight-bold' : '' }}">
                                 @php
                                     $uLower = strtolower($item->unidad ?? '');
                                     $esUnidad = in_array($item->categoria, ['producto_planta', 'producto_terminado', 'cosecha', 'cosecha_consolidada'], true)
                                         && ! str_contains($uLower, 'kg');
                                 @endphp
                                 {{ number_format($item->cantidad, $esUnidad ? 0 : 2) }}
-                                <small class="text-muted">{{ $item->unidad }}</small>
+                                <small class="{{ $sinStock && $esProductoPlanta ? 'text-danger' : 'text-muted' }}">{{ $item->unidad }}</small>
                             </td>
 
-                            <td class="text-right">{{ number_format($item->kg, 2) }} kg</td>
+                            <td class="text-right {{ $sinStock && $esProductoPlanta ? 'text-danger' : '' }}">{{ number_format($item->kg, 2) }} kg</td>
 
                             <td class="text-muted small">{{ $item->detalle }}</td>
 
