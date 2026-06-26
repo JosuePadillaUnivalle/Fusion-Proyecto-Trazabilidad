@@ -106,34 +106,42 @@ class AlmacenCapacidadService
 
     public function productoPlantaKgEnAlmacen(Almacen $almacen): float
     {
-        if (Schema::hasTable('inventario_presentacion_lote')) {
-            $tieneInventario = InventarioPresentacionLote::query()
-                ->where('almacenid', $almacen->almacenid)
-                ->exists();
-
-            if ($tieneInventario) {
-                return $this->inventarioPresentacionKg($almacen);
-            }
-        }
-
-        return (float) AlmacenajeLoteProduccion::query()
+        $almacenajes = AlmacenajeLoteProduccion::query()
             ->with(['loteProduccionPedido.unidadMedida', 'loteProduccionPedido.materiasPrimas.insumo.unidadMedida'])
             ->whereNull('fecha_retiro')
             ->where('almacenid', $almacen->almacenid)
-            ->get()
-            ->sum(function (AlmacenajeLoteProduccion $row) {
-                $lote = $row->loteProduccionPedido;
-                if ($lote === null) {
-                    return 0.0;
-                }
+            ->get();
 
-                $kg = ProductoPlantaCatalogo::kgParaAlmacenaje($lote, $this);
-                if ($kg > 0) {
-                    return $kg;
-                }
+        $total = 0.0;
 
-                return $this->convertirAKg((float) $row->cantidad, $lote->unidadMedida);
-            });
+        foreach ($almacenajes as $row) {
+            $lote = $row->loteProduccionPedido;
+            if ($lote === null) {
+                continue;
+            }
+
+            if (Schema::hasTable('inventario_presentacion_lote')) {
+                $invRows = InventarioPresentacionLote::query()
+                    ->where('almacenid', $almacen->almacenid)
+                    ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
+                    ->get();
+
+                if ($invRows->isNotEmpty()) {
+                    $total += (float) $invRows->sum('cantidad_kg');
+
+                    continue;
+                }
+            }
+
+            $kg = ProductoPlantaCatalogo::kgParaAlmacenaje($lote, $this);
+            if ($kg > 0) {
+                $total += $kg;
+            } else {
+                $total += $this->convertirAKg((float) $row->cantidad, $lote->unidadMedida);
+            }
+        }
+
+        return $total;
     }
 
     public function capacidadKg(Almacen $almacen): float
