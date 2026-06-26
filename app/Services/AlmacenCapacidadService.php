@@ -106,9 +106,14 @@ class AlmacenCapacidadService
 
     public function productoPlantaKgEnAlmacen(Almacen $almacen): float
     {
-        $presentacionKg = $this->inventarioPresentacionKg($almacen);
-        if ($presentacionKg > 0) {
-            return $presentacionKg;
+        if (Schema::hasTable('inventario_presentacion_lote')) {
+            $tieneInventario = InventarioPresentacionLote::query()
+                ->where('almacenid', $almacen->almacenid)
+                ->exists();
+
+            if ($tieneInventario) {
+                return $this->inventarioPresentacionKg($almacen);
+            }
         }
 
         return (float) AlmacenajeLoteProduccion::query()
@@ -200,6 +205,10 @@ class AlmacenCapacidadService
             $query = InsumoCatalogo::aplicarFiltroProductoTerminado($query);
         } elseif (($almacen->ambito ?? '') === AlmacenAmbito::PUNTO_VENTA) {
             // Inventario PDV: productos terminados recibidos del mayorista
+        } elseif (($almacen->ambito ?? '') === AlmacenAmbito::PLANTA) {
+            // Producto empaquetado se contabiliza vía inventario_presentacion_lote / almacenaje de lote
+            $query = InsumoCatalogo::aplicarFiltroOperativo($query);
+            $query = InsumoCatalogo::aplicarFiltroExcluirProductoTerminado($query);
         } else {
             $query = InsumoCatalogo::aplicarFiltroOperativo($query);
         }
