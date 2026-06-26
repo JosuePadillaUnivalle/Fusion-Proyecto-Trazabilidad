@@ -107,6 +107,59 @@ class LoteProduccionTransformacionServiceTest extends TestCase
         $this->assertTrue($this->service->transformacionCompleta($lote));
     }
 
+    public function test_con_ruta_duplicada_mismo_proceso_solo_cuenta_un_paso_por_registro(): void
+    {
+        $proceso = ProcesoPlanta::create(['nombre' => 'Preparación de Materias Primas', 'activo' => true]);
+        $maquinaA = MaquinaPlanta::create(['nombre' => 'Lavadora', 'codigo' => 'L-100', 'activo' => true]);
+        $maquinaB = MaquinaPlanta::create(['nombre' => 'Clasificadora', 'codigo' => 'BC-20', 'activo' => true]);
+
+        $vinculoA = ProcesoMaquinaPlanta::create([
+            'procesoplantaid' => $proceso->procesoplantaid,
+            'maquinaplantaid' => $maquinaA->maquinaplantaid,
+            'orden_paso' => 1,
+            'nombre' => $proceso->nombre,
+        ]);
+        $vinculoB = ProcesoMaquinaPlanta::create([
+            'procesoplantaid' => $proceso->procesoplantaid,
+            'maquinaplantaid' => $maquinaB->maquinaplantaid,
+            'orden_paso' => 2,
+            'nombre' => $proceso->nombre,
+        ]);
+
+        $plantilla = PlantillaTransformacion::create([
+            'nombre' => 'Ruta duplicada test',
+            'producto_ejemplo' => 'Cebolla',
+            'palabras_clave' => json_encode(['cebolla']),
+            'activo' => true,
+        ]);
+
+        foreach ([[$vinculoA, 1], [$vinculoB, 2]] as [$vinculo, $orden]) {
+            PlantillaTransformacionPaso::create([
+                'plantillatransformacionid' => $plantilla->plantillatransformacionid,
+                'orden' => $orden,
+                'procesoplantaid' => $vinculo->procesoplantaid,
+                'maquinaplantaid' => $vinculo->maquinaplantaid,
+            ]);
+        }
+
+        $lote = $this->crearLote();
+        $lote->update(['plantillatransformacionid' => $plantilla->plantillatransformacionid]);
+        app(LoteProduccionRutaService::class)->inicializarDesdePlantilla(
+            $lote,
+            (int) $plantilla->plantillatransformacionid
+        );
+
+        $this->registrarEtapa($lote, $vinculoA);
+        $lote->refresh();
+
+        $this->assertSame(1, $this->service->etapasCompletadasCount($lote));
+        $this->assertFalse($this->service->transformacionCompleta($lote));
+
+        $ruta = app(LoteProduccionRutaService::class)->rutaParaVista($lote->fresh());
+        $hechos = collect($ruta)->where('estado', 'hecho')->count();
+        $this->assertSame(1, $hechos);
+    }
+
     /**
      * @return array{0: LoteProduccionPedido, 1: list<ProcesoMaquinaPlanta>}
      */

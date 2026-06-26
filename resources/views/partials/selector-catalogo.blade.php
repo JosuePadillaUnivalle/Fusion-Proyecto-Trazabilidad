@@ -30,9 +30,28 @@
     $registerScript = $registerScript ?? true;
     $pinnedOption = $pinnedOption ?? null;
     $esVarianteFiltros = $variant !== 'legacy';
+    $selectorConfig = [
+        'endpoint' => $endpoint,
+        'title' => $title,
+        'searchPlaceholder' => $searchPlaceholder,
+        'allowEmpty' => (bool) $allowEmpty,
+        'emptyLabel' => $emptyLabel,
+        'placeholderEmpty' => $placeholderEmpty,
+        'params' => $params,
+        'pinnedOption' => $pinnedOption,
+        'filter' => $filter,
+        'filterAlmacen' => $filterAlmacen,
+        'searchLabel' => $searchLabel,
+        'modalIcon' => $modalIcon,
+        'rowIcon' => $rowIcon,
+        'colDetalle' => $colDetalle ?? 'Detalle',
+        'colNombre' => $colNombre ?? 'Nombre',
+        'theme' => $theme ?? (str_contains((string) $endpoint, 'vehiculos') ? 'vehiculo' : null),
+    ];
 @endphp
 
-<div class="selector-catalogo-wrapper {{ $inputGroup ? 'flex-grow-1 w-100 mb-0' : 'form-group' }}{{ $esVarianteFiltros ? ' selector-catalogo--filtros' : '' }}" id="selector_wrap_{{ $id }}">
+<div class="selector-catalogo-wrapper {{ $inputGroup ? 'flex-grow-1 w-100 mb-0' : 'form-group' }}{{ $esVarianteFiltros ? ' selector-catalogo--filtros' : '' }}" id="selector_wrap_{{ $id }}"
+     @if($registerScript) data-selector-id="{{ $id }}" data-selector-config="{{ json_encode($selectorConfig, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) }}" @endif>
     @if($showLabel)
         <label class="small font-weight-bold mb-1 d-block">
             @if($icon)<i class="fas {{ $icon }} mr-1"></i>@endif

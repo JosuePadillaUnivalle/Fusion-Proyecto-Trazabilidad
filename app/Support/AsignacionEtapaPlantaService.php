@@ -312,8 +312,10 @@ class AsignacionEtapaPlantaService
      */
     public function completar(AsignacionEtapaPlanta $asignacion, array $data, Usuario $usuario): RegistroProcesoMaquinaPlanta
     {
+        $this->activarAsignacionProgramadaSiCorresponde($asignacion);
+
         if (! $asignacion->estaPendiente()) {
-            throw new \InvalidArgumentException('Esta tarea ya fue completada.');
+            throw new \InvalidArgumentException('Esta tarea ya fue completada o aún no está activa.');
         }
 
         $esOperador = UsuarioRol::esOperarioPlanta($usuario)
@@ -405,14 +407,33 @@ class AsignacionEtapaPlantaService
         return $registro;
     }
 
+    public function sincronizarPromocionCola(LoteProduccionPedido $lote): void
+    {
+        if ($this->trazabilidad->transformacionCompleta($lote) || ! $this->tienePlanConfirmado($lote)) {
+            return;
+        }
+
+        $hayPendiente = AsignacionEtapaPlanta::query()
+            ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
+            ->where('estado', AsignacionEtapaPlanta::ESTADO_PENDIENTE)
+            ->exists();
+
+        if ($hayPendiente) {
+            return;
+        }
+
+        $this->promoverSiguienteProgramada($lote);
+    }
+
     public function promoverSiguienteProgramada(LoteProduccionPedido $lote): void
     {
-        $siguienteOrden = $this->transformacion->ordenPasoActual($lote);
+        $completados = $this->transformacion->etapasCompletadasCount($lote);
 
         $siguiente = AsignacionEtapaPlanta::query()
             ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
             ->where('estado', AsignacionEtapaPlanta::ESTADO_PROGRAMADA)
-            ->where('orden', $siguienteOrden)
+            ->where('orden', '>', $completados)
+            ->orderBy('orden')
             ->first();
 
         if (! $siguiente) {
@@ -457,6 +478,24 @@ class AsignacionEtapaPlantaService
     public function puedeReiniciarPlan(LoteProduccionPedido $lote): bool
     {
         return $this->puedeReiniciarTodo($lote);
+    }
+
+    private function activarAsignacionProgramadaSiCorresponde(AsignacionEtapaPlanta $asignacion): void
+    {
+        if (! $asignacion->estaProgramada()) {
+            return;
+        }
+
+        $lote = $asignacion->loteProduccion()->first();
+        if ($lote === null) {
+            return;
+        }
+
+        $ordenActual = $this->transformacion->ordenPasoActual($lote);
+        if ($asignacion->orden !== null && (int) $asignacion->orden === $ordenActual) {
+            $asignacion->update(['estado' => AsignacionEtapaPlanta::ESTADO_PENDIENTE]);
+            $asignacion->refresh();
+        }
     }
 
     public function reiniciarTodo(LoteProduccionPedido $lote, Usuario $usuario): void

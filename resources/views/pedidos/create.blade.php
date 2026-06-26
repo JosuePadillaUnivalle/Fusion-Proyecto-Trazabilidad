@@ -461,6 +461,7 @@
     const COSTO_ENVIO_URL = @json(route('pedidos.calcular-costo-envio'));
     const CSRF_TOKEN = @json(csrf_token());
     let pickerRecogidaActivo = null;
+    let pickerRecogidaTrasladoActivo = null;
     let redrawToken = 0;
     let costoEditadoManual = false;
     let costoEnvioToken = 0;
@@ -1347,9 +1348,20 @@
         }
     }
 
+    let trasladoInventarioContext = { recogidaKey: 'principal', almacenId: '' };
+
     function inventarioOrigenTrasladoConfig() {
         return {
-            onApply: function (item) { aplicarOrigenTraslado(item, { abrirInventario: false }); },
+            onApply: function (item) {
+                const ctx = trasladoInventarioContext;
+                if (ctx.recogidaKey === 'principal') {
+                    aplicarOrigenTraslado(item, { abrirInventario: false });
+                } else {
+                    const row = document.querySelector('.traslado-extra-row[data-recogida-uid="' + ctx.recogidaKey + '"]')
+                        || document.querySelector('.traslado-extra-row [data-field="almacenid"][value="' + ctx.almacenId + '"]')?.closest('.traslado-extra-row');
+                    if (row) aplicarRecogidaExtraTraslado(row, item, true);
+                }
+            },
             title: 'Productos terminados en planta',
             searchPlaceholder: 'Buscar producto terminado…',
             params: {
@@ -1358,7 +1370,9 @@
                 solo_producto_terminado: '1',
             },
             theme: 'planta',
-            onProductSelect: agregarProductoPreseleccionadoTraslado,
+            onProductSelect: function (item) {
+                agregarProductoPreseleccionadoTraslado(item, trasladoInventarioContext);
+            },
         };
     }
 
@@ -1376,8 +1390,13 @@
         };
     }
 
-    function abrirInventarioOrigenTraslado(almacen) {
+    function abrirInventarioOrigenTraslado(almacen, ctx) {
         if (!almacen?.id) return;
+        ctx = ctx || { recogidaKey: 'principal', almacenId: String(almacen.id) };
+        trasladoInventarioContext = {
+            recogidaKey: ctx.recogidaKey || 'principal',
+            almacenId: String(ctx.almacenId || almacen.id),
+        };
         abrirInventarioAlmacenEnvio(almacen, inventarioOrigenTrasladoConfig());
     }
 
@@ -1780,18 +1799,260 @@
         return !!valorSelectorTraslado('traslado_mayorista_destino');
     }
 
+    function recogida1ListaTraslado() {
+        return tieneOrigenTraslado();
+    }
+
+    function hayRecogidasExtraVaciasTraslado() {
+        let vacia = false;
+        document.querySelectorAll('.traslado-extra-row').forEach(function (row) {
+            if (!row.querySelector('[data-field="almacenid"]')?.value) vacia = true;
+        });
+        return vacia;
+    }
+
+    function puedeElegirDestinoTraslado() {
+        return recogida1ListaTraslado() && !hayRecogidasExtraVaciasTraslado();
+    }
+
+    function bloquearRecogidaTrasladoSiDestino() {
+        if (tieneDestinoTraslado()) {
+            aviso('Ya definió el destino. Use «Reiniciar ruta» para volver a editar las recogidas.');
+            return true;
+        }
+        return false;
+    }
+
+    function almacenTrasladoYaEnRuta(almacenId, excluirRow) {
+        if (!almacenId) return false;
+        const id = String(almacenId);
+        if (String(valorSelectorTraslado('traslado_planta_origen')) === id) return true;
+        let duplicado = false;
+        document.querySelectorAll('.traslado-extra-row').forEach(function (row) {
+            if (excluirRow && row === excluirRow) return;
+            if (String(row.querySelector('[data-field="almacenid"]')?.value || '') === id) duplicado = true;
+        });
+        return duplicado;
+    }
+
+    function recogidasConAlmacenTraslado() {
+        const list = [];
+        const id1 = valorSelectorTraslado('traslado_planta_origen');
+        if (id1) {
+            const item = itemTrasladoPorId(id1);
+            list.push({
+                key: 'principal',
+                num: 1,
+                almacenId: id1,
+                almacenLabel: document.getElementById('txtNombreOrigenTraslado')?.value || item?.label || 'Recogida 1',
+            });
+        }
+        document.querySelectorAll('.traslado-extra-row').forEach(function (row, i) {
+            const aid = row.querySelector('[data-field="almacenid"]')?.value;
+            if (!aid) return;
+            list.push({
+                key: recogidaUidExtra(row),
+                num: i + 2,
+                almacenId: aid,
+                almacenLabel: row.querySelector('.txt-recogida-extra-traslado')?.value || ('Recogida ' + (i + 2)),
+            });
+        });
+        return list;
+    }
+
+    function renumerarRecogidasTraslado() {
+        document.querySelectorAll('.traslado-extra-row').forEach(function (row, i) {
+            const num = i + 2;
+            row.querySelector('.lbl-recogida-num-traslado').textContent = 'Recogida ' + num;
+            row.querySelector('[data-field="almacenid"]').setAttribute('name', 'recogidas[' + i + '][almacenid]');
+        });
+    }
+
+    function crearFilaRecogidaExtraTraslado(datos) {
+        datos = datos || {};
+        const row = document.createElement('div');
+        row.className = 'traslado-extra-row';
+        row.setAttribute('data-recogida-uid', 'rec-t-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
+        row.innerHTML =
+            '<div class="d-flex justify-content-between align-items-center mb-1">' +
+                '<label class="small text-muted mb-0 lbl-recogida-num-traslado">Recogida</label>' +
+                '<button type="button" class="btn btn-link btn-sm text-danger p-0 btn-quitar-recogida-traslado">Quitar</button>' +
+            '</div>' +
+            '<div class="pedido-picker-field">' +
+                '<input type="text" class="picker-display txt-recogida-extra-traslado text-muted" readonly placeholder="Buscar almacén de planta…">' +
+                '<div class="picker-actions">' +
+                    '<button type="button" class="btn btn-sm btn-picker-accion btn-buscar-recogida-extra-traslado" title="Buscar almacén">' +
+                        '<i class="fas fa-search"></i>' +
+                    '</button>' +
+                '</div>' +
+            '</div>' +
+            '<input type="hidden" data-field="almacenid" value="">';
+
+        if (datos.almacenid) row.querySelector('[data-field="almacenid"]').value = datos.almacenid;
+        if (datos.direccion) {
+            row.querySelector('.txt-recogida-extra-traslado').value = datos.direccion;
+            row.querySelector('.txt-recogida-extra-traslado').classList.remove('text-muted');
+        }
+
+        row.querySelector('.btn-buscar-recogida-extra-traslado').addEventListener('click', function () {
+            if (bloquearRecogidaTrasladoSiDestino()) return;
+            if (!recogida1ListaTraslado()) {
+                aviso('Primero elija la recogida 1.');
+                return;
+            }
+            pickerRecogidaTrasladoActivo = row;
+            CatalogoSelector.open('traslado_planta_recogida_extra');
+        });
+        row.querySelector('.btn-quitar-recogida-traslado').addEventListener('click', function () {
+            if (bloquearRecogidaTrasladoSiDestino()) return;
+            row.remove();
+            renumerarRecogidasTraslado();
+            syncFilasProductoTraslado();
+            syncEstadoRutaTraslado();
+            redrawRutaTraslado();
+        });
+
+        return row;
+    }
+
+    function aplicarRecogidaExtraTraslado(row, item, desdeVer) {
+        if (!row || !item?.id) return;
+        if (almacenTrasladoYaEnRuta(item.id, row)) {
+            aviso('Este almacén de planta ya está en la ruta.');
+            return;
+        }
+        row.querySelector('[data-field="almacenid"]').value = item.id;
+        const label = etiquetaAlmacenPedido(item) || item.label || '';
+        const txt = row.querySelector('.txt-recogida-extra-traslado');
+        txt.value = label;
+        txt.classList.remove('text-muted');
+        if (!desdeVer) {
+            syncFilasProductoTraslado();
+            syncEstadoRutaTraslado();
+            redrawRutaTraslado();
+            const key = recogidaUidExtra(row);
+            abrirInventarioOrigenTraslado(item, { recogidaKey: key, almacenId: String(item.id) });
+        }
+    }
+
+    function actualizarEtiquetaTarjetaTraslado(card, rec) {
+        const lbl = card.querySelector('.lbl-traslado-recogida-titulo');
+        if (lbl) {
+            lbl.innerHTML = '<i class="fas fa-industry mr-1 text-primary"></i> Recogida ' + rec.num + ' — ' + (rec.almacenLabel || 'Almacén de planta');
+        }
+        card.setAttribute('data-almacen-planta-id', rec.almacenId);
+    }
+
+    function crearTarjetaProductosTraslado(rec) {
+        const card = document.createElement('div');
+        card.className = 'traslado-recogida-productos-card border rounded p-3 mb-3';
+        card.setAttribute('data-recogida-key', rec.key);
+        card.setAttribute('data-almacen-planta-id', rec.almacenId);
+        card.innerHTML =
+            '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">' +
+                '<strong class="lbl-traslado-recogida-titulo small mb-0"></strong>' +
+                '<button type="button" class="btn btn-sm btn-outline-secondary btn-agregar-producto-traslado-rec">' +
+                    '<i class="fas fa-plus mr-1"></i> Agregar producto' +
+                '</button>' +
+            '</div>' +
+            '<div class="traslado-productos-inner"></div>';
+        actualizarEtiquetaTarjetaTraslado(card, rec);
+        card.querySelector('.btn-agregar-producto-traslado-rec').addEventListener('click', function () {
+            const inner = card.querySelector('.traslado-productos-inner');
+            const almacenId = card.getAttribute('data-almacen-planta-id');
+            agregarFilaProductoTraslado(null, inner, almacenId, rec.key);
+        });
+        return card;
+    }
+
+    function syncFilasProductoTraslado() {
+        const container = document.getElementById('traslado-productos-recogida-container');
+        if (!container) return;
+
+        const recogidas = recogidasConAlmacenTraslado();
+        if (recogidas.length === 0) {
+            container.innerHTML = '<p class="text-muted small mb-0 env-carga-compact"><i class="fas fa-info-circle mr-1"></i> Complete el paso <strong>Ruta</strong> para indicar productos por cada almacén de planta.</p>';
+            return;
+        }
+        if (container.querySelector('.env-carga-compact')) {
+            container.innerHTML = '';
+        }
+
+        const keysActivas = new Set();
+        recogidas.forEach(function (rec) {
+            keysActivas.add(rec.key);
+            let card = container.querySelector('[data-recogida-key="' + rec.key + '"]');
+            if (!card) {
+                card = crearTarjetaProductosTraslado(rec);
+                container.appendChild(card);
+            } else {
+                actualizarEtiquetaTarjetaTraslado(card, rec);
+            }
+            const inner = card.querySelector('.traslado-productos-inner');
+            if (inner && !inner.querySelector('.traslado-producto-row')) {
+                agregarFilaProductoTraslado(null, inner, rec.almacenId, rec.key);
+            }
+            inner?.querySelectorAll('.traslado-producto-row').forEach(function (fila) {
+                fila.setAttribute('data-almacen-planta-id', rec.almacenId);
+                const hiddenAlm = fila.querySelector('[data-field="almacen_plantaid"]');
+                if (hiddenAlm) hiddenAlm.value = rec.almacenId;
+                const selId = fila.getAttribute('data-selector-id');
+                const cfg = CatalogoSelector?.instances?.[selId];
+                if (cfg) {
+                    cfg.params = {
+                        ambito_planta: '1',
+                        solo_con_stock: '1',
+                        solo_producto_terminado: '1',
+                        almacenid: String(rec.almacenId),
+                    };
+                    cfg.title = 'Productos en ' + (rec.almacenLabel || 'planta');
+                }
+            });
+        });
+
+        container.querySelectorAll('.traslado-recogida-productos-card').forEach(function (card) {
+            const key = card.getAttribute('data-recogida-key');
+            if (!keysActivas.has(key)) {
+                card.querySelectorAll('.traslado-producto-row').forEach(function (fila) {
+                    const selId = fila.getAttribute('data-selector-id');
+                    if (selId && CatalogoSelector?.instances?.[selId]) {
+                        delete CatalogoSelector.instances[selId];
+                    }
+                });
+                card.remove();
+            }
+        });
+
+        renumerarDetallesTraslado();
+    }
+    window.syncFilasProductoTraslado = syncFilasProductoTraslado;
+    window.hayRecogidasExtraVaciasTraslado = hayRecogidasExtraVaciasTraslado;
+    window.puedeElegirDestinoTraslado = puedeElegirDestinoTraslado;
+
+    function almacenPlantaIdDeFilaTraslado(fila) {
+        return fila?.getAttribute('data-almacen-planta-id')
+            || fila?.querySelector('[data-field="almacen_plantaid"]')?.value
+            || almacenPlantaTrasladoId();
+    }
+
+    function contenedorProductosDeFilaTraslado(fila) {
+        return fila?.closest('.traslado-productos-inner');
+    }
+
     function itemTrasladoPorId(id) {
         return ALMACENES_MAPA_TRASLADO.find(function (x) { return String(x.id) === String(id); });
     }
 
     function coordsTrasladoSeleccionadas() {
         const coords = [];
-        const origen = itemTrasladoPorId(valorSelectorTraslado('traslado_planta_origen'));
+        recogidasConAlmacenTraslado().forEach(function (rec) {
+            const item = itemTrasladoPorId(rec.almacenId);
+            if (item?.extra?.lat) {
+                coords.push({ lat: parseFloat(item.extra.lat), lng: parseFloat(item.extra.lng) });
+            }
+        });
         const destino = itemTrasladoPorId(valorSelectorTraslado('traslado_mayorista_destino'));
-        if (origen) {
-            coords.push({ lat: parseFloat(origen.extra.lat), lng: parseFloat(origen.extra.lng) });
-        }
-        if (destino) {
+        if (destino?.extra?.lat) {
             coords.push({ lat: parseFloat(destino.extra.lat), lng: parseFloat(destino.extra.lng) });
         }
         return coords;
@@ -1836,21 +2097,27 @@
     }
 
     function syncEstadoRutaTraslado() {
-        const origenFijado = tieneOrigenTraslado();
         const destinoFijado = tieneDestinoTraslado();
-        const bloqueOrigen = document.getElementById('bloque-origen-traslado');
+        const puedeDestino = puedeElegirDestinoTraslado();
+        const bloqueRecogidas = document.getElementById('bloque-recogidas-traslado');
         const bloqueDestino = document.getElementById('bloque-destino-traslado');
         const msgDestino = document.getElementById('traslado-destino-bloqueado-msg');
+        const btnAgregar = document.getElementById('btnAgregarRecogidaTraslado');
 
-        if (bloqueOrigen) {
-            bloqueOrigen.classList.toggle('ruta-bloqueada', destinoFijado);
+        if (bloqueRecogidas) {
+            bloqueRecogidas.classList.toggle('ruta-bloqueada', destinoFijado);
+        }
+        if (btnAgregar) {
+            btnAgregar.disabled = destinoFijado || !recogida1ListaTraslado();
         }
         if (bloqueDestino && msgDestino) {
-            bloqueDestino.classList.toggle('ruta-bloqueada', !origenFijado);
-            if (!origenFijado) {
-                msgDestino.textContent = 'Primero elija el almacén de planta (origen).';
+            bloqueDestino.classList.toggle('ruta-bloqueada', !puedeDestino);
+            if (!recogida1ListaTraslado()) {
+                msgDestino.textContent = 'Primero elija la recogida 1 en planta.';
+            } else if (hayRecogidasExtraVaciasTraslado()) {
+                msgDestino.textContent = 'Complete o quite las recogidas adicionales antes de elegir destino.';
             } else if (destinoFijado) {
-                msgDestino.textContent = 'Ruta definida. Use Reiniciar ruta si necesita cambiar el origen.';
+                msgDestino.textContent = 'Ruta definida. Use Reiniciar ruta si necesita cambiar el orden de recogidas.';
             } else {
                 msgDestino.textContent = 'Ahora puede elegir el centro mayorista (destino).';
             }
@@ -1899,15 +2166,16 @@
 
     function waypointsTraslado() {
         const puntos = [];
-        const origen = itemTrasladoPorId(valorSelectorTraslado('traslado_planta_origen'));
-        const destino = itemTrasladoPorId(valorSelectorTraslado('traslado_mayorista_destino'));
-        if (origen) {
-            const lat = parseFloat(origen.extra.lat);
-            const lng = parseFloat(origen.extra.lng);
+        recogidasConAlmacenTraslado().forEach(function (rec) {
+            const item = itemTrasladoPorId(rec.almacenId);
+            if (!item) return;
+            const lat = parseFloat(item.extra.lat);
+            const lng = parseFloat(item.extra.lng);
             if (!isNaN(lat) && !isNaN(lng)) {
-                puntos.push({ lat: lat, lng: lng, label: origen.label, tipo: 'origen' });
+                puntos.push({ lat: lat, lng: lng, label: item.label, tipo: 'origen' });
             }
-        }
+        });
+        const destino = itemTrasladoPorId(valorSelectorTraslado('traslado_mayorista_destino'));
         if (destino) {
             const lat = parseFloat(destino.extra.lat);
             const lng = parseFloat(destino.extra.lng);
@@ -1921,10 +2189,14 @@
     function aplicarOrigenTraslado(item, opts) {
         opts = opts || {};
         if (!item || !window.CatalogoSelector) return;
+        if (almacenTrasladoYaEnRuta(item.id) && String(valorSelectorTraslado('traslado_planta_origen')) !== String(item.id)) {
+            aviso('Este almacén de planta ya está en la ruta.');
+            return;
+        }
         CatalogoSelector.setValue('traslado_planta_origen', item.id, item.label);
         actualizarPickerOrigenTraslado(item);
         syncEstadoRutaTraslado();
-        actualizarParamsProductosTraslado();
+        syncFilasProductoTraslado();
         recargarPresentacionesFilasTraslado();
         if (opts.abrirInventario !== false && item.id) {
             abrirInventarioOrigenTraslado(item);
@@ -1939,18 +2211,14 @@
     }
 
     function bloquearOrigenTrasladoSiDestino() {
-        if (tieneDestinoTraslado()) {
-            aviso('Ya definió el destino. Use «Reiniciar ruta» para volver a editar el origen.');
-            return true;
-        }
-        return false;
+        return bloquearRecogidaTrasladoSiDestino();
     }
 
     function asignarAlmacenDesdeMapaTraslado(item) {
         const ambito = item.extra?.ambito || 'planta';
         if (ambito === 'mayorista') {
-            if (!tieneOrigenTraslado()) {
-                aviso('Primero elija el almacén de planta (origen).');
+            if (!puedeElegirDestinoTraslado()) {
+                aviso('Complete todas las recogidas en planta antes de elegir el mayorista.');
                 return;
             }
             aplicarDestinoTraslado(item);
@@ -1959,11 +2227,35 @@
             redrawRutaTraslado();
             return;
         }
-        if (bloquearOrigenTrasladoSiDestino()) return;
-        aplicarOrigenTraslado(item);
-        flashMapaMsgTraslado('Origen asignado: ' + item.label);
-        resaltarAlmacenesEnMapaTraslado();
-        redrawRutaTraslado();
+        if (bloquearRecogidaTrasladoSiDestino()) return;
+
+        if (!recogida1ListaTraslado()) {
+            aplicarOrigenTraslado(item, { abrirInventario: true });
+            flashMapaMsgTraslado('Recogida 1: ' + item.label);
+            resaltarAlmacenesEnMapaTraslado();
+            redrawRutaTraslado();
+            return;
+        }
+
+        let row = Array.prototype.find.call(
+            document.querySelectorAll('.traslado-extra-row'),
+            function (r) { return !r.querySelector('[data-field="almacenid"]').value; }
+        );
+        if (!row && document.querySelectorAll('.traslado-extra-row').length < MAX_RECOGIDAS_EXTRA) {
+            row = crearFilaRecogidaExtraTraslado();
+            document.getElementById('recogidas-extra-traslado-container').appendChild(row);
+            renumerarRecogidasTraslado();
+            syncEstadoRutaTraslado();
+        }
+        if (row) {
+            aplicarRecogidaExtraTraslado(row, item);
+            const num = row.querySelector('.lbl-recogida-num-traslado')?.textContent || 'Recogida';
+            flashMapaMsgTraslado(num + ': ' + item.label);
+            resaltarAlmacenesEnMapaTraslado();
+            redrawRutaTraslado();
+        } else {
+            aviso('Máximo de recogidas alcanzado. Quite una o reinicie la ruta.');
+        }
     }
 
     function pintarAlmacenesEnMapaTraslado(items) {
@@ -2267,16 +2559,7 @@
     }
 
     function syncBloqueProductosTraslado() {
-        const visible = !!almacenPlantaTrasladoId();
-        if (visible) {
-            if (trasladoProductosPreseleccionados.length) {
-                sincronizarFilasTrasladoDesdePreseleccion();
-            } else {
-                const filas = document.querySelectorAll('.traslado-producto-row');
-                if (!filas.length) agregarFilaProductoTraslado();
-            }
-            actualizarParamsProductosTraslado();
-        }
+        syncFilasProductoTraslado();
     }
 
     function textoCantidadProductos(n) {
@@ -2360,36 +2643,51 @@
         recalcularKgFilaTraslado(fila);
     }
 
-    async function fetchPresentacionesInsumo(insumoId) {
+    const trasladoPresentacionesCache = new Map();
+    const trasladoLotesPresentacionCache = new Map();
+
+    async function fetchPresentacionesInsumo(insumoId, almacenId) {
         if (!insumoId) return [];
-        const almacenId = almacenPlantaTrasladoId();
+        const almacen = almacenId || almacenPlantaTrasladoId();
+        const cacheKey = (almacen || '') + '|' + insumoId;
+        if (trasladoPresentacionesCache.has(cacheKey)) {
+            return trasladoPresentacionesCache.get(cacheKey);
+        }
         try {
             let url = PRESENTACIONES_PRODUCTO_ENDPOINT + '?insumoid=' + encodeURIComponent(insumoId);
-            if (almacenId) url += '&almacenid=' + encodeURIComponent(almacenId);
+            if (almacen) url += '&almacenid=' + encodeURIComponent(almacen);
             const res = await fetch(url, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             });
             if (!res.ok) return [];
             const json = await res.json();
-            return json.data || [];
+            const data = json.data || [];
+            trasladoPresentacionesCache.set(cacheKey, data);
+            return data;
         } catch (e) {
             return [];
         }
     }
 
-    async function fetchLotesPresentacion(presentacionId) {
+    async function fetchLotesPresentacion(presentacionId, almacenId) {
         if (!presentacionId) return { data: [], stock_total_unidades: 0 };
-        const almacenId = almacenPlantaTrasladoId();
-        if (!almacenId) return { data: [], stock_total_unidades: 0 };
+        const almacen = almacenId || almacenPlantaTrasladoId();
+        if (!almacen) return { data: [], stock_total_unidades: 0 };
+        const cacheKey = almacen + '|' + presentacionId;
+        if (trasladoLotesPresentacionCache.has(cacheKey)) {
+            return trasladoLotesPresentacionCache.get(cacheKey);
+        }
         try {
             const url = STOCK_PRESENTACION_LOTE_ENDPOINT
-                + '?almacenid=' + encodeURIComponent(almacenId)
+                + '?almacenid=' + encodeURIComponent(almacen)
                 + '&insumo_presentacionid=' + encodeURIComponent(presentacionId);
             const res = await fetch(url, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             });
             if (!res.ok) return { data: [], stock_total_unidades: 0 };
-            return await res.json();
+            const json = await res.json();
+            trasladoLotesPresentacionCache.set(cacheKey, json);
+            return json;
         } catch (e) {
             return { data: [], stock_total_unidades: 0 };
         }
@@ -2488,7 +2786,8 @@
         if (selPres) {
             selPres.innerHTML = '<option value="">Seleccione…</option>';
             const presOcupadas = new Set();
-            document.querySelectorAll('.traslado-producto-row').forEach(function (otra) {
+            const contenedor = contenedorProductosDeFilaTraslado(fila);
+            (contenedor || document).querySelectorAll('.traslado-producto-row').forEach(function (otra) {
                 if (otra === fila) return;
                 const pid = otra.querySelector('[data-field="presentacion"]')?.value;
                 if (pid) presOcupadas.add(String(pid));
@@ -2548,7 +2847,7 @@
 
         selLote.innerHTML = '<option value="">Cargando lotes…</option>';
         selLote.disabled = true;
-        const payload = await fetchLotesPresentacion(presentacionId);
+        const payload = await fetchLotesPresentacion(presentacionId, almacenPlantaIdDeFilaTraslado(fila));
         const lotes = payload.data || [];
 
         if (!lotes.length) {
@@ -2611,8 +2910,9 @@
 
     function presentacionTrasladoUsadaEnOtraFila(presId, excluirFila) {
         if (!presId) return false;
+        const contenedor = contenedorProductosDeFilaTraslado(excluirFila);
         let usada = false;
-        document.querySelectorAll('.traslado-producto-row').forEach(function (otra) {
+        (contenedor || document).querySelectorAll('.traslado-producto-row').forEach(function (otra) {
             if (otra === excluirFila) return;
             if (String(otra.querySelector('[data-field="presentacion"]')?.value || '') === String(presId)) {
                 usada = true;
@@ -2792,16 +3092,17 @@
     async function cargarPresentacionesParaFilaTraslado(fila, insumoId, seleccionId) {
         resetPresentacionFilaTraslado(fila);
         if (!insumoId) return;
-        if (!almacenPlantaTrasladoId()) {
+        const almacenId = almacenPlantaIdDeFilaTraslado(fila);
+        if (!almacenId) {
             const hint = fila.querySelector('.lbl-equiv-traslado');
             if (hint) {
-                hint.textContent = 'Primero elija el almacén de planta (origen) en el paso Ruta.';
+                hint.textContent = 'Primero elija el almacén de planta en el paso Ruta.';
                 hint.classList.remove('d-none');
                 hint.classList.add('is-error');
             }
             return;
         }
-        const presentaciones = await fetchPresentacionesInsumo(insumoId);
+        const presentaciones = await fetchPresentacionesInsumo(insumoId, almacenId);
         poblarPresentacionesFilaTraslado(fila, presentaciones, seleccionId || null);
     }
 
@@ -2869,59 +3170,86 @@
         });
     }
 
-    function agregarProductoPreseleccionadoTraslado(item) {
+    function agregarProductoPreseleccionadoTraslado(item, ctx) {
         if (!item?.id) return;
+        ctx = ctx || trasladoInventarioContext;
+        const recogidaKey = ctx.recogidaKey || 'principal';
+        const almacenId = String(ctx.almacenId || valorSelectorTraslado('traslado_planta_origen') || '');
         const id = String(item.id);
-        const existente = trasladoProductosPreseleccionados.find(function (p) { return String(p.id) === id; });
+        const existente = trasladoProductosPreseleccionados.find(function (p) {
+            return String(p.id) === id && String(p.recogidaKey) === recogidaKey;
+        });
         const prod = {
             id: id,
             label: item.label || '',
             extra: item.extra || {},
+            recogidaKey: recogidaKey,
+            almacenId: almacenId,
         };
         if (existente) {
             existente.label = prod.label;
             existente.extra = prod.extra;
+            existente.almacenId = almacenId;
         } else {
             trasladoProductosPreseleccionados.push(prod);
         }
         actualizarResumenProductosPreseleccionadosTraslado();
+        if (almacenId) {
+            fetchPresentacionesInsumo(id, almacenId);
+        }
         sincronizarFilasTrasladoDesdePreseleccion();
     }
 
-    function sincronizarFilasTrasladoDesdePreseleccion() {
-        const container = document.getElementById('traslado-productos-container');
-        if (!container || !trasladoProductosPreseleccionados.length) return;
+    async function sincronizarFilasTrasladoDesdePreseleccion() {
+        if (!trasladoProductosPreseleccionados.length) return;
+        syncFilasProductoTraslado();
 
-        trasladoProductosPreseleccionados.forEach(function (prod, index) {
-            let fila = Array.from(container.querySelectorAll('.traslado-producto-row')).find(function (f) {
+        async function poblarFilaDesdeProd(fila, prod) {
+            const selId = fila.getAttribute('data-selector-id');
+            CatalogoSelector.setValue(selId, prod.id, prod.label);
+            aplicarStockEnFilaTraslado(fila, prod.extra);
+            await cargarPresentacionesParaFilaTraslado(fila, prod.id);
+        }
+
+        const tareas = trasladoProductosPreseleccionados.map(async function (prod) {
+            const key = prod.recogidaKey || 'principal';
+            const almacenId = prod.almacenId || valorSelectorTraslado('traslado_planta_origen');
+            const inner = document.querySelector('[data-recogida-key="' + key + '"] .traslado-productos-inner');
+            if (!inner || !almacenId) return;
+
+            let fila = Array.from(inner.querySelectorAll('.traslado-producto-row')).find(function (f) {
                 return f.querySelector('[data-field="insumoid"]')?.value === String(prod.id);
             });
 
             if (!fila) {
-                const vacia = Array.from(container.querySelectorAll('.traslado-producto-row')).find(function (f) {
+                const vacia = Array.from(inner.querySelectorAll('.traslado-producto-row')).find(function (f) {
                     return !f.querySelector('[data-field="insumoid"]')?.value;
                 });
-                if (vacia && index === 0 && container.querySelectorAll('.traslado-producto-row').length === 1) {
+                if (vacia && inner.querySelectorAll('.traslado-producto-row').length === 1) {
                     fila = vacia;
-                    const selId = fila.getAttribute('data-selector-id');
-                    CatalogoSelector.setValue(selId, prod.id, prod.label);
-                    aplicarStockEnFilaTraslado(fila, prod.extra);
-                    cargarPresentacionesParaFilaTraslado(fila, prod.id);
+                    await poblarFilaDesdeProd(fila, prod);
                 } else {
-                    agregarFilaProductoTraslado({
-                        insumoid: prod.id,
-                        producto_nombre: prod.label,
-                        extra: prod.extra,
+                    await new Promise(function (resolve) {
+                        agregarFilaProductoTraslado({
+                            insumoid: prod.id,
+                            producto_nombre: prod.label,
+                            extra: prod.extra,
+                        }, inner, almacenId, key);
+                        const nueva = inner.querySelector('.traslado-producto-row:last-child');
+                        if (nueva && nueva.querySelector('[data-field="insumoid"]')?.value === String(prod.id)) {
+                            cargarPresentacionesParaFilaTraslado(nueva, prod.id).then(resolve);
+                        } else {
+                            resolve();
+                        }
                     });
                 }
                 return;
             }
 
-            const selId = fila.getAttribute('data-selector-id');
-            CatalogoSelector.setValue(selId, prod.id, prod.label);
-            aplicarStockEnFilaTraslado(fila, prod.extra);
-            cargarPresentacionesParaFilaTraslado(fila, prod.id);
+            await poblarFilaDesdeProd(fila, prod);
         });
+
+        await Promise.all(tareas);
     }
 
     function limpiarPreseleccionProductosTraslado() {
@@ -2979,6 +3307,7 @@
 
     function renumerarDetallesTraslado() {
         document.querySelectorAll('.traslado-producto-row').forEach(function (fila, idx) {
+            fila.querySelector('[data-field="almacen_plantaid"]')?.setAttribute('name', 'detalles[' + idx + '][almacen_plantaid]');
             fila.querySelector('[data-field="insumoid"]')?.setAttribute('name', 'detalles[' + idx + '][insumoid]');
             fila.querySelector('[data-field="presentacion"]')?.setAttribute('name', 'detalles[' + idx + '][insumo_presentacionid]');
             fila.querySelector('[data-field="inventario_lote"]')?.setAttribute('name', 'detalles[' + idx + '][inventario_presentacion_loteid]');
@@ -2988,7 +3317,7 @@
         });
     }
 
-    function registrarSelectorProductoTraslado(selId) {
+    function registrarSelectorProductoTraslado(selId, almacenPlantaId) {
         if (!window.CatalogoSelector) return;
         CatalogoSelector.register(selId, {
             endpoint: INSUMOS_PLANTA_ENDPOINT,
@@ -2998,7 +3327,7 @@
                 ambito_planta: '1',
                 solo_con_stock: '1',
                 solo_producto_terminado: '1',
-                almacenid: almacenPlantaTrasladoId() || '',
+                almacenid: almacenPlantaId || almacenPlantaTrasladoId() || '',
             },
             rowIcon: 'fa-box',
             theme: 'planta',
@@ -3011,15 +3340,18 @@
         });
     }
 
-    function agregarFilaProductoTraslado(detalle) {
-        const container = document.getElementById('traslado-productos-container');
+    function agregarFilaProductoTraslado(detalle, container, almacenPlantaId, recogidaKey) {
+        container = container || document.querySelector('.traslado-productos-inner');
         if (!container) return;
 
         const idx = trasladoProductoIdx++;
         const selId = 'traslado_producto_' + idx;
+        const almacenId = almacenPlantaId || almacenPlantaTrasladoId() || '';
         const fila = document.createElement('div');
         fila.className = 'traslado-producto-row';
         fila.setAttribute('data-selector-id', selId);
+        fila.setAttribute('data-almacen-planta-id', almacenId);
+        if (recogidaKey) fila.setAttribute('data-recogida-key', recogidaKey);
         fila.innerHTML =
             '<div class="traslado-producto-row__head">' +
                 '<label>Producto terminado</label>' +
@@ -3028,6 +3360,7 @@
                 '</button>' +
             '</div>' +
             '<div class="form-row">' +
+                '<input type="hidden" data-field="almacen_plantaid" name="detalles[' + idx + '][almacen_plantaid]" value="' + almacenId + '">' +
                 '<div class="col-lg-3 col-md-6 mb-2 mb-lg-0">' +
                     '<span class="field-label">Producto</span>' +
                     '<div class="selector-catalogo-wrapper flex-grow-1 w-100 mb-0 selector-catalogo--filtros" id="selector_wrap_' + selId + '">' +
@@ -3072,8 +3405,10 @@
             '</div>';
 
         fila.querySelector('.btn-quitar-producto-traslado').addEventListener('click', function () {
-            if (document.querySelectorAll('.traslado-producto-row').length <= 1) {
-                aviso('Debe indicar al menos un producto en el traslado.');
+            const inner = contenedorProductosDeFilaTraslado(fila);
+            const total = inner ? inner.querySelectorAll('.traslado-producto-row').length : document.querySelectorAll('.traslado-producto-row').length;
+            if (total <= 1) {
+                aviso('Debe indicar al menos un producto por almacén de recogida.');
                 return;
             }
             delete CatalogoSelector?.instances?.[selId];
@@ -3083,7 +3418,7 @@
 
         container.appendChild(fila);
         initEventosPresentacionFilaTraslado(fila);
-        registrarSelectorProductoTraslado(selId);
+        registrarSelectorProductoTraslado(selId, almacenId);
 
         if (detalle?.insumoid) {
             CatalogoSelector.setValue(selId, detalle.insumoid, detalle.producto_nombre || detalle.label || '');
@@ -3114,15 +3449,17 @@
     }
 
     function limpiarProductosTraslado() {
-        const container = document.getElementById('traslado-productos-container');
+        const container = document.getElementById('traslado-productos-recogida-container');
         if (!container) return;
         container.innerHTML = '';
         trasladoProductoIdx = 0;
-        syncBloqueProductosTraslado();
+        syncFilasProductoTraslado();
     }
 
     function ejecutarReinicioRutaTraslado() {
         limpiarPreseleccionProductosTraslado();
+        const extraContainer = document.getElementById('recogidas-extra-traslado-container');
+        if (extraContainer) extraContainer.innerHTML = '';
         if (window.CatalogoSelector) {
             CatalogoSelector.clear('traslado_planta_origen');
             CatalogoSelector.clear('traslado_mayorista_destino');
@@ -3187,11 +3524,13 @@
         }
 
         document.getElementById('btnAgregarProductoTraslado')?.addEventListener('click', function () {
-            if (!almacenPlantaTrasladoId()) {
-                aviso('Primero elija el almacén de planta (origen).');
+            const rec = recogidasConAlmacenTraslado()[0];
+            if (!rec) {
+                aviso('Primero elija al menos un almacén de planta en el paso Ruta.');
                 return;
             }
-            agregarFilaProductoTraslado();
+            const inner = document.querySelector('[data-recogida-key="' + rec.key + '"] .traslado-productos-inner');
+            agregarFilaProductoTraslado(null, inner, rec.almacenId, rec.key);
         });
 
         document.getElementById('form-traslado-mayorista')?.addEventListener('submit', function (e) {
@@ -3967,6 +4306,24 @@
                 aplicarRecogidaExtra(pickerRecogidaActivo, item);
             },
         });
+        CatalogoSelector.register('traslado_planta_recogida_extra', {
+            endpoint: @json(route('catalogo-selector.almacenes')),
+            title: 'Almacén de planta — recogida adicional',
+            searchPlaceholder: 'Buscar almacén de planta…',
+            params: { ambito: 'planta' },
+            rowAction: { label: 'Ver' },
+            onRowAction: function (item) {
+                if (!pickerRecogidaTrasladoActivo) return;
+                if (bloquearRecogidaTrasladoSiDestino()) return;
+                const key = recogidaUidExtra(pickerRecogidaTrasladoActivo);
+                abrirInventarioOrigenTraslado(item, { recogidaKey: key, almacenId: String(item.id) });
+            },
+            onSelect: function (item) {
+                if (!pickerRecogidaTrasladoActivo) return;
+                if (bloquearRecogidaTrasladoSiDestino()) return;
+                aplicarRecogidaExtraTraslado(pickerRecogidaTrasladoActivo, item);
+            },
+        });
 
         CatalogoSelector.register('pedido_almacen_destino', {
             endpoint: @json(route('catalogo-selector.almacenes')),
@@ -4037,14 +4394,12 @@
                 const item = id ? itemTrasladoPorId(id) : null;
                 if (selId === 'traslado_planta_origen') {
                     actualizarPickerOrigenTraslado(item || (id ? { id: id, label: e.detail?.label || '', extra: {} } : null));
+                    syncFilasProductoTraslado();
+                    recargarPresentacionesFilasTraslado();
                 } else {
                     actualizarPickerDestinoTraslado(item || (id ? { id: id, label: e.detail?.label || '', extra: {} } : null));
                 }
                 syncEstadoRutaTraslado();
-                syncBloqueProductosTraslado();
-                if (selId === 'traslado_planta_origen') {
-                    recargarPresentacionesFilasTraslado();
-                }
                 if (mapaTrasladoListo) {
                     redrawRutaTraslado();
                 }
@@ -4056,8 +4411,8 @@
             CatalogoSelector.open('traslado_planta_origen');
         });
         document.getElementById('btnBuscarDestinoTraslado')?.addEventListener('click', function () {
-            if (!tieneOrigenTraslado()) {
-                aviso('Primero elija el almacén de planta (origen).');
+            if (!puedeElegirDestinoTraslado()) {
+                aviso('Complete todas las recogidas en planta antes de elegir el mayorista.');
                 return;
             }
             CatalogoSelector.open('traslado_mayorista_destino');
@@ -4105,21 +4460,65 @@
             inventario: inventarioOrigenTrasladoConfig(),
         });
 
+        const btnAgregarRecogidaTraslado = document.getElementById('btnAgregarRecogidaTraslado');
+        if (btnAgregarRecogidaTraslado) {
+            btnAgregarRecogidaTraslado.addEventListener('click', function () {
+                if (bloquearRecogidaTrasladoSiDestino()) return;
+                if (!recogida1ListaTraslado()) {
+                    aviso('Primero elija la recogida 1.');
+                    return;
+                }
+                if (hayRecogidasExtraVaciasTraslado()) {
+                    aviso('Complete la recogida adicional pendiente antes de agregar otra.');
+                    return;
+                }
+                const actuales = document.querySelectorAll('.traslado-extra-row').length;
+                if (actuales >= MAX_RECOGIDAS_EXTRA) {
+                    aviso('Máximo ' + MAX_RECOGIDAS_EXTRA + ' almacenes de planta adicionales.');
+                    return;
+                }
+                const container = document.getElementById('recogidas-extra-traslado-container');
+                container.appendChild(crearFilaRecogidaExtraTraslado());
+                renumerarRecogidasTraslado();
+                syncEstadoRutaTraslado();
+            });
+        }
+
+        @if(is_array(old('recogidas')))
+        (function () {
+            const oldRecogidas = @json(old('recogidas'));
+            const container = document.getElementById('recogidas-extra-traslado-container');
+            if (!container) return;
+            oldRecogidas.forEach(function (rec) {
+                container.appendChild(crearFilaRecogidaExtraTraslado(rec));
+            });
+            renumerarRecogidasTraslado();
+            syncFilasProductoTraslado();
+        })();
+        @endif
+
         window.EnvioTrasladoProductos = {
-            syncAlPaso2: function () {
-                sincronizarFilasTrasladoDesdePreseleccion();
-                recargarPresentacionesFilasTraslado();
+            syncAlPaso2: async function () {
+                syncFilasProductoTraslado();
+                await sincronizarFilasTrasladoDesdePreseleccion();
             },
         };
 
         syncEstadoRutaTraslado();
-        syncBloqueProductosTraslado();
+        syncFilasProductoTraslado();
 
         @if(is_array(old('detalles')))
         (function () {
             const oldDetalles = @json(old('detalles'));
+            syncFilasProductoTraslado();
             oldDetalles.forEach(function (d) {
-                agregarFilaProductoTraslado(d);
+                const almacenId = d.almacen_plantaid || valorSelectorTraslado('traslado_planta_origen');
+                const rec = recogidasConAlmacenTraslado().find(function (r) { return String(r.almacenId) === String(almacenId); })
+                    || recogidasConAlmacenTraslado()[0];
+                const inner = rec
+                    ? document.querySelector('[data-recogida-key="' + rec.key + '"] .traslado-productos-inner')
+                    : null;
+                agregarFilaProductoTraslado(d, inner, almacenId, rec?.key);
             });
         })();
         @endif

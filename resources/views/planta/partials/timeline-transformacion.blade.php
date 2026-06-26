@@ -124,9 +124,10 @@
                 && ! empty($paso['asignacion_id']);
 
             $mostrarMarcarCompletada = $puedeMarcarCompletada
-                && ($paso['estado_asignacion'] ?? '') === 'pendiente'
                 && ! empty($paso['asignacion_id'])
-                && ! empty($loteTimeline);
+                && ! empty($loteTimeline)
+                && (int) ($paso['orden'] ?? 0) === ((int) $etapasCompletadas + 1)
+                && in_array($paso['estado_asignacion'] ?? '', ['pendiente', 'programada'], true);
 
             $mostrarOperarioCompletar = $esOperarioPlanta
                 && $usuarioActualId > 0
@@ -397,6 +398,7 @@
                                     formaction="{{ $cerrarFaseUrl }}"
                                     name="cerrar_paso"
                                     value="{{ $pasoId }}"
+                                    formnovalidate
                                     class="btn btn-success btn-sm font-weight-bold js-cerrar-fase-single"
                                     disabled
                                     aria-disabled="true"
@@ -1194,68 +1196,9 @@ document.addEventListener('DOMContentLoaded', function () {
 @push('scripts')
 
 <script>
-(function () {
-    const form = document.getElementById('formAsignarPlanEtapas');
-    if (!form) return;
-
-    function acotarEnBlur(input) {
-        const minL = parseFloat(input.dataset.rangoMin);
-        const maxL = parseFloat(input.dataset.rangoMax);
-        if (isNaN(minL) || isNaN(maxL)) return;
-        let v = parseFloat(input.value);
-        if (isNaN(v)) return;
-        if (v < minL) input.value = minL;
-        if (v > maxL) input.value = maxL;
-    }
-
-    form.querySelectorAll('.tl-plan-var-min, .tl-plan-var-max').forEach(function (inp) {
-        inp.addEventListener('blur', function () { acotarEnBlur(inp); });
-    });
-
-    form.addEventListener('submit', function () {
-        form.querySelectorAll('.tl-plan-var-min, .tl-plan-var-max').forEach(function (inp) {
-            acotarEnBlur(inp);
-        });
-    });
-
-    const wrapCerrarTodos = document.getElementById('lp-cerrar-todos-wrap');
-
-    function operarioSeleccionadoEnCard(card) {
-        const hidden = card.querySelector('.selector-catalogo-value, input[name*="operador_usuarioid"]');
-        return hidden && String(hidden.value || '').trim() !== '';
-    }
-
-    function actualizarBotonesCerrarFase() {
-        form.querySelectorAll('[data-plan-etapa="1"]').forEach(function (card) {
-            const btn = card.querySelector('.js-cerrar-fase-single');
-            if (!btn) return;
-            const ok = operarioSeleccionadoEnCard(card);
-            btn.disabled = !ok;
-            btn.setAttribute('aria-disabled', ok ? 'false' : 'true');
-            btn.title = ok ? '' : 'Seleccione un operario para cerrar la fase';
-        });
-    }
-
-    function actualizarCerrarTodos() {
-        if (!wrapCerrarTodos) return;
-        const cards = form.querySelectorAll('[data-plan-etapa="1"]');
-        if (!cards.length) {
-            wrapCerrarTodos.classList.add('d-none');
-            actualizarBotonesCerrarFase();
-            return;
-        }
-        let todas = true;
-        cards.forEach(function (card) {
-            if (!operarioSeleccionadoEnCard(card)) todas = false;
-        });
-        wrapCerrarTodos.classList.toggle('d-none', !todas);
-        actualizarBotonesCerrarFase();
-    }
-
-    document.addEventListener('selector-catalogo:change', actualizarCerrarTodos);
-    form.addEventListener('change', actualizarCerrarTodos);
-    actualizarCerrarTodos();
-})();
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.LpPlanEtapas) window.LpPlanEtapas.init();
+});
 </script>
 
 @endpush

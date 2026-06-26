@@ -251,6 +251,7 @@ class LoteProduccionController extends Controller
         $rutaService->repararEmpaquetadoAlFinal($loteProduccion);
         $loteProduccion->refresh();
 
+        $this->asignacionEtapa->sincronizarPromocionCola($loteProduccion);
         $this->transformacion->limpiarAsignacionesObsoletas($loteProduccion);
 
         $rutaPlantilla = $this->transformacion->rutaPlantilla($loteProduccion);
@@ -400,7 +401,7 @@ class LoteProduccionController extends Controller
             ->with('success', 'Todas las fases pendientes fueron cerradas. Los operarios ejecutarán las etapas en orden.');
     }
 
-    public function cerrarFase(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse
+    public function cerrarFase(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse|JsonResponse
     {
         abort_unless(UsuarioRol::gestionaPlanta($request->user()) || $request->user()?->hasRole('admin'), 403);
 
@@ -437,7 +438,15 @@ class LoteProduccionController extends Controller
         try {
             $this->asignacionEtapa->cerrarFase($loteProduccion, $etapaValidada, $request->user());
         } catch (\InvalidArgumentException $e) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['ok' => false, 'message' => $e->getMessage()], 422);
+            }
+
             return back()->with('error', $e->getMessage())->withInput();
+        }
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return $this->respuestaAjaxTimeline($loteProduccion, $request->user(), 'Fase cerrada correctamente.');
         }
 
         return redirect()
@@ -548,13 +557,10 @@ class LoteProduccionController extends Controller
         $loteProduccion->refresh();
 
         if ($respondeJson) {
-            $registro->load(['procesoMaquina.proceso', 'procesoMaquina.maquina', 'usuario']);
             $etapas = $this->transformacion->timeline($loteProduccion);
             $ultima = $etapas[count($etapas) - 1] ?? null;
 
-            return response()->json([
-                'ok' => true,
-                'reload' => $this->asignacionEtapa->puedeAsignar($loteProduccion),
+            return $this->respuestaAjaxTimeline($loteProduccion, $user, 'Etapa completada correctamente.', [
                 'asignacion_id' => (int) $asignacion->asignacionetapaplantaid,
                 'etapa' => $ultima ? [
                     'numero' => $ultima['numero'],
@@ -567,11 +573,6 @@ class LoteProduccionController extends Controller
                     'es_cierre' => ! empty($ultima['es_cierre']),
                     'parametros_medidos' => $ultima['parametros_medidos'] ?? [],
                 ] : null,
-                'transformacion_completa' => $this->trazabilidad->transformacionCompleta($loteProduccion),
-                'ruta_plantilla' => $this->transformacion->rutaPlantilla($loteProduccion),
-                'timeline_html' => view('planta.partials.timeline-transformacion', [
-                    'items' => $this->transformacion->timelineVisual($loteProduccion),
-                ])->render(),
                 'mensaje_bloqueo' => $this->transformacion->mensajeBloqueoAsignacion($loteProduccion),
                 'puede_asignar_nueva' => $this->asignacionEtapa->puedeAsignar($loteProduccion),
                 'asignaciones_pendientes_count' => $this->transformacion->asignacionesPendientes($loteProduccion)->count(),
@@ -1219,5 +1220,75 @@ class LoteProduccionController extends Controller
             403,
             'Solo puede ver lotes en los que tiene etapas asignadas.'
         );
+    }
+
+    private function sincronizarLoteTimeline(LoteProduccionPedido $lote): void
+    {
+        $rutaService = app(LoteProduccionRutaService::class);
+        $rutaService->asegurarRuta($lote);
+        $rutaService->repararEmpaquetadoAlFinal($lote);
+        $lote->refresh();
+        $this->asignacionEtapa->sincronizarPromocionCola($lote);
+        $this->transformacion->limpiarAsignacionesObsoletas($lote);
+    }
+
+    /** @return array<string, mixed> */
+    private function variablesTimelinePartial(LoteProduccionPedido $lote, ?Usuario $user, string $panelActivo = 'transformacion'): array
+    {
+        $puedeAsignarEtapa = UsuarioRol::gestionaPlanta($user) || $user?->hasRole('admin');
+        $transformacionCompleta = $this->trazabilidad->transformacionCompleta($lote);
+        $puedeAsignarPlanEtapas = $puedeAsignarEtapa && $this->asignacionEtapa->puedeAsignarPlan($lote);
+
+        return [
+            'items' => $this->transformacion->timelineVisual($lote),
+            'sortable' => $panelActivo === 'transformacion' && $puedeAsignarPlanEtapas,
+            'modoPlan' => $puedeAsignarPlanEtapas,
+            'puedeGestionarPlan' => $puedeAsignarEtapa && ! $transformacionCompleta,
+            'puedeMarcarCompletada' => $puedeAsignarEtapa && ! $transformacionCompleta,
+            'usuarioActualId' => (int) ($user?->usuarioid ?? 0),
+            'esOperarioPlanta' => UsuarioRol::esOperarioPlanta($user),
+            'lote' => $lote,
+            'formPlanActivo' => $puedeAsignarPlanEtapas,
+            'cerrarFaseUrl' => route('procesamiento.cerrar-fase', $lote),
+            'cambiarFaseUrl' => route('procesamiento.cambiar-fase', $lote),
+            'rutaUrl' => route('procesamiento.actualizar-ruta', $lote),
+            'rutaPasosJson' => app(LoteProduccionRutaService::class)->payloadPasosParaSincronizar($lote),
+            'etapasCompletadas' => $this->transformacion->etapasCompletadasCount($lote),
+        ];
+    }
+
+    /** @param  array<string, mixed>  $extra */
+    private function respuestaAjaxTimeline(LoteProduccionPedido $lote, ?Usuario $user, string $message = '', array $extra = []): JsonResponse
+    {
+        $this->asignacionEtapa->sincronizarPromocionCola($lote);
+        $this->transformacion->limpiarAsignacionesObsoletas($lote);
+        $lote->refresh();
+
+        $vars = $this->variablesTimelinePartial($lote, $user);
+        $rutaPlantilla = $this->transformacion->rutaPlantilla($lote);
+        $ordenActual = $this->transformacion->ordenPasoActual($lote);
+        $totalRuta = count($rutaPlantilla);
+        $siguiente = $this->transformacion->siguientePasoPlantilla($lote);
+
+        $toolbarMeta = $this->trazabilidad->transformacionCompleta($lote)
+            ? '<i class="fas fa-check-circle text-success mr-1"></i>Ruta de transformación completada'
+            : sprintf(
+                'Etapa %d de %s%s',
+                min($ordenActual, max(1, $totalRuta)),
+                $totalRuta ?: '—',
+                $siguiente
+                    ? ' · Siguiente: <strong>'.e($siguiente->proceso?->nombre ?? '').'</strong>'
+                    : ''
+            );
+
+        return response()->json(array_merge([
+            'ok' => true,
+            'message' => $message,
+            'timeline_html' => view('planta.partials.timeline-transformacion', $vars)->render(),
+            'toolbar_meta' => $toolbarMeta,
+            'transformacion_completa' => $this->trazabilidad->transformacionCompleta($lote),
+            'puede_asignar_plan' => $this->asignacionEtapa->puedeAsignarPlan($lote),
+            'ruta_plantilla' => $rutaPlantilla,
+        ], $extra));
     }
 }

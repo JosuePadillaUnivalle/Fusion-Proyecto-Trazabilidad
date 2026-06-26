@@ -616,7 +616,7 @@
     <section class="auth-left" aria-hidden="true">
         <div class="auth-left-content">
             <div class="left-logo-ring">
-                <img src="{{ asset('images/agrofusion-logo.jpeg') }}" alt="AgroFusion">
+                <img src="{{ asset('images/agrofusion-logo.svg') }}" alt="AgroFusion" width="96" height="96">
             </div>
             <h1>Bienvenido a AgroFusion</h1>
             <p>Controla y da seguimiento a toda la trazabilidad agrícola desde un solo lugar.</p>
@@ -629,7 +629,7 @@
             <!-- Brand -->
             <div class="auth-brand">
                 <div class="auth-logo">
-                    <img src="{{ asset('images/agrofusion-logo.jpeg') }}" alt="AgroFusion">
+                    <img src="{{ asset('images/agrofusion-logo.svg') }}" alt="AgroFusion" width="96" height="96">
                 </div>
                 <span class="auth-app-name">AgroFusion</span>
                 <span class="auth-tagline">Sistema integral de gestión agrícola</span>

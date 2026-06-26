@@ -8,6 +8,8 @@ namespace App\Services;
 
 use App\Models\Almacen;
 
+use App\Models\AlmacenajeLoteProduccion;
+
 use App\Models\AlmacenMovimiento;
 
 use App\Models\DetalleTrasladoPlantaMayorista;
@@ -58,9 +60,13 @@ class TrasladoPlantaMayoristaService
     public function __construct(
         private readonly NotificacionUsuarioService $notificaciones,
         private readonly InventarioPresentacionService $inventarioPresentacion,
+        private readonly ProductoPlantaInventarioService $inventarioPlanta,
         private readonly TransporteCapacidadService $capacidadTransporte,
     ) {}
 
+    /**
+     * @param  list<int>  $recogidasPlantasExtraIds  Almacenes de planta adicionales (recogida 2, 3…)
+     */
     public function crear(
 
         Almacen $plantaOrigen,
@@ -77,7 +83,9 @@ class TrasladoPlantaMayoristaService
 
         ?string $nombre = null,
 
-        ?float $costoBs = null
+        ?float $costoBs = null,
+
+        array $recogidasPlantasExtraIds = [],
 
     ): RutaDistribucion {
 
@@ -97,15 +105,7 @@ class TrasladoPlantaMayoristaService
 
 
 
-        $coordsPlanta = UbicacionGpsParser::resolverAlmacen(
-
-            (int) $plantaOrigen->almacenid,
-
-            $plantaOrigen->nombre,
-
-            $plantaOrigen->ubicacion
-
-        );
+        $plantasRecogida = $this->resolverPlantasRecogida($plantaOrigen, $recogidasPlantasExtraIds);
 
         $coordsMayorista = UbicacionGpsParser::resolverAlmacen(
 
@@ -119,15 +119,17 @@ class TrasladoPlantaMayoristaService
 
 
 
-        if ($coordsPlanta === null || $coordsMayorista === null) {
+        if ($coordsMayorista === null) {
 
-            throw new InvalidArgumentException('Origen y destino deben tener ubicación GPS para planificar la ruta.');
+            throw new InvalidArgumentException('El destino debe tener ubicación GPS para planificar la ruta.');
 
         }
 
 
 
-        $detallesNormalizados = $this->normalizarDetalles($detalles, (int) $plantaOrigen->almacenid);
+        $almacenesPlantaIds = array_map(fn (Almacen $a) => (int) $a->almacenid, $plantasRecogida);
+
+        $detallesNormalizados = $this->normalizarDetalles($detalles, $almacenesPlantaIds, (int) $plantaOrigen->almacenid);
 
         $this->validarFlota($transportistaId, $vehiculoId);
 
@@ -151,7 +153,7 @@ class TrasladoPlantaMayoristaService
 
             $costoBs,
 
-            $coordsPlanta,
+            $plantasRecogida,
 
             $coordsMayorista,
 
@@ -159,11 +161,13 @@ class TrasladoPlantaMayoristaService
 
         ) {
 
+            $etiquetaOrigenes = collect($plantasRecogida)->pluck('nombre')->implode(' + ');
+
             $ruta = RutaDistribucion::create([
 
                 'codigo' => RutaDistribucionCatalogo::generarCodigoTraslado(),
 
-                'nombre' => $nombre ?: 'Traslado '.$plantaOrigen->nombre.' → '.$mayoristaDestino->nombre,
+                'nombre' => $nombre ?: 'Traslado '.$etiquetaOrigenes.' → '.$mayoristaDestino->nombre,
 
                 'tipo_ruta' => RutaDistribucionCatalogo::TIPO_RUTA_PLANTA_MAYORISTA,
 
@@ -189,33 +193,57 @@ class TrasladoPlantaMayoristaService
 
 
 
+            $orden = 1;
+
+            foreach ($plantasRecogida as $planta) {
+
+                $coordsPlanta = UbicacionGpsParser::resolverAlmacen(
+
+                    (int) $planta->almacenid,
+
+                    $planta->nombre,
+
+                    $planta->ubicacion
+
+                );
+
+                if ($coordsPlanta === null) {
+
+                    throw new InvalidArgumentException('Cada almacén de planta debe tener ubicación GPS: '.$planta->nombre);
+
+                }
+
+                RutaDistribucionParada::create([
+
+                    'rutadistribucionid' => $ruta->rutadistribucionid,
+
+                    'orden' => $orden,
+
+                    'tipo' => RutaDistribucionCatalogo::PARADA_CARGA_PLANTA,
+
+                    'almacenid' => $planta->almacenid,
+
+                    'destino' => 'Carga: '.$planta->nombre,
+
+                    'latitud' => $coordsPlanta['lat'],
+
+                    'longitud' => $coordsPlanta['lng'],
+
+                    'estado' => 'completada',
+
+                ]);
+
+                $orden++;
+
+            }
+
+
+
             RutaDistribucionParada::create([
 
                 'rutadistribucionid' => $ruta->rutadistribucionid,
 
-                'orden' => 1,
-
-                'tipo' => RutaDistribucionCatalogo::PARADA_CARGA_PLANTA,
-
-                'almacenid' => $plantaOrigen->almacenid,
-
-                'destino' => 'Carga: '.$plantaOrigen->nombre,
-
-                'latitud' => $coordsPlanta['lat'],
-
-                'longitud' => $coordsPlanta['lng'],
-
-                'estado' => 'completada',
-
-            ]);
-
-
-
-            RutaDistribucionParada::create([
-
-                'rutadistribucionid' => $ruta->rutadistribucionid,
-
-                'orden' => 2,
+                'orden' => $orden,
 
                 'tipo' => RutaDistribucionCatalogo::PARADA_ENTREGA_MAYORISTA,
 
@@ -439,7 +467,25 @@ class TrasladoPlantaMayoristaService
 
 
 
-        $origen = $ruta->almacenPlantaOrigen?->nombre ?? 'Planta';
+        $ruta->loadMissing('paradas.almacen');
+
+        $origenes = $ruta->paradas
+
+            ->where('tipo', RutaDistribucionCatalogo::PARADA_CARGA_PLANTA)
+
+            ->sortBy('orden')
+
+            ->map(fn ($p) => $p->almacen?->nombre ?? trim(str_replace('Carga:', '', (string) $p->destino)))
+
+            ->filter()
+
+            ->values();
+
+        $origen = $origenes->isNotEmpty()
+
+            ? $origenes->implode(' + ')
+
+            : ($ruta->almacenPlantaOrigen?->nombre ?? 'Planta');
 
         $destino = TrasladoPlantaMayoristaPresentacion::nombreDestinoMayorista($ruta) ?? 'Almacén mayorista';
 
@@ -453,7 +499,8 @@ class TrasladoPlantaMayoristaService
 
     /** @return list<array{insumoid: int, insumo_presentacionid: ?int, inventario_presentacion_loteid: ?int, loteproduccionpedidoid: ?int, presentacion_nombre: ?string, producto_nombre: string, cantidad: float, cantidad_unidades: ?float, observaciones: ?string}> */
 
-    private function normalizarDetalles(array $detalles, int $almacenPlantaId): array
+    /** @param  list<int>  $almacenesPlantaIds */
+    private function normalizarDetalles(array $detalles, array $almacenesPlantaIds, int $almacenPlantaPrincipalId): array
 
     {
 
@@ -469,6 +516,8 @@ class TrasladoPlantaMayoristaService
 
         $vistos = [];
 
+        $almacenesPermitidos = array_fill_keys($almacenesPlantaIds, true);
+
 
 
         foreach ($detalles as $detalle) {
@@ -483,6 +532,8 @@ class TrasladoPlantaMayoristaService
 
             $cantidad = (float) ($detalle['cantidad'] ?? 0);
 
+            $almacenPlantaId = (int) ($detalle['almacen_plantaid'] ?? $almacenPlantaPrincipalId);
+
 
 
             if ($insumoId <= 0) {
@@ -493,11 +544,19 @@ class TrasladoPlantaMayoristaService
 
 
 
-            $claveLinea = $insumoId.'-'.$presentacionId.'-'.$inventarioId;
+            if ($almacenPlantaId <= 0 || ! isset($almacenesPermitidos[$almacenPlantaId])) {
+
+                throw new InvalidArgumentException('Cada producto debe pertenecer a uno de los almacenes de planta de la ruta.');
+
+            }
+
+
+
+            $claveLinea = $almacenPlantaId.'-'.$insumoId.'-'.$presentacionId.'-'.$inventarioId;
 
             if (isset($vistos[$claveLinea])) {
 
-                throw new InvalidArgumentException('No repita la misma presentación y lote en el traslado.');
+                throw new InvalidArgumentException('No repita la misma presentación y lote del mismo almacén de planta en el traslado.');
 
             }
 
@@ -861,14 +920,91 @@ class TrasladoPlantaMayoristaService
 
             }
 
+            $this->descontarAlmacenajePlanta(
+                (int) $insumoOrigen->almacenid,
+                $detalle->loteproduccionpedidoid,
+                $cantidadUnidades,
+                $cantidad
+            );
+
         } else {
 
             $insumoOrigen->decrementarStock($cantidad);
 
             $insumoDestino->incrementarStock($cantidad);
 
+            $this->descontarAlmacenajePlanta(
+                (int) $insumoOrigen->almacenid,
+                $detalle->loteproduccionpedidoid,
+                0,
+                $cantidad
+            );
+
         }
 
+    }
+
+    private function descontarAlmacenajePlanta(
+        int $almacenPlantaId,
+        ?int $loteProduccionPedidoId,
+        float $cantidadUnidades,
+        float $cantidadKg
+    ): void {
+        if ($loteProduccionPedidoId === null) {
+            return;
+        }
+
+        $restanteUnidades = $cantidadUnidades > 0 ? $cantidadUnidades : 0.0;
+        $restanteKg = $cantidadKg > 0 ? $cantidadKg : 0.0;
+
+        if ($restanteUnidades <= 0 && $restanteKg <= 0) {
+            return;
+        }
+
+        $almacenajes = AlmacenajeLoteProduccion::query()
+            ->where('almacenid', $almacenPlantaId)
+            ->where('loteproduccionpedidoid', $loteProduccionPedidoId)
+            ->whereNull('fecha_retiro')
+            ->orderBy('fecha_almacenaje')
+            ->get();
+
+        foreach ($almacenajes as $alm) {
+            if ($restanteUnidades <= 0 && $restanteKg <= 0) {
+                break;
+            }
+
+            $actual = (float) $alm->cantidad;
+            if ($actual <= 0) {
+                continue;
+            }
+
+            $reduccion = $restanteUnidades > 0
+                ? min($actual, $restanteUnidades)
+                : min($actual, $restanteKg);
+
+            if ($reduccion <= 0) {
+                continue;
+            }
+
+            $nueva = max(0.0, $actual - $reduccion);
+            if ($nueva <= 0.0001) {
+                $alm->update([
+                    'cantidad' => 0,
+                    'fecha_retiro' => now(),
+                    'observaciones' => trim(($alm->observaciones ?? '').' · Salida por traslado a mayorista.'),
+                ]);
+            } else {
+                $alm->update(['cantidad' => $nueva]);
+            }
+
+            if ($restanteUnidades > 0) {
+                $restanteUnidades -= $reduccion;
+            } else {
+                $restanteKg -= $reduccion;
+            }
+        }
+
+        $this->inventarioPlanta->sincronizarDesdeAlmacenajes($almacenPlantaId);
     }
 
 
@@ -1005,6 +1141,33 @@ class TrasladoPlantaMayoristaService
         $insumo->update([
             'descripcion' => $esGenerica ? $marca : $descripcion.' | '.$marca,
         ]);
+    }
+
+    /** @param  list<int>  $recogidasPlantasExtraIds  @return list<Almacen> */
+    private function resolverPlantasRecogida(Almacen $plantaPrincipal, array $recogidasPlantasExtraIds): array
+    {
+        $plantas = [$plantaPrincipal];
+        $vistos = [(int) $plantaPrincipal->almacenid => true];
+
+        foreach ($recogidasPlantasExtraIds as $almacenId) {
+            $almacenId = (int) $almacenId;
+            if ($almacenId <= 0 || isset($vistos[$almacenId])) {
+                continue;
+            }
+
+            $planta = Almacen::query()->where('almacenid', $almacenId)->first();
+            if ($planta === null) {
+                throw new InvalidArgumentException('Uno de los almacenes de planta adicionales no existe.');
+            }
+            if ($planta->ambito !== AlmacenAmbito::PLANTA) {
+                throw new InvalidArgumentException('Las recogidas adicionales deben ser almacenes de planta.');
+            }
+
+            $plantas[] = $planta;
+            $vistos[$almacenId] = true;
+        }
+
+        return $plantas;
     }
 
 }

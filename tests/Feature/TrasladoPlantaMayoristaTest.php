@@ -575,6 +575,52 @@ class TrasladoPlantaMayoristaTest extends TestCase
 
         ]);
 
+        $loteProduccion = \App\Models\LoteProduccionPedido::create([
+
+            'pedidoid' => \App\Models\Pedido::create([
+
+                'numero_solicitud' => 'TEST-ALM-TPM',
+
+                'nombre_planta' => 'Planta Lote',
+
+                'latitud' => -17.77,
+
+                'longitud' => -63.17,
+
+                'estado' => 'completado',
+
+            ])->pedidoid,
+
+            'nombre' => 'Lote test traslado',
+
+            'codigo_lote' => 'LOTE-TEST-A',
+
+            'cantidad_objetivo' => 300,
+
+            'cantidad_producida' => 300,
+
+            'fecha_creacion' => now()->toDateString(),
+
+        ]);
+
+        $inventario->update(['loteproduccionpedidoid' => $loteProduccion->loteproduccionpedidoid]);
+
+        $almacenaje = \App\Models\AlmacenajeLoteProduccion::create([
+
+            'loteproduccionpedidoid' => $loteProduccion->loteproduccionpedidoid,
+
+            'almacenid' => $planta->almacenid,
+
+            'ubicacion' => 'Planta Lote',
+
+            'condicion' => 'Buena',
+
+            'cantidad' => 300,
+
+            'fecha_almacenaje' => now(),
+
+        ]);
+
         $flota = $this->flotaPlanta();
 
         $service = app(TrasladoPlantaMayoristaService::class);
@@ -618,6 +664,12 @@ class TrasladoPlantaMayoristaTest extends TestCase
         $this->assertEquals(250.0, (float) $inventario->cantidad_unidades);
 
         $this->assertEquals(100.0, (float) $inventario->cantidad_kg);
+
+        $almacenaje->refresh();
+
+        $this->assertEquals(250.0, (float) $almacenaje->cantidad);
+
+        $this->assertNull($almacenaje->fecha_retiro);
 
     }
 
@@ -833,6 +885,58 @@ class TrasladoPlantaMayoristaTest extends TestCase
 
         $this->assertSame(RutaDistribucionCatalogo::ESTADO_PLANIFICADA, $ruta->fresh()->estado);
 
+    }
+
+    public function test_crea_traslado_con_dos_plantas_y_productos_por_almacen(): void
+    {
+        $admin = $this->admin();
+        $plantaA = $this->almacen('Planta Norte', AlmacenAmbito::PLANTA, 'GPS -17.78,-63.18');
+        $plantaB = $this->almacen('Planta Sur', AlmacenAmbito::PLANTA, 'GPS -17.80,-63.20');
+        $mayorista = $this->almacen('Mayorista Multi', AlmacenAmbito::MAYORISTA, 'GPS -17.79,-63.19');
+        $insumoA = $this->insumoPlanta($plantaA, 200);
+        $insumoB = Insumo::create([
+            'nombre' => 'Tomate procesado',
+            'tipoinsumoid' => $insumoA->tipoinsumoid,
+            'unidadmedidaid' => $insumoA->unidadmedidaid,
+            'stock' => 150,
+            'stockminimo' => 10,
+            'almacenid' => $plantaB->almacenid,
+        ]);
+        $flota = $this->flotaPlanta();
+
+        $ruta = app(TrasladoPlantaMayoristaService::class)->crear(
+            $plantaA,
+            $mayorista,
+            (int) $flota['transportista']->usuarioid,
+            (int) $flota['vehiculo']->vehiculoid,
+            (int) $admin->usuarioid,
+            [
+                ['insumoid' => $insumoA->insumoid, 'almacen_plantaid' => $plantaA->almacenid, 'cantidad' => 40],
+                ['insumoid' => $insumoB->insumoid, 'almacen_plantaid' => $plantaB->almacenid, 'cantidad' => 25],
+            ],
+            null,
+            60.0,
+            [(int) $plantaB->almacenid],
+        );
+
+        $ruta->load('paradas');
+
+        $this->assertCount(3, $ruta->paradas);
+        $this->assertSame(
+            RutaDistribucionCatalogo::PARADA_CARGA_PLANTA,
+            $ruta->paradas->where('orden', 1)->first()?->tipo
+        );
+        $this->assertSame(
+            RutaDistribucionCatalogo::PARADA_CARGA_PLANTA,
+            $ruta->paradas->where('orden', 2)->first()?->tipo
+        );
+        $this->assertSame(
+            RutaDistribucionCatalogo::PARADA_ENTREGA_MAYORISTA,
+            $ruta->paradas->where('orden', 3)->first()?->tipo
+        );
+        $this->assertCount(2, $ruta->detallesTraslado);
+        $this->assertStringContainsString('Planta Norte', app(TrasladoPlantaMayoristaService::class)->trayectoTexto($ruta));
+        $this->assertStringContainsString('Planta Sur', app(TrasladoPlantaMayoristaService::class)->trayectoTexto($ruta));
     }
 
 }

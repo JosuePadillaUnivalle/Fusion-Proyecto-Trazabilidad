@@ -77,8 +77,20 @@
         }
     }
 
-    function enviarFormularioPendiente(form) {
+    function aplicarSubmitterAlForm(form, submitter) {
+        form.querySelectorAll('.js-modal-temp-submit').forEach(function (el) { el.remove(); });
+        if (!submitter || !submitter.name) return;
+        const h = document.createElement('input');
+        h.type = 'hidden';
+        h.name = submitter.name;
+        h.value = submitter.value || '';
+        h.className = 'js-modal-temp-submit';
+        form.appendChild(h);
+    }
+
+    function enviarFormularioPendiente(form, submitter) {
         if (!form || !form.isConnected) return;
+        aplicarSubmitterAlForm(form, submitter);
         let oculto = form.querySelector('input[type="submit"].js-modal-confirm-submit');
         if (!oculto) {
             oculto = document.createElement('input');
@@ -147,12 +159,12 @@
                 if (submitter.hasAttribute('formmethod')) {
                     form.method = submitter.getAttribute('formmethod');
                 }
-                enviarFormularioPendiente(form);
+                enviarFormularioPendiente(form, submitter);
                 form.action = prevAction;
                 form.method = prevMethod;
                 return;
             }
-            enviarFormularioPendiente(form);
+            enviarFormularioPendiente(form, submitter);
         };
 
         if (window.jQuery && window.jQuery('#modalConfirmarAccion').length) {
@@ -167,21 +179,21 @@
         if (!form) return;
         if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') return;
         const attrs = form.dataset;
-        state.buttonPendiente = btn;
         guardarScrollLpProcesamiento(form);
         window.ModalConfirmar.abrir(
             form,
             attrs.confirmTitle || btn.getAttribute('data-confirm-title') || 'Confirmar acción',
             attrs.confirmMessage || btn.getAttribute('data-confirm-message') || '¿Desea continuar?',
             attrs.confirmTone || btn.getAttribute('data-confirm-tone') || 'danger',
-            attrs.confirmBtn || btn.getAttribute('data-confirm-btn') || undefined
+            attrs.confirmBtn || btn.getAttribute('data-confirm-btn') || undefined,
+            btn
         );
     }
 
     window.ModalConfirmar = {
-        abrir(form, titulo, mensaje, tono, btnText) {
+        abrir(form, titulo, mensaje, tono, btnText, submitter) {
             state.formPendiente = form;
-            state.buttonPendiente = null;
+            state.buttonPendiente = submitter ?? null;
             state.callbackPendiente = null;
             mostrarModalConfirmar(titulo, mensaje, tono, btnText, false);
         },

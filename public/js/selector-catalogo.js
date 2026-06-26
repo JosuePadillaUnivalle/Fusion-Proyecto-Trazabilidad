@@ -249,6 +249,22 @@
             this.instances[id] = config;
         },
 
+        registerAll(scope) {
+            const root = scope && scope.querySelectorAll ? scope : document;
+            root.querySelectorAll('[data-selector-id][data-selector-config]').forEach((el) => {
+                const id = el.getAttribute('data-selector-id');
+                if (!id || this.instances[id]) {
+                    return;
+                }
+                try {
+                    const config = JSON.parse(el.getAttribute('data-selector-config') || '{}');
+                    this.register(id, config);
+                } catch (err) {
+                    console.warn('Selector catálogo: config inválida', id, err);
+                }
+            });
+        },
+
         resolveCargaContext(cfg) {
             if (typeof cfg.getCargaContext === 'function') {
                 const ctx = cfg.getCargaContext();
@@ -830,6 +846,9 @@
         },
     };
 
-    document.addEventListener('DOMContentLoaded', () => CatalogoSelector.init());
+    document.addEventListener('DOMContentLoaded', () => {
+        CatalogoSelector.init();
+        CatalogoSelector.registerAll(document);
+    });
     window.CatalogoSelector = CatalogoSelector;
 })(window, document);

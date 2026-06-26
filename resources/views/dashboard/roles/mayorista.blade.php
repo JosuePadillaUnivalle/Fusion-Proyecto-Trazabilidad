@@ -205,6 +205,13 @@ document.addEventListener('DOMContentLoaded', function () {
     var c = @json($charts);
     var grid = { color: '#f1f5f9' };
 
+    function emptyChart(id, msg) {
+        var canvas = document.getElementById(id);
+        if (!canvas) return;
+        var wrap = canvas.parentElement;
+        wrap.innerHTML = '<div class="d-flex align-items-center justify-content-center text-muted small" style="min-height:12rem">' + msg + '</div>';
+    }
+
     new Chart(document.getElementById('chartMayPedidos'), {
         type: 'line',
         data: {
@@ -231,6 +238,8 @@ document.addEventListener('DOMContentLoaded', function () {
             data: { labels: c.estadosPedido.labels, datasets: [{ data: c.estadosPedido.data, backgroundColor: c.estadosPedido.colors, borderWidth: 0 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
         });
+    } else {
+        emptyChart('chartMayEstados', 'Sin pedidos de minoristas en el periodo');
     }
 
     if (c.porPdv.labels.length) {
@@ -239,6 +248,8 @@ document.addEventListener('DOMContentLoaded', function () {
             data: { labels: c.porPdv.labels, datasets: [{ data: c.porPdv.data, backgroundColor: '#0d9488cc', borderRadius: 8 }] },
             options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: grid } } },
         });
+    } else {
+        emptyChart('chartMayPdv', 'Sin pedidos por punto de venta en el periodo');
     }
 });
 </script>

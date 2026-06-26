@@ -32,17 +32,17 @@
             </div>
 
             <div class="alert alert-light border py-2 mb-3 small" id="traslado-paso-ayuda">
-                <strong>Paso a paso:</strong> 1) Elija el almacén de planta (origen) en el mapa o en el buscador.
-                2) Luego el centro mayorista (destino). La ruta se traza automáticamente.
+                <strong>Paso a paso:</strong> 1) Elija todos los almacenes de planta en orden (mapa o buscador) y el producto en cada uno en el paso 2.
+                2) Al final, elija el centro mayorista (destino). La ruta se traza automáticamente.
             </div>
 
-            <div class="env-paso" id="bloque-origen-traslado">
+            <div class="env-paso" id="bloque-recogidas-traslado">
                 <div class="d-flex align-items-center mb-2">
                     <span class="env-paso__num">1</span>
-                    <strong>Origen</strong>
+                    <strong>Puntos de recogida — Almacenes de planta</strong>
                 </div>
                 <div class="form-group mb-2">
-                    <label class="small text-muted mb-1">Almacén de planta <span class="text-danger">*</span></label>
+                    <label class="small text-muted mb-1">Recogida 1 <span class="text-danger">*</span></label>
                     <div class="pedido-picker-field">
                         <input type="text" id="txtNombreOrigenTraslado" class="picker-display text-muted" readonly
                                placeholder="Buscar almacén de planta…">
@@ -61,14 +61,19 @@
                     <small id="txtOrigenTrasladoCoords" class="form-text text-muted"></small>
                     <small id="traslado-productos-preseleccion-resumen" class="text-success small d-none mt-1 mb-0"></small>
                 </div>
+                <div id="recogidas-extra-traslado-container"></div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnAgregarRecogidaTraslado">
+                    <i class="fas fa-plus mr-1"></i> Agregar otro almacén de planta
+                </button>
+                <small class="text-muted d-block mt-1">Opcional: cuando el camión recoge en 2 o más plantas antes de entregar al mayorista.</small>
             </div>
 
             <div class="env-paso" id="bloque-destino-traslado">
                 <div class="d-flex align-items-center mb-2">
                     <span class="env-paso__num">2</span>
-                    <strong>Destino</strong>
+                    <strong>Destino — Centro mayorista</strong>
                 </div>
-                <small class="text-muted d-block mb-2" id="traslado-destino-bloqueado-msg">Primero elija el almacén de planta (origen).</small>
+                <small class="text-muted d-block mb-2" id="traslado-destino-bloqueado-msg">Primero elija la recogida 1 en planta.</small>
                 <div class="pedido-picker-field">
                     <input type="text" id="txtNombreDestinoTraslado" class="picker-display text-muted" readonly
                            placeholder="Buscar almacén mayorista…">
@@ -148,15 +153,10 @@
         <div class="env-wizard-panel__head"><i class="fas fa-box-open"></i> Carga y productos</div>
         <div class="env-wizard-panel__body">
             <p class="text-muted small mb-3">
-                Elija <strong>productos terminados</strong>, su <strong>presentación comercial</strong>, el <strong>lote</strong> en planta
-                y la cantidad de unidades. El sistema calcula los kg y valida stock por SKU/lote.
+                Indique qué <strong>productos terminados</strong> recoger en cada almacén de planta:
+                presentación comercial, lote y cantidad. El sistema calcula los kg y valida stock por almacén.
             </p>
-            <div class="d-flex justify-content-end mb-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary btn-agregar-producto-traslado" id="btnAgregarProductoTraslado">
-                    <i class="fas fa-plus mr-1"></i> Agregar producto terminado
-                </button>
-            </div>
-            <div id="traslado-productos-container"></div>
+            <div id="traslado-productos-recogida-container"></div>
             @error('detalles')<small class="text-danger d-block">{{ $message }}</small>@enderror
             @error('detalles.*.insumoid')<small class="text-danger d-block">{{ $message }}</small>@enderror
         </div>

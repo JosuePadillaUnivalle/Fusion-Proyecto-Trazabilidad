@@ -246,7 +246,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var grid = { color: '#f1f5f9' };
 
-
+    function emptyChart(id, msg) {
+        var canvas = document.getElementById(id);
+        if (!canvas) return;
+        var wrap = canvas.parentElement;
+        wrap.innerHTML = '<div class="d-flex align-items-center justify-content-center text-muted small" style="min-height:12rem">' + msg + '</div>';
+    }
 
     new Chart(document.getElementById('chartMayPedidos'), {
 
@@ -292,6 +297,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         });
 
+    } else {
+        emptyChart('chartMayEstados', 'Sin pedidos de minoristas en el periodo');
     }
 
 
@@ -308,6 +315,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         });
 
+    } else {
+        emptyChart('chartMayPdv', 'Sin pedidos por punto de venta en el periodo');
     }
 
 });

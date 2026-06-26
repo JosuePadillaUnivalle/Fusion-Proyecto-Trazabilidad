@@ -262,9 +262,7 @@ final class DocumentoEntregaArchivo
                 foreach ($snap as $linea) {
                     $lineasProducto[] = [
                         'producto' => $linea['producto'] ?? 'Producto',
-                        'cantidad' => isset($linea['cantidad'], $linea['unidad'])
-                            ? number_format((float) $linea['cantidad'], 2, '.', '').' '.$linea['unidad']
-                            : (string) ($linea['cantidad'] ?? '—'),
+                        'cantidad' => self::formatearCantidadLineaTraslado($linea),
                         'empaquetaje' => $linea['empaquetaje'] ?? $linea['presentacion'] ?? '—',
                         'observaciones' => $linea['observaciones'] ?? '—',
                     ];
@@ -276,8 +274,11 @@ final class DocumentoEntregaArchivo
             foreach ($rutaOperacion->detallesTraslado as $detalle) {
                 $lineasProducto[] = [
                     'producto' => $detalle->producto_nombre ?? $detalle->insumo?->nombre ?? 'Producto',
-                    'cantidad' => number_format((float) $detalle->cantidad, 2, '.', '')
-                        .' '.($detalle->insumo?->unidadMedida?->abreviatura ?? 'kg'),
+                    'cantidad' => self::formatearCantidadLineaTraslado([
+                        'cantidad_unidades' => $detalle->cantidad_unidades,
+                        'cantidad' => $detalle->cantidad,
+                        'unidad' => $detalle->insumo?->unidadMedida?->abreviatura ?? 'kg',
+                    ]),
                     'empaquetaje' => $detalle->presentacion_nombre ?: '—',
                     'observaciones' => $detalle->observaciones ?: '—',
                 ];
@@ -537,9 +538,36 @@ final class DocumentoEntregaArchivo
 
         return [
             'producto' => trim($nombreProducto),
-            'cantidad' => number_format((float) $detalle->cantidad, 2, '.', '').' '.$unidad,
+            'cantidad' => self::formatearCantidadLineaTraslado([
+                'cantidad_unidades' => $detalle->cantidad_unidades ?? null,
+                'cantidad' => $detalle->cantidad,
+                'unidad' => $unidad,
+            ]),
             'empaquetaje' => $empaque ?? '—',
             'observaciones' => $obsUsuario ?: '—',
         ];
+    }
+
+    /** @param  array<string, mixed>  $linea */
+    private static function formatearCantidadLineaTraslado(array $linea): string
+    {
+        $unidades = isset($linea['cantidad_unidades']) ? (float) $linea['cantidad_unidades'] : 0.0;
+        $kg = isset($linea['cantidad']) ? (float) $linea['cantidad'] : 0.0;
+        $unidad = (string) ($linea['unidad'] ?? 'kg');
+
+        if ($unidades > 0) {
+            $texto = number_format($unidades, 0, '.', ',').' u.';
+            if ($kg > 0) {
+                $texto .= ' ('.number_format($kg, 2, '.', '').' kg)';
+            }
+
+            return $texto;
+        }
+
+        if ($kg > 0) {
+            return number_format($kg, 2, '.', '').' '.$unidad;
+        }
+
+        return '—';
     }
 }

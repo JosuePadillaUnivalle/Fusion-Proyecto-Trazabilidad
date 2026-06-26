@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\AsignacionEtapaPlanta;
 use App\Models\LoteProduccionPedido;
 use App\Models\LoteProduccionPasoVariable;
 use App\Models\LoteProduccionRutaPaso;
@@ -303,7 +304,6 @@ class LoteProduccionRutaService
         $completados = $this->etapasCompletadas($lote);
         $ordenActual = $completados + 1;
         $hayPendiente = app(LoteProduccionTransformacionService::class)->tieneAsignacionesPendientes($lote);
-        $registrados = collect(app(LoteProduccionTransformacionService::class)->procesosRegistradosIds($lote));
         $pasosBloqueadosReorden = app(LoteProduccionTransformacionService::class)
             ->pasosRutaPasoIdsBloqueadosReorden($lote);
         $items = [];
@@ -311,10 +311,16 @@ class LoteProduccionRutaService
         foreach ($pasos as $paso) {
             $orden = (int) $paso->orden;
             $esCierre = ProcesoPlantaCatalogo::esCierreTransformacion($paso->proceso?->nombre);
-            $procesoHecho = $registrados->contains((int) $paso->procesoplantaid);
+            $procesoHecho = $orden <= $completados;
+            $asigActiva = AsignacionEtapaPlanta::query()
+                ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
+                ->where('orden', $orden)
+                ->activas()
+                ->first();
+            $enColaActiva = $asigActiva?->estaProgramada() && $orden === $ordenActual;
             $estado = match (true) {
                 $procesoHecho => 'hecho',
-                $orden === $ordenActual && $hayPendiente => 'en_curso',
+                $orden === $ordenActual && ($hayPendiente || $enColaActiva) => 'en_curso',
                 $orden === $ordenActual => 'actual',
                 default => 'bloqueado',
             };

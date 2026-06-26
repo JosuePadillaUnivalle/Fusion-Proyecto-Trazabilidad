@@ -145,43 +145,137 @@ class LoteProduccionTransformacionService
 
     public function pasosRutaCompletadosEnSecuencia(LoteProduccionPedido $lote): int
     {
-        $registrados = collect($this->procesosRegistradosIds($lote));
         $rutaService = app(LoteProduccionRutaService::class);
 
         if ($rutaService->tieneRuta($lote)) {
-            $count = 0;
-            foreach ($rutaService->pasosOrdenados($lote) as $paso) {
-                if ($registrados->contains((int) $paso->procesoplantaid)) {
-                    $count++;
-                } else {
-                    break;
-                }
-            }
-
-            return $count;
+            return $this->pasosRutaCompletadosConAsignaciones($lote, $rutaService->pasosOrdenados($lote))
+                ?? $this->pasosRutaCompletadosConRegistros($rutaService->pasosOrdenados($lote), $this->registrosOrdenados($lote));
         }
 
         $plantilla = $this->plantillaDelLote($lote);
         if ($plantilla) {
             $plantilla->loadMissing('pasos');
-            $count = 0;
-            foreach ($plantilla->pasos->sortBy('orden') as $paso) {
-                if ($registrados->contains((int) $paso->procesoplantaid)) {
-                    $count++;
-                } else {
-                    break;
-                }
-            }
 
-            return $count;
+            return $this->pasosRutaCompletadosConAsignaciones($lote, $plantilla->pasos->sortBy('orden'))
+                ?? $this->pasosRutaCompletadosConRegistros($plantilla->pasos->sortBy('orden'), $this->registrosOrdenados($lote));
+        }
+
+        $porAsignaciones = $this->pasosCompletadosPorAsignacionesOrden($lote);
+        if ($porAsignaciones !== null) {
+            return $porAsignaciones;
         }
 
         return $this->registrosOrdenados($lote)->count();
     }
 
+    /**
+     * Cuenta etapas completadas en secuencia según asignaciones (orden 1, 2, …) cuando no hay ruta/plantilla.
+     */
+    private function pasosCompletadosPorAsignacionesOrden(LoteProduccionPedido $lote): ?int
+    {
+        if (! Schema::hasColumn('asignacion_etapa_planta', 'orden')) {
+            return null;
+        }
+
+        $asignaciones = AsignacionEtapaPlanta::query()
+            ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
+            ->whereIn('estado', [
+                AsignacionEtapaPlanta::ESTADO_COMPLETADA,
+                AsignacionEtapaPlanta::ESTADO_PENDIENTE,
+                AsignacionEtapaPlanta::ESTADO_PROGRAMADA,
+            ])
+            ->orderBy('orden')
+            ->get();
+
+        if ($asignaciones->isEmpty()) {
+            return null;
+        }
+
+        $count = 0;
+        foreach ($asignaciones as $asignacion) {
+            if ($asignacion->estado === AsignacionEtapaPlanta::ESTADO_COMPLETADA) {
+                $count++;
+            } else {
+                break;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param  Collection<int, \App\Models\LoteProduccionRutaPaso|PlantillaTransformacionPaso>  $pasos
+     */
+    private function pasosRutaCompletadosConAsignaciones(LoteProduccionPedido $lote, Collection $pasos): ?int
+    {
+        if (! Schema::hasColumn('asignacion_etapa_planta', 'orden')) {
+            return null;
+        }
+
+        $asignaciones = AsignacionEtapaPlanta::query()
+            ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
+            ->whereIn('estado', [
+                AsignacionEtapaPlanta::ESTADO_COMPLETADA,
+                AsignacionEtapaPlanta::ESTADO_PENDIENTE,
+                AsignacionEtapaPlanta::ESTADO_PROGRAMADA,
+            ])
+            ->get()
+            ->keyBy(fn (AsignacionEtapaPlanta $a) => (int) $a->orden);
+
+        if ($asignaciones->isEmpty()) {
+            return null;
+        }
+
+        $count = 0;
+        foreach ($pasos as $paso) {
+            $asig = $asignaciones->get((int) $paso->orden);
+            if ($asig && $asig->estado === AsignacionEtapaPlanta::ESTADO_COMPLETADA) {
+                $count++;
+            } else {
+                break;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * Empareja cada paso de la ruta con un registro distinto (evita marcar dos pasos iguales al completar uno).
+     *
+     * @param  Collection<int, \App\Models\LoteProduccionRutaPaso|PlantillaTransformacionPaso>  $pasos
+     * @param  Collection<int, RegistroProcesoMaquinaPlanta>  $registros
+     */
+    private function pasosRutaCompletadosConRegistros(Collection $pasos, Collection $registros): int
+    {
+        $usados = collect();
+        $count = 0;
+
+        foreach ($pasos as $paso) {
+            $match = $registros->first(function (RegistroProcesoMaquinaPlanta $reg) use ($paso, $usados) {
+                if ($usados->contains($reg->registroprocesomaquinaplantaid)) {
+                    return false;
+                }
+
+                $procesoId = (int) ($reg->procesoMaquina?->procesoplantaid ?? 0);
+                $maquinaId = (int) ($reg->procesoMaquina?->maquinaplantaid ?? 0);
+
+                return $procesoId === (int) $paso->procesoplantaid
+                    && $maquinaId === (int) ($paso->maquinaplantaid ?? 0);
+            });
+
+            if ($match) {
+                $usados->push($match->registroprocesomaquinaplantaid);
+                $count++;
+            } else {
+                break;
+            }
+        }
+
+        return $count;
+    }
+
     public function procesosRutaCompletos(LoteProduccionPedido $lote): bool
     {
-        $registrados = collect($this->procesosRegistradosIds($lote));
         $rutaService = app(LoteProduccionRutaService::class);
 
         if ($rutaService->tieneRuta($lote)) {
@@ -190,7 +284,7 @@ class LoteProduccionTransformacionService
                 return false;
             }
 
-            return $pasos->every(fn ($paso) => $registrados->contains((int) $paso->procesoplantaid));
+            return $this->pasosRutaCompletadosEnSecuencia($lote) >= $pasos->count();
         }
 
         $plantilla = $this->plantillaDelLote($lote);
@@ -203,7 +297,7 @@ class LoteProduccionTransformacionService
             return false;
         }
 
-        return $plantilla->pasos->every(fn ($paso) => $registrados->contains((int) $paso->procesoplantaid));
+        return $this->pasosRutaCompletadosEnSecuencia($lote) >= $plantilla->pasos->count();
     }
 
     public function pasoEstaRegistrado(LoteProduccionPedido $lote, int $procesoplantaid): bool
@@ -666,12 +760,11 @@ class LoteProduccionTransformacionService
         $completados = $this->pasosRutaCompletadosEnSecuencia($lote);
         $ordenActual = $completados + 1;
         $hayPendiente = $this->tieneAsignacionesPendientes($lote);
-        $registrados = collect($this->procesosRegistradosIds($lote));
         $items = [];
 
         foreach ($plantilla->pasos as $paso) {
             $orden = (int) $paso->orden;
-            $procesoHecho = $registrados->contains((int) $paso->procesoplantaid);
+            $procesoHecho = $orden <= $completados;
             $estado = match (true) {
                 $procesoHecho => 'hecho',
                 $orden === $ordenActual && $hayPendiente => 'en_curso',

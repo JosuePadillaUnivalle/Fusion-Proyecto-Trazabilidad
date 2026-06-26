@@ -106,6 +106,11 @@ class AlmacenCapacidadService
 
     public function productoPlantaKgEnAlmacen(Almacen $almacen): float
     {
+        $presentacionKg = $this->inventarioPresentacionKg($almacen);
+        if ($presentacionKg > 0) {
+            return $presentacionKg;
+        }
+
         return (float) AlmacenajeLoteProduccion::query()
             ->with(['loteProduccionPedido.unidadMedida', 'loteProduccionPedido.materiasPrimas.insumo.unidadMedida'])
             ->whereNull('fecha_retiro')

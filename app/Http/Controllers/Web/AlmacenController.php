@@ -754,6 +754,57 @@ class AlmacenController extends Controller
             $producto = \App\Support\LoteProduccionNombre::productoDesdeLote($lote);
             $nombre = \App\Support\ProductoPlantaCatalogo::etiquetaLoteAlmacen($lote);
             $resumen = \App\Support\ProductoPlantaCatalogo::resumenProduccion($lote, $this->capacidadService);
+            $fechaAlm = $ingreso->fecha_almacenaje ? \Carbon\Carbon::parse($ingreso->fecha_almacenaje) : null;
+
+            $invRows = InventarioPresentacionLote::query()
+                ->where('almacenid', $almacen->almacenid)
+                ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
+                ->where(function ($q) {
+                    $q->where('cantidad_unidades', '>', 0)
+                        ->orWhere('cantidad_kg', '>', 0);
+                })
+                ->with('presentacion')
+                ->get();
+
+            if ($invRows->isNotEmpty()) {
+                foreach ($invRows as $inv) {
+                    $presentacion = $inv->presentacion;
+                    $cantidad = (float) $inv->cantidad_unidades;
+                    $kg = (float) $inv->cantidad_kg;
+                    $unidad = $presentacion
+                        ? \App\Support\EmpaquePlantaCatalogo::etiquetaUnidad(null, $presentacion->tipo_envase)
+                        : \App\Support\ProductoPlantaCatalogo::unidadEtiqueta($producto, $lote->unidadMedida, $lote);
+                    $empaqueLabel = $presentacion?->nombre;
+                    $detalleEmpaque = $cantidad > 0 && $empaqueLabel
+                        ? number_format($cantidad, 0, ',', '.').' '.$unidad.' · '.$empaqueLabel
+                            .($kg > 0 ? ' · '.number_format($kg, 2, ',', '.').' kg producto' : '')
+                        : '';
+
+                    $insumoId = Insumo::query()
+                        ->where('almacenid', $almacen->almacenid)
+                        ->whereRaw('LOWER(TRIM(nombre)) = ?', [\Illuminate\Support\Str::lower(trim($producto))])
+                        ->value('insumoid');
+
+                    $items->push((object) [
+                        'categoria' => 'producto_planta',
+                        'tipo_label' => 'Producto procesado',
+                        'tipo_filtro' => 'producto procesado',
+                        'nombre' => $nombre,
+                        'detalle' => $detalleEmpaque !== '' ? \Illuminate\Support\Str::limit($detalleEmpaque, 120) : ($lote->codigo_lote ?? '—'),
+                        'cantidad' => $cantidad > 0 ? $cantidad : (float) ($resumen['cantidad'] ?? $ingreso->cantidad),
+                        'unidad' => $unidad,
+                        'kg' => $kg > 0 ? $kg : (float) ($resumen['kg'] ?? 0),
+                        'empaque' => $empaqueLabel,
+                        'fecha_orden' => $fechaAlm?->timestamp ?? 0,
+                        'search' => strtolower(trim($nombre.' producto planta '.$producto.' '.$lote->codigo_lote.' '.($empaqueLabel ?? ''))),
+                        'lote_produccion_pedido_id' => $lote->loteproduccionpedidoid,
+                        'insumoid' => $insumoId ? (int) $insumoId : null,
+                    ]);
+                }
+
+                continue;
+            }
+
             $kg = (float) ($resumen['kg'] ?? 0);
             if ($kg <= 0) {
                 $kg = $this->capacidadService->convertirAKg((float) $ingreso->cantidad, $lote->unidadMedida);

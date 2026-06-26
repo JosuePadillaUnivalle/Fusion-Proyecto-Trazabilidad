@@ -79,11 +79,14 @@ class TrasladoPlantaMayoristaController extends Controller
         $data = $request->validate([
             'almacen_planta_origenid' => 'required|integer|exists:almacen,almacenid',
             'almacen_mayorista_destinoid' => 'required|integer|exists:almacen,almacenid',
+            'recogidas' => 'nullable|array|max:5',
+            'recogidas.*.almacenid' => 'required|integer|exists:almacen,almacenid',
             'transportista_usuarioid' => 'required|integer|exists:usuario,usuarioid',
             'vehiculoid' => 'required|integer|exists:vehiculo,vehiculoid',
             'nombre' => 'nullable|string|max:200',
             'costo_bs' => 'required|numeric|min:1',
             'detalles' => 'required|array|min:1',
+            'detalles.*.almacen_plantaid' => 'nullable|integer|exists:almacen,almacenid',
             'detalles.*.insumoid' => 'required|integer|exists:insumo,insumoid',
             'detalles.*.insumo_presentacionid' => 'nullable|integer|exists:insumo_presentacion,insumo_presentacionid',
             'detalles.*.inventario_presentacion_loteid' => 'nullable|integer|exists:inventario_presentacion_lote,inventario_presentacion_loteid',
@@ -93,6 +96,12 @@ class TrasladoPlantaMayoristaController extends Controller
         ]);
         $planta = Almacen::query()->findOrFail((int) $data['almacen_planta_origenid']);
         $mayorista = Almacen::query()->findOrFail((int) $data['almacen_mayorista_destinoid']);
+        $recogidasExtra = collect($data['recogidas'] ?? [])
+            ->pluck('almacenid')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0 && $id !== (int) $planta->almacenid)
+            ->values()
+            ->all();
 
         try {
             $ruta = $this->traslados->crear(
@@ -103,7 +112,8 @@ class TrasladoPlantaMayoristaController extends Controller
                 (int) auth()->id(),
                 $data['detalles'],
                 $data['nombre'] ?? null,
-                (float) $data['costo_bs']
+                (float) $data['costo_bs'],
+                $recogidasExtra,
             );
         } catch (\InvalidArgumentException $e) {
             return redirect()

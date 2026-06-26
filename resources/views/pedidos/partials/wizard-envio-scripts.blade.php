@@ -241,7 +241,7 @@
         if (n > pasoMaximo) pasoMaximo = n;
         pintarProgreso();
         if (n === max) construirResumen();
-        if (n === 2) {
+        if (n === 2 && !opts.paso2Preparado) {
             if (f === 'planta' && typeof window.syncFilasProductoPlanta === 'function') {
                 window.syncFilasProductoPlanta();
             }
@@ -348,7 +348,11 @@
                 return false;
             }
             if (!valorSelector('traslado_planta_origen')) {
-                avisoWizard('Seleccione el almacén de planta (origen).');
+                avisoWizard('Seleccione al menos la recogida 1 (almacén de planta).');
+                return false;
+            }
+            if (typeof window.hayRecogidasExtraVaciasTraslado === 'function' && window.hayRecogidasExtraVaciasTraslado()) {
+                avisoWizard('Complete o quite las recogidas adicionales en planta.');
                 return false;
             }
             if (!valorSelector('traslado_mayorista_destino')) {
@@ -358,32 +362,54 @@
             return true;
         }
         if (n === 2) {
-            const filas = document.querySelectorAll('.traslado-producto-row');
-            if (!filas.length) {
-                avisoWizard('Agregue al menos un producto al traslado.');
+            const cards = document.querySelectorAll('.traslado-recogida-productos-card');
+            if (!cards.length) {
+                avisoWizard('Complete el paso Ruta para indicar productos por almacén de planta.');
                 return false;
             }
-            let ok = false;
+            let okGlobal = false;
             let msgStock = '';
-            filas.forEach((f) => {
-                const ins = f.querySelector('[data-field="insumoid"]')?.value;
-                if (!ins) return;
-                if (typeof window.filaTrasladoTieneStockSuficiente === 'function' && !window.filaTrasladoTieneStockSuficiente(f)) {
-                    msgStock = 'Revise stock, lote y cantidad en cada línea. No puede despachar más unidades de las disponibles.';
-                    return;
-                }
-                const modo = f.dataset.modoCantidad || '';
-                const cantKg = parseFloat(f.querySelector('[data-field="cantidad"]')?.value);
-                const pres = f.querySelector('[data-field="presentacion"]')?.value;
-                const unidades = parseInt(f.querySelector('[data-field="cantidad_unidades"]')?.value || '0', 10);
-                const loteSel = f.querySelector('[data-field="inventario_lote"]');
-                const loteRequerido = loteSel && !loteSel.disabled && loteSel.options.length > 1;
-                if (modo === 'unidades') {
-                    if (pres && unidades > 0 && cantKg > 0 && (!loteRequerido || loteSel.value)) ok = true;
-                } else if (modo === 'sin_presentacion') {
-                    msgStock = msgStock || 'Hay productos sin empaques configurados. Configure presentaciones comerciales o elija otro producto.';
+            let errorCard = '';
+            cards.forEach(function (card) {
+                const filas = card.querySelectorAll('.traslado-producto-row');
+                let okCard = false;
+                filas.forEach((f) => {
+                    const ins = f.querySelector('[data-field="insumoid"]')?.value;
+                    if (!ins) return;
+                    if (typeof window.filaTrasladoTieneStockSuficiente === 'function' && !window.filaTrasladoTieneStockSuficiente(f)) {
+                        msgStock = 'Revise stock, lote y cantidad en cada línea. No puede despachar más unidades de las disponibles.';
+                        return;
+                    }
+                    const modo = f.dataset.modoCantidad || '';
+                    const cantKg = parseFloat(f.querySelector('[data-field="cantidad"]')?.value);
+                    const pres = f.querySelector('[data-field="presentacion"]')?.value;
+                    const unidades = parseInt(f.querySelector('[data-field="cantidad_unidades"]')?.value || '0', 10);
+                    const loteSel = f.querySelector('[data-field="inventario_lote"]');
+                    const loteRequerido = loteSel && !loteSel.disabled && loteSel.options.length > 1;
+                    if (modo === 'unidades') {
+                        if (pres && unidades > 0 && cantKg > 0 && (!loteRequerido || loteSel.value)) {
+                            okCard = true;
+                        }
+                    } else if (modo === 'sin_presentacion') {
+                        msgStock = msgStock || 'Hay productos sin empaques configurados. Configure presentaciones comerciales o elija otro producto.';
+                    } else if (Number.isFinite(cantKg) && cantKg > 0) {
+                        okCard = true;
+                    }
+                });
+                if (!okCard) {
+                    const titulo = card.querySelector('.lbl-traslado-recogida-titulo')?.textContent?.trim() || 'cada recogida';
+                    errorCard = 'Indique al menos un producto completo en: ' + titulo;
+                } else {
+                    okGlobal = true;
                 }
             });
+            if (errorCard) {
+                avisoWizard(errorCard);
+                if (typeof window.marcarErroresValidacionTraslado === 'function') {
+                    window.marcarErroresValidacionTraslado();
+                }
+                return false;
+            }
             if (msgStock) {
                 avisoWizard(msgStock);
                 if (typeof window.marcarErroresValidacionTraslado === 'function') {
@@ -391,11 +417,11 @@
                 }
                 return false;
             }
-            if (!ok) {
+            if (!okGlobal) {
                 if (typeof window.marcarErroresValidacionTraslado === 'function') {
                     window.marcarErroresValidacionTraslado();
                 }
-                avisoWizard('Indique producto, presentación, lote y cantidad en cada línea.');
+                avisoWizard('Indique producto, presentación, lote y cantidad en cada almacén de planta.');
                 return false;
             }
             return true;
@@ -904,9 +930,35 @@
         pasoMaximo = 1;
 
         el('wizard-btn-anterior')?.addEventListener('click', () => irPaso(paso - 1, { sinValidar: true }));
-        el('wizard-btn-siguiente')?.addEventListener('click', () => {
+        el('wizard-btn-siguiente')?.addEventListener('click', async () => {
             if (!validarPaso(paso)) return;
-            irPaso(paso + 1);
+            const destino = paso + 1;
+            const f = flujoActivo();
+            const btn = el('wizard-btn-siguiente');
+            const necesitaPrepararCarga = destino === 2 && (
+                (f === 'mayorista' && window.EnvioTrasladoProductos?.syncAlPaso2) ||
+                (f === 'punto-venta' && window.EnvioPdvProductos?.syncAlPaso2)
+            );
+            if (necesitaPrepararCarga && btn) {
+                const htmlPrevio = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Preparando carga…';
+                try {
+                    if (f === 'mayorista') {
+                        await window.EnvioTrasladoProductos.syncAlPaso2();
+                    } else if (f === 'punto-venta') {
+                        await window.EnvioPdvProductos.syncAlPaso2();
+                    }
+                    irPaso(destino, { paso2Preparado: true });
+                } catch (err) {
+                    avisoWizard('No se pudo preparar la carga. Intente de nuevo.');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = htmlPrevio;
+                }
+                return;
+            }
+            irPaso(destino);
         });
         el('btnAgregarParticionEnvio')?.addEventListener('click', agregarParticion);
 

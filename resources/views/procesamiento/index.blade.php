@@ -284,8 +284,7 @@
                     <div class="lote-section mb-0">
                         <div class="lote-section-title"><i class="fas fa-boxes mr-1"></i> Materia prima <span class="text-danger">*</span></div>
                         <p class="small text-muted mb-2">Paso 1: elija el insumo del almacén de planta. El empaquetado y el cálculo se habilitan después, según el stock de ese insumo.</p>
-                        <div id="alertaStockMateriaPrima" class="alert alert-danger small py-2 px-3 mb-2 d-none" role="alert">
-                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                        <div id="alertaStockMateriaPrima" class="d-none" aria-hidden="true">
                             <span id="alertaStockMateriaPrimaTexto"></span>
                         </div>
                         <div class="table-responsive tabla-materias mb-2">
@@ -650,32 +649,77 @@
         return manual;
     }
 
+    function stockMaximoMateriaPrima() {
+        if (!materias.length) return null;
+        const m = materias[0];
+        return esUnidadKg(m.unidad) && Number.isFinite(m.stock) && m.stock > 0 ? m.stock : null;
+    }
+
+    function acotarCantidadKgInput(input) {
+        if (!input) return;
+        const max = stockMaximoMateriaPrima();
+        if (max == null) return;
+        const val = parseFloat(input.value);
+        if (!Number.isFinite(val)) return;
+        if (val > max) {
+            input.value = String(max);
+        } else if (val < 0) {
+            input.value = '0';
+        }
+    }
+
+    function acotarEmpaquesSegunStock() {
+        const inputEmp = document.getElementById('cantidadEmpaquesObjetivo');
+        const maxKg = stockMaximoMateriaPrima();
+        if (!inputEmp || maxKg == null) return;
+        const calc = calcularPlanificacionLocal();
+        const pesoPorEmpaque = calc?.peso_neto_kg || parseFloat(document.getElementById('empaquePesoNetoKg')?.value || '0');
+        if (!pesoPorEmpaque || pesoPorEmpaque <= 0) return;
+        const maxEmpaques = Math.max(1, Math.floor(maxKg / pesoPorEmpaque));
+        const val = parseInt(inputEmp.value || '0', 10);
+        if (val > maxEmpaques) {
+            inputEmp.value = String(maxEmpaques);
+            inputEmp.max = String(maxEmpaques);
+        }
+    }
+
+    function actualizarLimitesCantidadLote() {
+        const maxKg = stockMaximoMateriaPrima();
+        const inputMp = document.getElementById('cantidadObjetivoLote');
+        const inputEmp = document.getElementById('cantidadEmpaquesObjetivo');
+        if (maxKg != null) {
+            if (inputMp) {
+                inputMp.max = String(maxKg);
+                acotarCantidadKgInput(inputMp);
+            }
+            acotarEmpaquesSegunStock();
+        } else {
+            if (inputMp) inputMp.removeAttribute('max');
+            if (inputEmp) inputEmp.removeAttribute('max');
+        }
+    }
+
     function validarStockMateriaPrima() {
         if (!materias.length) {
-            alertaStock?.classList.add('d-none');
             btnCrearLote?.setAttribute('disabled', 'disabled');
             btnBuscarInsumo?.classList.remove('d-none');
             return false;
         }
 
         btnBuscarInsumo?.classList.add('d-none');
+        actualizarLimitesCantidadLote();
 
         const m = materias[0];
         const usoKg = Math.max(kgRequeridosMateriaPrima(), cantidadKgMateriaSeleccionada());
+        const ok = !esUnidadKg(m.unidad) || usoKg <= m.stock + 0.0001;
 
-        if (esUnidadKg(m.unidad) && usoKg > m.stock) {
-            const msg = '«' + m.label + '» tiene ' + formatoKg(m.stock) + ' kg en stock y el lote requiere ' + formatoKg(usoKg) + ' kg. Reduzca empaques o elija otra materia prima.';
-            if (alertaStockTexto) {
-                alertaStockTexto.textContent = msg;
-            }
-            alertaStock?.classList.remove('d-none');
+        if (ok) {
+            btnCrearLote?.removeAttribute('disabled');
+        } else {
             btnCrearLote?.setAttribute('disabled', 'disabled');
-            return false;
         }
 
-        alertaStock?.classList.add('d-none');
-        btnCrearLote?.removeAttribute('disabled');
-        return true;
+        return ok;
     }
 
     function actualizarPlanificacionEmpaque() {
@@ -724,13 +768,18 @@
         }
 
         if (inputsKg.length === 1) {
-            inputsKg[0].value = entradaKg;
+            const max = stockMaximoMateriaPrima();
+            const valor = max != null ? Math.min(entradaKg, max) : entradaKg;
+            inputsKg[0].value = valor;
             validarStockMateriaPrima();
             return;
         }
 
         const porInsumo = Math.round((entradaKg / inputsKg.length) * 100) / 100;
-        inputsKg.forEach(inp => { inp.value = porInsumo; });
+        const max = stockMaximoMateriaPrima();
+        inputsKg.forEach(inp => {
+            inp.value = max != null ? Math.min(porInsumo, max) : porInsumo;
+        });
         validarStockMateriaPrima();
     }
 
@@ -811,10 +860,12 @@
         actualizarRecomendacionMp();
     });
     document.getElementById('cantidadEmpaquesObjetivo')?.addEventListener('input', function () {
+        acotarEmpaquesSegunStock();
         actualizarPlanificacionEmpaque();
         actualizarRecomendacionMp();
     });
     document.getElementById('cantidadObjetivoLote')?.addEventListener('input', function () {
+        acotarCantidadKgInput(this);
         actualizarPlanificacionEmpaque();
         actualizarRecomendacionMp();
     });
@@ -999,6 +1050,13 @@
 
     tbody.addEventListener('input', function (e) {
         if (e.target.classList.contains('mp-cantidad-input')) {
+            const max = parseFloat(e.target.dataset.stock || '0');
+            if (Number.isFinite(max) && max > 0) {
+                const val = parseFloat(e.target.value);
+                if (Number.isFinite(val) && val > max) {
+                    e.target.value = String(max);
+                }
+            }
             validarStockMateriaPrima();
         }
     });
@@ -1015,7 +1073,6 @@
         if (materias.length > 1) { e.preventDefault(); alert('Solo puede usar una materia prima por lote.'); return; }
         if (!validarStockMateriaPrima()) {
             e.preventDefault();
-            alert(alertaStockTexto?.textContent || 'La cantidad supera el stock disponible.');
             return;
         }
         const slug = document.getElementById('empaqueCatalogoSlug')?.value;

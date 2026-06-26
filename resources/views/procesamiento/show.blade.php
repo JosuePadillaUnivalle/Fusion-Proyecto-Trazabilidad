@@ -1494,106 +1494,213 @@
             '</div>';
     }
 
+    window.LpPlanEtapas = {
+        acotarInput: function (input) {
+            const minL = parseFloat(input.dataset.rangoMin);
+            const maxL = parseFloat(input.dataset.rangoMax);
+            if (isNaN(minL) || isNaN(maxL)) return;
+            let v = parseFloat(input.value);
+            if (isNaN(v)) return;
+            if (v < minL) input.value = minL;
+            if (v > maxL) input.value = maxL;
+        },
+        operarioSeleccionadoEnCard: function (card) {
+            const hidden = card.querySelector('.selector-catalogo-value, input[name*="operador_usuarioid"]');
+            return hidden && String(hidden.value || '').trim() !== '';
+        },
+        actualizarBotones: function () {
+            const form = document.getElementById('formAsignarPlanEtapas');
+            const wrapCerrarTodos = document.getElementById('lp-cerrar-todos-wrap');
+            if (!form) return;
+            const cards = form.querySelectorAll('[data-plan-etapa="1"]');
+            if (wrapCerrarTodos) {
+                if (!cards.length) {
+                    wrapCerrarTodos.classList.add('d-none');
+                } else {
+                    let todas = true;
+                    cards.forEach(function (card) {
+                        if (!window.LpPlanEtapas.operarioSeleccionadoEnCard(card)) todas = false;
+                    });
+                    wrapCerrarTodos.classList.toggle('d-none', !todas);
+                }
+            }
+            cards.forEach(function (card) {
+                const btn = card.querySelector('.js-cerrar-fase-single');
+                if (!btn) return;
+                const ok = window.LpPlanEtapas.operarioSeleccionadoEnCard(card);
+                btn.disabled = !ok;
+                btn.setAttribute('aria-disabled', ok ? 'false' : 'true');
+                btn.title = ok ? '' : 'Seleccione un operario para cerrar la fase';
+            });
+        },
+        refresh: function () {
+            window.LpPlanEtapas.actualizarBotones();
+        },
+        init: function () {
+            const form = document.getElementById('formAsignarPlanEtapas');
+            if (!form || form.dataset.lpPlanBound === '1') return;
+            form.dataset.lpPlanBound = '1';
+            form.addEventListener('focusout', function (e) {
+                const inp = e.target;
+                if (!inp.classList) return;
+                if (!inp.classList.contains('tl-plan-var-min') && !inp.classList.contains('tl-plan-var-max')) return;
+                window.LpPlanEtapas.acotarInput(inp);
+            });
+            form.addEventListener('submit', function () {
+                form.querySelectorAll('.tl-plan-var-min, .tl-plan-var-max').forEach(function (inp) {
+                    window.LpPlanEtapas.acotarInput(inp);
+                });
+            });
+            document.addEventListener('selector-catalogo:change', function () {
+                window.LpPlanEtapas.actualizarBotones();
+            });
+            form.addEventListener('change', function () {
+                window.LpPlanEtapas.actualizarBotones();
+            });
+            window.LpPlanEtapas.actualizarBotones();
+        },
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        window.LpPlanEtapas.init();
+    });
+
+    function postJsonForm(url, formData) {
+        return fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+        }).then(function (r) {
+            return r.text().then(function (text) {
+                let data = null;
+                try {
+                    data = text ? JSON.parse(text) : null;
+                } catch (parseErr) {
+                    throw {
+                        message: r.ok
+                            ? 'Respuesta inválida del servidor.'
+                            : 'Error del servidor (' + r.status + '). Recargue la página e intente de nuevo.',
+                    };
+                }
+                if (!r.ok || !data || data.ok === false) {
+                    throw { message: (data && data.message) || 'No se pudo completar la operación.' };
+                }
+                return data;
+            });
+        });
+    }
+
+    function actualizarTimelineDesdeAjax(data) {
+        const timeline = document.getElementById('lp-timeline-visual');
+        if (timeline && data.timeline_html) {
+            timeline.innerHTML = data.timeline_html;
+            if (window.CatalogoSelector && typeof window.CatalogoSelector.registerAll === 'function') {
+                window.CatalogoSelector.registerAll(timeline);
+            }
+            if (window.LpPlanEtapas) {
+                window.LpPlanEtapas.refresh();
+            }
+            document.dispatchEvent(new CustomEvent('lp-timeline-updated'));
+        }
+
+        const toolbar = document.getElementById('lp-toolbar-etapa-meta');
+        if (toolbar && data.toolbar_meta) {
+            toolbar.innerHTML = data.toolbar_meta;
+        }
+
+        const ruta = document.getElementById('lp-ruta-plantilla-pasos');
+        if (ruta && Array.isArray(data.ruta_plantilla)) {
+            let html = '';
+            data.ruta_plantilla.forEach(function (paso, idx) {
+                const prev = idx > 0 ? data.ruta_plantilla[idx - 1].estado : '';
+                html += htmlRutaPaso(paso, idx, prev);
+            });
+            ruta.innerHTML = html;
+        }
+
+        const formAsignar = document.getElementById('lp-form-registrar-etapa');
+        if (formAsignar && data.puede_asignar_nueva) {
+            formAsignar.classList.remove('d-none');
+        }
+
+        const bloqueo = document.getElementById('lp-bloqueo-asignacion');
+        if (bloqueo) {
+            if (data.mensaje_bloqueo) {
+                bloqueo.classList.remove('d-none');
+                bloqueo.innerHTML = '<i class="fas fa-lock mr-1"></i>' + escHtml(data.mensaje_bloqueo);
+            } else {
+                bloqueo.classList.add('d-none');
+            }
+        }
+
+        const seccion = document.getElementById('lp-asignaciones-pendientes');
+        if (seccion && (data.asignaciones_pendientes_count || 0) <= 0) {
+            seccion.style.transition = 'opacity .35s ease';
+            seccion.style.opacity = '0';
+            setTimeout(function () { seccion.remove(); }, 350);
+        }
+    }
+
+    function aplicarRespuestaAjaxProcesamiento(data, btn, card) {
+        if (data.transformacion_completa) {
+            window.location.assign(window.location.pathname + '#certificacion');
+            window.location.reload();
+            return;
+        }
+
+        if (data.timeline_html && document.getElementById('lp-timeline-visual')) {
+            actualizarTimelineDesdeAjax(data);
+            mostrarFlashAjax(data.message || 'Operación realizada correctamente.', 'success');
+            return;
+        }
+
+        if (card) {
+            card.style.transition = 'opacity .3s ease';
+            card.style.opacity = '0';
+            setTimeout(function () { card.remove(); }, 300);
+        }
+        const lista = document.getElementById('lp-lista-etapas-completadas');
+        const vacio = document.getElementById('lp-etapas-vacio');
+        if (vacio) vacio.remove();
+        if (lista && data.etapa) lista.insertAdjacentHTML('beforeend', htmlEtapaCompletada(data.etapa));
+        actualizarTimelineDesdeAjax(data);
+        mostrarFlashAjax(data.message || 'Operación realizada correctamente.', 'success');
+    }
+
     window.LpProcesamientoAjax = {
+        cerrarFase: function (form, submitter) {
+            const btn = submitter;
+            if (btn) btn.classList.add('lp-ajax-loading');
+            const url = btn ? (btn.getAttribute('formaction') || '') : '';
+            const fd = new FormData(form);
+            if (btn && btn.name) {
+                fd.set(btn.name, btn.value || '');
+            }
+            postJsonForm(url, fd)
+                .then(function (data) {
+                    if (btn) btn.classList.remove('lp-ajax-loading');
+                    aplicarRespuestaAjaxProcesamiento(data, btn, null);
+                })
+                .catch(function (err) {
+                    if (btn) btn.classList.remove('lp-ajax-loading');
+                    mostrarFlashAjax((err && err.message) || 'No se pudo cerrar la fase.', 'error');
+                });
+        },
         completarEtapa: function (form, triggerBtn) {
             const btn = triggerBtn || form.querySelector('button[type="submit"]');
             const card = btn
                 ? btn.closest('[data-asignacion-id]')
                 : form.closest('[data-asignacion-id]');
-            const scrollKey = 'lp_procesamiento_scroll';
-            try {
-                sessionStorage.setItem(scrollKey, String(window.scrollY));
-            } catch (e) {}
             if (btn) btn.classList.add('lp-ajax-loading');
 
-            fetch(form.action, {
-                method: 'POST',
-                body: new FormData(form),
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                credentials: 'same-origin',
-            })
-                .then(function (r) {
-                    return r.text().then(function (text) {
-                        let data = null;
-                        try {
-                            data = text ? JSON.parse(text) : null;
-                        } catch (parseErr) {
-                            throw {
-                                message: r.ok
-                                    ? 'Respuesta inválida del servidor.'
-                                    : 'Error del servidor (' + r.status + '). Recargue la página e intente de nuevo.',
-                            };
-                        }
-                        if (!r.ok || !data || data.ok === false) {
-                            throw { message: (data && data.message) || 'No se pudo completar la etapa.' };
-                        }
-                        return data;
-                    });
-                })
+            postJsonForm(form.action, new FormData(form))
                 .then(function (data) {
                     if (btn) btn.classList.remove('lp-ajax-loading');
-                    if (data.transformacion_completa) {
-                        window.location.assign(window.location.pathname + '#certificacion');
-                        window.location.reload();
-                        return;
-                    }
-                    if (data.reload) {
-                        window.location.reload();
-                        return;
-                    }
-                    if (document.getElementById('lp-timeline-visual')) {
-                        window.location.reload();
-                        return;
-                    }
-                    if (card) {
-                        card.style.transition = 'opacity .3s ease';
-                        card.style.opacity = '0';
-                        setTimeout(function () { card.remove(); }, 300);
-                    }
-                    const lista = document.getElementById('lp-lista-etapas-completadas');
-                    const vacio = document.getElementById('lp-etapas-vacio');
-                    if (vacio) vacio.remove();
-                    if (lista && data.etapa) lista.insertAdjacentHTML('beforeend', htmlEtapaCompletada(data.etapa));
-
-                    const ruta = document.getElementById('lp-ruta-plantilla-pasos');
-                    if (ruta && Array.isArray(data.ruta_plantilla)) {
-                        let html = '';
-                        data.ruta_plantilla.forEach(function (paso, idx) {
-                            const prev = idx > 0 ? data.ruta_plantilla[idx - 1].estado : '';
-                            html += htmlRutaPaso(paso, idx, prev);
-                        });
-                        ruta.innerHTML = html;
-                    }
-
-                    const timeline = document.getElementById('lp-timeline-visual');
-                    if (timeline && data.timeline_html) {
-                        timeline.innerHTML = data.timeline_html;
-                    }
-
-                    const formAsignar = document.getElementById('lp-form-registrar-etapa');
-                    if (formAsignar && data.puede_asignar_nueva) {
-                        formAsignar.classList.remove('d-none');
-                    }
-
-                    const bloqueo = document.getElementById('lp-bloqueo-asignacion');
-                    if (bloqueo) {
-                        if (data.mensaje_bloqueo) {
-                            bloqueo.classList.remove('d-none');
-                            bloqueo.innerHTML = '<i class="fas fa-lock mr-1"></i>' + escHtml(data.mensaje_bloqueo);
-                        } else {
-                            bloqueo.classList.add('d-none');
-                        }
-                    }
-
-                    const seccion = document.getElementById('lp-asignaciones-pendientes');
-                    if (seccion && (data.asignaciones_pendientes_count || 0) <= 0) {
-                        seccion.style.transition = 'opacity .35s ease';
-                        seccion.style.opacity = '0';
-                        setTimeout(function () { seccion.remove(); }, 350);
-                    }
+                    aplicarRespuestaAjaxProcesamiento(data, btn, card);
                 })
                 .catch(function (err) {
                     if (btn) btn.classList.remove('lp-ajax-loading');
@@ -1604,8 +1711,16 @@
 
     document.addEventListener('submit', function (e) {
         const form = e.target;
-        if (!(form instanceof HTMLFormElement)) return;
-        if (form.dataset.ajaxLpAction !== 'completar-etapa' || !window.LpProcesamientoAjax) return;
+        if (!(form instanceof HTMLFormElement) || !window.LpProcesamientoAjax) return;
+        if (form.id === 'formAsignarPlanEtapas') {
+            const submitter = e.submitter;
+            if (submitter && submitter.classList.contains('js-cerrar-fase-single')) {
+                e.preventDefault();
+                window.LpProcesamientoAjax.cerrarFase(form, submitter);
+                return;
+            }
+        }
+        if (form.dataset.ajaxLpAction !== 'completar-etapa') return;
         e.preventDefault();
         window.LpProcesamientoAjax.completarEtapa(form);
     });
