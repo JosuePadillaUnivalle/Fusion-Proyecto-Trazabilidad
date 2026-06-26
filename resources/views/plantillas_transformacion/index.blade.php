@@ -78,7 +78,6 @@
                 <thead>
                     <tr>
                         <th>Nombre</th>
-                        <th>Producto ejemplo</th>
                         <th>Pasos</th>
                         <th>Estado</th>
                         <th style="width:140px">Acciones</th>
@@ -88,7 +87,6 @@
                     @forelse($plantillas as $p)
                     <tr>
                         <td><strong>{{ $p->nombre }}</strong><br><small class="text-muted">{{ \Illuminate\Support\Str::limit($p->descripcion, 60) }}</small></td>
-                        <td>{{ $p->producto_ejemplo ?: '—' }}</td>
                         <td><span class="badge badge-light border">{{ $p->pasos_count }} etapas</span></td>
                         <td>
                             @include('plantillas_transformacion.partials.badge-estado', ['plantilla' => $p])
@@ -108,7 +106,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="5" class="text-center text-muted py-4">Sin procesos definidos. Ejecute el seeder o cree uno nuevo.</td></tr>
+                    <tr><td colspan="4" class="text-center text-muted py-4">Sin procesos definidos. Ejecute el seeder o cree uno nuevo.</td></tr>
                     @endforelse
                 </tbody>
             </table>

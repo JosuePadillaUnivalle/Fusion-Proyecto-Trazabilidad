@@ -14,6 +14,10 @@ class AsignacionEtapaPlantaServiceTest extends TestCase
 
         $asignacion->estado = AsignacionEtapaPlanta::ESTADO_COMPLETADA;
         $this->assertFalse($asignacion->estaPendiente());
+
+        $asignacion->estado = AsignacionEtapaPlanta::ESTADO_PROGRAMADA;
+        $this->assertTrue($asignacion->estaProgramada());
+        $this->assertFalse($asignacion->estaPendiente());
     }
 }
 

@@ -321,10 +321,6 @@
                         <dt>Último acceso</dt>
                         <dd>{{ $usuario->ultimologin ? $usuario->ultimologin->format('d/m/Y H:i') : '—' }}</dd>
                     </div>
-                    <div class="usu-show-dl-row">
-                        <dt>Almacén vinculado</dt>
-                        <dd>{{ $usuario->almacen->nombre ?? '—' }}</dd>
-                    </div>
                 </dl>
                 @if(count($infoAdicional) > 0)
                 <div class="usu-show-extra">

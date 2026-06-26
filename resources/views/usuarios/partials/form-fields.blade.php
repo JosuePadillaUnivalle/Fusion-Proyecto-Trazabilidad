@@ -76,7 +76,6 @@
 </div>
 
 <div class="row">
-    @unless($modoJefe)
     <div class="col-md-6">
         <div class="form-group">
             <label for="telefono">Teléfono</label>
@@ -85,12 +84,12 @@
                 <strong>Opcional.</strong> Número de contacto operativo (campo, planta, logística).
             </div>
             @endif
-            <input type="text" class="form-control @error('telefono') is-invalid @enderror" id="telefono" name="telefono"
-                value="{{ old('telefono', $usuarioForm->telefono ?? '') }}" placeholder="+591 …">
+            <input type="tel" class="form-control js-telefono-bo @error('telefono') is-invalid @enderror" id="telefono" name="telefono"
+                value="{{ old('telefono', $usuarioForm->telefono ?? '') }}" placeholder="+591 71234567"
+                inputmode="tel" autocomplete="tel">
             @error('telefono')<span class="invalid-feedback">{{ $message }}</span>@enderror
         </div>
     </div>
-    @endunless
     <div class="col-md-6">
         <div class="form-group">
             <label for="passwordhash">
@@ -107,8 +106,8 @@
             </div>
             @endif
             <input type="password" class="form-control @error('passwordhash') is-invalid @enderror" id="passwordhash" name="passwordhash"
-                {{ $usuarioForm ? '' : 'required' }}>
-            @error('passwordhash')<span class="invalid-feedback">{{ $message }}</span>@enderror
+                {{ $usuarioForm ? '' : 'required' }} minlength="5" autocomplete="new-password">
+            @error('passwordhash')<span class="invalid-feedback d-none">{{ $message }}</span>@enderror
         </div>
     </div>
 </div>
@@ -149,3 +148,5 @@
     </div>
 </div>
 @endunless
+
+@include('partials.telefono-bo-input-script')

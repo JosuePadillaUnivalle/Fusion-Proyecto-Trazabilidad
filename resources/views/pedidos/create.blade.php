@@ -2657,8 +2657,12 @@
 
         const sinStock = (!Number.isFinite(stockUnidades) || stockUnidades <= 0)
             && (!Number.isFinite(stockKg) || stockKg <= 0);
-        const excede = (Number.isFinite(stockUnidades) && stockUnidades > 0 && unidades > stockUnidades)
-            || (Number.isFinite(stockKg) && stockKg > 0 && kg > stockKg + 0.0001);
+        let excede = false;
+        if (Number.isFinite(stockUnidades) && stockUnidades > 0) {
+            excede = unidades > stockUnidades;
+        } else if (Number.isFinite(stockKg) && stockKg > 0) {
+            excede = kg > stockKg + 0.0001;
+        }
         const selLote = fila.querySelector('[data-field="inventario_lote"]');
         const lotePendiente = false;
         const mostrarErrorLote = lotePendiente && fila.dataset.mostrarErrorLote === '1';

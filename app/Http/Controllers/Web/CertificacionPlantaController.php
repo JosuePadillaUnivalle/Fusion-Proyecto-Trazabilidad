@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\EvaluacionFinalLoteProduccion;
 use App\Support\CertificacionIndexService;
+use App\Support\UsuarioRol;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -16,6 +17,7 @@ class CertificacionPlantaController extends Controller
 
     public function index(Request $request): View
     {
+        abort_if(UsuarioRol::esOperarioPlanta($request->user()), 403, 'Solo el jefe de planta o administración pueden certificar lotes.');
         $datos = $this->indexService->datosPlanta([
             'q' => $request->string('q')->trim()->toString(),
             'producto' => $request->string('producto')->trim()->toString(),
@@ -34,6 +36,7 @@ class CertificacionPlantaController extends Controller
 
     public function show(EvaluacionFinalLoteProduccion $evaluacionFinalLoteProduccion): View
     {
+        abort_if(UsuarioRol::esOperarioPlanta(auth()->user()), 403, 'Solo el jefe de planta o administración pueden certificar lotes.');
         $evaluacionFinalLoteProduccion->load([
             'loteProduccionPedido.pedido',
             'loteProduccionPedido.plantillaTransformacion',

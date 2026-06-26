@@ -59,7 +59,11 @@ class LoteProduccionController extends Controller
         $desde = $request->query('desde');
         $hasta = $request->query('hasta');
 
-        $lotesQuery = LoteProduccionPedido::query()
+        $user = $request->user();
+        $baseQuery = LoteProduccionPedido::query();
+        $this->aplicarFiltroOperarioPlanta($baseQuery, $user);
+
+        $lotesQuery = (clone $baseQuery)
             ->with(['pedido', 'unidadMedida', 'materiasPrimas.insumo', 'procesoPlanta', 'evaluacionesFinales', 'almacenajes'])
             ->orderByDesc('fecha_creacion');
 
@@ -113,10 +117,10 @@ class LoteProduccionController extends Controller
         });
 
         $stats = [
-            'total' => LoteProduccionPedido::count(),
-            'pendientes' => LoteProduccionPedido::query()->whereNull('hora_fin')->whereDoesntHave('registrosProceso')->count(),
-            'en_proceso' => LoteProduccionPedido::query()->whereNull('hora_fin')->whereHas('registrosProceso')->whereDoesntHave('almacenajes')->count(),
-            'completados' => LoteProduccionPedido::query()->where(fn ($q) => $q->whereNotNull('hora_fin')->orWhereHas('almacenajes'))->count(),
+            'total' => (clone $baseQuery)->count(),
+            'pendientes' => (clone $baseQuery)->whereNull('hora_fin')->whereDoesntHave('registrosProceso')->count(),
+            'en_proceso' => (clone $baseQuery)->whereNull('hora_fin')->whereHas('registrosProceso')->whereDoesntHave('almacenajes')->count(),
+            'completados' => (clone $baseQuery)->where(fn ($q) => $q->whereNotNull('hora_fin')->orWhereHas('almacenajes'))->count(),
         ];
 
         $pedidoLabel = '';
@@ -187,6 +191,8 @@ class LoteProduccionController extends Controller
             403
         );
 
+        $this->autorizarLoteOperarioPlanta($loteProduccion, auth()->user());
+
         $loteProduccion->load(['pedido', 'unidadMedida', 'materiasPrimas.insumo.unidadMedida', 'almacenajes']);
 
         if ($loteProduccion->almacenajes->isNotEmpty() && ! $loteProduccion->hora_fin) {
@@ -209,6 +215,10 @@ class LoteProduccionController extends Controller
         $resumenesCapacidadPlanta = [];
         foreach ($almacenesPlanta as $almacenPlanta) {
             $resumenesCapacidadPlanta[$almacenPlanta->almacenid] = $this->capacidadService->resumen($almacenPlanta);
+        }
+        $datosAlmacenEnvioPlanta = [];
+        if (($dash['panel_fase_activo'] ?? '') === 'almacenaje' && empty($dash['almacenaje'])) {
+            $datosAlmacenEnvioPlanta = app(\App\Support\AlmacenEnvioSelectorService::class)->datosPlanta();
         }
         $condicionesAlmacenaje = AlmacenajeLoteCondiciones::opciones();
 
@@ -247,6 +257,7 @@ class LoteProduccionController extends Controller
         $siguientePasoPlantilla = $this->transformacion->siguientePasoPlantilla($loteProduccion);
         $user = auth()->user();
         $puedeAsignarEtapa = UsuarioRol::gestionaPlanta($user) || $user?->hasRole('admin');
+        $puedeCertificar = $puedeAsignarEtapa;
         $operadoresPlanta = $puedeAsignarEtapa
             ? UsuarioRol::queryOperariosPlanta()->orderBy('nombre')->orderBy('apellido')->get()
             : collect();
@@ -283,6 +294,14 @@ class LoteProduccionController extends Controller
         }
 
         $timelineVisual = $this->transformacion->timelineVisual($loteProduccion);
+        $pasosPlanAsignacion = [];
+        if ($puedeAsignarEtapa && $this->asignacionEtapa->puedeAsignarPlan($loteProduccion)) {
+            $completadosRuta = $this->transformacion->etapasCompletadasCount($loteProduccion);
+            $pasosPlanAsignacion = $rutaService->pasosOrdenados($loteProduccion)
+                ->where('orden', '>', $completadosRuta)
+                ->values();
+        }
+        $asignacionesPlanLote = $this->transformacion->asignacionesActivas($loteProduccion);
 
         return view('procesamiento.show', array_merge($dash, [
             'lote' => $loteProduccion,
@@ -304,23 +323,28 @@ class LoteProduccionController extends Controller
             'fases' => LoteProduccionTrazabilidadService::FASES,
             'puedeEliminar' => $this->loteService->puedeEliminar($loteProduccion),
             'puedeAsignarEtapa' => $puedeAsignarEtapa,
+            'puedeCertificar' => $puedeCertificar,
             'operadoresPlanta' => $operadoresPlanta,
             'asignacionesPendientesLote' => $asignacionesPendientesLote,
-            'puedeAsignarNuevaEtapa' => $puedeAsignarEtapa && $this->asignacionEtapa->puedeAsignar($loteProduccion),
+            'puedeAsignarNuevaEtapa' => $puedeAsignarEtapa
+                && $this->asignacionEtapa->puedeAsignar($loteProduccion)
+                && ! $this->asignacionEtapa->puedeAsignarPlan($loteProduccion),
+            'puedeAsignarPlanEtapas' => $puedeAsignarEtapa && $this->asignacionEtapa->puedeAsignarPlan($loteProduccion),
+            'puedeReiniciarTodoAsignaciones' => $puedeAsignarEtapa && $this->asignacionEtapa->puedeReiniciarTodo($loteProduccion),
+            'puedeReiniciarPlanAsignaciones' => $puedeAsignarEtapa && $this->asignacionEtapa->puedeReiniciarTodo($loteProduccion),
+            'pasosPlanAsignacion' => $pasosPlanAsignacion,
+            'asignacionesPlanLote' => $asignacionesPlanLote,
             'mensajeBloqueoAsignacion' => $this->transformacion->mensajeBloqueoAsignacion($loteProduccion),
             'ordenEtapaActual' => $ordenActual,
             'parametrosLote' => $parametrosLote,
             'parametrosEtapaActual' => $parametrosEtapaActual,
             'parametrosPorAsignacion' => $parametrosPorAsignacion,
             'timelineVisual' => $timelineVisual,
-            'puedeEditarRuta' => $puedeAsignarEtapa
-                && empty($dash['transformacion_completa'] ?? false)
-                && ($dash['fase_actual'] ?? '') === 'transformacion',
             'etapasCompletadasRuta' => $this->transformacion->etapasCompletadasCount($loteProduccion),
             'parametrosPreviewEtapa' => app(LoteProduccionParametrosService::class)
                 ->parametrosParaEtapaActual($loteProduccion, (int) ($siguientePasoPlantilla?->maquinaplantaid ?? 0)),
             'rutaPasosJson' => app(LoteProduccionRutaService::class)->payloadPasosParaSincronizar($loteProduccion),
-        ]));
+        ], $datosAlmacenEnvioPlanta));
     }
 
     public function asignarEtapa(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse
@@ -347,12 +371,135 @@ class LoteProduccionController extends Controller
             ->with('success', 'Etapa asignada a '.($operador?->nombreCompleto() ?? 'operario').'. Recibirá una alerta en su panel.');
     }
 
+    public function asignarPlanEtapas(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse
+    {
+        abort_unless(UsuarioRol::gestionaPlanta($request->user()) || $request->user()?->hasRole('admin'), 403);
+
+        $data = $request->validate([
+            'etapas' => ['required', 'array', 'min:1'],
+            'etapas.*.loteproduccionrutapasoid' => ['required', 'integer'],
+            'etapas.*.operador_usuarioid' => ['required', 'integer', 'exists:usuario,usuarioid'],
+            'etapas.*.variables' => ['nullable', 'array'],
+            'etapas.*.variables.*.variableestandarid' => ['required_with:etapas.*.variables', 'integer'],
+            'etapas.*.variables.*.valor_minimo' => ['required_with:etapas.*.variables', 'numeric'],
+            'etapas.*.variables.*.valor_maximo' => ['required_with:etapas.*.variables', 'numeric'],
+        ]);
+
+        try {
+            $this->asignacionEtapa->asignarPlanEtapas(
+                $loteProduccion,
+                array_values($data['etapas']),
+                $request->user(),
+            );
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage())->withInput();
+        }
+
+        return redirect()
+            ->route('procesamiento.show', $loteProduccion)
+            ->with('success', 'Todas las fases pendientes fueron cerradas. Los operarios ejecutarán las etapas en orden.');
+    }
+
+    public function cerrarFase(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse
+    {
+        abort_unless(UsuarioRol::gestionaPlanta($request->user()) || $request->user()?->hasRole('admin'), 403);
+
+        $request->validate([
+            'cerrar_paso' => ['required', 'integer'],
+            'etapas' => ['required', 'array'],
+        ]);
+
+        $pasoId = (int) $request->input('cerrar_paso');
+        $etapas = $request->input('etapas', []);
+        $etapa = $etapas[$pasoId] ?? $etapas[(string) $pasoId] ?? null;
+
+        if (! is_array($etapa)) {
+            $etapa = collect($etapas)->first(
+                fn ($f) => (int) ($f['loteproduccionrutapasoid'] ?? 0) === $pasoId
+            );
+        }
+
+        if (! is_array($etapa)) {
+            return back()->with('error', 'No se encontraron datos de la etapa a cerrar.')->withInput();
+        }
+
+        $etapaValidada = validator($etapa, [
+            'loteproduccionrutapasoid' => ['required', 'integer'],
+            'operador_usuarioid' => ['required', 'integer', 'exists:usuario,usuarioid'],
+            'variables' => ['nullable', 'array'],
+            'variables.*.variableestandarid' => ['required_with:variables', 'integer'],
+            'variables.*.valor_minimo' => ['required_with:variables', 'numeric'],
+            'variables.*.valor_maximo' => ['required_with:variables', 'numeric'],
+        ])->validate();
+
+        $etapaValidada['loteproduccionrutapasoid'] = $pasoId;
+
+        try {
+            $this->asignacionEtapa->cerrarFase($loteProduccion, $etapaValidada, $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage())->withInput();
+        }
+
+        return redirect()
+            ->route('procesamiento.show', $loteProduccion)
+            ->with('success', 'Fase cerrada correctamente.');
+    }
+
+    public function cambiarFase(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse
+    {
+        abort_unless(UsuarioRol::gestionaPlanta($request->user()) || $request->user()?->hasRole('admin'), 403);
+
+        $data = $request->validate([
+            'loteproduccionrutapasoid' => ['required', 'integer'],
+        ]);
+
+        try {
+            $this->asignacionEtapa->cambiarFase(
+                $loteProduccion,
+                (int) $data['loteproduccionrutapasoid'],
+                $request->user(),
+            );
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('procesamiento.show', $loteProduccion)
+            ->with('success', 'Fase liberada. Puede elegir otro operario o ajustar los rangos de variables.');
+    }
+
+    public function reiniciarTodoAsignaciones(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse
+    {
+        abort_unless(UsuarioRol::gestionaPlanta($request->user()) || $request->user()?->hasRole('admin'), 403);
+
+        try {
+            $this->asignacionEtapa->reiniciarTodo($loteProduccion, $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('procesamiento.show', $loteProduccion)
+            ->with('success', 'Operarios quitados de todas las fases no completadas. Los parámetros de la ruta se conservan.');
+    }
+
+    /** @deprecated Use reiniciarTodoAsignaciones() */
+    public function reiniciarPlanAsignaciones(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse
+    {
+        return $this->reiniciarTodoAsignaciones($request, $loteProduccion);
+    }
+
     public function completarEtapaAsignada(
         Request $request,
         LoteProduccionPedido $loteProduccion,
         AsignacionEtapaPlanta $asignacion,
     ): RedirectResponse|JsonResponse {
-        abort_unless(UsuarioRol::gestionaPlanta($request->user()) || $request->user()?->hasRole('admin'), 403);
+        $user = $request->user();
+        $esOperador = UsuarioRol::esOperarioPlanta($user)
+            && (int) $asignacion->operador_usuarioid === (int) $user->usuarioid;
+        $esSupervisor = UsuarioRol::gestionaPlanta($user) || $user?->hasRole('admin');
+
+        abort_unless($esOperador || $esSupervisor, 403);
 
         if ((int) $asignacion->loteproduccionpedidoid !== (int) $loteProduccion->loteproduccionpedidoid) {
             abort(404);
@@ -367,11 +514,19 @@ class LoteProduccionController extends Controller
         ]);
 
         try {
-            $registro = $this->asignacionEtapa->completarPorSupervisor(
-                $asignacion,
-                $request->user(),
-                array_values($data['parametros'] ?? []),
-            );
+            $payload = [
+                'hora_inicio' => ($asignacion->creado_en ?? now())->toDateTimeString(),
+                'hora_fin' => now()->toDateTimeString(),
+                'parametros' => array_values($data['parametros'] ?? []),
+            ];
+
+            $registro = $esOperador
+                ? $this->asignacionEtapa->completar($asignacion, $payload, $user)
+                : $this->asignacionEtapa->completarPorSupervisor(
+                    $asignacion,
+                    $user,
+                    $payload['parametros'],
+                );
         } catch (\InvalidArgumentException $e) {
             if ($respondeJson) {
                 return response()->json(['ok' => false, 'message' => $e->getMessage()], 422);
@@ -553,7 +708,7 @@ class LoteProduccionController extends Controller
 
     public function certificar(Request $request, LoteProduccionPedido $loteProduccion): RedirectResponse
     {
-        abort_unless(UsuarioRol::esPlantaOperativo($request->user()) || $request->user()?->hasRole('admin'), 403);
+        abort_unless(UsuarioRol::gestionaPlanta($request->user()) || $request->user()?->hasRole('admin'), 403);
 
         if (! $this->trazabilidad->transformacionCompleta($loteProduccion)) {
             return back()->with('error', 'Complete la transformación antes de certificar.');
@@ -1038,5 +1193,31 @@ class LoteProduccionController extends Controller
         return redirect()
             ->route('procesamiento.index')
             ->with('success', 'Lote «'.$nombre.'» eliminado. Se revirtió el stock de materias primas.');
+    }
+
+    private function aplicarFiltroOperarioPlanta($query, ?Usuario $user): void
+    {
+        if (! UsuarioRol::debeAcotarLotesProduccionPorAsignacion($user)) {
+            return;
+        }
+
+        $query->whereHas('asignacionesEtapa', fn ($q) => $q->where('operador_usuarioid', (int) $user->usuarioid));
+    }
+
+    private function autorizarLoteOperarioPlanta(LoteProduccionPedido $lote, ?Usuario $user): void
+    {
+        if (! UsuarioRol::debeAcotarLotesProduccionPorAsignacion($user)) {
+            return;
+        }
+
+        $asignado = $lote->asignacionesEtapa()
+            ->where('operador_usuarioid', (int) $user->usuarioid)
+            ->exists();
+
+        abort_unless(
+            $asignado,
+            403,
+            'Solo puede ver lotes en los que tiene etapas asignadas.'
+        );
     }
 }

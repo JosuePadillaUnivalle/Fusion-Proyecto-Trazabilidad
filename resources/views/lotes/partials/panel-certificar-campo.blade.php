@@ -1,72 +1,57 @@
-<div class="card lote-section-card mb-3 border" id="panel-certificacion-campo" style="border-color:#c4b5fd !important;">
-    <div class="card-header bg-white py-3">
-        <h6 class="mb-0 font-weight-bold" style="color:#7c3aed">
-            <i class="fas fa-certificate mr-2"></i>Certificación del lote
-        </h6>
+<div class="card lote-section-card mb-3 border-0 shadow-sm" id="panel-certificacion-campo" style="border-radius:14px;overflow:hidden">
+    <div class="card-header bg-white font-weight-bold d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-certificate mr-2" style="color:#7c3aed"></i>Certificación</span>
     </div>
     <div class="card-body">
-        <p class="small text-muted mb-3">
-            Evalúe la cosecha como <strong>Certificado</strong> o <strong>No conforme</strong>.
-            Solo los lotes certificados pueden enviarse al almacén agrícola.
-        </p>
-
         @can('certificaciones.create')
             @if(\App\Support\UsuarioRol::gestionaCampo(auth()->user()))
-            <form action="{{ route('certificaciones.store') }}" method="POST" class="mb-3">
-                @csrf
-                <input type="hidden" name="loteid" value="{{ $lote->loteid }}">
-                <input type="hidden" name="resultado" value="{{ \App\Models\CertificacionLote::RAZON_CERTIFICADO }}">
-                <input type="hidden" name="return" value="{{ route('lotes.trazabilidad', $lote, absolute: false) }}">
-                <input type="hidden" name="from_trazabilidad" value="1">
-                <div class="form-row align-items-end">
-                    <div class="col-md-8 mb-2 mb-md-0">
-                        <label class="small font-weight-bold text-muted">Observaciones (opcional)</label>
-                        <input type="text" name="observaciones" class="form-control form-control-sm"
-                               value="{{ old('observaciones') }}" maxlength="1000"
-                               placeholder="Calidad, condición del producto, etc.">
-                    </div>
-                    <div class="col-md-4">
-                        <button type="submit" class="btn btn-success btn-sm btn-block font-weight-bold">
-                            <i class="fas fa-stamp mr-1"></i> Certificar lote
+            <p class="small text-muted mb-3">
+                Registre el resultado del control de calidad. Solo los lotes <strong>conformes</strong> pueden pasar a almacenaje.
+            </p>
+            <div class="row">
+                <div class="col-lg-6 mb-3">
+                    <form action="{{ route('certificaciones.store') }}" method="POST" class="border rounded p-3 h-100" style="background:#f0fdf4;border-color:#bbf7d0!important">
+                        @csrf
+                        <input type="hidden" name="loteid" value="{{ $lote->loteid }}">
+                        <input type="hidden" name="resultado" value="{{ \App\Models\CertificacionLote::RAZON_CERTIFICADO }}">
+                        <input type="hidden" name="return" value="{{ route('lotes.trazabilidad', $lote, absolute: false) }}">
+                        <input type="hidden" name="from_trazabilidad" value="1">
+                        <h6 class="font-weight-bold text-success mb-2"><i class="fas fa-check-circle mr-1"></i>Conforme</h6>
+                        <input type="text" name="observaciones" class="form-control form-control-sm mb-2" maxlength="1000"
+                               value="{{ old('observaciones') }}" placeholder="Observación (opcional)">
+                        <button type="submit" class="btn btn-success btn-sm font-weight-bold">
+                            <i class="fas fa-stamp mr-1"></i>Registrar conforme
                         </button>
-                    </div>
+                    </form>
                 </div>
-            </form>
-
-            <form action="{{ route('certificaciones.store') }}" method="POST"
-                  onsubmit="return confirm('¿Marcar este lote como No conforme? No podrá enviarse al almacén.');">
-                @csrf
-                <input type="hidden" name="loteid" value="{{ $lote->loteid }}">
-                <input type="hidden" name="resultado" value="{{ \App\Models\CertificacionLote::RAZON_NO_CONFORME }}">
-                <input type="hidden" name="return" value="{{ route('lotes.trazabilidad', $lote, absolute: false) }}">
-                <input type="hidden" name="from_trazabilidad" value="1">
-                <div class="form-row align-items-end">
-                    <div class="col-md-6 mb-2 mb-md-0">
-                        <label class="small font-weight-bold text-muted">Motivo no conforme <span class="text-danger">*</span></label>
-                        <input type="text" name="observaciones" class="form-control form-control-sm" required maxlength="1000"
-                               placeholder="Daños, plagas, humedad, calidad deficiente…">
-                    </div>
-                    <div class="col-md-6 mb-2 mb-md-0">
-                        <label class="small font-weight-bold text-muted">Recomendaciones para mejorar</label>
-                        <input type="text" name="recomendaciones" class="form-control form-control-sm" maxlength="2000"
-                               placeholder="Secado, selección, tratamiento, etc.">
-                    </div>
-                    <div class="col-md-12 mt-2">
-                        <button type="submit" class="btn btn-outline-danger btn-sm font-weight-bold">
-                            <i class="fas fa-times-circle mr-1"></i> No conforme
+                <div class="col-lg-6 mb-3">
+                    <form action="{{ route('certificaciones.store') }}" method="POST" class="border rounded p-3 h-100" style="background:#fffbeb;border-color:#fde68a!important"
+                          onsubmit="return confirm('¿Marcar este lote como no conforme? No podrá enviarse al almacén.');">
+                        @csrf
+                        <input type="hidden" name="loteid" value="{{ $lote->loteid }}">
+                        <input type="hidden" name="resultado" value="{{ \App\Models\CertificacionLote::RAZON_NO_CONFORME }}">
+                        <input type="hidden" name="return" value="{{ route('lotes.trazabilidad', $lote, absolute: false) }}">
+                        <input type="hidden" name="from_trazabilidad" value="1">
+                        <h6 class="font-weight-bold text-warning mb-2"><i class="fas fa-times-circle mr-1"></i>No conforme</h6>
+                        <input type="text" name="observaciones" class="form-control form-control-sm mb-2" maxlength="1000" required
+                               placeholder="Motivo obligatorio: daños, calidad…">
+                        <input type="text" name="recomendaciones" class="form-control form-control-sm mb-2" maxlength="2000"
+                               placeholder="Recomendaciones (opcional)">
+                        <button type="submit" class="btn btn-warning btn-sm font-weight-bold text-dark">
+                            <i class="fas fa-ban mr-1"></i>Registrar no conforme
                         </button>
-                    </div>
+                    </form>
                 </div>
-            </form>
+            </div>
             @else
             <div class="alert alert-light border small mb-0">
-                <i class="fas fa-info-circle mr-1"></i>
-                Solo el jefe agrícola o administrador puede certificar este lote.
+                <i class="fas fa-info-circle mr-1 text-muted"></i>
+                Solo el jefe agrícola o administración debe registrar la certificación (conforme o no conforme).
             </div>
             @endif
         @else
             <div class="alert alert-light border small mb-0">
-                <i class="fas fa-info-circle mr-1"></i>
+                <i class="fas fa-info-circle mr-1 text-muted"></i>
                 Solicite a un responsable con permiso de certificación que evalúe este lote.
             </div>
         @endcan

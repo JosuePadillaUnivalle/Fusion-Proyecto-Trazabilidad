@@ -10,6 +10,8 @@ use App\Services\UsuarioEliminacionService;
 use App\Services\UsuarioUsernameService;
 use App\Support\CuentaEstado;
 use App\Support\PermissionMatrixSync;
+use App\Support\RegistroValidacion;
+use App\Support\TelefonoBolivia;
 use App\Support\UsuarioAvatar;
 use App\Support\UsuarioRol;
 use App\Support\UsuarioSolicitud;
@@ -70,7 +72,7 @@ class GestionUsuariosController extends Controller
     {
         $this->autorizarAccesoUsuario($usuario);
 
-        $usuario->load(['roles', 'almacen', 'perfilTransportista']);
+        $usuario->load(['roles', 'perfilTransportista']);
 
         $stats = [
             'lotes' => $usuario->lotes()->count(),
@@ -114,17 +116,19 @@ class GestionUsuariosController extends Controller
             return $this->storeEmpleadoJefe($request);
         }
 
+        $this->normalizarTelefonoEnRequest($request);
+
         $data = $request->validate([
             'nombre' => 'required|string|max:100',
             'apellido' => 'required|string|max:100',
             'email' => 'required|email|max:100|unique:usuario,email',
             'nombreusuario' => 'required|string|max:100|unique:usuario,nombreusuario',
-            'telefono' => 'nullable|string|max:20',
+            'telefono' => $this->reglaTelefonoOpcional(),
             'passwordhash' => 'required|string|max:250',
             'imagenurl' => 'nullable|string|max:250',
             'informacionadicional' => 'nullable|string',
             'rolid' => 'nullable|exists:roles,id',
-        ]);
+        ], $this->mensajesValidacionUsuario(), $this->atributosValidacionUsuario());
 
         $data['passwordhash'] = Hash::make($data['passwordhash']);
         $data['activo'] = true;
@@ -155,16 +159,18 @@ class GestionUsuariosController extends Controller
             return $this->updateEmpleadoJefe($request, $usuario);
         }
 
+        $this->normalizarTelefonoEnRequest($request);
+
         $data = $request->validate([
             'nombre' => 'required|string|max:100',
             'apellido' => 'required|string|max:100',
             'email' => 'required|email|max:100|unique:usuario,email,'.$usuario->usuarioid.',usuarioid',
             'nombreusuario' => 'required|string|max:100|unique:usuario,nombreusuario,'.$usuario->usuarioid.',usuarioid',
-            'telefono' => 'nullable|string|max:20',
+            'telefono' => $this->reglaTelefonoOpcional(),
             'imagenurl' => 'nullable|string|max:250',
             'informacionadicional' => 'nullable|string',
             'rolid' => 'nullable|exists:roles,id',
-        ]);
+        ], $this->mensajesValidacionUsuario(), $this->atributosValidacionUsuario());
 
         unset($data['activo']);
 
@@ -308,12 +314,15 @@ class GestionUsuariosController extends Controller
         $rolEmpleado = UsuarioRol::rolEmpleadoAsignable($jefe);
         abort_unless($rolEmpleado !== null, 403);
 
+        $this->normalizarTelefonoEnRequest($request);
+
         $data = $request->validate([
             'nombre' => 'required|string|max:100',
             'apellido' => 'required|string|max:100',
             'email' => 'required|email|max:100|unique:usuario,email',
-            'passwordhash' => 'required|string|min:6|max:250',
-        ]);
+            'telefono' => $this->reglaTelefonoOpcional(),
+            'passwordhash' => 'required|string|min:5|max:250',
+        ], $this->mensajesValidacionUsuario(), $this->atributosValidacionUsuario());
 
         Role::firstOrCreate(['name' => $rolEmpleado, 'guard_name' => 'web']);
 
@@ -326,6 +335,7 @@ class GestionUsuariosController extends Controller
             'nombre' => $data['nombre'],
             'apellido' => $data['apellido'],
             'email' => $data['email'],
+            'telefono' => $data['telefono'] ?? null,
             'nombreusuario' => $nombreusuario,
             'passwordhash' => Hash::make($data['passwordhash']),
             'imagenurl' => UsuarioAvatar::placeholder(),
@@ -345,23 +355,27 @@ class GestionUsuariosController extends Controller
 
     private function updateEmpleadoJefe(Request $request, Usuario $usuario): RedirectResponse
     {
+        $this->normalizarTelefonoEnRequest($request);
+
         $rules = [
             'nombre' => 'required|string|max:100',
             'apellido' => 'required|string|max:100',
             'email' => 'required|email|max:100|unique:usuario,email,'.$usuario->usuarioid.',usuarioid',
-            'passwordhash' => 'nullable|string|min:6|max:250',
+            'telefono' => $this->reglaTelefonoOpcional(),
+            'passwordhash' => 'nullable|string|min:5|max:250',
         ];
 
         if (! $usuario->nombreusuario_editado) {
             $rules['nombreusuario'] = 'required|string|max:100|unique:usuario,nombreusuario,'.$usuario->usuarioid.',usuarioid';
         }
 
-        $data = $request->validate($rules);
+        $data = $request->validate($rules, $this->mensajesValidacionUsuario(), $this->atributosValidacionUsuario());
 
         $payload = [
             'nombre' => $data['nombre'],
             'apellido' => $data['apellido'],
             'email' => $data['email'],
+            'telefono' => $data['telefono'] ?? null,
             'fechamodificacion' => now(),
         ];
 
@@ -546,5 +560,41 @@ class GestionUsuariosController extends Controller
             ->get()
             ->sortBy(fn (Role $rol) => [$orden[$rol->name] ?? 999, UsuarioRol::etiquetaRol($rol->name)])
             ->values();
+    }
+
+    private function normalizarTelefonoEnRequest(Request $request): void
+    {
+        if (! $request->has('telefono')) {
+            return;
+        }
+
+        $request->merge([
+            'telefono' => TelefonoBolivia::normalizar($request->input('telefono')),
+        ]);
+    }
+
+    /** @return array<int, string> */
+    private function reglaTelefonoOpcional(): array
+    {
+        return ['nullable', 'string', 'max:20', 'regex:'.RegistroValidacion::TELEFONO];
+    }
+
+    /** @return array<string, string> */
+    private function mensajesValidacionUsuario(): array
+    {
+        return array_merge(RegistroValidacion::mensajes(), [
+            'passwordhash.required' => 'Indica una contraseña para el nuevo usuario.',
+            'passwordhash.min' => 'La contraseña debe tener al menos 5 caracteres.',
+        ]);
+    }
+
+    /** @return array<string, string> */
+    private function atributosValidacionUsuario(): array
+    {
+        return [
+            'passwordhash' => 'contraseña',
+            'telefono' => 'teléfono',
+            'nombreusuario' => 'nombre de usuario',
+        ];
     }
 }

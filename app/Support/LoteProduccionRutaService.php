@@ -303,13 +303,17 @@ class LoteProduccionRutaService
         $completados = $this->etapasCompletadas($lote);
         $ordenActual = $completados + 1;
         $hayPendiente = app(LoteProduccionTransformacionService::class)->tieneAsignacionesPendientes($lote);
+        $registrados = collect(app(LoteProduccionTransformacionService::class)->procesosRegistradosIds($lote));
+        $pasosBloqueadosReorden = app(LoteProduccionTransformacionService::class)
+            ->pasosRutaPasoIdsBloqueadosReorden($lote);
         $items = [];
 
         foreach ($pasos as $paso) {
             $orden = (int) $paso->orden;
             $esCierre = ProcesoPlantaCatalogo::esCierreTransformacion($paso->proceso?->nombre);
+            $procesoHecho = $registrados->contains((int) $paso->procesoplantaid);
             $estado = match (true) {
-                $orden <= $completados => 'hecho',
+                $procesoHecho => 'hecho',
                 $orden === $ordenActual && $hayPendiente => 'en_curso',
                 $orden === $ordenActual => 'actual',
                 default => 'bloqueado',
@@ -340,7 +344,9 @@ class LoteProduccionRutaService
                 'estado' => $estado,
                 'es_cierre' => $esCierre,
                 'parametros' => $vars,
-                'editable' => $orden > $completados && ! $esCierre,
+                'editable' => $orden > $completados
+                    && ! $esCierre
+                    && ! in_array((int) $paso->loteproduccionrutapasoid, $pasosBloqueadosReorden, true),
             ];
         }
 
@@ -361,6 +367,9 @@ class LoteProduccionRutaService
 
         $pasos = $this->normalizarPayloadEmpaquetadoAlFinal($pasos, $completados, $cierreId);
 
+        $bloqueados = app(LoteProduccionTransformacionService::class)
+            ->pasosRutaPasoIdsBloqueadosReorden($lote);
+
         if ($cierreId) {
             $ultimo = $pasos[array_key_last($pasos)] ?? null;
             if ($ultimo && (int) ($ultimo['procesoplantaid'] ?? 0) !== $cierreId) {
@@ -368,7 +377,7 @@ class LoteProduccionRutaService
             }
         }
 
-        DB::transaction(function () use ($lote, $pasos, $completados) {
+        DB::transaction(function () use ($lote, $pasos, $completados, $bloqueados) {
             $existentes = $this->pasosOrdenados($lote)->keyBy('loteproduccionrutapasoid');
 
             // Evitar choque del índice único (lote, orden) al reordenar pasos pendientes.
@@ -396,6 +405,13 @@ class LoteProduccionRutaService
                     $orden++;
 
                     continue;
+                }
+
+                if ($paso && in_array((int) $paso->loteproduccionrutapasoid, $bloqueados, true)
+                    && (int) $paso->orden !== $orden) {
+                    throw new \InvalidArgumentException(
+                        'No puede reordenar etapas con operario asignado. Complete la etapa o cancele el plan.'
+                    );
                 }
 
                 $procId = (int) ($fila['procesoplantaid'] ?? 0);
@@ -472,6 +488,13 @@ class LoteProduccionRutaService
         ])->all());
 
         return $actuales !== $normalizar($variables);
+    }
+
+    /** @param  list<array{variableestandarid: int, valor_minimo: float|int, valor_maximo: float|int}>  $variables */
+    public function actualizarVariablesPaso(LoteProduccionRutaPaso $paso, array $variables): void
+    {
+        $paso->loadMissing('maquina');
+        $this->syncVariablesPaso($paso, $variables, $paso->maquinaplantaid ? (int) $paso->maquinaplantaid : null);
     }
 
     /** @param  list<array{variableestandarid: int, valor_minimo: float|int, valor_maximo: float|int}>  $variables */

@@ -10,6 +10,7 @@ use App\Models\ProcesoMaquinaPlanta;
 use App\Models\ProcesoPlanta;
 use App\Models\RegistroProcesoMaquinaPlanta;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class LoteProduccionTransformacionService
 {
@@ -25,27 +26,18 @@ class LoteProduccionTransformacionService
 
     public function transformacionCompleta(LoteProduccionPedido $lote): bool
     {
-        $registros = $this->registrosOrdenados($lote);
-        if ($registros->isEmpty()) {
+        if ($this->tieneAsignacionesActivasPendientes($lote)) {
             return false;
         }
 
-        $rutaService = app(LoteProduccionRutaService::class);
-        if ($rutaService->tieneRuta($lote)) {
-            $pasos = $rutaService->pasosOrdenados($lote);
-            $totalPasos = $pasos->count();
-            if ($totalPasos === 0 || $registros->count() < $totalPasos) {
-                return false;
-            }
+        $ruta = $this->rutaPlantilla($lote);
+        if ($ruta !== []) {
+            return $this->transformacionCompletaSegunRuta($ruta, $lote);
+        }
 
-            $ultimoPaso = $pasos->sortByDesc('orden')->first();
-            $ultimoRegistro = $registros->last();
-            $nombreUltimoPaso = $ultimoPaso?->proceso?->nombre ?? '';
-            $nombreUltimoRegistro = $ultimoRegistro->procesoMaquina?->proceso?->nombre ?? '';
-
-            return $registros->count() === $totalPasos
-                && ProcesoPlantaCatalogo::esCierreTransformacion($nombreUltimoPaso)
-                && $nombreUltimoRegistro === $nombreUltimoPaso;
+        $registros = $this->registrosOrdenados($lote);
+        if ($registros->isEmpty()) {
+            return false;
         }
 
         $plantilla = $this->plantillaDelLote($lote);
@@ -56,14 +48,15 @@ class LoteProduccionTransformacionService
                 return false;
             }
 
-            $ultimoPasoPlantilla = $plantilla->pasos->sortByDesc('orden')->first();
-            $ultimoRegistro = $registros->last();
-            $nombreUltimoPaso = $ultimoPasoPlantilla?->proceso?->nombre ?? '';
-            $nombreUltimoRegistro = $ultimoRegistro->procesoMaquina?->proceso?->nombre ?? '';
+            if (! $this->procesosDeRutaRegistrados($plantilla->pasos->pluck('procesoplantaid'), $registros)) {
+                return false;
+            }
 
-            return $registros->count() === $totalPasos
-                && ProcesoPlantaCatalogo::esCierreTransformacion($nombreUltimoPaso)
-                && $nombreUltimoRegistro === $nombreUltimoPaso;
+            $ultimoPasoPlantilla = $plantilla->pasos->sortByDesc('orden')->first();
+            $nombreUltimoPaso = $ultimoPasoPlantilla?->proceso?->nombre ?? '';
+
+            return ProcesoPlantaCatalogo::esCierreTransformacion($nombreUltimoPaso)
+                && $this->registroCierreTransformacion($registros);
         }
 
         $ultimo = $registros->last();
@@ -72,9 +65,150 @@ class LoteProduccionTransformacionService
         return ProcesoPlantaCatalogo::esCierreTransformacion($nombre);
     }
 
+    private function tieneAsignacionesActivasPendientes(LoteProduccionPedido $lote): bool
+    {
+        if ($this->procesosRutaCompletos($lote)) {
+            return false;
+        }
+
+        if ($this->tieneAsignacionesPendientes($lote)) {
+            return true;
+        }
+
+        return AsignacionEtapaPlanta::query()
+            ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
+            ->where('estado', AsignacionEtapaPlanta::ESTADO_PROGRAMADA)
+            ->exists();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $ruta
+     */
+    private function transformacionCompletaSegunRuta(array $ruta, LoteProduccionPedido $lote): bool
+    {
+        $coleccion = collect($ruta);
+        if ($coleccion->isEmpty()) {
+            return false;
+        }
+
+        if (! $coleccion->every(fn (array $paso) => ($paso['estado'] ?? '') === 'hecho')) {
+            return false;
+        }
+
+        $ultimo = $coleccion->sortByDesc('orden')->first();
+        $nombreUltimoPaso = $ultimo['proceso'] ?? '';
+        if (! ProcesoPlantaCatalogo::esCierreTransformacion($nombreUltimoPaso)) {
+            return false;
+        }
+
+        $registros = $this->registrosOrdenados($lote);
+        if ($registros->isEmpty()) {
+            return false;
+        }
+
+        if (! $this->procesosDeRutaRegistrados($coleccion->pluck('procesoplantaid'), $registros)) {
+            return false;
+        }
+
+        return $this->registroCierreTransformacion($registros);
+    }
+
+    private function procesosDeRutaRegistrados(Collection $procesosRuta, Collection $registros): bool
+    {
+        $procesosRegistrados = $registros
+            ->map(fn (RegistroProcesoMaquinaPlanta $registro) => (int) $registro->procesoMaquina?->procesoplantaid)
+            ->filter()
+            ->unique();
+
+        foreach ($procesosRuta as $procesoId) {
+            if (! $procesosRegistrados->contains((int) $procesoId)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function registroCierreTransformacion(Collection $registros): bool
+    {
+        return $registros->contains(
+            fn (RegistroProcesoMaquinaPlanta $registro) => ProcesoPlantaCatalogo::esCierreTransformacion(
+                $registro->procesoMaquina?->proceso?->nombre
+            )
+        );
+    }
+
     public function etapasCompletadasCount(LoteProduccionPedido $lote): int
     {
+        return $this->pasosRutaCompletadosEnSecuencia($lote);
+    }
+
+    public function pasosRutaCompletadosEnSecuencia(LoteProduccionPedido $lote): int
+    {
+        $registrados = collect($this->procesosRegistradosIds($lote));
+        $rutaService = app(LoteProduccionRutaService::class);
+
+        if ($rutaService->tieneRuta($lote)) {
+            $count = 0;
+            foreach ($rutaService->pasosOrdenados($lote) as $paso) {
+                if ($registrados->contains((int) $paso->procesoplantaid)) {
+                    $count++;
+                } else {
+                    break;
+                }
+            }
+
+            return $count;
+        }
+
+        $plantilla = $this->plantillaDelLote($lote);
+        if ($plantilla) {
+            $plantilla->loadMissing('pasos');
+            $count = 0;
+            foreach ($plantilla->pasos->sortBy('orden') as $paso) {
+                if ($registrados->contains((int) $paso->procesoplantaid)) {
+                    $count++;
+                } else {
+                    break;
+                }
+            }
+
+            return $count;
+        }
+
         return $this->registrosOrdenados($lote)->count();
+    }
+
+    public function procesosRutaCompletos(LoteProduccionPedido $lote): bool
+    {
+        $registrados = collect($this->procesosRegistradosIds($lote));
+        $rutaService = app(LoteProduccionRutaService::class);
+
+        if ($rutaService->tieneRuta($lote)) {
+            $pasos = $rutaService->pasosOrdenados($lote);
+            if ($pasos->isEmpty()) {
+                return false;
+            }
+
+            return $pasos->every(fn ($paso) => $registrados->contains((int) $paso->procesoplantaid));
+        }
+
+        $plantilla = $this->plantillaDelLote($lote);
+        if (! $plantilla) {
+            return false;
+        }
+
+        $plantilla->loadMissing('pasos');
+        if ($plantilla->pasos->isEmpty()) {
+            return false;
+        }
+
+        return $plantilla->pasos->every(fn ($paso) => $registrados->contains((int) $paso->procesoplantaid));
+    }
+
+    public function pasoEstaRegistrado(LoteProduccionPedido $lote, int $procesoplantaid): bool
+    {
+        return in_array($procesoplantaid, $this->procesosRegistradosIds($lote), true);
     }
 
     public function ordenPasoActual(LoteProduccionPedido $lote): int
@@ -85,10 +219,18 @@ class LoteProduccionTransformacionService
     /** @return Collection<int, AsignacionEtapaPlanta> */
     public function asignacionesPendientes(LoteProduccionPedido $lote): Collection
     {
+        $ordenActual = $this->ordenPasoActual($lote);
+
         $query = AsignacionEtapaPlanta::query()
             ->pendientes()
             ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
             ->with(['proceso', 'maquina', 'operador']);
+
+        if (Schema::hasColumn('asignacion_etapa_planta', 'orden')) {
+            $query->where(function ($q) use ($ordenActual) {
+                $q->where('orden', $ordenActual)->orWhereNull('orden');
+            });
+        }
 
         $paso = $this->pasoPlantillaActual($lote);
         if ($paso) {
@@ -98,8 +240,54 @@ class LoteProduccionTransformacionService
         return $query->orderByDesc('creado_en')->get();
     }
 
+    /** @return Collection<int, AsignacionEtapaPlanta> */
+    public function asignacionesActivas(LoteProduccionPedido $lote): Collection
+    {
+        return AsignacionEtapaPlanta::query()
+            ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
+            ->activas()
+            ->with(['proceso', 'maquina', 'operador'])
+            ->orderBy('orden')
+            ->orderBy('asignacionetapaplantaid')
+            ->get();
+    }
+
+    /** @return list<int> */
+    public function pasosRutaPasoIdsBloqueadosReorden(LoteProduccionPedido $lote): array
+    {
+        if (! Schema::hasColumn('asignacion_etapa_planta', 'loteproduccionrutapasoid')) {
+            return [];
+        }
+
+        return AsignacionEtapaPlanta::query()
+            ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
+            ->whereIn('estado', [
+                AsignacionEtapaPlanta::ESTADO_PENDIENTE,
+                AsignacionEtapaPlanta::ESTADO_PROGRAMADA,
+                AsignacionEtapaPlanta::ESTADO_COMPLETADA,
+            ])
+            ->whereNotNull('loteproduccionrutapasoid')
+            ->pluck('loteproduccionrutapasoid')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function puedeAsignarPlanEtapas(LoteProduccionPedido $lote): bool
+    {
+        return app(AsignacionEtapaPlantaService::class)->puedeAsignarPlan($lote);
+    }
+
     public function limpiarAsignacionesObsoletas(LoteProduccionPedido $lote): int
     {
+        if ($this->procesosRutaCompletos($lote)) {
+            return AsignacionEtapaPlanta::query()
+                ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid)
+                ->activas()
+                ->update(['estado' => AsignacionEtapaPlanta::ESTADO_CANCELADA]);
+        }
+
         $query = AsignacionEtapaPlanta::query()
             ->pendientes()
             ->where('loteproduccionpedidoid', $lote->loteproduccionpedidoid);
@@ -181,6 +369,10 @@ class LoteProduccionTransformacionService
 
     public function puedeAsignarNuevaEtapa(LoteProduccionPedido $lote): bool
     {
+        if (app(AsignacionEtapaPlantaService::class)->tienePlanConfirmado($lote)) {
+            return false;
+        }
+
         if ($this->plantillaAgotada($lote)) {
             return false;
         }
@@ -205,6 +397,10 @@ class LoteProduccionTransformacionService
 
         if ($this->tieneAsignacionesPendientes($lote)) {
             if ($this->pendienteEsUltimaEtapaPlantilla($lote)) {
+                return null;
+            }
+
+            if (app(AsignacionEtapaPlantaService::class)->tienePlanConfirmado($lote)) {
                 return null;
             }
 
@@ -261,7 +457,7 @@ class LoteProduccionTransformacionService
     {
         $rutaService = app(LoteProduccionRutaService::class);
         if ($rutaService->tieneRuta($lote)) {
-            return $this->registrosOrdenados($lote)->count() >= $rutaService->pasosOrdenados($lote)->count();
+            return $this->procesosRutaCompletos($lote);
         }
 
         $plantilla = $this->plantillaDelLote($lote);
@@ -269,7 +465,7 @@ class LoteProduccionTransformacionService
             return false;
         }
 
-        return $this->registrosOrdenados($lote)->count() >= $plantilla->pasos()->count();
+        return $this->procesosRutaCompletos($lote);
     }
 
     public function transformacionIniciada(LoteProduccionPedido $lote): bool
@@ -315,6 +511,7 @@ class LoteProduccionTransformacionService
         $ruta = $this->rutaPlantilla($lote);
         $completados = $this->timeline($lote);
         $porOrden = collect($completados)->keyBy('numero');
+        $asignacionesActivas = collect($this->asignacionesActivas($lote))->keyBy('orden');
 
         if ($ruta === []) {
             return array_map(function (array $item) {
@@ -354,6 +551,8 @@ class LoteProduccionTransformacionService
                 $maqCodigo = $maq?->codigo;
             }
 
+            $asig = $asignacionesActivas->get((int) $paso['orden']);
+
             $items[] = [
                 'loteproduccionrutapasoid' => (int) ($paso['loteproduccionrutapasoid'] ?? 0),
                 'procesoplantaid' => (int) ($paso['procesoplantaid'] ?? 0),
@@ -369,9 +568,17 @@ class LoteProduccionTransformacionService
                 'parametros_medidos' => $reg['parametros_medidos'] ?? [],
                 'inicio' => $reg['inicio'] ?? null,
                 'fin' => $reg['fin'] ?? null,
-                'operador' => $reg['operador'] ?? null,
+                'operador' => $reg['operador'] ?? ($asig?->operador?->nombreCompleto()),
+                'operador_asignado' => $asig?->operador?->nombreCompleto(),
+                'operador_usuarioid' => $asig?->operador_usuarioid ? (int) $asig->operador_usuarioid : null,
+                'estado_asignacion' => $asig?->estado,
+                'asignacion_id' => $asig?->asignacionetapaplantaid,
                 'es_cierre' => ProcesoPlantaCatalogo::esCierreTransformacion($paso['proceso']),
                 'editable' => ! empty($paso['editable']),
+                'asignacion_bloqueada' => ! empty($paso['editable']) ? false : (
+                    ($paso['estado'] ?? '') !== 'hecho'
+                    && in_array((int) ($paso['loteproduccionrutapasoid'] ?? 0), $this->pasosRutaPasoIdsBloqueadosReorden($lote), true)
+                ),
             ];
         }
 
@@ -456,15 +663,17 @@ class LoteProduccionTransformacionService
             app(LoteProduccionParametrosService::class)->parametrosEfectivosPorPlantilla($lote, $plantilla)
         )->keyBy('plantillapasoid');
 
-        $completados = $this->etapasCompletadasCount($lote);
-        $ordenActual = $this->ordenPasoActual($lote);
+        $completados = $this->pasosRutaCompletadosEnSecuencia($lote);
+        $ordenActual = $completados + 1;
         $hayPendiente = $this->tieneAsignacionesPendientes($lote);
+        $registrados = collect($this->procesosRegistradosIds($lote));
         $items = [];
 
         foreach ($plantilla->pasos as $paso) {
             $orden = (int) $paso->orden;
+            $procesoHecho = $registrados->contains((int) $paso->procesoplantaid);
             $estado = match (true) {
-                $orden <= $completados => 'hecho',
+                $procesoHecho => 'hecho',
                 $orden === $ordenActual && $hayPendiente => 'en_curso',
                 $orden === $ordenActual => 'actual',
                 default => 'bloqueado',

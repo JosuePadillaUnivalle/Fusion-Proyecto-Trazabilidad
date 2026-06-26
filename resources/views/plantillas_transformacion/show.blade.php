@@ -47,36 +47,6 @@
             </div>
         </div>
 
-        @php
-            $previewTimeline = $plantilla->pasos->map(function ($paso) {
-                return [
-                    'orden' => (int) $paso->orden,
-                    'proceso' => $paso->proceso?->nombre ?? '—',
-                    'maquina' => $paso->maquina?->nombre,
-                    'maquina_codigo' => $paso->maquina?->codigo,
-                    'estado' => 'bloqueado',
-                    'imagen_src' => $paso->maquina?->imagenSrc(),
-                    'notas' => $paso->notas,
-                    'es_cierre' => \App\Support\ProcesoPlantaCatalogo::esCierreTransformacion($paso->proceso?->nombre ?? ''),
-                    'parametros_rango' => $paso->variables->map(fn ($v) => [
-                        'nombre' => $v->variableEstandar?->nombre ?? '—',
-                        'unidad' => $v->variableEstandar?->unidad,
-                        'valor_minimo' => (float) $v->valor_minimo,
-                        'valor_maximo' => (float) $v->valor_maximo,
-                    ])->values()->all(),
-                ];
-            })->all();
-        @endphp
-        @if(!empty($previewTimeline))
-        <div class="mb-3 p-2 rounded border bg-white">
-            @include('planta.partials.timeline-transformacion', [
-                'items' => $previewTimeline,
-                'compacto' => true,
-                'titulo' => 'Vista previa de la línea',
-            ])
-        </div>
-        @endif
-
         @forelse($plantilla->pasos as $paso)
             @include('plantillas_transformacion.partials.paso-detalle-card', ['paso' => $paso, 'esUltimo' => $loop->last])
         @empty

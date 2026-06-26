@@ -16,18 +16,6 @@
 @section('content')
 <div class="modulo-usu">
 
-    @if($errors->any())
-    <div class="alert alert-danger alert-dismissible fade show">
-        <strong><i class="fas fa-exclamation-triangle mr-1"></i> Revisa el formulario.</strong>
-        <ul class="mb-0 mt-2 pl-3">
-            @foreach($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-        <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
-    </div>
-    @endif
-
     <div class="mb-3">
         <a href="{{ route('gestion.index') }}" class="btn btn-outline-secondary btn-sm">
             <i class="fas fa-arrow-left mr-1"></i> Volver al listado
@@ -62,3 +50,30 @@
     </div>
 </div>
 @endsection
+
+@include('partials.form-errors-modal')
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var form = document.querySelector('.modulo-usu form');
+    var password = document.getElementById('passwordhash');
+    if (!form || !password) return;
+
+    form.addEventListener('submit', function (e) {
+        var valor = (password.value || '').trim();
+        if (valor.length > 0 && valor.length < 5) {
+            e.preventDefault();
+            if (window.ModalConfirmar && typeof ModalConfirmar.aviso === 'function') {
+                ModalConfirmar.aviso({
+                    titulo: 'Contraseña muy corta',
+                    mensaje: 'La contraseña debe tener al menos 5 caracteres.',
+                    tono: 'warning',
+                });
+            }
+            password.focus();
+        }
+    });
+});
+</script>
+@endpush

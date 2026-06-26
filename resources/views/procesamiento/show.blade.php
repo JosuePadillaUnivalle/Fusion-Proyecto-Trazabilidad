@@ -327,7 +327,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
                 <div>
                     <h5 class="mb-1 text-success">
-                        <i class="fas fa-route mr-2"></i>Fase actual:
+                        <i class="fas fa-route mr-2"></i>Estado actual:
                         <span class="badge badge-success">{{ $fase_actual_label }}</span>
                     </h5>
                     <p class="text-muted small mb-0">Cadena de industrialización en planta</p>
@@ -422,7 +422,7 @@
     @if($mostrarTransformacion)
     <div id="lp-seccion-transformacion" class="card mb-3 lp-fase-panel {{ $panelActivo === 'transformacion' ? 'lp-fase-panel--activa' : 'lp-fase-panel--historial' }}" data-fase="transformacion">
         <div class="card-header bg-white font-weight-bold d-flex justify-content-between align-items-center">
-            <span><i class="fas fa-cogs text-info mr-2"></i>Transformación — línea de procesos</span>
+            <span><i class="fas fa-cogs text-info mr-2"></i>Línea de procesos</span>
             <div>
                 @if($panelActivo !== 'transformacion')
                     <span class="lp-historial-badge mr-2"><i class="fas fa-check mr-1"></i>Fase completada</span>
@@ -443,29 +443,72 @@
                         {{ $lote->plantillaTransformacion?->nombre ?? 'Línea manual' }}
                     </p>
                     <p class="lp-transform-toolbar__meta mb-0" id="lp-toolbar-etapa-meta">
-                        Etapa {{ $ordenEtapaActual ?? 1 }} de {{ count($rutaPlantilla ?? []) ?: '—' }}
-                        @if(!empty($siguientePasoPlantilla)) · Siguiente: <strong>{{ $siguientePasoPlantilla->proceso?->nombre }}</strong>@endif
+                        @if(!empty($transformacion_completa))
+                            <i class="fas fa-check-circle text-success mr-1"></i>Ruta de transformación completada
+                        @else
+                            @php $totalRuta = count($rutaPlantilla ?? []); @endphp
+                            Etapa {{ min($ordenEtapaActual ?? 1, max(1, $totalRuta)) }} de {{ $totalRuta ?: '—' }}
+                            @if(!empty($siguientePasoPlantilla)) · Siguiente: <strong>{{ $siguientePasoPlantilla->proceso?->nombre }}</strong>@endif
+                        @endif
                     </p>
                 </div>
-                @if(!empty($puedeEditarRuta))
-                <button type="button" class="btn btn-sm btn-outline-success" data-toggle="collapse" data-target="#lpEditorRutaCollapse" aria-expanded="false">
-                    <i class="fas fa-route mr-1"></i> Editar ruta pendiente
-                </button>
+                <div class="d-flex flex-wrap align-items-center" style="gap:.5rem">
+                @if(!empty($puedeReiniciarTodoAsignaciones))
+                <form method="POST" action="{{ route('procesamiento.reiniciar-todo-asignaciones', $lote) }}" class="mb-0 js-lp-guardar-scroll">
+                    @csrf
+                    <button type="submit"
+                            class="btn btn-sm btn-outline-warning font-weight-bold"
+                            data-confirm-modal
+                            data-confirm-title="Reiniciar todo"
+                            data-confirm-message="Se quitarán los operarios de todas las fases no completadas. Los parámetros de la ruta se conservan."
+                            data-confirm-tone="warning"
+                            data-confirm-btn="Reiniciar todo">
+                        <i class="fas fa-undo mr-1"></i> Reiniciar todo
+                    </button>
+                </form>
                 @endif
+                </div>
             </div>
             @endif
 
             @if(!empty($timelineVisual))
             <div class="lp-timeline-shell mb-0">
+                @if(!empty($puedeAsignarPlanEtapas))
+                <form method="POST" action="{{ route('procesamiento.asignar-plan-etapas', $lote) }}" id="formAsignarPlanEtapas" class="js-lp-guardar-scroll">
+                    @csrf
+                @endif
                 <div id="lp-timeline-visual">
                     @include('planta.partials.timeline-transformacion', [
                         'items' => $timelineVisual,
-                        'sortable' => !empty($puedeEditarRuta) && $panelActivo === 'transformacion',
+                        'sortable' => $panelActivo === 'transformacion' && ! empty($puedeAsignarPlanEtapas),
+                        'modoPlan' => !empty($puedeAsignarPlanEtapas),
+                        'puedeGestionarPlan' => !empty($puedeAsignarEtapa) && empty($transformacion_completa),
+                        'puedeMarcarCompletada' => !empty($puedeAsignarEtapa) && empty($transformacion_completa),
+                        'usuarioActualId' => (int) (auth()->id() ?? 0),
+                        'esOperarioPlanta' => \App\Support\UsuarioRol::esOperarioPlanta(auth()->user()),
+                        'lote' => $lote,
+                        'formPlanActivo' => !empty($puedeAsignarPlanEtapas),
+                        'cerrarFaseUrl' => route('procesamiento.cerrar-fase', $lote),
+                        'cambiarFaseUrl' => route('procesamiento.cambiar-fase', $lote),
                         'rutaUrl' => route('procesamiento.actualizar-ruta', $lote),
                         'rutaPasosJson' => $rutaPasosJson ?? [],
                         'etapasCompletadas' => $etapasCompletadasRuta ?? 0,
                     ])
                 </div>
+                @if(!empty($puedeAsignarPlanEtapas))
+                    <div id="lp-cerrar-todos-wrap" class="d-none mt-3">
+                        <button type="submit"
+                                class="btn btn-success font-weight-bold"
+                                data-confirm-modal
+                                data-confirm-title="Cerrar todas las fases"
+                                data-confirm-message="¿Cerrar todas las etapas pendientes con los operarios y parámetros indicados?"
+                                data-confirm-tone="success"
+                                data-confirm-btn="Cerrar todos">
+                            <i class="fas fa-check-double mr-1"></i> Cerrar todos
+                        </button>
+                    </div>
+                </form>
+                @endif
             </div>
             @elseif(!empty($rutaPlantilla))
             <div class="lp-timeline-shell mb-0">
@@ -496,21 +539,19 @@
             </div>
             @endif
 
-            @if(!empty($puedeEditarRuta) && $panelActivo === 'transformacion')
-            <div class="collapse mt-3" id="lpEditorRutaCollapse">
-                @include('procesamiento.partials.editor-ruta-lote', [
-                    'lote' => $lote,
-                    'rutaPlantilla' => $rutaPlantilla,
-                    'procesosPlanta' => $procesosPlanta,
-                    'mapaCompatibilidad' => $mapaCompatibilidad,
-                    'maquinasPlanta' => $maquinasPlanta,
-                    'etapasCompletadasRuta' => $etapasCompletadasRuta ?? 0,
-                ])
-            </div>
-            @endif
+            @php
+                $timelineGestionPlan = !empty($timelineVisual)
+                    && !empty($asignacionesPlanLote)
+                    && $asignacionesPlanLote->isNotEmpty();
+            @endphp
 
-            @if($panelActivo === 'transformacion' && in_array($fase_actual, ['transformacion', 'creacion']) && empty($transformacion_completa))
+            @if($panelActivo === 'transformacion' && in_array($fase_actual, ['transformacion', 'creacion']) && empty($transformacion_completa) && !$timelineGestionPlan)
             <div class="lp-accion-actual" id="lp-accion-actual">
+
+                @include('procesamiento.partials.resumen-plan-asignaciones', [
+                    'lote' => $lote,
+                ])
+
                 @if((empty($asignacionesPendientesLote) || $asignacionesPendientesLote->isEmpty()) && !empty($mensajeBloqueoAsignacion) && empty($puedeAsignarNuevaEtapa))
                 <div class="alert alert-warning py-2 px-3 mb-0 small" id="lp-bloqueo-asignacion">
                     <i class="fas fa-lock mr-1"></i>{{ $mensajeBloqueoAsignacion }}
@@ -538,12 +579,11 @@
                             <form method="POST" action="{{ route('procesamiento.completar-etapa-asignada', [$lote, $asig]) }}" class="mb-0 js-lp-guardar-scroll"
                                   data-ajax-lp-action="completar-etapa">
                                 @csrf
-                                @include('planta.partials.form-parametros-etapa', [
-                                    'parametrosRequeridos' => $parametrosPorAsignacion[$asig->asignacionetapaplantaid] ?? [],
-                                    'prefix' => 'parametros',
-                                    'inputIdPrefix' => 'lp-asig-'.$asig->asignacionetapaplantaid,
-                                ])
-                                <button type="submit" class="btn btn-success btn-sm font-weight-bold mt-2">
+                                <p class="small text-muted mb-2">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    El operario registrará los valores reales de los parámetros desde <strong>Mis tareas de planta</strong>.
+                                </p>
+                                <button type="submit" class="btn btn-success btn-sm font-weight-bold">
                                     <i class="fas fa-check mr-1"></i> Marcar completada
                                 </button>
                             </form>
@@ -553,7 +593,7 @@
                     @endforeach
                 </div>
 
-                @elseif(!empty($puedeAsignarEtapa) && !empty($puedeAsignarNuevaEtapa))
+                @elseif(!empty($puedeAsignarEtapa) && !empty($puedeAsignarNuevaEtapa) && empty($puedeAsignarPlanEtapas))
                 <div class="lp-accion-actual__head">
                     <h6 id="lp-titulo-asignar-etapa"><i class="fas fa-user-plus mr-1"></i> Asignar etapa {{ $ordenEtapaActual ?? 1 }}</h6>
                 </div>
@@ -665,7 +705,7 @@
                     </div>
                 </form>
                 </div>
-                @elseif(\App\Support\UsuarioRol::esOperarioPlanta(auth()->user()))
+                @elseif(\App\Support\UsuarioRol::esOperarioPlanta(auth()->user()) && empty($timelineVisual))
                 <div class="alert alert-info py-2 px-3 mb-0 small">
                     <i class="fas fa-info-circle mr-1"></i>
                     Las etapas las asigna el jefe de planta. Revise
@@ -715,7 +755,7 @@
                         @if($evaluacion->observaciones) — {{ $evaluacion->observaciones }} @endif
                     </p>
                 </div>
-            @elseif($panelActivo === 'certificacion')
+            @elseif($panelActivo === 'certificacion' && !empty($puedeCertificar))
             <p class="small text-muted mb-3">
                 Registre el resultado del control de calidad. Solo los lotes <strong>conformes</strong> pueden pasar a almacenaje.
             </p>
@@ -743,6 +783,11 @@
                         </button>
                     </form>
                 </div>
+            </div>
+            @elseif($panelActivo === 'certificacion')
+            <div class="alert alert-light border small mb-0">
+                <i class="fas fa-info-circle mr-1 text-muted"></i>
+                La transformación finalizó. El jefe de planta o administración debe registrar la certificación (conforme o no conforme).
             </div>
             @endif
         </div>
@@ -812,10 +857,17 @@
                 </div>
                 @endpush
                 @include('partials.almacen-envio-selector', [
-                    'almacenes' => $almacenesPlanta ?? collect(),
-                    'resumenesCapacidad' => $resumenesCapacidadPlanta ?? [],
+                    'almacenes' => $almacenesMasUsados ?? $almacenesPlanta ?? collect(),
+                    'almacenesMasUsados' => $almacenesMasUsados ?? $almacenesPlanta ?? collect(),
+                    'almacenesMenosUsados' => $almacenesMenosUsados ?? collect(),
+                    'almacenesTodos' => $almacenesTodos ?? $almacenesPlanta ?? collect(),
+                    'resumenesCapacidad' => ! empty($resumenesCapacidad) ? $resumenesCapacidad : ($resumenesCapacidadPlanta ?? []),
                     'sectionId' => 'almacenSectionLote',
                     'hiddenInputId' => 'almacenidLote',
+                    'selectedAlmacenId' => old('almacenid'),
+                    'etiquetaAmbito' => 'de planta',
+                    'almacenRequerido' => true,
+                    'modoPreview' => true,
                     'guiaTexto' => 'Toda la producción terminada del lote debe ingresar al inventario del almacén elegido. El sistema valida la capacidad disponible y puede sugerir un almacén según el producto.',
                     'instruccion' => 'Seleccione el almacén de planta donde guardar el producto terminado',
                     'crearAlmacenUrl' => route('almacen-planta.create'),
@@ -936,6 +988,7 @@
         'sectionId' => 'almacenSectionLote',
         'hiddenInputId' => 'almacenidLote',
         'formSelector' => '#formAlmacenajeLote',
+        'almacenesCatalogo' => $almacenesCatalogo ?? [],
         'cantidadFija' => $cantidadProductoAlmacenKg ?? 0,
         'productoHint' => trim(($lote->producto ?? '').' '.($lote->nombre ?? '')),
     ])
@@ -1442,9 +1495,11 @@
     }
 
     window.LpProcesamientoAjax = {
-        completarEtapa: function (form) {
-            const card = form.closest('[data-asignacion-id]');
-            const btn = form.querySelector('button');
+        completarEtapa: function (form, triggerBtn) {
+            const btn = triggerBtn || form.querySelector('button[type="submit"]');
+            const card = btn
+                ? btn.closest('[data-asignacion-id]')
+                : form.closest('[data-asignacion-id]');
             const scrollKey = 'lp_procesamiento_scroll';
             try {
                 sessionStorage.setItem(scrollKey, String(window.scrollY));
@@ -1553,6 +1608,21 @@
         if (form.dataset.ajaxLpAction !== 'completar-etapa' || !window.LpProcesamientoAjax) return;
         e.preventDefault();
         window.LpProcesamientoAjax.completarEtapa(form);
+    });
+
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.js-tl-marcar-completada');
+        if (!btn || btn.classList.contains('lp-ajax-loading') || !window.LpProcesamientoAjax) return;
+        e.preventDefault();
+        const form = document.createElement('form');
+        form.action = btn.getAttribute('data-completar-url') || '';
+        form.method = 'POST';
+        const token = document.createElement('input');
+        token.type = 'hidden';
+        token.name = '_token';
+        token.value = btn.getAttribute('data-csrf') || '';
+        form.appendChild(token);
+        window.LpProcesamientoAjax.completarEtapa(form, btn);
     });
 })();
 </script>

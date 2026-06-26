@@ -235,7 +235,9 @@ class LoteProduccionParametrosService
         }
 
         $maqId = (int) ($asignacion->maquinaplantaid ?? 0);
-        $orden = app(LoteProduccionTransformacionService::class)->ordenPasoActual($lote);
+        $orden = $asignacion->orden !== null
+            ? (int) $asignacion->orden
+            : app(LoteProduccionTransformacionService::class)->ordenPasoActual($lote);
         $defs = [];
 
         $rutaService = app(LoteProduccionRutaService::class);
@@ -371,6 +373,35 @@ class LoteProduccionParametrosService
                 'valor' => $valor,
                 'valor_minimo' => (float) $req['valor_minimo'],
                 'valor_maximo' => (float) $req['valor_maximo'],
+                'cumple' => true,
+            ];
+        }
+
+        return $salida;
+    }
+
+    /**
+     * Valores de registro a partir del plan de ruta (rangos fijados por el jefe).
+     *
+     * @return list<array{variableestandarid: int, nombre: string, unidad: ?string, valor: float, valor_minimo: float, valor_maximo: float, cumple: bool}>
+     */
+    public function parametrosRegistradosDesdePlan(AsignacionEtapaPlanta $asignacion): array
+    {
+        $requeridos = $this->parametrosRequeridosParaAsignacion($asignacion);
+        $salida = [];
+
+        foreach ($requeridos as $req) {
+            $min = (float) $req['valor_minimo'];
+            $max = (float) $req['valor_maximo'];
+            $valor = round(($min + $max) / 2, 2);
+
+            $salida[] = [
+                'variableestandarid' => (int) $req['variableestandarid'],
+                'nombre' => $req['nombre'],
+                'unidad' => $req['unidad'] ?? null,
+                'valor' => $valor,
+                'valor_minimo' => $min,
+                'valor_maximo' => $max,
                 'cumple' => true,
             ];
         }

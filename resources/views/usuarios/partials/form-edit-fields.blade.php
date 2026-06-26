@@ -70,28 +70,26 @@
                 @error('nombreusuario')<span class="usu-edit-error">{{ $message }}</span>@enderror
             </div>
         </div>
-        @unless($modoJefe)
         <div class="col-md-6">
-            <div class="usu-edit-field mb-md-0">
+            <div class="usu-edit-field {{ $modoJefe ? '' : 'mb-md-0' }}">
                 <label for="telefono">Teléfono</label>
                 <div class="usu-edit-input-wrap">
                     <i class="fas fa-phone"></i>
-                    <input type="text" class="form-control @error('telefono') is-invalid @enderror" id="telefono" name="telefono"
-                        value="{{ old('telefono', $usuario->telefono) }}" placeholder="+591 …">
+                    <input type="tel" class="form-control js-telefono-bo @error('telefono') is-invalid @enderror" id="telefono" name="telefono"
+                        value="{{ old('telefono', $usuario->telefono) }}" placeholder="+591 71234567"
+                        inputmode="tel" autocomplete="tel">
                 </div>
                 @error('telefono')<span class="usu-edit-error">{{ $message }}</span>@enderror
             </div>
         </div>
-        @endunless
         @if($modoJefe)
         <div class="col-md-6">
             <div class="usu-edit-field mb-md-0">
                 <label for="passwordhash">Nueva contraseña <small class="text-muted">(opcional)</small></label>
                 <div class="usu-edit-input-wrap">
                     <i class="fas fa-lock"></i>
-                    <input type="password" class="form-control @error('passwordhash') is-invalid @enderror" id="passwordhash" name="passwordhash">
+                    <input type="password" class="form-control @error('passwordhash') is-invalid @enderror" id="passwordhash" name="passwordhash" minlength="5" autocomplete="new-password">
                 </div>
-                @error('passwordhash')<span class="usu-edit-error">{{ $message }}</span>@enderror
             </div>
         </div>
         @endif
@@ -124,3 +122,5 @@
     </div>
 </section>
 @endunless
+
+@include('partials.telefono-bo-input-script')

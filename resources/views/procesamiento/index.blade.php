@@ -73,6 +73,7 @@
     border-radius: 10px; font-weight: 600; width: 100%; padding: .65rem;
 }
 #modalNuevoLote .btn-agregar-mp:hover { background: #dcfce7; }
+#modalNuevoLote .lote-controles-empaque.is-bloqueado { opacity: .55; pointer-events: none; user-select: none; }
 #modalNuevoLote .modal-footer { background: #fff; border-top: 1px solid #e5e7eb; padding: 1rem 1.5rem; }
 #modalNuevoLote #productoLote::-webkit-calendar-picker-indicator,
 #modalNuevoLote #productoLote::-webkit-list-button { display: none !important; }
@@ -159,7 +160,7 @@
                 <tr>
                     <th>Código</th>
                     <th>Producto / Lote</th>
-                    <th>Fase</th>
+                    <th>Estado</th>
                     <th>Pedido</th>
                     <th>Cant. objetivo</th>
                     <th>Materias usadas</th>
@@ -280,11 +281,36 @@
                         </div>
                     </div>
 
-                    <div class="lote-section">
+                    <div class="lote-section mb-0">
+                        <div class="lote-section-title"><i class="fas fa-boxes mr-1"></i> Materia prima <span class="text-danger">*</span></div>
+                        <p class="small text-muted mb-2">Paso 1: elija el insumo del almacén de planta. El empaquetado y el cálculo se habilitan después, según el stock de ese insumo.</p>
+                        <div id="alertaStockMateriaPrima" class="alert alert-danger small py-2 px-3 mb-2 d-none" role="alert">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            <span id="alertaStockMateriaPrimaTexto"></span>
+                        </div>
+                        <div class="table-responsive tabla-materias mb-2">
+                            <table class="table table-sm mb-0">
+                                <thead><tr><th>Insumo</th><th style="width:130px">Cantidad</th><th style="width:44px"></th></tr></thead>
+                                <tbody id="tbodyMaterias">
+                                    <tr id="filaMateriasVacia"><td colspan="3" class="text-center text-muted py-3 small">Sin materias. Use el botón de abajo para buscar insumos del almacén de planta.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <button type="button" class="btn btn-agregar-mp" id="btnBuscarInsumo">
+                            <i class="fas fa-plus-circle mr-1"></i> Agregar materia prima
+                        </button>
+                    </div>
+
+                    <div class="lote-section" id="seccionEmpaquetadoPlanificado">
                         <div class="lote-section-title"><i class="fas fa-box-open mr-1"></i> Empaquetado planificado <span class="text-danger">*</span></div>
+                        <div id="avisoEmpaqueBloqueado" class="alert alert-warning small py-2 px-3 mb-2">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Primero agregue la materia prima. El empaquetado y el estimado se calculan según el insumo elegido.
+                        </div>
+                        <div id="loteControlesEmpaque" class="lote-controles-empaque is-bloqueado">
                         <div class="form-group mb-2">
                             <label class="small font-weight-bold mb-1">Presentación comercial</label>
-                            <select name="empaque_catalogo_slug" id="empaqueCatalogoSlug" class="form-control form-control-sm" required>
+                            <select name="empaque_catalogo_slug" id="empaqueCatalogoSlug" class="form-control form-control-sm" disabled>
                                 <option value="">Seleccione empaque…</option>
                                 @foreach($empaquesPlanta ?? [] as $emp)
                                     <option value="{{ $emp['slug'] }}"
@@ -335,26 +361,7 @@
                             <span id="planificacionEmpaqueTexto"></span>
                         </div>
                         <small class="text-muted d-block mt-1">Rendimiento estándar {{ \App\Support\EmpaquePlantaCatalogo::rendimientoPorcentaje() }}&nbsp;%. Al almacenar se calcula la producción real según la materia prima consumida.</small>
-                    </div>
-
-                    <div class="lote-section mb-0">
-                        <div class="lote-section-title"><i class="fas fa-boxes mr-1"></i> Materia prima <span class="text-danger">*</span></div>
-                        <p class="small text-muted mb-2">Un solo insumo por lote (cosecha a granel del almacén de planta). La cantidad en kg se calcula según el empaquetado planificado.</p>
-                        <div id="alertaStockMateriaPrima" class="alert alert-danger small py-2 px-3 mb-2 d-none" role="alert">
-                            <i class="fas fa-exclamation-triangle mr-1"></i>
-                            <span id="alertaStockMateriaPrimaTexto"></span>
                         </div>
-                        <div class="table-responsive tabla-materias mb-2">
-                            <table class="table table-sm mb-0">
-                                <thead><tr><th>Insumo</th><th style="width:130px">Cantidad</th><th style="width:44px"></th></tr></thead>
-                                <tbody id="tbodyMaterias">
-                                    <tr id="filaMateriasVacia"><td colspan="3" class="text-center text-muted py-3 small">Sin materias. Use el botón de abajo para buscar insumos del almacén de planta.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <button type="button" class="btn btn-agregar-mp" id="btnBuscarInsumo">
-                            <i class="fas fa-plus-circle mr-1"></i> Agregar materia prima
-                        </button>
                     </div>
 
                     <div class="lote-section mt-3 mb-0">
@@ -511,7 +518,64 @@
         return document.getElementById('modoPlanificacion')?.value || EMPAQUE_CFG.modoEmpaques;
     }
 
+    function tieneMateriaPrima() {
+        return materias.length > 0;
+    }
+
+    function limpiarEmpaquePlanificado() {
+        const sel = document.getElementById('empaqueCatalogoSlug');
+        if (sel) sel.value = '';
+        const emp = document.getElementById('cantidadEmpaquesObjetivo');
+        if (emp) emp.value = '';
+        const mp = document.getElementById('cantidadObjetivoLote');
+        if (mp) mp.value = '';
+        document.getElementById('planificacionEmpaqueBox')?.classList.add('d-none');
+        toggleEmpaquePersonalizado();
+    }
+
+    function actualizarEstadoSeccionEmpaque() {
+        const habilitado = tieneMateriaPrima();
+        const controles = document.getElementById('loteControlesEmpaque');
+        const aviso = document.getElementById('avisoEmpaqueBloqueado');
+        const selEmpaque = document.getElementById('empaqueCatalogoSlug');
+        const inputEmp = document.getElementById('cantidadEmpaquesObjetivo');
+        const inputMp = document.getElementById('cantidadObjetivoLote');
+        const toggles = document.querySelectorAll('#toggleModoPlanificacion [data-modo]');
+
+        aviso?.classList.toggle('d-none', habilitado);
+        controles?.classList.toggle('is-bloqueado', !habilitado);
+
+        if (selEmpaque) {
+            selEmpaque.disabled = !habilitado;
+            selEmpaque.required = habilitado;
+        }
+        toggles.forEach(btn => { btn.disabled = !habilitado; });
+
+        const esEmpaques = modoPlanificacionActual() === EMPAQUE_CFG.modoEmpaques;
+        if (inputEmp) {
+            inputEmp.disabled = !habilitado || !esEmpaques;
+            inputEmp.required = habilitado && esEmpaques;
+        }
+        if (inputMp) {
+            inputMp.disabled = !habilitado || esEmpaques;
+            inputMp.required = habilitado && !esEmpaques;
+        }
+
+        ['empaqueNombrePersonalizado', 'empaquePesoNetoKg', 'empaqueTipoEnvase'].forEach(function (id) {
+            const el = document.getElementById(id);
+            if (el) el.disabled = !habilitado;
+        });
+
+        if (!habilitado) {
+            document.getElementById('planificacionEmpaqueBox')?.classList.add('d-none');
+        } else {
+            actualizarPlanificacionEmpaque();
+        }
+    }
+
     function calcularPlanificacionLocal() {
+        if (!tieneMateriaPrima()) return null;
+
         const peso = pesoNetoEmpaqueSeleccionado();
         const slug = document.getElementById('empaqueCatalogoSlug')?.value || '';
         if (!slug || peso <= 0) return null;
@@ -544,15 +608,16 @@
         });
 
         const esEmpaques = modo === EMPAQUE_CFG.modoEmpaques;
+        const habilitado = tieneMateriaPrima();
         bloqueEmp?.classList.toggle('d-none', !esEmpaques);
         bloqueMp?.classList.toggle('d-none', esEmpaques);
         if (inputEmp) {
-            inputEmp.disabled = !esEmpaques;
-            inputEmp.required = esEmpaques;
+            inputEmp.disabled = !habilitado || !esEmpaques;
+            inputEmp.required = habilitado && esEmpaques;
         }
         if (inputMp) {
-            inputMp.disabled = esEmpaques;
-            inputMp.required = !esEmpaques;
+            inputMp.disabled = !habilitado || esEmpaques;
+            inputMp.required = habilitado && !esEmpaques;
         }
         actualizarPlanificacionEmpaque();
     }
@@ -564,8 +629,11 @@
     function toggleEmpaquePersonalizado() {
         const slug = document.getElementById('empaqueCatalogoSlug')?.value || '';
         const bloque = document.getElementById('bloqueEmpaquePersonalizado');
-        bloque?.classList.toggle('d-none', slug !== EMPAQUE_CFG.slugPersonalizado);
-        actualizarPlanificacionEmpaque();
+        const habilitado = tieneMateriaPrima();
+        bloque?.classList.toggle('d-none', slug !== EMPAQUE_CFG.slugPersonalizado || !habilitado);
+        if (habilitado) {
+            actualizarPlanificacionEmpaque();
+        }
     }
 
     function cantidadKgMateriaSeleccionada() {
@@ -613,18 +681,27 @@
     function actualizarPlanificacionEmpaque() {
         const box = document.getElementById('planificacionEmpaqueBox');
         const texto = document.getElementById('planificacionEmpaqueTexto');
-        const calc = calcularPlanificacionLocal();
-        if (!box || !texto) return;
+        if (!box || !texto || !tieneMateriaPrima()) {
+            box?.classList.add('d-none');
+            return;
+        }
 
+        const calc = calcularPlanificacionLocal();
         if (!calc) {
             box.classList.add('d-none');
             return;
         }
 
+        const m = materias[0];
+        const stockTxt = esUnidadKg(m.unidad)
+            ? ' · disp. <strong>' + formatoKg(m.stock) + ' kg</strong>'
+            : '';
+
         texto.innerHTML =
-            'Estimado: <strong>' + formatoEntero(calc.unidades) + ' ' + calc.etiqueta_unidad + '</strong> ' +
+            'Con <strong>' + esc(m.label) + '</strong>' + stockTxt + ': estimado ' +
+            '<strong>' + formatoEntero(calc.unidades) + ' ' + calc.etiqueta_unidad + '</strong> ' +
             '(~' + formatoKg(calc.salida_kg) + ' kg de producto). ' +
-            'Se usa <strong>' + formatoKg(calc.entrada_kg) + ' kg</strong> de materia prima.';
+            'Se usarán <strong>' + formatoKg(calc.entrada_kg) + ' kg</strong> de este insumo.';
         box.classList.remove('d-none');
         autoRellenarMateriaPrima();
         validarStockMateriaPrima();
@@ -661,6 +738,8 @@
         tbody.querySelectorAll('tr:not(#filaMateriasVacia)').forEach(r => r.remove());
         if (!materias.length) {
             filaVacia.style.display = '';
+            limpiarEmpaquePlanificado();
+            actualizarEstadoSeccionEmpaque();
             validarStockMateriaPrima();
             return;
         }
@@ -676,6 +755,7 @@
                 '<td><button type="button" class="btn btn-outline-danger btn-sm btn-quitar-materia" data-idx="' + i + '" title="Quitar materia prima"><i class="fas fa-trash"></i></button></td>';
             tbody.appendChild(tr);
         });
+        actualizarEstadoSeccionEmpaque();
         validarStockMateriaPrima();
     }
 
@@ -781,6 +861,7 @@
         actualizarNombrePreview();
         toggleEmpaquePersonalizado();
         aplicarModoPlanificacion(document.getElementById('modoPlanificacion')?.value || EMPAQUE_CFG.modoEmpaques);
+        actualizarEstadoSeccionEmpaque();
         validarStockMateriaPrima();
     });
 
@@ -856,10 +937,25 @@
                 minIn.name = 'parametros_lote[' + idx + '][valor_minimo]';
                 maxIn.name = 'parametros_lote[' + idx + '][valor_maximo]';
                 if (lim) {
-                    [minIn, maxIn].forEach(function (inp) {
-                        inp.min = lim.min;
-                        inp.max = lim.max;
-                        inp.addEventListener('input', function () { acotarValorLote(inp, lim); });
+                    minIn.min = lim.min;
+                    minIn.max = lim.max;
+                    maxIn.min = lim.min;
+                    maxIn.max = lim.max;
+                    minIn.title = 'Rango permitido: ' + lim.min + ' – ' + lim.max;
+                    maxIn.title = minIn.title;
+                    minIn.addEventListener('blur', function () {
+                        acotarValorLote(minIn, lim);
+                        acotarValorLote(maxIn, lim);
+                        if (parseFloat(minIn.value) > parseFloat(maxIn.value)) {
+                            maxIn.value = minIn.value;
+                        }
+                    });
+                    maxIn.addEventListener('blur', function () {
+                        acotarValorLote(maxIn, lim);
+                        acotarValorLote(minIn, lim);
+                        if (parseFloat(minIn.value) > parseFloat(maxIn.value)) {
+                            minIn.value = maxIn.value;
+                        }
                     });
                 }
                 if (!personalizar) {

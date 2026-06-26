@@ -43,6 +43,12 @@ final class UsuarioRol
         return (bool) ($user && $user->hasRole('planta') && ! self::esJefePlanta($user) && ! self::esAdminGlobal($user));
     }
 
+    /** Operario de planta: solo ve lotes de producción con etapas asignadas a él. */
+    public static function debeAcotarLotesProduccionPorAsignacion(?Usuario $user): bool
+    {
+        return self::esOperarioPlanta($user);
+    }
+
     /** Usuarios asignables como operarios en transformación (solo Spatie «planta», nunca jefe). */
     public static function queryOperariosPlanta(): Builder
     {

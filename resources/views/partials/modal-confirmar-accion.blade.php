@@ -29,9 +29,17 @@
 (function () {
     const state = window.__modalConfirmarState || (window.__modalConfirmarState = {
         formPendiente: null,
+        buttonPendiente: null,
         callbackPendiente: null,
         modoAviso: false,
     });
+
+    function guardarScrollLpProcesamiento(form) {
+        if (!form || !form.classList.contains('js-lp-guardar-scroll')) return;
+        try {
+            sessionStorage.setItem('lp_procesamiento_scroll', String(window.scrollY));
+        } catch (e) {}
+    }
 
     function mostrarModalConfirmar(titulo, mensaje, tono, btnText, esAviso) {
         state.modoAviso = !!esAviso;
@@ -115,13 +123,11 @@
         if (!state.formPendiente) return;
 
         const form = state.formPendiente;
+        const submitter = state.buttonPendiente;
         state.formPendiente = null;
+        state.buttonPendiente = null;
 
-        if (form.classList.contains('js-lp-guardar-scroll')) {
-            try {
-                sessionStorage.setItem('lp_procesamiento_scroll', String(window.scrollY));
-            } catch (e) {}
-        }
+        guardarScrollLpProcesamiento(form);
 
         if (form.dataset.ajaxLpAction === 'completar-etapa' && window.LpProcesamientoAjax) {
             if (window.jQuery) window.jQuery('#modalConfirmarAccion').modal('hide');
@@ -130,6 +136,22 @@
         }
 
         const enviar = function () {
+            if (submitter && typeof form.requestSubmit === 'function') {
+                form.requestSubmit(submitter);
+                return;
+            }
+            if (submitter && submitter.hasAttribute('formaction')) {
+                const prevAction = form.action;
+                const prevMethod = form.method;
+                form.action = submitter.getAttribute('formaction');
+                if (submitter.hasAttribute('formmethod')) {
+                    form.method = submitter.getAttribute('formmethod');
+                }
+                enviarFormularioPendiente(form);
+                form.action = prevAction;
+                form.method = prevMethod;
+                return;
+            }
             enviarFormularioPendiente(form);
         };
 
@@ -143,7 +165,10 @@
     function abrirConfirmacionDesdeForm(btn) {
         const form = btn.closest('form');
         if (!form) return;
+        if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') return;
         const attrs = form.dataset;
+        state.buttonPendiente = btn;
+        guardarScrollLpProcesamiento(form);
         window.ModalConfirmar.abrir(
             form,
             attrs.confirmTitle || btn.getAttribute('data-confirm-title') || 'Confirmar acción',
@@ -156,6 +181,7 @@
     window.ModalConfirmar = {
         abrir(form, titulo, mensaje, tono, btnText) {
             state.formPendiente = form;
+            state.buttonPendiente = null;
             state.callbackPendiente = null;
             mostrarModalConfirmar(titulo, mensaje, tono, btnText, false);
         },
@@ -204,6 +230,7 @@
                 state.callbackPendiente = null;
             }
             state.formPendiente = null;
+            state.buttonPendiente = null;
             state.modoAviso = false;
             const cancelBtn = document.getElementById('btnCancelarConfirmar');
             if (cancelBtn) cancelBtn.style.display = '';
@@ -217,6 +244,7 @@
                     state.callbackPendiente = null;
                 }
                 state.formPendiente = null;
+                state.buttonPendiente = null;
                 state.modoAviso = false;
                 const cancelBtn = document.getElementById('btnCancelarConfirmar');
                 if (cancelBtn) cancelBtn.style.display = '';

@@ -209,10 +209,8 @@
                     </div>
                     <form method="POST" action="{{ route('tareas-planta.completar', $tarea) }}" class="mb-0">
                         @csrf
-                        @include('planta.partials.form-parametros-etapa', [
+                        @include('planta.partials.parametros-etapa-lectura', [
                             'parametrosRequeridos' => $parametrosRequeridos ?? [],
-                            'prefix' => 'parametros',
-                            'inputIdPrefix' => 'tp-param',
                         ])
                         <button type="submit" class="btn btn-success btn-block tp-btn-complete">
                             <i class="fas fa-check-double mr-1"></i>Completar tarea

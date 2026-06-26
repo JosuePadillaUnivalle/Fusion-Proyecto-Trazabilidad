@@ -64,7 +64,7 @@
                         } elseif (($step['key'] ?? '') === 'certificacion' && ($puede_certificar_campo ?? false)) {
                             $titulo = 'Certificar el lote — formulario abajo';
                         } elseif (($step['key'] ?? '') === 'envio_almacen' && ($puede_enviar_almacen ?? false)) {
-                            $titulo = 'Abrir formulario para enviar al almacén';
+                            $titulo = 'Ir al formulario de almacenaje';
                         }
                         $siembraPendienteId = (int) ($actividad_siembra_pendiente['actividadid'] ?? 0);
                         $puedeCompletarSiembra = (bool) ($puede_completar_siembra ?? false);
@@ -111,12 +111,11 @@
                             <span class="d-block small mt-1"><i class="fas fa-certificate"></i> Certificar</span>
                         </a>
                     @elseif(($step['key'] ?? '') === 'envio_almacen' && ($puede_enviar_almacen ?? false))
-                        <button type="button" class="fase-step {{ $step['estado'] }} fase-step-link"
-                                data-toggle="modal" data-target="#modalEnviarAlmacenCampo" title="{{ $titulo }}">
+                        <a href="#panel-enviar-almacen-campo" class="fase-step {{ $step['estado'] }} fase-step-link" title="{{ $titulo }}">
                             <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
                             {{ $step['label'] }}
-                            <span class="d-block small mt-1"><i class="fas fa-warehouse"></i> Enviar</span>
-                        </button>
+                            <span class="d-block small mt-1"><i class="fas fa-warehouse"></i> Almacenar</span>
+                        </a>
                     @else
                         <div class="fase-step {{ $step['estado'] }}" title="{{ $titulo }}">
                             <i class="fas fa-{{ $step['icon'] }} d-block mb-1"></i>
@@ -186,12 +185,7 @@
                     Siembra asignada a <strong>{{ $actividad_siembra_pendiente['responsable'] ?? '—' }}</strong> — pendiente de realizar.
                 </p>
             @elseif($puede_enviar_almacen ?? false)
-                <div class="text-center mb-3">
-                    <button type="button" class="btn btn-warning btn-sm font-weight-bold text-dark"
-                            data-toggle="modal" data-target="#modalEnviarAlmacenCampo">
-                        <i class="fas fa-warehouse mr-1"></i> Enviar al almacén
-                    </button>
-                </div>
+                @include('lotes.partials.panel-enviar-almacen-campo')
             @elseif(!empty($url_siguiente_fase) && !empty($siguiente_fase_label))
                 <div class="text-center mb-3">
                     <a href="{{ $url_siguiente_fase }}" class="btn btn-success btn-sm">
@@ -459,9 +453,6 @@
 @if(($puede_asignar_siembra ?? false) || $errors->has('usuarioid'))
     @include('lotes.partials.modal-asignar-siembra')
 @endif
-@if(($puede_enviar_almacen ?? false) || $errors->has('almacenid') || $errors->has('produccionid'))
-    @include('lotes.partials.modal-enviar-almacen-campo')
-@endif
 @endsection
 
 @push('scripts')
@@ -492,8 +483,9 @@
     @endif
 
     @if($errors->has('almacenid') || $errors->has('produccionid'))
-    if (window.jQuery) {
-        window.jQuery('#modalEnviarAlmacenCampo').modal('show');
+    var panelAlmacen = document.getElementById('panel-enviar-almacen-campo');
+    if (panelAlmacen) {
+        panelAlmacen.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     @endif
 })();

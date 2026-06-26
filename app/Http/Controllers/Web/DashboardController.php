@@ -37,6 +37,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use App\Models\UsuarioNotificacion;
 use App\Models\AsignacionEtapaPlanta;
+use App\Models\LoteProduccionPedido;
 use App\Services\NotificacionUsuarioService;
 use App\Services\RecepcionPlantaMayoristaService;
 use App\Support\AgricultorLoginNotificacion;
@@ -91,6 +92,13 @@ class DashboardController extends Controller
         if (! $this->isAdmin($user) && $user?->can('panel_transportista.view')) {
             return view('dashboard.inicio.transportista', array_merge(
                 $this->buildTransportistaInicioData($user, $filtros),
+                $extras,
+            ));
+        }
+
+        if (! $this->isAdmin($user) && UsuarioRol::esOperarioPlanta($user)) {
+            return view('dashboard.inicio.operario-planta', array_merge(
+                $this->buildOperarioPlantaInicioData($user, $filtros),
                 $extras,
             ));
         }
@@ -553,6 +561,51 @@ class DashboardController extends Controller
         ]);
     }
 
+    private function buildOperarioPlantaInicioData(Usuario $user, ?DashboardFiltros $filtros = null): array
+    {
+        $filtros ??= DashboardFiltros::desdeRequest(request());
+        $operarioId = (int) $user->usuarioid;
+
+        $lotesAsignadosQuery = LoteProduccionPedido::query()
+            ->whereHas('asignacionesEtapa', fn ($q) => $q->where('operador_usuarioid', $operarioId));
+
+        $tareasPendientes = AsignacionEtapaPlanta::query()
+            ->with(['proceso', 'maquina', 'loteProduccion'])
+            ->where('operador_usuarioid', $operarioId)
+            ->pendientes()
+            ->orderByDesc('creado_en')
+            ->limit(8)
+            ->get();
+
+        $tareasPendientesCount = AsignacionEtapaPlanta::query()
+            ->where('operador_usuarioid', $operarioId)
+            ->pendientes()
+            ->count();
+
+        $tareasCompletadasCount = AsignacionEtapaPlanta::query()
+            ->where('operador_usuarioid', $operarioId)
+            ->where('estado', AsignacionEtapaPlanta::ESTADO_COMPLETADA)
+            ->count();
+
+        $lotesRecientes = (clone $lotesAsignadosQuery)
+            ->with(['pedido', 'plantillaTransformacion'])
+            ->orderByDesc('fecha_creacion')
+            ->limit(6)
+            ->get();
+
+        return [
+            'filtros' => $filtros,
+            'stats' => [
+                'lotes_asignados' => (clone $lotesAsignadosQuery)->count(),
+                'tareas_pendientes' => $tareasPendientesCount,
+                'tareas_completadas' => $tareasCompletadasCount,
+            ],
+            'tareasPendientes' => $tareasPendientes,
+            'tareasPendientesCount' => $tareasPendientesCount,
+            'lotesRecientes' => $lotesRecientes,
+        ];
+    }
+
     private function buildTransportistaInicioData($user, ?DashboardFiltros $filtros = null): array
     {
         $filtros ??= DashboardFiltros::desdeRequest(request());
@@ -724,7 +777,7 @@ class DashboardController extends Controller
                 ->where('operador_usuarioid', $operarioId)
                 ->pendientes()
                 ->orderByDesc('creado_en')
-                ->limit(5)
+                ->limit(8)
                 ->get();
             $data['tareasPendientes'] = $tareasPendientes;
             $data['tareasPendientesCount'] = AsignacionEtapaPlanta::query()
@@ -739,7 +792,7 @@ class DashboardController extends Controller
                 ->where('operador_usuarioid', $user->usuarioid)
                 ->pendientes()
                 ->orderByDesc('creado_en')
-                ->limit(5)
+                ->limit(8)
                 ->get();
             $data['tareasPendientes'] = $tareasPendientes;
             $data['tareasPendientesCount'] = AsignacionEtapaPlanta::query()

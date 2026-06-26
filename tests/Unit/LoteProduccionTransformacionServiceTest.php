@@ -11,6 +11,7 @@ use App\Models\ProcesoMaquinaPlanta;
 use App\Models\ProcesoPlanta;
 use App\Models\RegistroProcesoMaquinaPlanta;
 use App\Models\Usuario;
+use App\Support\LoteProduccionRutaService;
 use App\Support\LoteProduccionTransformacionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -65,6 +66,28 @@ class LoteProduccionTransformacionServiceTest extends TestCase
 
         $this->assertTrue($this->service->transformacionCompleta($lote));
         $this->assertTrue($this->service->plantillaAgotada($lote));
+    }
+
+    public function test_con_ruta_completa_aunque_haya_registros_extra(): void
+    {
+        [$lote, $vinculos] = $this->crearLoteConPlantillaDeTresPasos();
+        app(LoteProduccionRutaService::class)->inicializarDesdePlantilla(
+            $lote,
+            (int) $lote->plantillatransformacionid
+        );
+
+        foreach ($vinculos as $vinculo) {
+            $this->registrarEtapa($lote, $vinculo);
+        }
+        $this->registrarEtapa($lote, $vinculos[0]);
+
+        $lote->refresh();
+
+        $this->assertTrue($this->service->transformacionCompleta($lote));
+        $this->assertSame(
+            'certificacion',
+            app(\App\Support\LoteProduccionTrazabilidadService::class)->resolverFaseActual($lote)
+        );
     }
 
     public function test_sin_plantilla_completa_solo_con_empaquetado(): void

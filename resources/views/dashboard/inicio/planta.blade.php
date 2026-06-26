@@ -16,6 +16,27 @@
     --inicio-title: #14532d;
     --inicio-icon-bg: linear-gradient(135deg, #16a34a, #22c55e);
 }
+.inicio-op-tareas { border-radius: 14px; overflow: hidden; border-left: 4px solid #f59e0b !important; }
+.inicio-op-tareas__head { padding: 1rem 1.15rem; background: linear-gradient(135deg, #fffbeb, #fff); border-bottom: 1px solid #fde68a; }
+.inicio-op-tareas__title { font-size: 1.05rem; font-weight: 800; color: #14532d; }
+.inicio-op-tareas__sub { font-size: .8rem; color: #64748b; margin-top: .2rem; }
+.inicio-op-tareas__body { background: #fff; }
+.inicio-op-tareas__item {
+    display: flex; align-items: center; gap: .85rem; padding: .9rem 1.15rem;
+    border-bottom: 1px solid #f1f5f3; color: inherit; text-decoration: none !important;
+    transition: background .15s ease;
+}
+.inicio-op-tareas__item:hover { background: #f8fbf8; }
+.inicio-op-tareas__item:last-child { border-bottom: 0; }
+.inicio-op-tareas__icon {
+    width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #fef3c7, #fde68a); color: #b45309;
+}
+.inicio-op-tareas__info { flex: 1; min-width: 0; }
+.inicio-op-tareas__info strong { display: block; color: #1f2937; font-size: .95rem; }
+.inicio-op-tareas__go { font-size: .8rem; font-weight: 700; color: #15803d; white-space: nowrap; }
+.inicio-op-tareas__foot { padding: .75rem 1rem; background: #fafcfb; border-top: 1px solid #eef2f0; }
 </style>
 @endpush
 
@@ -36,6 +57,8 @@
         </div>
 
         @include('partials.dashboard-alertas')
+
+        @include('partials.operario-planta-tareas-inicio')
 
         @if(($envios_pendientes_planta ?? []) !== [])
             @php $envioPlanta = $envios_pendientes_planta[0]; @endphp

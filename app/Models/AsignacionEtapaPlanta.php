@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class AsignacionEtapaPlanta extends Model
 {
     public const ESTADO_PENDIENTE = 'pendiente';
+    public const ESTADO_PROGRAMADA = 'programada';
     public const ESTADO_COMPLETADA = 'completada';
     public const ESTADO_CANCELADA = 'cancelada';
 
@@ -22,6 +23,8 @@ class AsignacionEtapaPlanta extends Model
 
     protected $fillable = [
         'loteproduccionpedidoid',
+        'loteproduccionrutapasoid',
+        'orden',
         'procesoplantaid',
         'maquinaplantaid',
         'operador_usuarioid',
@@ -41,6 +44,11 @@ class AsignacionEtapaPlanta extends Model
     public function loteProduccion(): BelongsTo
     {
         return $this->belongsTo(LoteProduccionPedido::class, 'loteproduccionpedidoid', 'loteproduccionpedidoid');
+    }
+
+    public function rutaPaso(): BelongsTo
+    {
+        return $this->belongsTo(LoteProduccionRutaPaso::class, 'loteproduccionrutapasoid', 'loteproduccionrutapasoid');
     }
 
     public function proceso(): BelongsTo
@@ -73,8 +81,23 @@ class AsignacionEtapaPlanta extends Model
         return $this->estado === self::ESTADO_PENDIENTE;
     }
 
+    public function estaProgramada(): bool
+    {
+        return $this->estado === self::ESTADO_PROGRAMADA;
+    }
+
     public function scopePendientes($query)
     {
         return $query->where('estado', self::ESTADO_PENDIENTE);
+    }
+
+    public function scopeProgramadas($query)
+    {
+        return $query->where('estado', self::ESTADO_PROGRAMADA);
+    }
+
+    public function scopeActivas($query)
+    {
+        return $query->whereIn('estado', [self::ESTADO_PENDIENTE, self::ESTADO_PROGRAMADA]);
     }
 }

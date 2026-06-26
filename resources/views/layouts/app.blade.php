@@ -1294,7 +1294,9 @@
                 <span class="ag-nav-label">Producción planta</span>
 
                 @can('panel_planta.view')
+                @if(! ($authUser && \App\Support\UsuarioRol::esOperarioPlanta($authUser)))
                 <li class="ag-nav-li"><a href="{{ route('dashboard.panel-planta') }}" class="ag-nav-a {{ request()->routeIs('dashboard.panel-planta') ? 'active' : '' }}"><i class="ag-nav-icon fas fa-industry"></i><span class="ag-nav-text">Panel Planta</span></a></li>
+                @endif
                 @endcan
 
                 @if($puedeProdPlanta)
@@ -1307,7 +1309,9 @@
                     <ul class="ag-subnav {{ $prodPlaMenuOpen ? 'open' : '' }}" id="sub-prod-pla">
                         @can('lote_produccion.view')
                         <li class="ag-sub-li"><a href="{{ route('procesamiento.index') }}" class="ag-sub-a {{ request()->routeIs('procesamiento.*') && ! request()->routeIs('certificaciones-planta.*') ? 'active' : '' }}">Procesamiento de Lote</a></li>
+                        @if($isAdmin || \App\Support\UsuarioRol::gestionaPlanta($authUser))
                         <li class="ag-sub-li"><a href="{{ route('certificaciones-planta.index') }}" class="ag-sub-a {{ request()->routeIs('certificaciones-planta.*') ? 'active' : '' }}">Certificaciones</a></li>
+                        @endif
                         @endcan
                         @if($authUser && \App\Support\UsuarioRol::esOperarioPlanta($authUser))
                         <li class="ag-sub-li"><a href="{{ route('tareas-planta.index') }}" class="ag-sub-a {{ request()->routeIs('tareas-planta.*') ? 'active' : '' }}">Mis tareas de transformación</a></li>

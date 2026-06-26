@@ -72,6 +72,11 @@ class InventarioPresentacionService
             );
         }
 
+        $stockUnidades = (float) $inventario->cantidad_unidades;
+        if ($unidades >= $stockUnidades - 0.0001) {
+            return;
+        }
+
         if ($kg > (float) $inventario->cantidad_kg + 0.0001) {
             throw new InvalidArgumentException(
                 'Stock insuficiente en kg para el lote «'.$inventario->etiquetaLote().'».'
@@ -83,8 +88,13 @@ class InventarioPresentacionService
     {
         $this->validarDisponibilidad($inventario, $unidades, $kg);
 
+        $stockUnidades = (float) $inventario->cantidad_unidades;
+        $kgDescontar = $unidades >= $stockUnidades - 0.0001
+            ? (float) $inventario->cantidad_kg
+            : min($kg, (float) $inventario->cantidad_kg);
+
         $inventario->decrement('cantidad_unidades', $unidades);
-        $inventario->decrement('cantidad_kg', $kg);
+        $inventario->decrement('cantidad_kg', $kgDescontar);
 
         $this->sincronizarStockAgregadoInsumo((int) $inventario->insumoid);
     }
