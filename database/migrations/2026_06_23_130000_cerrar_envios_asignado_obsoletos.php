@@ -12,6 +12,10 @@ return new class extends Migration
             return;
         }
 
+        $fechaRecepcion = DB::connection()->getDriverName() === 'pgsql'
+            ? DB::raw("COALESCE(fecha_asignacion, CURRENT_TIMESTAMP) + INTERVAL '2 days'")
+            : DB::raw("datetime(COALESCE(fecha_asignacion, CURRENT_TIMESTAMP), '+2 days')");
+
         // Asignaciones agrícolas huérfanas: quedaron en «asignado» sin iniciar cierre operativo.
         DB::table('envio_asignacion_multiple')
             ->whereIn('estado', ['asignado', 'asignada'])
@@ -20,7 +24,7 @@ return new class extends Migration
             ->where('fecha_asignacion', '<', '2026-06-13 00:00:00')
             ->update([
                 'estado' => 'recibido_planta',
-                'fecha_recepcion_planta' => DB::raw("datetime(COALESCE(fecha_asignacion, CURRENT_TIMESTAMP), '+2 days')"),
+                'fecha_recepcion_planta' => $fechaRecepcion,
             ]);
     }
 
