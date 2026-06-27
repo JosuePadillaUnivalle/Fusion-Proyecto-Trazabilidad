@@ -93,8 +93,9 @@ class PuntoVentaInventarioPresentacionService
     private function detalleRecienteParaInsumo(Collection $detalles, PuntoVenta $punto, Insumo $insumo): ?DetallePedidoDistribucion
     {
         $nombreInsumo = Str::lower(trim($insumo->nombre));
+        $baseInsumo = Str::lower($this->nombreBaseProductoPdv($insumo->nombre));
 
-        return $detalles->first(function (DetallePedidoDistribucion $detalle) use ($punto, $nombreInsumo) {
+        return $detalles->first(function (DetallePedidoDistribucion $detalle) use ($punto, $nombreInsumo, $baseInsumo) {
             if ((int) ($detalle->pedido?->puntoventaid ?? 0) !== (int) $punto->puntoventaid) {
                 return false;
             }
@@ -105,14 +106,18 @@ class PuntoVentaInventarioPresentacionService
             ]);
 
             foreach ($candidatos as $nombre) {
-                if ($nombre === '' || $nombre === $nombreInsumo) {
+                if ($nombre === '' || $nombre === $nombreInsumo || $nombre === $baseInsumo) {
+                    return true;
+                }
+                $baseDetalle = Str::lower($this->nombreBaseProductoPdv((string) $detalle->producto_nombre));
+                if ($baseDetalle !== '' && $baseDetalle === $baseInsumo) {
                     return true;
                 }
                 if (str_starts_with($nombreInsumo, $nombre.' · ')) {
                     return true;
                 }
-                $baseInsumo = explode(' · ', $nombreInsumo, 2)[0];
-                if ($nombre === $baseInsumo) {
+                $baseDesdeInsumo = explode(' · ', $nombreInsumo, 2)[0];
+                if ($nombre === $baseDesdeInsumo || $baseDetalle === $baseDesdeInsumo) {
                     return true;
                 }
             }
@@ -169,6 +174,7 @@ class PuntoVentaInventarioPresentacionService
     private function inferirDesdePresentacionProducto(Insumo $insumo): array
     {
         $nombreInsumo = trim($insumo->nombre);
+        $nombreBase = $this->nombreBaseProductoPdv($nombreInsumo);
         $presentacion = null;
 
         if (str_contains($nombreInsumo, ' · ')) {
@@ -185,6 +191,19 @@ class PuntoVentaInventarioPresentacionService
                 ->with('tipoEmpaque')
                 ->where('insumoid', $insumo->insumoid)
                 ->where('activo', true)
+                ->orderByDesc('peso_neto_kg')
+                ->first();
+        }
+
+        if ($presentacion === null) {
+            $presentacion = InsumoPresentacion::query()
+                ->with('tipoEmpaque')
+                ->where('activo', true)
+                ->whereHas('insumo', function ($q) use ($nombreBase) {
+                    $base = Str::lower(trim($nombreBase));
+                    $q->whereRaw('LOWER(TRIM(nombre)) = ?', [$base])
+                        ->orWhereRaw('LOWER(TRIM(nombre)) LIKE ?', [$base.' · %']);
+                })
                 ->orderByDesc('peso_neto_kg')
                 ->first();
         }
@@ -273,6 +292,20 @@ class PuntoVentaInventarioPresentacionService
         }
 
         return $producto !== '' ? $producto : (string) ($detalle->insumo?->nombre ?? 'Producto');
+    }
+
+    private function nombreBaseProductoPdv(string $nombre): string
+    {
+        $nombre = trim($nombre);
+        if (preg_match('/^(.+?)\s-\sLOTE[-\s]/i', $nombre, $coincidencia)) {
+            return trim($coincidencia[1]);
+        }
+
+        if (str_contains($nombre, ' · ')) {
+            return trim(explode(' · ', $nombre, 2)[0]);
+        }
+
+        return $nombre;
     }
 
     private function etiquetaStock(float $unidades, string $unidadEtiqueta, float $kg): string

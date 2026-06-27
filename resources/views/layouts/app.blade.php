@@ -1753,13 +1753,20 @@
 
     // Borrador del wizard «Nuevo envío»: no debe sobrevivir al cerrar sesión
     document.querySelectorAll('a[href*="logout"]').forEach(function (link) {
-        link.addEventListener('click', function () {
+        link.addEventListener('click', function (e) {
+            e.preventDefault();
+            const destino = link.getAttribute('href');
+            if (!destino) return;
             try { sessionStorage.removeItem('agrofusion_envio_borrador_v1'); } catch (err) {}
             if (window.SimulacionRuta && typeof window.SimulacionRuta.marcarLogout === 'function') {
                 window.SimulacionRuta.marcarLogout();
             } else {
                 window.__agrofusionLoggingOut = true;
             }
+            if (window.SimulacionMapaGlobal && typeof window.SimulacionMapaGlobal.destruir === 'function') {
+                window.SimulacionMapaGlobal.destruir();
+            }
+            window.location.replace(destino);
         });
     });
 

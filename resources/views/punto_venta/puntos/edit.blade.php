@@ -29,6 +29,7 @@
     </div>
 
     @can('punto_venta.delete')
+    @if($evalEliminacion['ok'] ?? false)
     <form method="POST" action="{{ route('punto-venta.puntos.destroy', $punto) }}" class="mt-2">
         @csrf
         @method('DELETE')
@@ -40,6 +41,13 @@
             <i class="fas fa-trash mr-1"></i> Eliminar punto de venta
         </button>
     </form>
+    @else
+    <button type="button" class="btn btn-outline-danger btn-sm mt-2" disabled
+        title="{{ $evalEliminacion['mensaje'] ?? 'Vacíe el depósito para eliminar' }}">
+        <i class="fas fa-trash mr-1"></i> Eliminar punto de venta
+    </button>
+    <p class="small text-muted mt-1 mb-0">{{ $evalEliminacion['mensaje'] ?? '' }}</p>
+    @endif
     @include('partials.modal-confirmar-accion')
     @endcan
 @endsection

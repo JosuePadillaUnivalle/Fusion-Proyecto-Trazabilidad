@@ -203,6 +203,39 @@ class AlmacenCapacidadService
         }
     }
 
+    public function validarOcupacionTrasCambioInsumo(
+        Almacen $almacen,
+        Insumo $insumo,
+        float $nuevoStock,
+        string $campo = 'stock'
+    ): void {
+        if ($nuevoStock < 0) {
+            throw ValidationException::withMessages([
+                $campo => 'El stock no puede ser negativo.',
+            ]);
+        }
+
+        $insumo->loadMissing('unidadMedida');
+        $stockActualKg = $this->convertirAKg((float) $insumo->stock, $insumo->unidadMedida);
+        $nuevoStockKg = $this->convertirAKg($nuevoStock, $insumo->unidadMedida);
+        $resumen = $this->resumen($almacen);
+        $ocupadoNuevo = $resumen['ocupado_kg'] - $stockActualKg + $nuevoStockKg;
+        $capacidadKg = $resumen['capacidad_kg'];
+
+        if ($capacidadKg <= 0 || $ocupadoNuevo <= $capacidadKg + 0.001) {
+            return;
+        }
+
+        $maximoProductoKg = $resumen['disponible_kg'] + $stockActualKg;
+
+        throw ValidationException::withMessages([
+            $campo => 'El stock indicado supera la capacidad del punto de venta. '
+                .'Capacidad: '.number_format($capacidadKg, 2).' kg · Ocupado: '
+                .number_format($resumen['ocupado_kg'], 2).' kg · Máximo para este producto: '
+                .number_format($maximoProductoKg, 2).' kg.',
+        ]);
+    }
+
     private function insumosEnAlmacen(Almacen $almacen)
     {
         $query = Insumo::query()

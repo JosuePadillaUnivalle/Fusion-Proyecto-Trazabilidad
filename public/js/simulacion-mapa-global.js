@@ -345,9 +345,19 @@
                 credentials: 'same-origin',
                 cache: 'no-store',
             })
-                .then((r) => r.json())
-                .then((data) => sincronizarRutas(data.rutas || []))
-                .catch((e) => console.warn('Mapa global:', e));
+                .then((r) => {
+                    if (r.status === 419 || window.__agrofusionLoggingOut) {
+                        destruirMapaGlobal();
+                        return null;
+                    }
+                    return r.json();
+                })
+                .then((data) => {
+                    if (data) sincronizarRutas(data.rutas || []);
+                })
+                .catch((e) => {
+                    if (!window.__agrofusionLoggingOut) console.warn('Mapa global:', e);
+                });
         }
 
         function tickAnimacion() {

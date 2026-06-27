@@ -39,88 +39,131 @@
 @push('scripts')
 @include('logistica.partials.mapa-ruta-libs')
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+(function () {
     const paradas = @json($paradasMapa);
     const urlTrazado = @json($urlTrazadoRuta ?? null);
-    const modal = document.getElementById('modalMapaRecorrido');
-    if (!modal || !paradas.length) return;
 
-    let mapa = null;
-    let capas = null;
+    function bootMapaRecorridoModal() {
+        const modal = document.getElementById('modalMapaRecorrido');
+        if (!modal || !paradas.length) return;
 
-    function redimensionarMapa() {
-        if (!mapa) return;
-        mapa.invalidateSize({ animate: false });
-    }
+        let mapa = null;
+        let capas = null;
+        let dibujando = false;
 
-    function asegurarMapa() {
-        const el = document.getElementById('mapaRecorridoEnvio');
-        if (!el || !window.L) return null;
-        if (mapa) {
-            redimensionarMapa();
-            return mapa;
+        function redimensionarMapa() {
+            if (!mapa) return;
+            mapa.invalidateSize({ animate: false, pan: false });
         }
-        mapa = L.map(el, { scrollWheelZoom: true }).setView([paradas[0].lat, paradas[0].lng], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap',
-        }).addTo(mapa);
-        capas = L.layerGroup().addTo(mapa);
-        redimensionarMapa();
-        return mapa;
-    }
 
-    async function dibujarRecorrido() {
-        if (!window.L) return;
-        const mapaActivo = asegurarMapa();
-        if (!mapaActivo || !capas) return;
-        redimensionarMapa();
-        capas.clearLayers();
-
-        let routeResult = null;
-        if (urlTrazado) {
-            try {
-                const res = await fetch(urlTrazado);
-                const data = await res.json();
-                if (data.geo) {
-                    routeResult = {
-                        geojson: data.geo,
-                        straight: data.geo?.features?.[0]?.properties?.provider === 'straight',
-                    };
+        function esperarLeaflet() {
+            return new Promise(function (resolve) {
+                if (window.L) {
+                    resolve(true);
+                    return;
                 }
-            } catch (e) {
-                console.warn(e);
-            }
-        }
-
-        if (!routeResult && paradas.length >= 2 && window.RutaPorCalles) {
-            routeResult = await RutaPorCalles.fetchRoute(paradas);
-        }
-
-        redimensionarMapa();
-        if (window.RutaPorCalles) {
-            RutaPorCalles.drawOnMap(mapaActivo, capas, paradas, routeResult);
-        } else {
-            paradas.forEach(function (p, i) {
-                L.marker([p.lat, p.lng]).addTo(capas).bindPopup(p.label || ('Parada ' + (i + 1)));
+                let intentos = 0;
+                const timer = setInterval(function () {
+                    intentos += 1;
+                    if (window.L || intentos > 80) {
+                        clearInterval(timer);
+                        resolve(!!window.L);
+                    }
+                }, 50);
             });
         }
 
-        [100, 300, 600].forEach(function (ms) {
-            setTimeout(redimensionarMapa, ms);
+        function asegurarMapa() {
+            const el = document.getElementById('mapaRecorridoEnvio');
+            if (!el || !window.L) return null;
+            if (mapa) {
+                redimensionarMapa();
+                return mapa;
+            }
+            mapa = L.map(el, { scrollWheelZoom: true }).setView([paradas[0].lat, paradas[0].lng], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap',
+            }).addTo(mapa);
+            capas = L.layerGroup().addTo(mapa);
+            redimensionarMapa();
+            return mapa;
+        }
+
+        async function dibujarRecorrido() {
+            if (dibujando) return;
+            dibujando = true;
+            try {
+                if (!await esperarLeaflet()) return;
+                const mapaActivo = asegurarMapa();
+                if (!mapaActivo || !capas) return;
+                redimensionarMapa();
+                capas.clearLayers();
+
+                let routeResult = null;
+                if (urlTrazado) {
+                    try {
+                        const res = await fetch(urlTrazado);
+                        const data = await res.json();
+                        if (data.geo) {
+                            routeResult = {
+                                geojson: data.geo,
+                                straight: data.geo?.features?.[0]?.properties?.provider === 'straight',
+                            };
+                        }
+                    } catch (e) {
+                        console.warn(e);
+                    }
+                }
+
+                if (!routeResult && paradas.length >= 2 && window.RutaPorCalles) {
+                    routeResult = await RutaPorCalles.fetchRoute(paradas);
+                }
+
+                redimensionarMapa();
+                if (window.RutaPorCalles) {
+                    RutaPorCalles.drawOnMap(mapaActivo, capas, paradas, routeResult);
+                } else {
+                    paradas.forEach(function (p, i) {
+                        L.marker([p.lat, p.lng]).addTo(capas).bindPopup(p.label || ('Parada ' + (i + 1)));
+                    });
+                }
+
+                [50, 150, 350, 700].forEach(function (ms) {
+                    setTimeout(redimensionarMapa, ms);
+                });
+            } finally {
+                dibujando = false;
+            }
+        }
+
+        function alAbrirModal() {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    dibujarRecorrido();
+                });
+            });
+        }
+
+        document.querySelectorAll('[data-target="#modalMapaRecorrido"], [data-bs-target="#modalMapaRecorrido"]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                setTimeout(redimensionarMapa, 0);
+            });
         });
+
+        if (window.jQuery) {
+            window.jQuery(modal).on('shown.bs.modal', alAbrirModal);
+        } else {
+            modal.addEventListener('shown.bs.modal', alAbrirModal);
+        }
     }
 
-    function alAbrirModal() {
-        setTimeout(dibujarRecorrido, 200);
-    }
-
-    if (window.jQuery) {
-        window.jQuery(modal).on('shown.bs.modal', alAbrirModal);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootMapaRecorridoModal);
     } else {
-        modal.addEventListener('shown.bs.modal', alAbrirModal);
+        bootMapaRecorridoModal();
     }
-});
+})();
 </script>
 @endpush
 @endif

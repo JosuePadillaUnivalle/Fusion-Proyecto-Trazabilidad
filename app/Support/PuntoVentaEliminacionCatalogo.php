@@ -6,7 +6,7 @@ use App\Models\PedidoDistribucion;
 use App\Models\PuntoVenta;
 use App\Models\RutaDistribucionParada;
 use App\Models\SolicitudProduccionPlanta;
-use App\Services\PuntoVentaAlmacenService;
+use App\Services\AlmacenCapacidadService;
 
 final class PuntoVentaEliminacionCatalogo
 {
@@ -14,11 +14,12 @@ final class PuntoVentaEliminacionCatalogo
     public static function evaluar(PuntoVenta $punto): array
     {
         $stock = self::stockTotalEnPunto($punto);
-        if ($stock > 0) {
+        if ($stock > 0.0001) {
             return [
                 'ok' => false,
                 'titulo' => 'Inventario con stock',
-                'mensaje' => 'No se puede eliminar «'.$punto->nombre.'» mientras tenga productos en inventario. '
+                'mensaje' => 'No se puede eliminar «'.$punto->nombre.'» mientras tenga productos en inventario ('
+                    .number_format($stock, 2, ',', '.').' kg en depósito). '
                     .'Vacíe el stock del punto de venta antes de eliminarlo.',
             ];
         }
@@ -45,9 +46,17 @@ final class PuntoVentaEliminacionCatalogo
 
     public static function stockTotalEnPunto(PuntoVenta $punto): float
     {
-        $insumos = app(PuntoVentaAlmacenService::class)->insumosEnPuntoVenta($punto);
+        $punto->loadMissing('almacen');
+        if ($punto->almacen === null) {
+            return 0.0;
+        }
 
-        return (float) $insumos->sum(fn ($insumo) => (float) $insumo->stock);
+        return app(AlmacenCapacidadService::class)->ocupadoKg($punto->almacen);
+    }
+
+    public static function estaVacio(PuntoVenta $punto): bool
+    {
+        return self::stockTotalEnPunto($punto) <= 0.0001;
     }
 
     public static function cancelarPedidosPendientes(PuntoVenta $punto): int

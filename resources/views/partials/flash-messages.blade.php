@@ -15,7 +15,7 @@
     </div>
 @endif
 
-@if (session('error') && ! session('error_modal'))
+@if (session('error') && ! session('error_modal') && session('error') !== 'El pedido debe estar aceptado y sin transportista asignado.')
     <div class="ag-flash ag-flash--error" role="alert">
         <span class="ag-flash__icon"><i class="fas fa-ban"></i></span>
         <span class="ag-flash__text">{{ session('error') }}</span>

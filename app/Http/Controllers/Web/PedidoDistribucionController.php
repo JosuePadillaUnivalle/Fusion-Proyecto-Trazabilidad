@@ -848,6 +848,17 @@ class PedidoDistribucionController extends Controller
                 (int) auth()->id()
             );
         } catch (\Throwable $e) {
+            $pedido->refresh();
+            if (PedidoDistribucionCatalogo::tieneTransportistaDesignado($pedido)) {
+                return redirect()
+                    ->route('punto-venta.pedidos.show', [
+                        'pedido' => $pedido,
+                        'ctx' => 'mayorista',
+                        'paso' => 4,
+                    ])
+                    ->with('success', 'Transportista y vehículo ya estaban asignados.');
+            }
+
             return back()
                 ->withInput()
                 ->with('error', $e->getMessage());

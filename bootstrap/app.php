@@ -54,7 +54,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            $mensaje = EliminacionSegura::mensajeGenerico();
+            $mensaje = $request->isMethod('DELETE')
+                ? EliminacionSegura::mensajeGenerico()
+                : 'No se pudo completar la operación por una referencia de datos inconsistente. '
+                    .'Revise los datos vinculados o contacte al administrador.';
 
             if ($request->expectsJson()) {
                 return response()->json(['message' => $mensaje], 422);
@@ -64,7 +67,9 @@ return Application::configure(basePath: dirname(__DIR__))
                 return back()->with([
                     'error' => $mensaje,
                     'error_modal' => true,
-                    'error_modal_titulo' => 'No se puede eliminar',
+                    'error_modal_titulo' => $request->isMethod('DELETE')
+                        ? 'No se puede eliminar'
+                        : 'No se pudo completar',
                 ]);
             }
 

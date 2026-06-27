@@ -24,6 +24,7 @@
         if (!paginaActiva || enLogoutActivo()) {
             return false;
         }
+        destruirSimulacion();
         window.location.reload();
 
         return true;

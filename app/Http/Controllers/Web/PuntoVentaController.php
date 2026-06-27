@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Insumo;
 use App\Models\PuntoVenta;
 use App\Models\Usuario;
+use App\Services\AlmacenCapacidadService;
 use App\Services\PuntoVentaAlmacenService;
 use App\Services\PuntoVentaInventarioPresentacionService;
 use App\Support\CuentaEstado;
@@ -18,11 +19,11 @@ use Illuminate\View\View;
 
 class PuntoVentaController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, AlmacenCapacidadService $capacidadService): View
     {
         $user = $request->user();
         $query = PuntoVentaAccess::scopePuntosDelUsuario(
-            PuntoVenta::query()->with(['minorista', 'almacen']),
+            PuntoVenta::query()->with(['minorista', 'almacen.unidadMedida']),
             $user
         );
 
@@ -46,7 +47,32 @@ class PuntoVentaController extends Controller
         $puntos = $query->orderByDesc('puntoventaid')->get();
         $esAdmin = UsuarioRol::esAdminGlobal($user);
 
-        return view('punto_venta.puntos.index', compact('puntos', 'esAdmin'));
+        $ocupacionPorPunto = [];
+        $eliminacionPorPunto = [];
+        $stockTotalKg = 0.0;
+        foreach ($puntos as $punto) {
+            if ($punto->almacen) {
+                $resumen = $capacidadService->resumen($punto->almacen);
+            } else {
+                $resumen = [
+                    'ocupado_kg' => 0.0,
+                    'capacidad_kg' => 0.0,
+                    'disponible_kg' => 0.0,
+                    'porcentaje' => 0.0,
+                ];
+            }
+            $ocupacionPorPunto[$punto->puntoventaid] = $resumen;
+            $eliminacionPorPunto[$punto->puntoventaid] = PuntoVentaEliminacionCatalogo::evaluar($punto);
+            $stockTotalKg += (float) $resumen['ocupado_kg'];
+        }
+
+        return view('punto_venta.puntos.index', compact(
+            'puntos',
+            'esAdmin',
+            'ocupacionPorPunto',
+            'eliminacionPorPunto',
+            'stockTotalKg'
+        ));
     }
 
     public function create(Request $request): View
@@ -78,13 +104,17 @@ class PuntoVentaController extends Controller
             'latitud' => 'required|numeric|between:-90,90',
             'longitud' => 'required|numeric|between:-180,180',
             'observaciones' => 'nullable|string|max:1000',
+            'capacidad' => 'required|numeric|min:0.01',
         ];
 
         if ($esAdmin) {
             $rules['usuarioid'] = 'required|integer|exists:usuario,usuarioid';
         }
 
-        $data = $request->validate($rules);
+        $data = $request->validate($rules, [
+            'capacidad.min' => 'La capacidad debe ser mayor a 0 kg.',
+            'capacidad.required' => 'Indique la capacidad del depósito en kilogramos.',
+        ]);
 
         if ($esAdmin) {
             $responsable = Usuario::query()->findOrFail((int) $data['usuarioid']);
@@ -109,7 +139,10 @@ class PuntoVentaController extends Controller
             'fechacreacion' => now(),
         ]);
 
-        app(PuntoVentaAlmacenService::class)->crearAlmacenParaPuntoVenta($puntoVenta);
+        app(PuntoVentaAlmacenService::class)->crearAlmacenParaPuntoVenta(
+            $puntoVenta,
+            (float) $data['capacidad']
+        );
 
         return redirect()
             ->route('punto-venta.puntos.show', $puntoVenta)
@@ -128,20 +161,24 @@ class PuntoVentaController extends Controller
             ->limit(10)
             ->get();
 
-        return view('punto_venta.puntos.show', compact('punto', 'lineasInventario', 'pedidos'));
+        $evalEliminacion = PuntoVentaEliminacionCatalogo::evaluar($punto);
+
+        return view('punto_venta.puntos.show', compact('punto', 'lineasInventario', 'pedidos', 'evalEliminacion'));
     }
 
     public function edit(PuntoVenta $punto): View
     {
         abort_unless(PuntoVentaAccess::puedeEditarPunto(auth()->user(), $punto), 403);
 
+        $punto->load('almacen');
         $minoristas = $this->minoristasParaSelector(auth()->user());
         $puntosMapa = $this->puntosParaMapa(auth()->user(), $punto->puntoventaid);
+        $evalEliminacion = PuntoVentaEliminacionCatalogo::evaluar($punto);
 
-        return view('punto_venta.puntos.edit', compact('punto', 'minoristas', 'puntosMapa'));
+        return view('punto_venta.puntos.edit', compact('punto', 'minoristas', 'puntosMapa', 'evalEliminacion'));
     }
 
-    public function update(Request $request, PuntoVenta $punto): RedirectResponse
+    public function update(Request $request, PuntoVenta $punto, AlmacenCapacidadService $capacidadService): RedirectResponse
     {
         abort_unless(PuntoVentaAccess::puedeEditarPunto(auth()->user(), $punto), 403);
 
@@ -157,6 +194,7 @@ class PuntoVentaController extends Controller
             'latitud' => 'required|numeric|between:-90,90',
             'longitud' => 'required|numeric|between:-180,180',
             'observaciones' => 'nullable|string|max:1000',
+            'capacidad' => 'required|numeric|min:0.01',
             'activo' => 'sometimes|boolean',
         ];
 
@@ -164,7 +202,12 @@ class PuntoVentaController extends Controller
             $rules['usuarioid'] = 'required|integer|exists:usuario,usuarioid';
         }
 
-        $data = $request->validate($rules);
+        $data = $request->validate($rules, [
+            'capacidad.min' => 'La capacidad debe ser mayor a 0 kg.',
+            'capacidad.required' => 'Indique la capacidad del depósito en kilogramos.',
+        ]);
+
+        $punto->load('almacen');
 
         if ($esAdmin) {
             $responsable = Usuario::query()->findOrFail((int) $data['usuarioid']);
@@ -189,9 +232,19 @@ class PuntoVentaController extends Controller
         ]);
 
         if ($punto->almacen) {
+            $ocupadoKg = $capacidadService->ocupadoKg($punto->almacen);
+            if ((float) $data['capacidad'] < $ocupadoKg - 0.001) {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        'capacidad' => 'La capacidad no puede ser menor al stock actual ('.number_format($ocupadoKg, 2, ',', '.').' kg).',
+                    ]);
+            }
+
             app(PuntoVentaAlmacenService::class)->sincronizarNombreAlmacen($punto, $punto->almacen);
             $almacenUpdate = [
                 'ubicacion' => $punto->direccion,
+                'capacidad' => (float) $data['capacidad'],
             ];
             if (\Illuminate\Support\Facades\Schema::hasColumn('almacen', 'responsable_usuarioid')) {
                 $almacenUpdate['responsable_usuarioid'] = $usuarioidResponsable;

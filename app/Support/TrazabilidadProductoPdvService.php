@@ -1333,8 +1333,9 @@ class TrazabilidadProductoPdvService
             $lineas[] = 'Operador: '.$operador;
         }
         if ($registro->hora_inicio && $registro->hora_fin) {
-            $minutos = $registro->hora_inicio->diffInMinutes($registro->hora_fin);
-            if ($minutos > 0) {
+            $segundos = (int) $registro->hora_inicio->diffInSeconds($registro->hora_fin);
+            if ($segundos > 0) {
+                $minutos = max(1, (int) round($segundos / 60));
                 $lineas[] = 'Duración: '.$minutos.' min';
             }
         }

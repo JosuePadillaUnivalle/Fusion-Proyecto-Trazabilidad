@@ -190,7 +190,29 @@ class PedidoDistribucionMayoristaService
 
         if (! PedidoDistribucionCatalogo::puedeDesignarTransportista($pedido)) {
 
-            throw new InvalidArgumentException('El pedido debe estar aceptado y sin transportista asignado.');
+            if (PedidoDistribucionCatalogo::tieneTransportistaDesignado($pedido)) {
+
+                return $pedido->fresh([
+
+                    'detalles.insumo.unidadMedida',
+
+                    'detalles.presentacion',
+
+                    'puntoVenta.minorista',
+
+                    'almacenMayoristaOrigen',
+
+                    'transportista',
+
+                    'vehiculo',
+
+                    'rutaDistribucion',
+
+                ]);
+
+            }
+
+            throw new InvalidArgumentException('El pedido no está listo para asignar transportista.');
 
         }
 

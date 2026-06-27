@@ -45,6 +45,7 @@
             <a href="{{ route('punto-venta.puntos.edit', $punto) }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-edit mr-1"></i> Editar</a>
             @endcan
             @can('punto_venta.delete')
+            @if($evalEliminacion['ok'] ?? false)
             <form method="POST" action="{{ route('punto-venta.puntos.destroy', $punto) }}" class="d-inline">
                 @csrf
                 @method('DELETE')
@@ -56,6 +57,12 @@
                     <i class="fas fa-trash mr-1"></i> Eliminar
                 </button>
             </form>
+            @else
+            <button type="button" class="btn btn-outline-danger btn-sm" disabled
+                title="{{ $evalEliminacion['mensaje'] ?? 'Vacíe el depósito para eliminar' }}">
+                <i class="fas fa-trash mr-1"></i> Eliminar
+            </button>
+            @endif
             @endcan
         </div>
     </div>

@@ -5,6 +5,8 @@
     $latInicial = old('latitud', $punto?->latitud ?? -17.7833);
     $lngInicial = old('longitud', $punto?->longitud ?? -63.1821);
     $puntosMapa = $puntosMapa ?? [];
+    $capacidadDefault = \App\Services\PuntoVentaAlmacenService::CAPACIDAD_DEFAULT_KG;
+    $capacidadValor = old('capacidad', $punto?->almacen?->capacidad ?? $capacidadDefault);
 @endphp
 
 @if($errors->any())
@@ -70,6 +72,23 @@
             <label for="observaciones"><i class="fas fa-sticky-note mr-1"></i> Observaciones</label>
             <textarea name="observaciones" id="observaciones" rows="2" class="form-control"
                 placeholder="Horario, referencias adicionales…">{{ old('observaciones', $punto?->observaciones) }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="capacidad"><i class="fas fa-weight-hanging mr-1"></i> Capacidad del depósito (kg) <span class="text-danger">*</span></label>
+            <div class="input-group">
+                <input type="number" step="0.01" min="0.01" name="capacidad" id="capacidad" required
+                    class="form-control @error('capacidad') is-invalid @enderror"
+                    value="{{ $capacidadValor }}"
+                    placeholder="Ej. {{ number_format($capacidadDefault, 0, ',', '.') }}">
+                <div class="input-group-append">
+                    <span class="input-group-text">kg</span>
+                </div>
+            </div>
+            <p class="pdv-campo-guia mb-0">
+                Espacio máximo que puede almacenar este punto de venta. Se usa para la barra de ocupación y para validar recepciones.
+            </p>
+            @error('capacidad')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
         </div>
 
         @if($esEdicion)

@@ -52,6 +52,12 @@ class RecepcionPuntoVentaService
             throw new \InvalidArgumentException('No se pudo vincular el almacén del punto de venta.');
         }
 
+        $kgRecepcion = 0.0;
+        foreach ($this->gruposConsolidadosConDetalle($pedido->detalles) as $item) {
+            $kgRecepcion += (float) ($item['grupo']['cantidad_kg'] ?? 0);
+        }
+        app(PuntoVentaAlmacenService::class)->validarIngresoPedido($puntoVenta, $kgRecepcion);
+
         $tipoIngreso = TipoMovimientoAlmacen::activosPorNaturaleza('ingreso')->firstOrFail();
         $tipoSalida = TipoMovimientoAlmacen::activosPorNaturaleza('salida')->firstOrFail();
 

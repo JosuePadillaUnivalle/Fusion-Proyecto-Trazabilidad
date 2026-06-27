@@ -43,7 +43,15 @@
                         <div class="form-row">
                             <div class="form-group col-md-6">
                                 <label>Stock</label>
-                                <input type="number" name="stock" class="form-control" value="{{ old('stock', $insumo->stock) }}" min="0" step="0.01" required>
+                                <input type="number" name="stock" class="form-control @error('stock') is-invalid @enderror"
+                                    value="{{ old('stock', $insumo->stock) }}" min="0" step="0.01" required>
+                                @error('stock')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                @if($resumenCapacidad)
+                                <small class="form-text text-muted">
+                                    Depósito: {{ number_format($resumenCapacidad['ocupado_kg'], 2, ',', '.') }} / {{ number_format($resumenCapacidad['capacidad_kg'], 0, ',', '.') }} kg
+                                    · {{ number_format($resumenCapacidad['disponible_kg'], 2, ',', '.') }} kg libres
+                                </small>
+                                @endif
                             </div>
                             <div class="form-group col-md-6">
                                 <label>Stock mínimo</label>

@@ -12,7 +12,7 @@
         </div>
         <form method="POST" action="{{ route('punto-venta.pedidos.confirmar-envio-mayorista', $pedido) }}" class="js-form-confirmar-envio-mayorista">
             @csrf
-            <button type="submit" class="btn btn-success btn-block"
+            <button type="submit" class="btn btn-success btn-block js-btn-confirmar-envio-mayorista"
                 data-confirm-modal
                 data-confirm-title="Confirmar envío"
                 data-confirm-message="¿Confirma que espera este envío en su punto de venta? El transportista podrá continuar con el cierre operativo."
@@ -23,3 +23,17 @@
         </form>
     </div>
 </div>
+@once
+@push('scripts')
+<script>
+document.addEventListener('submit', function (e) {
+    const form = e.target.closest('.js-form-confirmar-envio-mayorista');
+    if (!form) return;
+    const btn = form.querySelector('.js-btn-confirmar-envio-mayorista');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Confirmando…';
+});
+</script>
+@endpush
+@endonce

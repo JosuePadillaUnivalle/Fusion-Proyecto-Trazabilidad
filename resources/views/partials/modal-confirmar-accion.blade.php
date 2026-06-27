@@ -148,10 +148,18 @@
         }
 
         const enviar = function () {
-            if (submitter && typeof form.requestSubmit === 'function') {
-                form.requestSubmit(submitter);
-                return;
+            const submitterValido = submitter
+                && (submitter.type === 'submit' || submitter.getAttribute('type') === 'submit');
+
+            if (submitterValido && typeof form.requestSubmit === 'function') {
+                try {
+                    form.requestSubmit(submitter);
+                    return;
+                } catch (err) {
+                    // Fallback si el navegador rechaza el submitter.
+                }
             }
+
             if (submitter && submitter.hasAttribute('formaction')) {
                 const prevAction = form.action;
                 const prevMethod = form.method;
@@ -164,6 +172,7 @@
                 form.method = prevMethod;
                 return;
             }
+
             enviarFormularioPendiente(form, submitter);
         };
 
@@ -263,6 +272,16 @@
                 restaurarBotonConfirmar();
             });
         }
+
+        document.addEventListener('submit', function (e) {
+            const form = e.target.closest('#form-finalizar-cierre-traslado, #form-finalizar-cierre-agricola');
+            if (!form) return;
+            const btn = form.querySelector('[data-confirm-submit]');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="cierre-ag-btn-finalizar__icon"><i class="fas fa-spinner fa-spin"></i></span> Finalizando entrega…';
+            }
+        });
     }
 })();
 </script>

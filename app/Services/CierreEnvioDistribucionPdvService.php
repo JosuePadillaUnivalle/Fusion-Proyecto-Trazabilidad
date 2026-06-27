@@ -453,8 +453,12 @@ class CierreEnvioDistribucionPdvService
             ->first();
 
         if ($existente) {
-            if ($primerPedido && ! $existente->pedidoid) {
-                $existente->update(['pedidoid' => $primerPedido->pedidodistribucionid]);
+            if ($primerPedido) {
+                $existente->update([
+                    'metadata' => array_merge($existente->metadata ?? [], [
+                        'pedidodistribucionid' => $primerPedido->pedidodistribucionid,
+                    ]),
+                ]);
             }
             DocumentoEntregaArchivo::generarPdfOperativo($existente);
 
@@ -463,7 +467,7 @@ class CierreEnvioDistribucionPdvService
 
         $documento = DocumentoEntrega::create([
             'externo_envio_id' => $codigo,
-            'pedidoid' => $primerPedido?->pedidodistribucionid,
+            'pedidoid' => null,
             'usuarioid' => $usuario->usuarioid,
             'tipo_documento' => 'guia_transporte',
             'titulo' => 'Comprobante de entrega PDV — '.$codigo,
@@ -472,6 +476,7 @@ class CierreEnvioDistribucionPdvService
             'metadata' => [
                 'envio_cierre_mayorista_pdv' => true,
                 'rutadistribucionid' => $ruta->rutadistribucionid,
+                'pedidodistribucionid' => $primerPedido?->pedidodistribucionid,
             ],
         ]);
 

@@ -13,7 +13,9 @@ use Illuminate\Support\Facades\Schema;
 
 class PuntoVentaAlmacenService
 {
-    public function crearAlmacenParaPuntoVenta(PuntoVenta $puntoVenta): Almacen
+    public const CAPACIDAD_DEFAULT_KG = 500;
+
+    public function crearAlmacenParaPuntoVenta(PuntoVenta $puntoVenta, ?float $capacidadKg = null): Almacen
     {
         if ($puntoVenta->almacenid) {
             $almacen = Almacen::query()->findOrFail($puntoVenta->almacenid);
@@ -32,7 +34,7 @@ class PuntoVentaAlmacenService
             'nombre' => $this->nombreAlmacenParaPuntoVenta($puntoVenta),
             'descripcion' => 'Inventario del punto de venta '.$puntoVenta->nombre,
             'ubicacion' => $this->ubicacionAlmacenParaPuntoVenta($puntoVenta),
-            'capacidad' => 500,
+            'capacidad' => max(0.01, (float) ($capacidadKg ?? self::CAPACIDAD_DEFAULT_KG)),
             'unidadmedidaid' => $unidadId,
             'tipoalmacenid' => $tipoAlmacenId,
             'ambito' => AlmacenAmbito::PUNTO_VENTA,

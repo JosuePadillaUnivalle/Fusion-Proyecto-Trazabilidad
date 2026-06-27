@@ -1301,6 +1301,15 @@ document.addEventListener('DOMContentLoaded', function () {
             btnConfirmar.getAttribute('data-confirm-tone') || 'success'
         );
     });
+
+    form?.addEventListener('submit', function () {
+        if (!btnConfirmar) return;
+        btnConfirmar.disabled = true;
+        btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Asignando transportista…';
+        form.querySelectorAll('button, input, select').forEach(function (el) {
+            if (el !== btnConfirmar) el.disabled = true;
+        });
+    });
 });
 </script>
 @endpush

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Insumo;
 use App\Models\PuntoVenta;
 use App\Services\InventarioAlmacenProductoService;
+use App\Services\AlmacenCapacidadService;
 use App\Services\PuntoVentaInventarioPresentacionService;
 use App\Support\EliminacionSegura;
 use App\Support\PuntoVentaAccess;
@@ -46,15 +47,23 @@ class PuntoVentaInventarioController extends Controller
         ]);
     }
 
-    public function edit(PuntoVenta $punto, Insumo $insumo): View
+    public function edit(PuntoVenta $punto, Insumo $insumo, AlmacenCapacidadService $capacidadService): View
     {
         $this->autorizarInsumo($punto, $insumo);
 
-        return view('punto_venta.puntos.inventario.edit', compact('punto', 'insumo'));
+        $resumenCapacidad = $punto->almacen
+            ? $capacidadService->resumen($punto->almacen)
+            : null;
+
+        return view('punto_venta.puntos.inventario.edit', compact('punto', 'insumo', 'resumenCapacidad'));
     }
 
-    public function update(Request $request, PuntoVenta $punto, Insumo $insumo): RedirectResponse
-    {
+    public function update(
+        Request $request,
+        PuntoVenta $punto,
+        Insumo $insumo,
+        AlmacenCapacidadService $capacidadService
+    ): RedirectResponse {
         $this->autorizarInsumo($punto, $insumo);
 
         $data = $request->validate([
@@ -62,7 +71,20 @@ class PuntoVentaInventarioController extends Controller
             'stock' => 'required|numeric|min:0',
             'stockminimo' => 'nullable|numeric|min:0',
             'descripcion' => 'nullable|string|max:500',
+        ], [
+            'stock.min' => 'El stock no puede ser negativo.',
+            'stockminimo.min' => 'El stock mínimo no puede ser negativo.',
         ]);
+
+        $almacen = $punto->almacen;
+        abort_unless($almacen !== null, 404);
+
+        $capacidadService->validarOcupacionTrasCambioInsumo(
+            $almacen,
+            $insumo,
+            (float) $data['stock'],
+            'stock'
+        );
 
         $insumo->update([
             'nombre' => $data['nombre'],
