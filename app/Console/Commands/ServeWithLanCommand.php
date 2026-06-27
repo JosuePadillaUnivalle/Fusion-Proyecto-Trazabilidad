@@ -22,7 +22,7 @@ class ServeWithLanCommand extends ServeCommand
     {
         return [
             ['host', null, InputOption::VALUE_OPTIONAL, 'The host address to serve the application on (auto = IP WiFi actual)', Env::get('SERVER_HOST', 'auto')],
-            ['port', null, InputOption::VALUE_OPTIONAL, 'The port to serve the application on', Env::get('SERVER_PORT')],
+            ['port', null, InputOption::VALUE_OPTIONAL, 'The port to serve the application on', $this->puertoPorDefecto()],
             ['tries', null, InputOption::VALUE_OPTIONAL, 'The max number of ports to attempt to serve from', 10],
             ['no-reload', null, InputOption::VALUE_NONE, 'Do not reload the development server on .env file changes'],
         ];
@@ -30,6 +30,12 @@ class ServeWithLanCommand extends ServeCommand
 
     public function handle()
     {
+        if ($this->debeUsarModoProduccion()) {
+            $this->configurarHostPuertoProduccion();
+
+            return parent::handle();
+        }
+
         $this->aplicarHostWifiActual();
 
         $port = (int) $this->port();
@@ -94,5 +100,27 @@ class ServeWithLanCommand extends ServeCommand
         }
 
         return false;
+    }
+
+    private function debeUsarModoProduccion(): bool
+    {
+        return app()->environment('production')
+            || getenv('RAILWAY_ENVIRONMENT')
+            || getenv('RAILWAY_PROJECT_ID')
+            || getenv('RAILWAY_SERVICE_ID');
+    }
+
+    private function configurarHostPuertoProduccion(): void
+    {
+        $this->input->setOption('host', '0.0.0.0');
+        $port = getenv('PORT') ?: env('PORT') ?: env('SERVER_PORT') ?: 8080;
+        $this->input->setOption('port', (string) max(1, (int) $port));
+    }
+
+    private function puertoPorDefecto(): ?string
+    {
+        $port = getenv('PORT') ?: env('PORT') ?: env('SERVER_PORT');
+
+        return $port !== null && $port !== '' ? (string) (int) $port : null;
     }
 }

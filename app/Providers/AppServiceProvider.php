@@ -17,9 +17,20 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->extend(\Illuminate\Foundation\Console\ServeCommand::class, function ($command, $app) {
-            return new \App\Console\Commands\ServeWithLanCommand;
-        });
+        if ($this->debeUsarServeLan()) {
+            $this->app->extend(\Illuminate\Foundation\Console\ServeCommand::class, function ($command, $app) {
+                return new \App\Console\Commands\ServeWithLanCommand;
+            });
+        }
+    }
+
+    private function debeUsarServeLan(): bool
+    {
+        if (getenv('RAILWAY_ENVIRONMENT') || getenv('RAILWAY_PROJECT_ID') || getenv('RAILWAY_SERVICE_ID')) {
+            return false;
+        }
+
+        return $this->app->environment('local');
     }
 
     /**
