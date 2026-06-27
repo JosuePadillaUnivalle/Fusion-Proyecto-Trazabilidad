@@ -13,8 +13,8 @@ return new class extends Migration
         }
 
         $ids = DB::table('pedido_distribucion')
-            ->whereRaw('UPPER(COALESCE(numero_solicitud, "")) LIKE ?', ['%DEMO%'])
-            ->orWhereRaw('UPPER(COALESCE(observaciones, "")) LIKE ?', ['%[DEMO%'])
+            ->whereRaw("UPPER(COALESCE(numero_solicitud, '')) LIKE ?", ['%DEMO%'])
+            ->orWhereRaw("UPPER(COALESCE(observaciones, '')) LIKE ?", ['%[DEMO%'])
             ->pluck('pedidodistribucionid');
 
         if ($ids->isEmpty()) {
