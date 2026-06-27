@@ -78,6 +78,20 @@ return new class extends Migration
                 }
             });
         }
+
+        if (Schema::hasTable('detalle_pedido_distribucion')
+            && Schema::hasColumn('detalle_pedido_distribucion', 'inventario_presentacion_loteid')) {
+            try {
+                Schema::table('detalle_pedido_distribucion', function (Blueprint $table) {
+                    $table->foreign('inventario_presentacion_loteid', 'det_ped_dist_inv_pres_lote_fk')
+                        ->references('inventario_presentacion_loteid')
+                        ->on('inventario_presentacion_lote')
+                        ->nullOnDelete();
+                });
+            } catch (\Throwable) {
+                // FK ya aplicada por migración anterior.
+            }
+        }
     }
 
     public function down(): void

@@ -22,15 +22,33 @@ return new class extends Migration
             }
             if (! Schema::hasColumn('detalle_pedido_distribucion', 'inventario_presentacion_loteid')) {
                 $table->unsignedBigInteger('inventario_presentacion_loteid')->nullable()->after('insumo_presentacionid');
-                $table->foreign('inventario_presentacion_loteid')
-                    ->references('inventario_presentacion_loteid')
-                    ->on('inventario_presentacion_lote')
-                    ->nullOnDelete();
             }
             if (! Schema::hasColumn('detalle_pedido_distribucion', 'referencia_lote')) {
                 $table->string('referencia_lote', 80)->nullable()->after('inventario_presentacion_loteid');
             }
         });
+
+        if (Schema::hasTable('inventario_presentacion_lote')) {
+            $this->agregarFkInventarioPresentacionLote();
+        }
+    }
+
+    private function agregarFkInventarioPresentacionLote(): void
+    {
+        if (! Schema::hasColumn('detalle_pedido_distribucion', 'inventario_presentacion_loteid')) {
+            return;
+        }
+
+        try {
+            Schema::table('detalle_pedido_distribucion', function (Blueprint $table) {
+                $table->foreign('inventario_presentacion_loteid', 'det_ped_dist_inv_pres_lote_fk')
+                    ->references('inventario_presentacion_loteid')
+                    ->on('inventario_presentacion_lote')
+                    ->nullOnDelete();
+            });
+        } catch (\Throwable) {
+            // FK ya existe (re-ejecución o entorno con orden distinto de migraciones).
+        }
     }
 
     public function down(): void
@@ -45,7 +63,15 @@ return new class extends Migration
                 $table->dropColumn('almacen_mayorista_origenid');
             }
             if (Schema::hasColumn('detalle_pedido_distribucion', 'inventario_presentacion_loteid')) {
-                $table->dropForeign(['inventario_presentacion_loteid']);
+                try {
+                    $table->dropForeign('det_ped_dist_inv_pres_lote_fk');
+                } catch (\Throwable) {
+                    try {
+                        $table->dropForeign(['inventario_presentacion_loteid']);
+                    } catch (\Throwable) {
+                        // Sin FK previa.
+                    }
+                }
                 $table->dropColumn('inventario_presentacion_loteid');
             }
             if (Schema::hasColumn('detalle_pedido_distribucion', 'referencia_lote')) {
