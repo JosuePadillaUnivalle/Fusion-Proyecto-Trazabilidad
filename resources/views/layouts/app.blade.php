@@ -1755,6 +1755,11 @@
     document.querySelectorAll('a[href*="logout"]').forEach(function (link) {
         link.addEventListener('click', function () {
             try { sessionStorage.removeItem('agrofusion_envio_borrador_v1'); } catch (err) {}
+            if (window.SimulacionRuta && typeof window.SimulacionRuta.marcarLogout === 'function') {
+                window.SimulacionRuta.marcarLogout();
+            } else {
+                window.__agrofusionLoggingOut = true;
+            }
         });
     });
 

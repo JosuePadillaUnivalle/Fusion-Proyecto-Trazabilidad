@@ -99,6 +99,14 @@ class SimulacionRutaService
                     'fecha_envio' => now(),
                 ]);
             }
+
+            $usuarioSalida = Usuario::query()->find($ruta->transportista_usuarioid)
+                ?? Usuario::query()->find($ruta->creado_por_usuarioid);
+
+            if ($usuarioSalida !== null) {
+                app(PedidoDistribucionSalidaMayoristaService::class)
+                    ->descontarPedidosDeRuta($ruta, $usuarioSalida);
+            }
         });
     }
 

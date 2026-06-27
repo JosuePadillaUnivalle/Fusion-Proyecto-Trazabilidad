@@ -182,7 +182,9 @@ class PedidoDistribucionMayoristaService
 
         int $vehiculoId,
 
-        int $creadoPorId
+        int $creadoPorId,
+
+        ?array $almacenesRecogidaOrden = null
 
     ): PedidoDistribucion {
 
@@ -228,40 +230,42 @@ class PedidoDistribucionMayoristaService
 
 
 
-        return DB::transaction(function () use ($pedido, $transportistaId, $vehiculoId, $creadoPorId, $almacen, $pdv) {
+        return DB::transaction(function () use ($pedido, $transportistaId, $vehiculoId, $creadoPorId, $almacen, $pdv, $almacenesRecogidaOrden) {
 
-            $coordsOrigen = UbicacionGpsParser::resolverAlmacen(
-                (int) $almacen->almacenid,
-                $almacen->nombre,
-                $almacen->ubicacion
-            );
+            $almacenesOrigen = $this->almacenesRecogidaOrdenados($pedido, $almacenesRecogidaOrden);
+            if ($almacenesOrigen === []) {
+                $almacenesOrigen = [$almacen];
+            }
+
+            $waypoints = [];
+            foreach ($almacenesOrigen as $alm) {
+                $coords = UbicacionGpsParser::resolverAlmacen(
+                    (int) $alm->almacenid,
+                    $alm->nombre,
+                    $alm->ubicacion
+                );
+                if ($coords['lat'] !== null && $coords['lng'] !== null) {
+                    $waypoints[] = ['lat' => (float) $coords['lat'], 'lng' => (float) $coords['lng']];
+                }
+            }
+            $waypoints[] = ['lat' => (float) $pdv->latitud, 'lng' => (float) $pdv->longitud];
+
             $costoBs = null;
-            if ($coordsOrigen['lat'] !== null && $coordsOrigen['lng'] !== null) {
-                $estimacion = app(CostoEnvioRutaService::class)->calcular([
-                    ['lat' => (float) $coordsOrigen['lat'], 'lng' => (float) $coordsOrigen['lng']],
-                    ['lat' => (float) $pdv->latitud, 'lng' => (float) $pdv->longitud],
-                ]);
+            if (count($waypoints) >= 2) {
+                $estimacion = app(CostoEnvioRutaService::class)->calcular($waypoints);
                 if (($estimacion['costo_bs'] ?? 0) > 0) {
                     $costoBs = (float) $estimacion['costo_bs'];
                 }
             }
 
-            app(DistribucionRutaService::class)->crear(
-
-                $almacen,
-
-                [$pedido->pedidodistribucionid],
-
+            app(DistribucionRutaService::class)->crearEnvioDirectoPedido(
+                $almacenesOrigen,
+                $pedido,
                 $transportistaId,
-
                 $vehiculoId,
-
                 $creadoPorId,
-
                 'Envío directo '.$pedido->numero_solicitud,
-
                 $costoBs
-
             );
 
 
@@ -515,6 +519,47 @@ class PedidoDistribucionMayoristaService
 
             return $pedido->fresh(['detalles.insumo.unidadMedida', 'puntoVenta.minorista', 'almacenMayoristaOrigen']);
         });
+    }
+
+    /** @return array<int, Almacen> */
+    private function almacenesRecogidaOrdenados(PedidoDistribucion $pedido, ?array $ordenPreferido = null): array
+    {
+        $pedido->loadMissing('detalles');
+
+        $idsOrdenados = array_values(array_filter(array_map('intval', $ordenPreferido ?? [])));
+
+        if ($idsOrdenados === []) {
+            foreach ($pedido->detalles as $detalle) {
+                $id = (int) ($detalle->almacen_mayorista_origenid ?? 0);
+                if ($id > 0 && ! in_array($id, $idsOrdenados, true)) {
+                    $idsOrdenados[] = $id;
+                }
+            }
+        } else {
+            foreach ($pedido->detalles as $detalle) {
+                $id = (int) ($detalle->almacen_mayorista_origenid ?? 0);
+                if ($id > 0 && ! in_array($id, $idsOrdenados, true)) {
+                    $idsOrdenados[] = $id;
+                }
+            }
+        }
+
+        if ($idsOrdenados === [] && $pedido->almacen_mayorista_origenid) {
+            $idsOrdenados[] = (int) $pedido->almacen_mayorista_origenid;
+        }
+
+        if ($idsOrdenados === []) {
+            return [];
+        }
+
+        $posicion = array_flip($idsOrdenados);
+
+        return Almacen::query()
+            ->whereIn('almacenid', $idsOrdenados)
+            ->get()
+            ->sortBy(fn (Almacen $a) => $posicion[(int) $a->almacenid] ?? 999)
+            ->values()
+            ->all();
     }
 }
 

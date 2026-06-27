@@ -15,9 +15,12 @@ class DetallePedidoDistribucion extends Model
 
     protected $fillable = [
         'pedidodistribucionid',
+        'almacen_mayorista_origenid',
         'insumoid',
         'insumo_planta_referenciaid',
         'insumo_presentacionid',
+        'inventario_presentacion_loteid',
+        'referencia_lote',
         'tipo_envase',
         'es_solicitud_custom',
         'producto_nombre',
@@ -28,9 +31,11 @@ class DetallePedidoDistribucion extends Model
     protected $casts = [
         'detallepedidodistribucionid' => 'integer',
         'pedidodistribucionid' => 'integer',
+        'almacen_mayorista_origenid' => 'integer',
         'insumoid' => 'integer',
         'insumo_planta_referenciaid' => 'integer',
         'insumo_presentacionid' => 'integer',
+        'inventario_presentacion_loteid' => 'integer',
         'es_solicitud_custom' => 'boolean',
         'cantidad' => 'float',
     ];
@@ -53,5 +58,15 @@ class DetallePedidoDistribucion extends Model
     public function presentacion(): BelongsTo
     {
         return $this->belongsTo(InsumoPresentacion::class, 'insumo_presentacionid', 'insumo_presentacionid');
+    }
+
+    public function almacenMayoristaOrigen(): BelongsTo
+    {
+        return $this->belongsTo(Almacen::class, 'almacen_mayorista_origenid', 'almacenid');
+    }
+
+    public function inventarioPresentacionLote(): BelongsTo
+    {
+        return $this->belongsTo(InventarioPresentacionLote::class, 'inventario_presentacion_loteid', 'inventario_presentacion_loteid');
     }
 }

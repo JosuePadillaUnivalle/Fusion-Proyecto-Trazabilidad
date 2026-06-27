@@ -647,9 +647,9 @@
     function construirResumenPdv() {
         if (PDV_CON_ASIGNACION) {
             const set = (id, val) => { const e = el(id); if (e) e.textContent = val || '—'; };
-            const origen = valorSelector('pdv_unificado_almacen')
-                ? labelSelector('pdv_unificado_almacen')
-                : 'Almacén mayorista asignado';
+            const origen = (typeof recogidasConAlmacenPdv === 'function' && recogidasConAlmacenPdv().length)
+                ? recogidasConAlmacenPdv().map(function (r) { return r.almacenLabel; }).join(' + ')
+                : (valorSelector('pdv_unificado_almacen') ? labelSelector('pdv_unificado_almacen') : 'Almacén mayorista asignado');
             const carga = window.PdvEnvioCarga?.resumenItems?.() || { items: [], kg: 0 };
             set('conf-trayecto-tipo', 'Mayorista → Punto de Venta');
             set('conf-origen', origen);

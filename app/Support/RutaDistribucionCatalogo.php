@@ -121,8 +121,8 @@ final class RutaDistribucionCatalogo
         return self::etiquetasEstado();
     }
 
-    /** @return array{clase: string, etiqueta: string} */
-    public static function badgeEstado(RutaDistribucion $ruta): array
+    /** Badge compacto para cabecera de ruta (sin estados operativos de espera). */
+    public static function badgeEstadoCabecera(RutaDistribucion $ruta): array
     {
         return match ($ruta->estado) {
             self::ESTADO_PENDIENTE_APROBACION => ['clase' => 'warning', 'etiqueta' => 'Pendiente aprobación planta'],
@@ -133,5 +133,49 @@ final class RutaDistribucionCatalogo
             self::ESTADO_CANCELADA => ['clase' => 'secondary', 'etiqueta' => 'Cancelada'],
             default => ['clase' => 'secondary', 'etiqueta' => self::etiquetaEstado($ruta->estado)],
         };
+    }
+
+    /** @return array{clase: string, etiqueta: string} */
+    public static function badgeEstado(RutaDistribucion $ruta): array
+    {
+        if ($ruta->estado === self::ESTADO_PLANIFICADA) {
+            return self::badgeEstadoPlanificada($ruta);
+        }
+
+        return match ($ruta->estado) {
+            self::ESTADO_PENDIENTE_APROBACION => ['clase' => 'warning', 'etiqueta' => 'Pendiente aprobación planta'],
+            self::ESTADO_EN_RUTA => ['clase' => 'primary', 'etiqueta' => 'En ruta'],
+            self::ESTADO_COMPLETADA => ['clase' => 'success', 'etiqueta' => 'Completada'],
+            self::ESTADO_RECHAZADA => ['clase' => 'danger', 'etiqueta' => 'Rechazada'],
+            self::ESTADO_CANCELADA => ['clase' => 'secondary', 'etiqueta' => 'Cancelada'],
+            default => ['clase' => 'secondary', 'etiqueta' => self::etiquetaEstado($ruta->estado)],
+        };
+    }
+
+    public static function etiquetaOperativa(RutaDistribucion $ruta): ?string
+    {
+        $badge = self::badgeEstado($ruta);
+
+        return in_array($badge['etiqueta'], ['Planificada', 'Completada', 'En ruta'], true)
+            ? null
+            : $badge['etiqueta'];
+    }
+
+    /** @return array{clase: string, etiqueta: string} */
+    private static function badgeEstadoPlanificada(RutaDistribucion $ruta): array
+    {
+        $ruta->loadMissing('pedidos');
+
+        foreach ($ruta->pedidos as $pedido) {
+            if (PedidoDistribucionCatalogo::pendienteConfirmacionMinorista($pedido)) {
+                return ['clase' => 'warning', 'etiqueta' => 'Esperando confirmación del minorista'];
+            }
+        }
+
+        if ($ruta->transportista_usuarioid !== null && $ruta->simulacion_inicio_at === null) {
+            return ['clase' => 'warning', 'etiqueta' => 'Esperando confirmación del transportista'];
+        }
+
+        return ['clase' => 'info', 'etiqueta' => 'Planificada'];
     }
 }

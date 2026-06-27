@@ -129,6 +129,142 @@ final class PedidoDistribucionCatalogo
         return $pedido->estado === self::ESTADO_EN_TRANSITO;
     }
 
+    /** Paso visible del wizard (1–5) según estado real del pedido. */
+    public static function pasoActualFlujo(PedidoDistribucion $pedido): int
+    {
+        if (self::pendienteConfirmacionMinorista($pedido)) {
+            return 3;
+        }
+
+        if (self::pendienteAprobacionMayorista($pedido)) {
+            return 2;
+        }
+
+        if (self::puedeDesignarTransportista($pedido)) {
+            return 3;
+        }
+
+        if ($pedido->estado === self::ESTADO_EN_TRANSITO) {
+            return 4;
+        }
+
+        if ($pedido->estado === self::ESTADO_RECIBIDO) {
+            return 5;
+        }
+
+        if (self::tieneTransportistaDesignado($pedido) && $pedido->estado === self::ESTADO_CONFIRMADO) {
+            return 4;
+        }
+
+        return 3;
+    }
+
+    /**
+     * Pasos del stepper en detalle de pedido (mayorista → PDV vs solicitud minorista).
+     *
+     * @return list<array{num: int, icon: string, label: string, hecho: bool, activo: bool, navegable: bool}>
+     */
+    public static function pasosFlujoUi(
+        PedidoDistribucion $pedido,
+        bool $esMinoristaDueño,
+        bool $puedeEditarFlujo,
+        bool $transportistaDesignado,
+    ): array {
+        $envioMayorista = self::envioIniciadoPorMayorista($pedido);
+        $pendienteMayorista = self::pendienteAprobacionMayorista($pedido);
+        $pendienteConfMinorista = self::pendienteConfirmacionMinorista($pedido);
+        $estado = $pedido->estado;
+
+        $paso3Label = $envioMayorista
+            ? ($esMinoristaDueño ? 'Confirmar envío' : 'Confirmación minorista')
+            : 'Designar transportista';
+        $paso3Icon = $envioMayorista ? 'fa-check-circle' : 'fa-user-tie';
+
+        if ($envioMayorista) {
+            $paso1Hecho = false;
+            $paso2Hecho = false;
+        } else {
+            $paso1Hecho = true;
+            $paso2Hecho = in_array($estado, [self::ESTADO_CONFIRMADO, self::ESTADO_EN_TRANSITO, self::ESTADO_RECIBIDO], true);
+        }
+
+        $paso3Hecho = $envioMayorista
+            ? ! $pendienteConfMinorista
+            : (($transportistaDesignado && ! $pendienteConfMinorista)
+                || in_array($estado, [self::ESTADO_EN_TRANSITO, self::ESTADO_RECIBIDO], true));
+
+        $paso3Activo = $pendienteConfMinorista
+            || (! $envioMayorista && $estado === self::ESTADO_CONFIRMADO && ! $transportistaDesignado);
+
+        $paso4Activo = $transportistaDesignado
+            && $estado === self::ESTADO_CONFIRMADO
+            && ! $pendienteConfMinorista;
+
+        return [
+            [
+                'num' => 1,
+                'icon' => 'fa-paper-plane',
+                'label' => $envioMayorista ? 'Envío mayorista' : 'Solicitud minorista',
+                'hecho' => $paso1Hecho,
+                'activo' => ! $envioMayorista && $pendienteMayorista,
+                'navegable' => $puedeEditarFlujo && ! $envioMayorista,
+            ],
+            [
+                'num' => 2,
+                'icon' => 'fa-warehouse',
+                'label' => $envioMayorista ? 'Programación mayorista' : 'Revisión mayorista',
+                'hecho' => $paso2Hecho,
+                'activo' => ! $envioMayorista && $pendienteMayorista,
+                'navegable' => $puedeEditarFlujo && ! $envioMayorista,
+            ],
+            [
+                'num' => 3,
+                'icon' => $paso3Icon,
+                'label' => $paso3Label,
+                'hecho' => $paso3Hecho,
+                'activo' => $paso3Activo,
+                'navegable' => $puedeEditarFlujo || ($esMinoristaDueño && $pendienteConfMinorista),
+            ],
+            [
+                'num' => 4,
+                'icon' => 'fa-shipping-fast',
+                'label' => 'En ruta',
+                'hecho' => in_array($estado, [self::ESTADO_EN_TRANSITO, self::ESTADO_RECIBIDO], true),
+                'activo' => $paso4Activo,
+                'navegable' => $transportistaDesignado
+                    && in_array($estado, [self::ESTADO_CONFIRMADO, self::ESTADO_EN_TRANSITO], true)
+                    && ! $pendienteConfMinorista,
+            ],
+            [
+                'num' => 5,
+                'icon' => 'fa-dolly',
+                'label' => 'Recepción PDV',
+                'hecho' => $estado === self::ESTADO_RECIBIDO,
+                'activo' => $estado === self::ESTADO_EN_TRANSITO,
+                'navegable' => $estado === self::ESTADO_EN_TRANSITO,
+            ],
+        ];
+    }
+
+    /** Panel de capacidad de vehículo: solo quien designa transportista (mayorista). */
+    public static function mostrarPanelCapacidadVehiculo(
+        PedidoDistribucion $pedido,
+        bool $puedeGestionarMayorista,
+        bool $puedeDesignarTransportista,
+        bool $transportistaDesignado,
+    ): bool {
+        if (! $puedeGestionarMayorista) {
+            return false;
+        }
+
+        if (self::pendienteConfirmacionMinorista($pedido)) {
+            return false;
+        }
+
+        return $puedeDesignarTransportista
+            || ($transportistaDesignado && $pedido->estado === self::ESTADO_CONFIRMADO);
+    }
+
     /** @return array<string, string> Etiquetas legibles para filtros (menos opciones técnicas). */
     public static function etiquetasFiltroEstado(): array
     {
@@ -255,9 +391,47 @@ final class PedidoDistribucionCatalogo
         };
     }
 
+    public static function esperaConfirmacionTransportista(PedidoDistribucion $pedido): bool
+    {
+        if ($pedido->estado !== self::ESTADO_CONFIRMADO || ! self::tieneTransportistaDesignado($pedido)) {
+            return false;
+        }
+
+        if (self::pendienteConfirmacionMinorista($pedido)) {
+            return false;
+        }
+
+        $ruta = $pedido->relationLoaded('rutaDistribucion')
+            ? $pedido->rutaDistribucion
+            : null;
+
+        if ($ruta !== null) {
+            return $ruta->estado === \App\Support\RutaDistribucionCatalogo::ESTADO_PLANIFICADA
+                && $ruta->simulacion_inicio_at === null;
+        }
+
+        return $pedido->rutadistribucionid !== null || $pedido->transportista_usuarioid !== null;
+    }
+
     /** @return array{clase: string, etiqueta: string, icono: string} */
     public static function badgeEstado(PedidoDistribucion $pedido): array
     {
+        if (self::pendienteConfirmacionMinorista($pedido)) {
+            return [
+                'clase' => 'revision',
+                'etiqueta' => 'Esperando confirmación del minorista',
+                'icono' => 'fa-user-clock',
+            ];
+        }
+
+        if (self::esperaConfirmacionTransportista($pedido)) {
+            return [
+                'clase' => 'asignado',
+                'etiqueta' => 'Esperando confirmación del transportista',
+                'icono' => 'fa-truck-loading',
+            ];
+        }
+
         if ($pedido->estado === self::ESTADO_PENDIENTE && $pedido->espera_stock) {
             $det = $pedido->relationLoaded('detalles')
                 ? $pedido->detalles->first()
@@ -278,7 +452,7 @@ final class PedidoDistribucionCatalogo
         return match ($pedido->estado) {
             self::ESTADO_PENDIENTE => ['clase' => 'revision', 'etiqueta' => 'En revisión', 'icono' => 'fa-hourglass-half'],
             self::ESTADO_CONFIRMADO => self::tieneTransportistaDesignado($pedido)
-                ? ['clase' => 'asignado', 'etiqueta' => 'Transportista asignado', 'icono' => 'fa-user-check']
+                ? ['clase' => 'preparacion', 'etiqueta' => 'Preparando salida', 'icono' => 'fa-truck-loading']
                 : ['clase' => 'preparacion', 'etiqueta' => 'Preparando envío', 'icono' => 'fa-box-open'],
             self::ESTADO_EN_TRANSITO => self::estaEnRutaTiempoReal($pedido)
                 ? ['clase' => 'ruta', 'etiqueta' => 'En ruta', 'icono' => 'fa-shipping-fast']

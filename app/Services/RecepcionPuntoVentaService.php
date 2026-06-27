@@ -6,6 +6,7 @@ use App\Models\Almacen;
 use App\Models\AlmacenMovimiento;
 use App\Models\DetallePedidoDistribucion;
 use App\Models\Insumo;
+use App\Models\InsumoPresentacion;
 use App\Models\PedidoDistribucion;
 use App\Models\RutaDistribucion;
 use App\Models\TipoInsumo;
@@ -13,13 +14,16 @@ use App\Models\TipoMovimientoAlmacen;
 use App\Models\Usuario;
 use App\Support\InsumoCatalogo;
 use App\Support\PedidoDistribucionCatalogo;
+use App\Support\PedidoDistribucionConsolidacion;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class RecepcionPuntoVentaService
 {
     public function __construct(
-        private readonly DistribucionRutaService $rutas
+        private readonly DistribucionRutaService $rutas,
+        private readonly PedidoDistribucionSalidaMayoristaService $salidaMayorista,
     ) {}
 
     public function confirmar(PedidoDistribucion $pedido, Usuario $usuario): void
@@ -28,7 +32,12 @@ class RecepcionPuntoVentaService
             throw new \InvalidArgumentException('El pedido no está en tránsito o ya fue recibido.');
         }
 
-        $pedido->load(['detalles.insumo.unidadMedida', 'puntoVenta.almacen']);
+        $pedido->load([
+            'detalles.insumo.unidadMedida',
+            'detalles.presentacion.tipoEmpaque',
+            'detalles.inventarioPresentacionLote',
+            'puntoVenta.almacen',
+        ]);
 
         $puntoVenta = $pedido->puntoVenta;
         if ($puntoVenta === null) {
@@ -48,7 +57,23 @@ class RecepcionPuntoVentaService
 
         DB::transaction(function () use ($pedido, $usuario, $almacenPdv, $tipoIngreso, $tipoSalida) {
             foreach ($pedido->detalles as $detalle) {
-                $this->transferirDetalle($detalle, $pedido, $usuario, $almacenPdv, $tipoIngreso, $tipoSalida);
+                if ($this->salidaMayorista->yaDescontado($pedido, $detalle)) {
+                    $this->salidaMayorista->descontarSoloInventarioSiPendiente($detalle, $pedido);
+
+                    continue;
+                }
+
+                $this->salidaMayorista->descontarDetalle(
+                    $detalle,
+                    $pedido,
+                    $usuario,
+                    $tipoSalida,
+                    $almacenPdv->nombre
+                );
+            }
+
+            foreach ($this->gruposConsolidadosConDetalle($pedido->detalles) as $grupo) {
+                $this->ingresarGrupoConsolidado($grupo, $pedido, $usuario, $almacenPdv, $tipoIngreso);
             }
 
             $pedido->update([
@@ -66,45 +91,56 @@ class RecepcionPuntoVentaService
         }
     }
 
-    private function transferirDetalle(
-        DetallePedidoDistribucion $detalle,
+    /** @return array<int, array{grupo: array<string, mixed>, detalle: DetallePedidoDistribucion}> */
+    private function gruposConsolidadosConDetalle(Collection $detalles): array
+    {
+        $resultado = [];
+        foreach (PedidoDistribucionConsolidacion::consolidar($detalles) as $grupo) {
+            $representante = $detalles->first(
+                fn (DetallePedidoDistribucion $d) => in_array(
+                    (int) $d->detallepedidodistribucionid,
+                    $grupo['detalle_ids'],
+                    true
+                )
+            );
+            if ($representante) {
+                $resultado[] = ['grupo' => $grupo, 'detalle' => $representante];
+            }
+        }
+
+        return $resultado;
+    }
+
+    /** @param  array{grupo: array<string, mixed>, detalle: DetallePedidoDistribucion}  $item */
+    private function ingresarGrupoConsolidado(
+        array $item,
         PedidoDistribucion $pedido,
         Usuario $usuario,
         Almacen $almacenPdv,
-        TipoMovimientoAlmacen $tipoIngreso,
-        TipoMovimientoAlmacen $tipoSalida
+        TipoMovimientoAlmacen $tipoIngreso
     ): void {
-        $cantidad = (float) $detalle->cantidad;
-        if ($cantidad <= 0) {
-            throw new \InvalidArgumentException('Cantidad inválida en el detalle del pedido.');
+        $grupo = $item['grupo'];
+        $detalle = $item['detalle'];
+        $cantidad = (float) $grupo['cantidad'];
+        $kgMovimiento = (float) $grupo['cantidad_kg'];
+
+        if ($cantidad <= 0 || $kgMovimiento <= 0) {
+            return;
         }
 
-        $detalle->loadMissing('presentacion.tipoEmpaque');
+        $detalle->loadMissing('presentacion', 'insumo.unidadMedida');
         $presentacion = $detalle->presentacion;
-        $kgMovimiento = $presentacion
-            ? round($cantidad * $presentacion->pesoNetoKg(), 4)
-            : $cantidad;
+
+        $nombrePdv = PedidoDistribucionConsolidacion::nombreProducto($detalle);
+        $lote = trim((string) ($grupo['lote'] ?? ''));
+        if ($lote !== '') {
+            $nombrePdv .= ' - '.$lote;
+        }
 
         $insumoOrigen = $detalle->insumo;
         if ($insumoOrigen === null) {
-            throw new \InvalidArgumentException('Producto de planta no encontrado.');
+            throw new \InvalidArgumentException('Producto de origen no encontrado.');
         }
-
-        if ($presentacion && $kgMovimiento > (float) $insumoOrigen->stock + 0.0001) {
-            throw new \InvalidArgumentException(
-                "Stock insuficiente en origen para «{$insumoOrigen->nombre}». Disponible: {$insumoOrigen->stock} kg."
-            );
-        }
-
-        if (! $presentacion && ! $insumoOrigen->tieneStockSuficiente($cantidad)) {
-            throw new \InvalidArgumentException(
-                "Stock insuficiente en planta para «{$insumoOrigen->nombre}». Disponible: {$insumoOrigen->stock}."
-            );
-        }
-
-        $nombrePdv = filled($detalle->producto_nombre)
-            ? trim((string) $detalle->producto_nombre)
-            : $insumoOrigen->nombre;
 
         $insumoDestino = Insumo::query()
             ->where('almacenid', $almacenPdv->almacenid)
@@ -129,21 +165,10 @@ class RecepcionPuntoVentaService
         }
 
         $ref = $pedido->numero_solicitud;
-        $obsUnidades = $presentacion
-            ? number_format($cantidad, 0).' '.$presentacion->etiquetaUnidad().' ('.number_format($kgMovimiento, 2).' kg)'
-            : number_format($cantidad, 2).' ud';
-
-        AlmacenMovimiento::create([
-            'almacenid' => $insumoOrigen->almacenid,
-            'insumoid' => $insumoOrigen->insumoid,
-            'tipo_movimiento_almacenid' => $tipoSalida->tipo_movimiento_almacenid,
-            'usuarioid' => $usuario->usuarioid,
-            'fecha' => now()->toDateString(),
-            'cantidad' => $kgMovimiento,
-            'referencia' => $ref,
-            'destino_motivo' => $almacenPdv->nombre,
-            'observaciones' => '[Distribución PDV — salida mayorista] '.$ref.' · '.$obsUnidades,
-        ]);
+        $unidad = $presentacion instanceof InsumoPresentacion
+            ? $presentacion->etiquetaUnidad()
+            : ($grupo['unidad'] ?? 'unidades');
+        $obsUnidades = number_format($cantidad, 0).' '.$unidad.' ('.number_format($kgMovimiento, 2).' kg)';
 
         AlmacenMovimiento::create([
             'almacenid' => $almacenPdv->almacenid,
@@ -157,7 +182,6 @@ class RecepcionPuntoVentaService
             'observaciones' => '[Recepción PDV] '.$ref.' · '.$obsUnidades,
         ]);
 
-        $insumoOrigen->decrementarStock($kgMovimiento);
         $insumoDestino->incrementarStock($kgMovimiento);
     }
 }

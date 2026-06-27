@@ -4,14 +4,12 @@ namespace App\Services;
 
 use App\Models\Almacen;
 use App\Models\PedidoDistribucion;
-use App\Models\PuntoVenta;
 use App\Models\RutaDistribucion;
 use App\Models\RutaDistribucionParada;
 use App\Support\PedidoDistribucionCatalogo;
 use App\Support\RutaDistribucionCatalogo;
 use App\Support\TransportistaFlotaCatalogo;
 use App\Support\UbicacionGpsParser;
-use App\Services\TransporteCapacidadService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -19,7 +17,38 @@ use InvalidArgumentException;
 class DistribucionRutaService
 {
     /**
+     * Envío directo mayorista → PDV con una o más paradas de carga mayorista.
+     *
+     * @param  array<int, Almacen>  $almacenesOrigen  Orden de recogida
+     */
+    public function crearEnvioDirectoPedido(
+        array $almacenesOrigen,
+        PedidoDistribucion $pedido,
+        int $transportistaId,
+        ?int $vehiculoId,
+        int $creadoPorId,
+        ?string $nombre = null,
+        ?float $costoBs = null
+    ): RutaDistribucion {
+        if ($almacenesOrigen === []) {
+            throw new InvalidArgumentException('El pedido no tiene almacenes mayorista de origen.');
+        }
+
+        return $this->crear(
+            $almacenesOrigen[0],
+            [$pedido->pedidodistribucionid],
+            $transportistaId,
+            $vehiculoId,
+            $creadoPorId,
+            $nombre,
+            $costoBs,
+            array_slice($almacenesOrigen, 1)
+        );
+    }
+
+    /**
      * @param  array<int>  $pedidoIds  Orden de visita a PDV
+     * @param  array<int, Almacen>  $almacenesRecogidaExtra  Recogidas mayorista adicionales
      */
     public function crear(
         Almacen $almacenOrigen,
@@ -28,7 +57,8 @@ class DistribucionRutaService
         ?int $vehiculoId,
         int $creadoPorId,
         ?string $nombre = null,
-        ?float $costoBs = null
+        ?float $costoBs = null,
+        array $almacenesRecogidaExtra = []
     ): RutaDistribucion {
         if ($pedidoIds === []) {
             throw new InvalidArgumentException('Seleccione al menos un pedido para la ruta.');
@@ -93,8 +123,11 @@ class DistribucionRutaService
             );
         }
 
+        $almacenesCarga = array_merge([$almacenOrigen], $almacenesRecogidaExtra);
+
         return DB::transaction(function () use (
             $almacenOrigen,
+            $almacenesCarga,
             $ordenPedidos,
             $transportistaId,
             $vehiculoId,
@@ -102,15 +135,11 @@ class DistribucionRutaService
             $nombre,
             $costoBs
         ) {
-            $coordsOrigen = UbicacionGpsParser::resolverAlmacen(
-                (int) $almacenOrigen->almacenid,
-                $almacenOrigen->nombre,
-                $almacenOrigen->ubicacion
-            );
+            $etiquetaOrigenes = collect($almacenesCarga)->pluck('nombre')->implode(' + ');
 
             $ruta = RutaDistribucion::create([
                 'codigo' => RutaDistribucionCatalogo::generarCodigo(),
-                'nombre' => $nombre ?: 'Distribución '.$almacenOrigen->nombre,
+                'nombre' => $nombre ?: 'Distribución '.$etiquetaOrigenes,
                 'tipo_ruta' => RutaDistribucionCatalogo::TIPO_RUTA_MAYORISTA_PDV,
                 'almacen_mayorista_origenid' => $almacenOrigen->almacenid,
                 'transportista_usuarioid' => $transportistaId,
@@ -121,18 +150,31 @@ class DistribucionRutaService
                 'fecha_salida' => null,
             ]);
 
-            RutaDistribucionParada::create([
-                'rutadistribucionid' => $ruta->rutadistribucionid,
-                'orden' => 1,
-                'tipo' => RutaDistribucionCatalogo::PARADA_CARGA_MAYORISTA,
-                'almacenid' => $almacenOrigen->almacenid,
-                'destino' => 'Carga: '.$almacenOrigen->nombre,
-                'latitud' => $coordsOrigen['lat'],
-                'longitud' => $coordsOrigen['lng'],
-                'estado' => 'completada',
-            ]);
+            $orden = 1;
+            foreach ($almacenesCarga as $alm) {
+                $coords = UbicacionGpsParser::resolverAlmacen(
+                    (int) $alm->almacenid,
+                    $alm->nombre,
+                    $alm->ubicacion
+                );
 
-            $orden = 2;
+                if ($coords === null || $coords['lat'] === null || $coords['lng'] === null) {
+                    throw new InvalidArgumentException('Cada almacén mayorista debe tener ubicación GPS: '.$alm->nombre);
+                }
+
+                RutaDistribucionParada::create([
+                    'rutadistribucionid' => $ruta->rutadistribucionid,
+                    'orden' => $orden,
+                    'tipo' => RutaDistribucionCatalogo::PARADA_CARGA_MAYORISTA,
+                    'almacenid' => $alm->almacenid,
+                    'destino' => 'Carga: '.$alm->nombre,
+                    'latitud' => $coords['lat'],
+                    'longitud' => $coords['lng'],
+                    'estado' => 'completada',
+                ]);
+                $orden++;
+            }
+
             foreach ($ordenPedidos as $pedido) {
                 /** @var PedidoDistribucion $pedido */
                 $pdv = $pedido->puntoVenta;
@@ -163,7 +205,16 @@ class DistribucionRutaService
     {
         $ruta->loadMissing(['paradas', 'almacenOrigen']);
 
-        $carga = $ruta->paradas->first(fn (RutaDistribucionParada $p) => $p->tipo === RutaDistribucionCatalogo::PARADA_CARGA_PLANTA);
+        $cargas = $ruta->paradas
+            ->filter(fn (RutaDistribucionParada $p) => in_array($p->tipo, [
+                RutaDistribucionCatalogo::PARADA_CARGA_PLANTA,
+                RutaDistribucionCatalogo::PARADA_CARGA_MAYORISTA,
+            ], true))
+            ->sortBy('orden')
+            ->map(fn (RutaDistribucionParada $p) => $this->nombreParada($p))
+            ->values()
+            ->all();
+
         $entregas = $ruta->paradas
             ->filter(fn (RutaDistribucionParada $p) => $p->tipo === RutaDistribucionCatalogo::PARADA_ENTREGA_PDV)
             ->sortBy('orden')
@@ -171,14 +222,16 @@ class DistribucionRutaService
             ->values()
             ->all();
 
-        $origen = $carga ? $this->nombreParada($carga) : ($ruta->almacenOrigen?->nombre);
+        $origen = $cargas !== []
+            ? (count($cargas) === 1 ? $cargas[0] : implode(' + ', $cargas))
+            : ($ruta->almacenOrigen?->nombre);
 
         if ($origen === null && $entregas === []) {
             return null;
         }
 
         return [
-            'origen' => $origen ?? 'Planta',
+            'origen' => $origen ?? 'Origen',
             'destinos' => $entregas,
         ];
     }

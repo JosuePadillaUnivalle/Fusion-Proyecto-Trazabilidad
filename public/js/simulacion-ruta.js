@@ -16,6 +16,19 @@
         if (typeof fn === 'function') cleanupsGlobales.push(fn);
     }
 
+    function enLogoutActivo() {
+        return window.__agrofusionLoggingOut === true;
+    }
+
+    function manejarRespuesta419() {
+        if (!paginaActiva || enLogoutActivo()) {
+            return false;
+        }
+        window.location.reload();
+
+        return true;
+    }
+
     function destruirSimulacion() {
         if (!paginaActiva) return;
         paginaActiva = false;
@@ -576,7 +589,7 @@
         }
 
         function poll() {
-            if (!paginaActiva) return;
+            if (!paginaActiva || enLogoutActivo()) return;
             fetch(`${urlEstado(tipo, id)}?_=${Date.now()}`, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
@@ -584,7 +597,7 @@
             })
                 .then((r) => {
                     if (r.status === 419) {
-                        if (paginaActiva) window.location.reload();
+                        manejarRespuesta419();
                         return null;
                     }
                     if (!r.ok) throw new Error(`estado ${r.status}`);
@@ -694,7 +707,7 @@
             }
 
             const pollFila = () => {
-                if (!paginaActiva) return;
+                if (!paginaActiva || enLogoutActivo()) return;
                 fetch(`${urlEstado(tipo, id)}?_=${Date.now()}`, {
                     headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     credentials: 'same-origin',
@@ -702,7 +715,7 @@
                 })
                     .then((r) => {
                         if (r.status === 419) {
-                            if (paginaActiva) window.location.reload();
+                            manejarRespuesta419();
                             return null;
                         }
                         return r.json();
@@ -734,7 +747,7 @@
             let estadoBase = null;
 
             const pollTrans = () => {
-                if (!paginaActiva) return;
+                if (!paginaActiva || enLogoutActivo()) return;
                 fetch(`${urlEstado(tipo, id)}?_=${Date.now()}`, {
                     headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     credentials: 'same-origin',
@@ -759,6 +772,17 @@
         document.querySelectorAll('[data-sim-mapa-vivo]').forEach(initMapaVivo);
         initListaTiempoReal();
     }
+
+    window.SimulacionRuta = {
+        destruir: destruirSimulacion,
+        marcarLogout: function () {
+            window.__agrofusionLoggingOut = true;
+            destruirSimulacion();
+            if (window.SimulacionMapaGlobal && typeof window.SimulacionMapaGlobal.destruir === 'function') {
+                window.SimulacionMapaGlobal.destruir();
+            }
+        },
+    };
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', boot);

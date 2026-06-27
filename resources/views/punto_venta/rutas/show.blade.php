@@ -63,6 +63,9 @@
     $esTrasladoPlanta = $ruta->esTrasladoPlantaMayorista();
     $esTransportista = \App\Support\UsuarioRol::esTransportista(auth()->user());
     $fechaSalida = RutaDistribucionNavegacion::fechaSalida($ruta);
+    $etiquetaSalida = RutaDistribucionNavegacion::etiquetaSalida($ruta);
+    $estadoOperativo = RutaDistribucionCatalogo::etiquetaOperativa($ruta);
+    $numeroRecogida = 0;
 @endphp
 <div class="ruta-show-compact">
 <div class="ruta-hero d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -100,17 +103,26 @@
                             @foreach($ruta->paradas as $parada)
                             <li>
                                 @if(in_array($parada->tipo, ['carga_mayorista', 'carga_planta'], true))
+                                @php
+                                    $numeroRecogida++;
+                                    $presentacion = RutaDistribucionNavegacion::presentacionParadaCarga($parada, $numeroRecogida);
+                                @endphp
                                 <span class="ruta-timeline-icon ruta-timeline-icon--carga"><i class="fas fa-warehouse"></i></span>
                                 <div>
-                                    <div class="font-weight-bold text-warning">{{ str_replace(['Carga: ', 'Entrega: '], '', $parada->destino) }}</div>
-                                    <span class="badge badge-light border text-warning small">{{ RutaDistribucionNavegacion::etiquetaParadaCarga($parada->tipo) }}</span>
+                                    <div class="font-weight-bold text-success">{{ $presentacion['titulo'] }}</div>
+                                    <div class="small text-muted">{{ $presentacion['subtitulo'] }}</div>
+                                    <span class="badge badge-light border text-muted small mt-1">{{ $presentacion['badge'] }}</span>
                                 </div>
                                 @else
+                                @php $presentacion = RutaDistribucionNavegacion::presentacionParadaEntrega($parada); @endphp
                                 <span class="ruta-timeline-icon ruta-timeline-icon--entrega"><i class="fas fa-store"></i></span>
                                 <div>
-                                    <div class="font-weight-bold text-danger">{{ str_replace('Entrega: ', '', $parada->destino) }}</div>
-                                    @if($parada->pedido)
-                                    <span class="text-muted small">{{ $parada->pedido->numero_solicitud }}</span>
+                                    <div class="font-weight-bold text-danger">{{ $presentacion['titulo'] }}</div>
+                                    @if($presentacion['subtitulo'])
+                                    <span class="text-muted small">{{ $presentacion['subtitulo'] }}</span>
+                                    @endif
+                                    @if($presentacion['badge'])
+                                    <span class="badge badge-light border text-danger small mt-1">{{ $presentacion['badge'] }}</span>
                                     @endif
                                 </div>
                                 @endif
@@ -136,7 +148,7 @@
                                         </td>
                                         <td>{{ $pedido->puntoVenta?->nombre ?? '—' }}</td>
                                         <td>{{ $det?->producto_nombre }} <span class="text-muted">({{ $det ? number_format((float) $det->cantidad, 2) : '—' }} kg)</span></td>
-                                        <td><span class="badge badge-{{ $pb['clase'] }}">{{ $pb['etiqueta'] }}</span></td>
+                                        <td><span class="badge badge-{{ \App\Support\PedidoDistribucionCatalogo::badgeBootstrapClase($pb) }}">{{ $pb['etiqueta'] }}</span></td>
                                     </tr>
                                     @empty
                                     <tr>
@@ -156,6 +168,12 @@
                         <h3 class="card-title font-weight-bold mb-0" style="font-size:1rem"><i class="fas fa-truck text-info mr-1"></i>Logística</h3>
                     </div>
                     <div class="card-body pt-0">
+                        @if($estadoOperativo)
+                        <div class="alert alert-warning py-2 px-3 small mb-3 mb-md-2">
+                            <i class="fas fa-hourglass-half mr-1"></i>
+                            <strong>{{ $estadoOperativo }}</strong>
+                        </div>
+                        @endif
                         <div class="ruta-log-grid">
                         <div class="ruta-log-item">
                             <span class="ruta-log-icon"><i class="fas fa-id-card"></i></span>
@@ -191,7 +209,7 @@
                             <span class="ruta-log-icon"><i class="fas fa-calendar-alt"></i></span>
                             <div>
                                 <div class="ruta-dist-label">Salida</div>
-                                <div class="ruta-dist-value">{{ $fechaSalida?->format('d/m/Y H:i') ?? '—' }}</div>
+                                <div class="ruta-dist-value {{ $fechaSalida ? '' : 'text-muted' }}">{{ $etiquetaSalida }}</div>
                             </div>
                         </div>
                         <div class="ruta-log-item">

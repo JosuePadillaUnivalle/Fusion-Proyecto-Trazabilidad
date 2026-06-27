@@ -99,6 +99,49 @@ class InventarioPresentacionService
         $this->sincronizarStockAgregadoInsumo((int) $inventario->insumoid);
     }
 
+    public function descontarFifo(int $almacenId, int $presentacionId, float $unidades, float $kg): void
+    {
+        if ($unidades <= 0) {
+            throw new InvalidArgumentException('La cantidad en unidades debe ser mayor a cero.');
+        }
+
+        $lotes = InventarioPresentacionLote::query()
+            ->with('presentacion')
+            ->where('almacenid', $almacenId)
+            ->where('insumo_presentacionid', $presentacionId)
+            ->where('cantidad_unidades', '>', 0)
+            ->orderBy('referencia_lote')
+            ->orderBy('inventario_presentacion_loteid')
+            ->get();
+
+        if ($lotes->isEmpty()) {
+            throw new InvalidArgumentException('No hay lotes con stock para descontar la presentación solicitada.');
+        }
+
+        $restante = $unidades;
+        $kgRestante = $kg;
+
+        foreach ($lotes as $lote) {
+            if ($restante <= 0.0001) {
+                break;
+            }
+
+            $stockLote = (float) $lote->cantidad_unidades;
+            $tomar = min($restante, $stockLote);
+            $kgTomar = $tomar >= $stockLote - 0.0001
+                ? (float) $lote->cantidad_kg
+                : min($kgRestante, round($tomar * $lote->presentacion?->pesoNetoKg(), 4));
+
+            $this->descontar($lote, $tomar, $kgTomar);
+            $restante -= $tomar;
+            $kgRestante = max(0, $kgRestante - $kgTomar);
+        }
+
+        if ($restante > 0.0001) {
+            throw new InvalidArgumentException('Stock insuficiente en lotes para completar el descuento.');
+        }
+    }
+
     public function ingresar(
         int $almacenId,
         int $insumoId,

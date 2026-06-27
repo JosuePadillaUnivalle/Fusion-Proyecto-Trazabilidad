@@ -1349,6 +1349,7 @@
     }
 
     let trasladoInventarioContext = { recogidaKey: 'principal', almacenId: '' };
+    let pdvInventarioContext = { recogidaKey: 'principal', almacenId: '' };
 
     function inventarioOrigenTrasladoConfig() {
         return {
@@ -1378,7 +1379,16 @@
 
     function inventarioOrigenPdvConfig() {
         return {
-            onApply: function (item) { aplicarOrigenPdv(item, { abrirInventario: false }); },
+            onApply: function (item) {
+                const ctx = pdvInventarioContext;
+                if (ctx.recogidaKey === 'principal') {
+                    aplicarOrigenPdv(item, { abrirInventario: false });
+                    return;
+                }
+                const row = document.querySelector('.pdv-extra-row[data-recogida-uid="' + ctx.recogidaKey + '"]')
+                    || document.querySelector('.pdv-extra-row [data-field="almacenid"][value="' + ctx.almacenId + '"]')?.closest('.pdv-extra-row');
+                if (row) aplicarRecogidaExtraPdv(row, item, true);
+            },
             title: 'Productos en almacén mayorista',
             searchPlaceholder: 'Buscar producto…',
             params: {
@@ -1386,7 +1396,9 @@
                 solo_con_stock: '1',
             },
             theme: 'planta',
-            onProductSelect: aplicarProductoPreseleccionadoPdv,
+            onProductSelect: function (item) {
+                agregarProductoPreseleccionadoPdv(item, pdvInventarioContext);
+            },
         };
     }
 
@@ -1400,8 +1412,13 @@
         abrirInventarioAlmacenEnvio(almacen, inventarioOrigenTrasladoConfig());
     }
 
-    function abrirInventarioOrigenPdv(almacen) {
+    function abrirInventarioOrigenPdv(almacen, ctx) {
         if (!almacen?.id) return;
+        ctx = ctx || { recogidaKey: 'principal', almacenId: String(almacen.id) };
+        pdvInventarioContext = {
+            recogidaKey: ctx.recogidaKey || 'principal',
+            almacenId: String(ctx.almacenId || almacen.id),
+        };
         abrirInventarioAlmacenEnvio(almacen, inventarioOrigenPdvConfig());
     }
 
@@ -1781,7 +1798,7 @@
     let trasladoProductoIdx = 0;
     const trasladoProductosPreseleccionados = [];
     let ultimoOrigenTrasladoId = '';
-    let pdvProductoPreseleccionado = null;
+    const pdvProductosPreseleccionados = [];
     let ultimoAlmacenPdvId = '';
     const INSUMOS_PLANTA_ENDPOINT = @json(route('catalogo-selector.insumos'));
     const PRESENTACIONES_PRODUCTO_ENDPOINT = @json(route('catalogo-selector.presentaciones-producto'));
@@ -3260,31 +3277,49 @@
     function actualizarResumenPdvProductoPreseleccionado() {
         const el = document.getElementById('pdv-producto-preseleccion-resumen');
         if (!el) return;
-        if (!pdvProductoPreseleccionado?.id) {
+        const n = pdvProductosPreseleccionados.length;
+        if (n <= 0) {
             el.classList.add('d-none');
             el.textContent = '';
             return;
         }
-        el.textContent = '1 producto seleccionado';
+        el.textContent = textoCantidadProductos(n);
         el.classList.remove('d-none');
     }
 
-    function aplicarProductoPreseleccionadoPdv(item) {
+    function agregarProductoPreseleccionadoPdv(item, ctx) {
         if (!item?.id) return;
-        pdvProductoPreseleccionado = {
-            id: String(item.id),
+        ctx = ctx || pdvInventarioContext;
+        const recogidaKey = ctx.recogidaKey || 'principal';
+        const almacenId = String(ctx.almacenId || valorSelectorPdv('pdv_unificado_almacen') || '');
+        const id = String(item.id);
+        const existente = pdvProductosPreseleccionados.find(function (p) {
+            return String(p.id) === id && String(p.recogidaKey) === recogidaKey;
+        });
+        const prod = {
+            id: id,
             label: item.label || '',
             extra: item.extra || {},
-            almacenId: valorSelectorPdv('pdv_unificado_almacen') || '',
+            recogidaKey: recogidaKey,
+            almacenId: almacenId,
         };
-        actualizarResumenPdvProductoPreseleccionado();
-        if (document.getElementById('selector_wrap_pdv_unificado_producto')) {
-            CatalogoSelector.setValue('pdv_unificado_producto', pdvProductoPreseleccionado.id, pdvProductoPreseleccionado.label);
+        if (existente) {
+            existente.label = prod.label;
+            existente.extra = prod.extra;
+            existente.almacenId = almacenId;
+        } else {
+            pdvProductosPreseleccionados.push(prod);
         }
+        actualizarResumenPdvProductoPreseleccionado();
+    }
+
+    async function sincronizarFilasPdvDesdePreseleccion() {
+        if (!pdvProductosPreseleccionados.length || !window.PdvEnvioCarga?.aplicarPreseleccion) return;
+        await window.PdvEnvioCarga.aplicarPreseleccion(pdvProductosPreseleccionados);
     }
 
     function limpiarPreseleccionProductoPdv() {
-        pdvProductoPreseleccionado = null;
+        pdvProductosPreseleccionados.length = 0;
         actualizarResumenPdvProductoPreseleccionado();
     }
 
@@ -3743,23 +3778,30 @@
 
     function coordsPdvSeleccionadas() {
         const coords = [];
-        if (PDV_MAPA_ES_ADMIN) {
-            const origen = itemPdvMapaPorId(valorSelectorPdv('pdv_unificado_almacen'), 'mayorista');
-            if (origen) {
-                coords.push({ lat: parseFloat(origen.extra.lat), lng: parseFloat(origen.extra.lng) });
+        recogidasConAlmacenPdv().forEach(function (rec) {
+            const c = coordsRecogidaPdv(rec);
+            if (c?.lat != null && c?.lng != null && !isNaN(c.lat) && !isNaN(c.lng)) {
+                coords.push({ lat: c.lat, lng: c.lng });
             }
-        }
+        });
         const destino = itemPdvMapaPorId(valorSelectorPdv('pdv_unificado_punto'), 'pdv');
-        if (destino) {
+        if (destino?.extra?.lat) {
             coords.push({ lat: parseFloat(destino.extra.lat), lng: parseFloat(destino.extra.lng) });
         }
         return coords;
     }
 
-    function coordPdvYaSeleccionada(lat, lng) {
-        return coordsPdvSeleccionadas().some(function (c) {
-            return Math.abs(c.lat - lat) < 0.00001 && Math.abs(c.lng - lng) < 0.00001;
-        });
+    function puntoEnRutaPdvSeleccionado(item) {
+        if (!item?.id) return false;
+        if (item.tipo === 'mayorista') {
+            return recogidasConAlmacenPdv().some(function (rec) {
+                return String(rec.almacenId) === String(item.id);
+            });
+        }
+        if (item.tipo === 'pdv') {
+            return String(valorSelectorPdv('pdv_unificado_punto')) === String(item.id);
+        }
+        return false;
     }
 
     function flashMapaMsgPdv(texto) {
@@ -3771,7 +3813,50 @@
         flashMapaMsgPdv._t = setTimeout(function () { el.style.display = 'none'; }, 2200);
     }
 
-    function iconPuntoMapaPdv(tipo, seleccionado) {
+    function ordenRecogidaAlmacenPdv(almacenId) {
+        const rec = recogidasConAlmacenPdv().find(function (r) {
+            return String(r.almacenId) === String(almacenId);
+        });
+        return rec ? rec.num : null;
+    }
+
+    function coordsRecogidaPdv(rec) {
+        const item = itemPdvMapaPorId(rec.almacenId, 'mayorista');
+        if (item?.extra?.lat != null && item?.extra?.lng != null) {
+            const lat = parseFloat(item.extra.lat);
+            const lng = parseFloat(item.extra.lng);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                return { lat: lat, lng: lng, label: item.label || ('Recogida ' + rec.num) };
+            }
+        }
+        if (rec.key === 'principal') {
+            const txt = document.getElementById('txtOrigenPdvCoords')?.textContent || '';
+            const m = txt.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+            if (m) {
+                return {
+                    lat: parseFloat(m[1]),
+                    lng: parseFloat(m[2]),
+                    label: document.getElementById('txtNombreOrigenPdv')?.value || ('Recogida ' + rec.num),
+                };
+            }
+        }
+        const extraRow = Array.prototype.find.call(
+            document.querySelectorAll('.pdv-extra-row'),
+            function (row) {
+                return String(row.querySelector('[data-field="almacenid"]')?.value || '') === String(rec.almacenId);
+            }
+        );
+        if (extraRow) {
+            return {
+                lat: null,
+                lng: null,
+                label: extraRow.querySelector('.txt-recogida-extra-pdv')?.value || ('Recogida ' + rec.num),
+            };
+        }
+        return null;
+    }
+
+    function iconPuntoMapaPdv(tipo, seleccionado, item) {
         const esMayorista = tipo === 'mayorista';
         const icon = esMayorista ? 'fa-warehouse' : 'fa-store';
         const clase = esMayorista ? 'almacen-mapa-pin--pdv-mayorista' : 'almacen-mapa-pin--pdv-tienda';
@@ -3797,30 +3882,203 @@
     function syncEstadoRutaPdv() {
         const origenFijado = tieneOrigenPdv();
         const destinoFijado = tieneDestinoPdv();
-        const bloqueOrigen = document.getElementById('bloque-origen-pdv');
+        const bloqueRecogidas = document.getElementById('bloque-recogidas-pdv');
+        const bloqueDestino = document.getElementById('bloque-destino-pdv');
+        const msgDestino = document.getElementById('pdv-destino-bloqueado-msg');
+        const btnAgregar = document.getElementById('btnAgregarRecogidaPdv');
         const msg = document.getElementById('pdv-paso-ayuda');
 
-        if (bloqueOrigen && PDV_MAPA_ES_ADMIN) {
-            bloqueOrigen.classList.toggle('ruta-bloqueada', destinoFijado);
+        if (bloqueRecogidas && PDV_MAPA_ES_ADMIN) {
+            bloqueRecogidas.classList.toggle('ruta-bloqueada', destinoFijado);
+        }
+        if (btnAgregar) {
+            btnAgregar.disabled = destinoFijado || !recogida1ListaPdv();
+        }
+        if (bloqueDestino && msgDestino && PDV_MAPA_ES_ADMIN) {
+            bloqueDestino.classList.toggle('ruta-bloqueada', !puedeElegirDestinoPdv());
+            if (!recogida1ListaPdv()) {
+                msgDestino.textContent = 'Primero elija la recogida 1 en almacén mayorista.';
+            } else if (hayRecogidasExtraVaciasPdv()) {
+                msgDestino.textContent = 'Complete o quite las recogidas adicionales antes de elegir destino.';
+            } else if (destinoFijado) {
+                msgDestino.textContent = 'Destino definido. Use «Reiniciar ruta» para cambiar.';
+            } else {
+                msgDestino.textContent = 'Elija el punto de venta destino.';
+            }
         }
         actualizarBtnVerOrigenPdv();
         actualizarResumenFiltroMinoristaPdv();
+        syncOrdenRecogidaPdvHidden();
 
         if (!msg) return;
         if (PDV_MAPA_ES_ADMIN) {
             if (!origenFijado && !destinoFijado) {
-                msg.innerHTML = '<strong>Paso a paso:</strong> 1) Elija el almacén mayorista (origen) en el mapa o en el buscador. 2) Luego el punto de venta (destino). Use <strong>Filtrar por Minorista</strong> para ver solo sus tiendas.';
+                msg.innerHTML = '<strong>Paso a paso:</strong> 1) Elija almacén(es) mayorista en orden. 2) Punto de venta destino. Productos por almacén en el paso 2.';
             } else if (!destinoFijado) {
-                msg.innerHTML = '<strong>Paso a paso:</strong> Elija el punto de venta (destino). Puede filtrar por minorista en el mapa o al buscar destino.';
+                msg.innerHTML = '<strong>Paso a paso:</strong> Elija el punto de venta (destino). Puede filtrar por minorista.';
             } else if (!origenFijado) {
-                msg.innerHTML = '<strong>Paso a paso:</strong> Elija el almacén mayorista (origen) para completar la ruta.';
+                msg.innerHTML = '<strong>Paso a paso:</strong> Elija al menos la recogida 1 en almacén mayorista.';
             } else {
                 msg.innerHTML = '<strong>Ruta definida.</strong> Use <strong>Reiniciar ruta</strong> si necesita cambiar origen o destino.';
             }
         } else if (!destinoFijado) {
-            msg.innerHTML = '<strong>Paso a paso:</strong> Elija el punto de venta (destino) en el mapa o en el buscador. La ruta se traza automáticamente.';
+            msg.innerHTML = '<strong>Paso a paso:</strong> Elija el punto de venta (destino) en el mapa o en el buscador.';
         } else {
             msg.innerHTML = '<strong>Ruta definida.</strong> Use <strong>Reiniciar ruta</strong> si necesita cambiar el destino.';
+        }
+    }
+
+    let pickerRecogidaPdvActivo = null;
+
+    function recogida1ListaPdv() {
+        return PDV_MAPA_ES_ADMIN ? !!valorSelectorPdv('pdv_unificado_almacen') : false;
+    }
+
+    function hayRecogidasExtraVaciasPdv() {
+        let vacia = false;
+        document.querySelectorAll('.pdv-extra-row').forEach(function (row) {
+            if (!row.querySelector('[data-field="almacenid"]')?.value) vacia = true;
+        });
+        return vacia;
+    }
+
+    function almacenPdvYaEnRuta(id, excluirRow) {
+        id = String(id || '');
+        if (!id) return false;
+        if (String(valorSelectorPdv('pdv_unificado_almacen')) === id) return true;
+        let duplicado = false;
+        document.querySelectorAll('.pdv-extra-row').forEach(function (row) {
+            if (excluirRow && row === excluirRow) return;
+            if (String(row.querySelector('[data-field="almacenid"]')?.value || '') === id) duplicado = true;
+        });
+        return duplicado;
+    }
+
+    function recogidasConAlmacenPdv() {
+        const list = [];
+        const id1 = valorSelectorPdv('pdv_unificado_almacen');
+        if (id1) {
+            const item = itemPdvMapaPorId(id1, 'mayorista');
+            list.push({
+                key: 'principal',
+                num: 1,
+                almacenId: id1,
+                almacenLabel: document.getElementById('txtNombreOrigenPdv')?.value || item?.label || 'Recogida 1',
+            });
+        }
+        document.querySelectorAll('.pdv-extra-row').forEach(function (row, i) {
+            const aid = row.querySelector('[data-field="almacenid"]')?.value;
+            if (!aid) return;
+            list.push({
+                key: row.getAttribute('data-recogida-uid') || ('extra-' + i),
+                num: i + 2,
+                almacenId: aid,
+                almacenLabel: row.querySelector('.txt-recogida-extra-pdv')?.value || ('Recogida ' + (i + 2)),
+            });
+        });
+        return list;
+    }
+    window.recogidasConAlmacenPdv = recogidasConAlmacenPdv;
+
+    function puedeElegirDestinoPdv() {
+        if (!PDV_MAPA_ES_ADMIN) return true;
+        return recogida1ListaPdv() && !hayRecogidasExtraVaciasPdv();
+    }
+
+    function bloquearRecogidaPdvSiDestino() {
+        if (tieneDestinoPdv() && PDV_MAPA_ES_ADMIN) {
+            aviso('Ya definió el destino. Use «Reiniciar ruta» para volver a editar las recogidas.');
+            return true;
+        }
+        return false;
+    }
+
+    function syncOrdenRecogidaPdvHidden() {
+        const form = document.getElementById('form-pedido-dist-pdv');
+        if (!form) return;
+        form.querySelectorAll('[name^="almacenes_recogida_orden"]').forEach(function (el) { el.remove(); });
+        recogidasConAlmacenPdv().forEach(function (rec, idx) {
+            const inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = 'almacenes_recogida_orden[' + idx + ']';
+            inp.value = rec.almacenId;
+            form.appendChild(inp);
+        });
+    }
+    window.syncOrdenRecogidaPdvHidden = syncOrdenRecogidaPdvHidden;
+
+    function renumerarRecogidasPdv() {
+        document.querySelectorAll('.pdv-extra-row').forEach(function (row, i) {
+            const num = i + 2;
+            const lbl = row.querySelector('.lbl-recogida-num-pdv');
+            if (lbl) lbl.textContent = 'Recogida ' + num;
+        });
+        syncOrdenRecogidaPdvHidden();
+    }
+
+    function crearFilaRecogidaExtraPdv(datos) {
+        datos = datos || {};
+        const row = document.createElement('div');
+        row.className = 'pdv-extra-row';
+        row.setAttribute('data-recogida-uid', 'rec-pdv-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
+        row.innerHTML =
+            '<div class="d-flex justify-content-between align-items-center mb-1">' +
+                '<label class="small text-muted mb-0 lbl-recogida-num-pdv">Recogida</label>' +
+                '<button type="button" class="btn btn-link btn-sm text-danger p-0 btn-quitar-recogida-pdv">Quitar</button>' +
+            '</div>' +
+            '<div class="pedido-picker-field">' +
+                '<input type="text" class="picker-display txt-recogida-extra-pdv text-muted" readonly placeholder="Buscar almacén mayorista…">' +
+                '<div class="picker-actions">' +
+                    '<button type="button" class="btn btn-sm btn-picker-accion btn-buscar-recogida-extra-pdv" title="Buscar almacén">' +
+                        '<i class="fas fa-search"></i>' +
+                    '</button>' +
+                '</div>' +
+            '</div>' +
+            '<input type="hidden" data-field="almacenid" value="">';
+        if (datos.almacenid) row.querySelector('[data-field="almacenid"]').value = datos.almacenid;
+        if (datos.direccion) {
+            row.querySelector('.txt-recogida-extra-pdv').value = datos.direccion;
+            row.querySelector('.txt-recogida-extra-pdv').classList.remove('text-muted');
+        }
+        row.querySelector('.btn-buscar-recogida-extra-pdv').addEventListener('click', function () {
+            if (bloquearRecogidaPdvSiDestino()) return;
+            if (!recogida1ListaPdv()) {
+                aviso('Primero elija la recogida 1.');
+                return;
+            }
+            pickerRecogidaPdvActivo = row;
+            CatalogoSelector.open('pdv_mayorista_recogida_extra');
+        });
+        row.querySelector('.btn-quitar-recogida-pdv').addEventListener('click', function () {
+            if (bloquearRecogidaPdvSiDestino()) return;
+            row.remove();
+            renumerarRecogidasPdv();
+            window.PdvEnvioCarga?.syncRecogidas?.();
+            syncEstadoRutaPdv();
+            redrawRutaPdv();
+        });
+        return row;
+    }
+
+    function aplicarRecogidaExtraPdv(row, item, desdeVer) {
+        if (!row || !item?.id) return;
+        if (almacenPdvYaEnRuta(item.id, row)) {
+            aviso('Este almacén mayorista ya está en la ruta.');
+            return;
+        }
+        row.querySelector('[data-field="almacenid"]').value = item.id;
+        const txt = row.querySelector('.txt-recogida-extra-pdv');
+        txt.value = item.label || '';
+        txt.classList.remove('text-muted');
+        if (!desdeVer) {
+            syncOrdenRecogidaPdvHidden();
+            window.PdvEnvioCarga?.syncRecogidas?.();
+            syncEstadoRutaPdv();
+            redrawRutaPdv();
+            abrirInventarioOrigenPdv(item, {
+                recogidaKey: row.getAttribute('data-recogida-uid') || '',
+                almacenId: String(item.id),
+            });
         }
     }
 
@@ -3865,25 +4123,64 @@
 
     function waypointsPdv() {
         const puntos = [];
-        if (PDV_MAPA_ES_ADMIN) {
-            const origen = itemPdvMapaPorId(valorSelectorPdv('pdv_unificado_almacen'), 'mayorista');
-            if (origen) {
-                const lat = parseFloat(origen.extra.lat);
-                const lng = parseFloat(origen.extra.lng);
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    puntos.push({ lat: lat, lng: lng, label: origen.label, tipo: 'origen' });
-                }
+        recogidasConAlmacenPdv().forEach(function (rec) {
+            const coords = coordsRecogidaPdv(rec);
+            if (coords && coords.lat != null && coords.lng != null && !isNaN(coords.lat) && !isNaN(coords.lng)) {
+                puntos.push({
+                    lat: coords.lat,
+                    lng: coords.lng,
+                    label: coords.label,
+                    tipo: 'origen',
+                    orden: rec.num,
+                });
             }
-        }
+        });
         const destino = itemPdvMapaPorId(valorSelectorPdv('pdv_unificado_punto'), 'pdv');
-        if (destino) {
+        if (destino?.extra?.lat) {
             const lat = parseFloat(destino.extra.lat);
             const lng = parseFloat(destino.extra.lng);
             if (!isNaN(lat) && !isNaN(lng)) {
-                puntos.push({ lat: lat, lng: lng, label: destino.label, tipo: 'destino' });
+                puntos.push({
+                    lat: lat,
+                    lng: lng,
+                    label: destino.label,
+                    tipo: 'destino',
+                    orden: recogidasConAlmacenPdv().length + 1,
+                });
             }
         }
         return puntos;
+    }
+
+    function asignarRecogidaMayoristaDesdeMapaPdv(item) {
+        if (!item?.id) return false;
+        if (almacenPdvYaEnRuta(item.id)) {
+            aviso('Este almacén mayorista ya está en la ruta.');
+            return false;
+        }
+        if (!recogida1ListaPdv()) {
+            aplicarOrigenPdv(item, { abrirInventario: true });
+            flashMapaMsgPdv('Recogida 1: ' + item.label);
+            return true;
+        }
+        let row = Array.prototype.find.call(
+            document.querySelectorAll('.pdv-extra-row'),
+            function (r) { return !r.querySelector('[data-field="almacenid"]')?.value; }
+        );
+        if (!row && document.querySelectorAll('.pdv-extra-row').length < MAX_RECOGIDAS_EXTRA) {
+            row = crearFilaRecogidaExtraPdv();
+            document.getElementById('recogidas-extra-pdv-container').appendChild(row);
+            renumerarRecogidasPdv();
+            syncEstadoRutaPdv();
+        }
+        if (!row) {
+            aviso('Máximo de recogidas alcanzado. Quite una o reinicie la ruta.');
+            return false;
+        }
+        aplicarRecogidaExtraPdv(row, item);
+        const num = row.querySelector('.lbl-recogida-num-pdv')?.textContent || 'Recogida';
+        flashMapaMsgPdv(num + ': ' + item.label);
+        return true;
     }
 
     function aplicarOrigenPdv(item, opts) {
@@ -3891,21 +4188,10 @@
         if (!item || !window.CatalogoSelector) return;
         CatalogoSelector.setValue('pdv_unificado_almacen', item.id, item.label);
         actualizarPickerOrigenPdv(item);
-        const cfgProd = CatalogoSelector.instances.pdv_unificado_producto;
-        if (cfgProd) {
-            cfgProd.params = {
-                ambito_mayorista: '1',
-                solo_con_stock: '1',
-                requiere_almacen: '1',
-                almacenid: item.id,
-            };
-        }
-        if (!pdvProductoPreseleccionado) {
-            CatalogoSelector.clear('pdv_unificado_producto');
-        }
         syncEstadoRutaPdv();
+        window.PdvEnvioCarga?.syncRecogidas?.();
         if (opts.abrirInventario !== false && item.id) {
-            abrirInventarioOrigenPdv(item);
+            abrirInventarioOrigenPdv(item, { recogidaKey: 'principal', almacenId: String(item.id) });
         }
     }
 
@@ -3924,15 +4210,15 @@
     }
 
     function bloquearOrigenPdvSiDestino() {
-        if (tieneDestinoPdv() && PDV_MAPA_ES_ADMIN) {
-            aviso('Ya definió el destino. Use «Reiniciar ruta» para volver a editar el origen.');
-            return true;
-        }
-        return false;
+        return bloquearRecogidaPdvSiDestino();
     }
 
     function asignarPuntoDesdeMapaPdv(item) {
         if (item.tipo === 'pdv') {
+            if (!puedeElegirDestinoPdv()) {
+                aviso('Complete todas las recogidas en almacén mayorista antes de elegir destino.');
+                return;
+            }
             if (pdvFiltroMinoristaId && String(item.extra?.minorista_usuarioid) !== String(pdvFiltroMinoristaId)) {
                 aviso('Este punto de venta no pertenece al minorista filtrado.');
                 return;
@@ -3943,11 +4229,12 @@
             redrawRutaPdv();
             return;
         }
-        if (bloquearOrigenPdvSiDestino()) return;
-        aplicarOrigenPdv(item);
-        flashMapaMsgPdv('Origen asignado: ' + item.label);
-        resaltarPuntosEnMapaPdv();
-        redrawRutaPdv();
+        if (bloquearRecogidaPdvSiDestino()) return;
+
+        if (asignarRecogidaMayoristaDesdeMapaPdv(item)) {
+            resaltarPuntosEnMapaPdv();
+            redrawRutaPdv();
+        }
     }
 
     function pintarPuntosEnMapaPdv(items) {
@@ -3957,9 +4244,9 @@
             const lat = parseFloat(item.extra.lat);
             const lng = parseFloat(item.extra.lng);
             if (isNaN(lat) || isNaN(lng)) return;
-            const seleccionado = coordPdvYaSeleccionada(lat, lng);
+            const seleccionado = puntoEnRutaPdvSeleccionado(item);
             const m = L.marker([lat, lng], {
-                icon: iconPuntoMapaPdv(item.tipo, seleccionado),
+                icon: iconPuntoMapaPdv(item.tipo, seleccionado, item),
                 zIndexOffset: seleccionado ? 200 : 0,
             })
                 .bindTooltip(item.label, {
@@ -3983,8 +4270,8 @@
             const item = layer._pdvItem;
             const lat = parseFloat(item.extra.lat);
             const lng = parseFloat(item.extra.lng);
-            const sel = coordPdvYaSeleccionada(lat, lng);
-            layer.setIcon(iconPuntoMapaPdv(item.tipo, sel));
+            const sel = puntoEnRutaPdvSeleccionado(item);
+            layer.setIcon(iconPuntoMapaPdv(item.tipo, sel, item));
             layer.setZIndexOffset(sel ? 200 : 0);
         });
     }
@@ -4065,10 +4352,14 @@
     function rebuildMarcadoresPdv(puntos) {
         limpiarCapaMapaPdv();
         if (!statePdv.capasRuta) return;
-        puntos.forEach(function (p, i) {
+        puntos.forEach(function (p) {
             const esDestino = p.tipo === 'destino';
             const color = esDestino ? '#2563eb' : '#ea580c';
-            const marker = L.marker([p.lat, p.lng], { icon: iconMarkerPdv(color, i + 1), zIndexOffset: 1000 }).addTo(statePdv.capasRuta);
+            const num = p.orden || 0;
+            const marker = L.marker([p.lat, p.lng], {
+                icon: iconMarkerPdv(color, num),
+                zIndexOffset: 1000 + num,
+            }).addTo(statePdv.capasRuta);
             marker.bindTooltip(p.label, { className: 'almacen-mapa-tooltip', direction: 'top', offset: [0, -14] });
             statePdv.markers.push(marker);
         });
@@ -4130,9 +4421,16 @@
     }
 
     function ejecutarReinicioRutaPdv() {
+        const extraContainer = document.getElementById('recogidas-extra-pdv-container');
+        if (extraContainer) extraContainer.innerHTML = '';
+        limpiarPreseleccionProductoPdv();
+        if (typeof ultimoAlmacenPdvId !== 'undefined') {
+            ultimoAlmacenPdvId = '';
+        }
         if (window.CatalogoSelector) {
             if (PDV_MAPA_ES_ADMIN) {
                 CatalogoSelector.clear('pdv_unificado_almacen');
+                CatalogoSelector.clear('pdv_unificado_minorista');
             }
             CatalogoSelector.clear('pdv_unificado_punto');
             CatalogoSelector.clear('pdv_unificado_producto');
@@ -4142,6 +4440,13 @@
         actualizarPickerDestinoPdv(null);
         const resumenEl = document.getElementById('rutaResumenPdv');
         if (resumenEl) resumenEl.textContent = '';
+        if (typeof resetCostoPdv === 'function') resetCostoPdv();
+        if (window.PdvEnvioCarga?.limpiar) {
+            window.PdvEnvioCarga.limpiar();
+        } else if (window.PdvEnvioCarga?.syncRecogidas) {
+            window.PdvEnvioCarga.syncRecogidas();
+        }
+        syncOrdenRecogidaPdvHidden();
         syncEstadoRutaPdv();
         resaltarPuntosEnMapaPdv();
         redrawRutaPdv();
@@ -4198,7 +4503,6 @@
         statePdv.capasRuta = L.layerGroup().addTo(statePdv.map);
 
         document.getElementById('btnVerPuntosMapaPdv')?.addEventListener('click', togglePuntosEnMapaPdv);
-        document.getElementById('btnReiniciarRutaPdv')?.addEventListener('click', reiniciarRutaPdv);
 
         mapaPdvListo = true;
         syncEstadoRutaPdv();
@@ -4262,6 +4566,12 @@
         }
     }
 
+    document.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('btnReiniciarRutaPdv')?.addEventListener('click', function (e) {
+            e.preventDefault();
+            reiniciarRutaPdv();
+        });
+    });
     document.addEventListener('DOMContentLoaded', iniciarMapasSegunTrayecto);
     window.addEventListener('load', function () {
         if (destinoInicial === 'mayorista') {
@@ -4675,6 +4985,7 @@
                     };
                 }
                 syncEstadoRutaPdv();
+                window.PdvEnvioCarga?.syncRecogidas?.();
                 if (mapaPdvListo) {
                     resaltarPuntosEnMapaPdv();
                     redrawRutaPdv();
@@ -4686,6 +4997,7 @@
                 const item = id ? itemPdvMapaPorId(id, 'pdv') : null;
                 actualizarPickerDestinoPdv(item || (id ? { id: id, label: e.detail?.label || '', extra: {} } : null));
                 syncEstadoRutaPdv();
+                window.PdvEnvioCarga?.syncRecogidas?.();
                 if (mapaPdvListo) {
                     resaltarPuntosEnMapaPdv();
                     redrawRutaPdv();
@@ -4699,15 +5011,50 @@
                 CatalogoSelector.open('pdv_unificado_almacen');
             });
             document.getElementById('btnBuscarDestinoPdv')?.addEventListener('click', function () {
+                if (!puedeElegirDestinoPdv()) {
+                    aviso('Complete todas las recogidas en almacén mayorista antes de elegir destino.');
+                    return;
+                }
                 CatalogoSelector.open('pdv_unificado_punto');
             });
+            document.getElementById('btnAgregarRecogidaPdv')?.addEventListener('click', function () {
+                if (bloquearRecogidaPdvSiDestino()) return;
+                if (!recogida1ListaPdv()) {
+                    aviso('Primero elija la recogida 1.');
+                    return;
+                }
+                if (hayRecogidasExtraVaciasPdv()) {
+                    aviso('Complete la recogida adicional pendiente antes de agregar otra.');
+                    return;
+                }
+                if (document.querySelectorAll('.pdv-extra-row').length >= MAX_RECOGIDAS_EXTRA) {
+                    aviso('Máximo ' + MAX_RECOGIDAS_EXTRA + ' almacenes mayorista adicionales.');
+                    return;
+                }
+                document.getElementById('recogidas-extra-pdv-container').appendChild(crearFilaRecogidaExtraPdv());
+                renumerarRecogidasPdv();
+                syncEstadoRutaPdv();
+            });
+            CatalogoSelector.register('pdv_mayorista_recogida_extra', {
+                endpoint: @json(route('catalogo-selector.almacenes')),
+                title: 'Almacén mayorista — recogida adicional',
+                searchPlaceholder: 'Buscar almacén mayorista…',
+                params: { ambito: 'mayorista' },
+                onSelect: function (item) {
+                    if (!pickerRecogidaPdvActivo) return;
+                    if (bloquearRecogidaPdvSiDestino()) return;
+                    aplicarRecogidaExtraPdv(pickerRecogidaPdvActivo, item);
+                },
+            });
             document.getElementById('btnLimpiarOrigenPdv')?.addEventListener('click', function () {
-                if (bloquearOrigenPdvSiDestino()) return;
+                if (bloquearRecogidaPdvSiDestino()) return;
                 limpiarSelector('pdv_unificado_almacen');
                 actualizarPickerOrigenPdv(null);
+                document.getElementById('recogidas-extra-pdv-container').innerHTML = '';
                 limpiarPreseleccionProductoPdv();
                 limpiarSelector('pdv_unificado_producto');
                 syncEstadoRutaPdv();
+                window.PdvEnvioCarga?.syncRecogidas?.();
                 redrawRutaPdv();
             });
             document.getElementById('btnLimpiarDestinoPdv')?.addEventListener('click', function () {
@@ -4740,15 +5087,9 @@
 
             if (window.PdvEnvioCarga) {
                 const syncPdvPaso2Base = window.PdvEnvioCarga.syncAlPaso2;
-                window.PdvEnvioCarga.syncAlPaso2 = function () {
-                    if (typeof syncPdvPaso2Base === 'function') syncPdvPaso2Base();
-                    if (pdvProductoPreseleccionado && document.getElementById('selector_wrap_pdv_unificado_producto')) {
-                        CatalogoSelector.setValue(
-                            'pdv_unificado_producto',
-                            pdvProductoPreseleccionado.id,
-                            pdvProductoPreseleccionado.label
-                        );
-                    }
+                window.PdvEnvioCarga.syncAlPaso2 = async function () {
+                    if (typeof syncPdvPaso2Base === 'function') await syncPdvPaso2Base();
+                    await sincronizarFilasPdvDesdePreseleccion();
                 };
                 window.EnvioPdvProductos = window.PdvEnvioCarga;
             }

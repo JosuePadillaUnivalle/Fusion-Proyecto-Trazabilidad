@@ -30,6 +30,8 @@ use App\Services\AlmacenCapacidadService;
 
 use App\Services\InventarioPresentacionService;
 
+use App\Services\PedidoDistribucionSalidaMayoristaService;
+
 use App\Services\ProductoPlantaInventarioService;
 
 use App\Services\UbicacionesAlmacenService;
@@ -263,6 +265,12 @@ class AlmacenController extends Controller
         $this->asegurarAmbitoAlmacen($almacen, $ctx['ambito']);
 
         $almacen->load(['unidadMedida', 'almacenamientos']);
+
+        if (($almacen->ambito ?? '') === AlmacenAmbito::MAYORISTA && $request->user() !== null) {
+            app(PedidoDistribucionSalidaMayoristaService::class)
+                ->reconciliarSalidasPendientesAlmacen($almacen, $request->user());
+            $almacen->refresh();
+        }
 
         $resumenCapacidad = $this->capacidadService->resumen($almacen);
 
@@ -636,16 +644,16 @@ class AlmacenController extends Controller
         $insumos = $insumosQuery->orderBy('nombre')->get();
 
         foreach ($insumos as $insumo) {
-            if ((float) $insumo->stock <= 0) {
-                continue;
-            }
-
             if ($esMayorista) {
                 $fila = $this->filaMayoristaConsolidada($almacen, $insumo);
                 if ($fila !== null) {
                     $items->push($fila);
                 }
 
+                continue;
+            }
+
+            if ((float) $insumo->stock <= 0) {
                 continue;
             }
 
@@ -877,6 +885,7 @@ class AlmacenController extends Controller
         $totalUnidades = 0.0;
         $totalKg = 0.0;
         $empaquesConStock = 0;
+        $empaquesRegistrados = 0;
         $nombresEmpaque = [];
         $etiquetasUnidad = [];
 
@@ -889,34 +898,50 @@ class AlmacenController extends Controller
                 (int) $almacen->almacenid,
                 (int) $presentacion->insumo_presentacionid
             );
+            $tieneRegistro = InventarioPresentacionLote::query()
+                ->where('almacenid', $almacen->almacenid)
+                ->where('insumo_presentacionid', $presentacion->insumo_presentacionid)
+                ->exists();
 
-            if ($unidades <= 0 && $kg <= 0) {
+            if ($unidades <= 0 && $kg <= 0 && ! $tieneRegistro) {
                 continue;
             }
 
+            $empaquesRegistrados++;
             if ($kg <= 0 && $unidades > 0) {
                 $kg = $unidades * $presentacion->pesoNetoKg();
             }
 
             $totalUnidades += $unidades;
             $totalKg += $kg;
-            $empaquesConStock++;
+            if ($unidades > 0 || $kg > 0) {
+                $empaquesConStock++;
+            }
             $nombresEmpaque[] = trim($presentacion->nombre);
             $etiquetasUnidad[] = $presentacion->etiquetaUnidad();
         }
 
-        if ($totalKg <= 0 && $totalUnidades <= 0) {
+        $tieneHistorial = $this->insumoTieneHistorialMayorista($almacen, $insumo);
+
+        if ($empaquesRegistrados === 0 && ! $tieneHistorial) {
             return null;
         }
 
-        if ($totalKg <= 0) {
+        $sinStock = $totalUnidades <= 0 && $totalKg <= 0;
+
+        if ($totalKg <= 0 && $totalUnidades <= 0 && $sinStock) {
+            $totalKg = 0.0;
+            $totalUnidades = 0.0;
+        } elseif ($totalKg <= 0 && $totalUnidades > 0) {
+            $totalKg = $this->capacidadService->convertirAKg((float) $insumo->stock, $insumo->unidadMedida);
+        } elseif ($totalKg <= 0) {
             $totalKg = $this->capacidadService->convertirAKg((float) $insumo->stock, $insumo->unidadMedida);
         }
 
         $empaque = match (true) {
-            $empaquesConStock === 0 => '—',
-            $empaquesConStock === 1 => $nombresEmpaque[0],
-            default => $empaquesConStock.' presentaciones',
+            $empaquesRegistrados === 1 => $nombresEmpaque[0] ?? '—',
+            $empaquesRegistrados > 1 => $empaquesRegistrados.' presentaciones',
+            default => '—',
         };
 
         $unidadEtiqueta = count(array_unique($etiquetasUnidad)) === 1
@@ -962,16 +987,36 @@ class AlmacenController extends Controller
             'tipo_label' => 'Producto procesado',
             'tipo_filtro' => 'producto procesado',
             'nombre' => $insumo->nombre,
-            'detalle' => $descripcionVisible !== '' ? \Illuminate\Support\Str::limit($descripcionVisible, 60) : '—',
-            'cantidad' => $totalUnidades > 0 ? $totalUnidades : (float) $insumo->stock,
-            'unidad' => $totalUnidades > 0 ? $unidadEtiqueta : ($insumo->unidadMedida?->abreviatura ?? 'kg'),
+            'detalle' => $sinStock
+                ? 'Sin stock en almacén'
+                : ($descripcionVisible !== '' ? \Illuminate\Support\Str::limit($descripcionVisible, 60) : '—'),
+            'cantidad' => $totalUnidades > 0 ? $totalUnidades : 0.0,
+            'unidad' => $totalUnidades > 0 || $empaquesRegistrados > 0
+                ? ($unidadEtiqueta ?? 'empaques')
+                : ($insumo->unidadMedida?->abreviatura ?? 'kg'),
             'kg' => $totalKg,
             'empaque' => $empaque,
+            'sin_stock' => $sinStock,
             'fecha_orden' => $fechaOrden,
             'search' => strtolower(trim($insumo->nombre.' '.$descripcionVisible.' '.implode(' ', $nombresEmpaque).' '.implode(' ', $lotesRefs).' producto procesado')),
             'insumoid' => $insumo->insumoid,
             'origen_tipo' => 'insumo',
         ];
+    }
+
+    private function insumoTieneHistorialMayorista(Almacen $almacen, Insumo $insumo): bool
+    {
+        if (InventarioPresentacionLote::query()
+            ->where('almacenid', $almacen->almacenid)
+            ->where('insumoid', $insumo->insumoid)
+            ->exists()) {
+            return true;
+        }
+
+        return AlmacenMovimiento::query()
+            ->where('almacenid', $almacen->almacenid)
+            ->where('insumoid', $insumo->insumoid)
+            ->exists();
     }
 
     private function queryAlmacenesVisibles(Request $request, string $ambito)

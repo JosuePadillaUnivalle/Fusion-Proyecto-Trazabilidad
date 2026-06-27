@@ -403,7 +403,9 @@
         $pendienteConfirmacionMinorista = $pendienteConfirmacionMinorista ?? false;
         $puedeConfirmarEnvioMayorista = $puedeConfirmarEnvioMayorista ?? false;
         $esMinoristaDueño = $esMinoristaDueño ?? false;
-        $esperaConfirmacionMinorista = $puedeConfirmarEnvioMayorista;
+        $esperaConfirmacionMinorista = $pendienteConfirmacionMinorista;
+        $pasos = $pasosFlujo ?? [];
+        $mostrarPanelCapacidadVehiculo = $mostrarPanelCapacidadVehiculo ?? false;
         $esAdmin = $esAdmin ?? false;
         $puedeVerRutaTiempoReal = $puedeVerRutaTiempoReal ?? false;
         $urlTiempoRealPedido = $urlTiempoRealPedido ?? null;
@@ -415,13 +417,14 @@
         $urlUbicacionAlmacen = $almacenContexto
             ? route('punto-venta.pedidos.ubicacion.almacen', $pedido)
             : null;
-        $pasos = [
-            ['num' => 1, 'icon' => 'fa-paper-plane', 'label' => 'Solicitud minorista', 'hecho' => true, 'activo' => false, 'navegable' => $puedeEditarFlujo],
-            ['num' => 2, 'icon' => 'fa-warehouse', 'label' => 'Revisión mayorista', 'hecho' => in_array($pedido->estado, ['confirmado', 'en_transito', 'recibido'], true), 'activo' => $pendienteMayorista, 'navegable' => $puedeEditarFlujo],
-            ['num' => 3, 'icon' => $esperaConfirmacionMinorista ? 'fa-check-circle' : 'fa-user-tie', 'label' => $esperaConfirmacionMinorista ? 'Confirmar envío' : 'Designar transportista', 'hecho' => ($transportistaDesignado && ! $esperaConfirmacionMinorista) || in_array($pedido->estado, ['en_transito', 'recibido'], true), 'activo' => $esperaConfirmacionMinorista || ($pedido->estado === 'confirmado' && ! $transportistaDesignado), 'navegable' => $puedeEditarFlujo || $esperaConfirmacionMinorista],
-            ['num' => 4, 'icon' => 'fa-shipping-fast', 'label' => 'En ruta', 'hecho' => in_array($pedido->estado, ['en_transito', 'recibido'], true), 'activo' => $transportistaDesignado && $pedido->estado === 'confirmado' && ! $esperaConfirmacionMinorista, 'navegable' => $transportistaDesignado && in_array($pedido->estado, ['confirmado', 'en_transito'], true) && ! $esperaConfirmacionMinorista],
-            ['num' => 5, 'icon' => 'fa-dolly', 'label' => 'Recepción PDV', 'hecho' => $pedido->estado === 'recibido', 'activo' => $pedido->estado === 'en_transito', 'navegable' => $pedido->estado === 'en_transito'],
-        ];
+        if ($pasos === []) {
+            $pasos = \App\Support\PedidoDistribucionCatalogo::pasosFlujoUi(
+                $pedido,
+                $esMinoristaDueño,
+                $puedeEditarFlujo,
+                $transportistaDesignado,
+            );
+        }
     @endphp
 
     <div class="row mb-3">
@@ -617,6 +620,7 @@
                     </div>
 
                     <div class="pdv-paso-panel" data-panel="3">
+                        @if($mostrarPanelCapacidadVehiculo)
                         <div class="pdv-capacidad-vehiculo mb-3" id="panelCapacidadVehiculoPdv"
                              data-peso-kg="{{ number_format((float) ($resumenCargaPedido['peso_kg'] ?? 0), 2, '.', '') }}"
                              data-volumen-m3="{{ $resumenCargaPedido['volumen_m3'] ?? '' }}"
@@ -647,6 +651,7 @@
                                 <p class="pdv-capacidad-vehiculo__alerta mb-0" id="alertaCapacidadVehiculoPdv"></p>
                             </div>
                         </div>
+                        @endif
                         <div class="pdv-info-grid mb-0">
                             <div class="pdv-info-tile">
                                 <span class="pdv-info-tile__icon pdv-info-tile__icon--prod"><i class="fas fa-box"></i></span>
@@ -800,8 +805,6 @@
                     </form>
                 </div>
             </div>
-            @elseif($puedeConfirmarEnvioMayorista ?? false)
-            @include('punto_venta.pedidos.partials.confirmar-envio-mayorista-minorista', ['pedido' => $pedido])
             @elseif($pendienteMayorista && ($esMinoristaDueño ?? false))
             <div class="card pdv-card card-outline card-warning mb-3">
                 <div class="card-body py-3">
@@ -924,7 +927,11 @@
 
             <div class="pdv-sidebar-paso" data-sidebar-paso="4">
             @if($puedeConfirmarEnvioMayorista ?? false)
-            @include('punto_venta.pedidos.partials.confirmar-envio-mayorista-minorista', ['pedido' => $pedido])
+            <div class="card pdv-card card-outline card-warning mb-3">
+                <div class="card-body small text-muted mb-0">
+                    <i class="fas fa-arrow-left mr-1"></i> Confirme el envío en el paso «Confirmar envío».
+                </div>
+            </div>
             @elseif($simulacionActiva && !empty($urlTiempoRealPedido))
             <div class="card pdv-card card-outline card-info mb-3">
                 <div class="card-body">
@@ -1028,7 +1035,6 @@
         </div>
     </div>
 
-    @include('partials.modal-confirmar-accion')
     @include('partials.selector-catalogo-assets')
 @endsection
 

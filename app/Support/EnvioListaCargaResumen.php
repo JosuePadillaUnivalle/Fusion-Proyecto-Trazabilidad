@@ -71,7 +71,7 @@ final class EnvioListaCargaResumen
 
     private static function lineaDesdeDetalleDistribucion(DetallePedidoDistribucion $detalle): string
     {
-        $detalle->loadMissing(['insumo.unidadMedida', 'presentacion.tipoEmpaque', 'presentacion.unidadMedida']);
+        $detalle->loadMissing(['insumo.unidadMedida', 'presentacion.tipoEmpaque']);
 
         $nombre = trim((string) ($detalle->insumo?->nombre ?? $detalle->producto_nombre ?? 'Producto'));
         if (str_contains($nombre, ' · ')) {
@@ -103,9 +103,9 @@ final class EnvioListaCargaResumen
             }
         }
 
-        $unidad = $detalle->insumo?->unidadMedida?->abreviatura
-            ?? $detalle->presentacion?->unidadMedida?->abreviatura
-            ?? 'kg';
+        $unidad = $detalle->presentacion?->etiquetaUnidad()
+            ?? $detalle->insumo?->unidadMedida?->abreviatura
+            ?? 'unidades';
         $partes[] = number_format((float) $detalle->cantidad, 2, ',', '.').' '.$unidad;
 
         return implode(' · ', $partes);

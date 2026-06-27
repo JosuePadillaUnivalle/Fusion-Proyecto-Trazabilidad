@@ -2,6 +2,19 @@
  * Mapa global — todas las rutas en simulación con capas por tipo y colores distintos.
  */
 (function () {
+    let paginaActiva = true;
+    const timersGlobales = [];
+
+    function destruirMapaGlobal() {
+        if (!paginaActiva) return;
+        paginaActiva = false;
+        timersGlobales.forEach((id) => clearInterval(id));
+        timersGlobales.length = 0;
+    }
+
+    window.addEventListener('pagehide', destruirMapaGlobal);
+    window.SimulacionMapaGlobal = { destruir: destruirMapaGlobal };
+
     const SVG_CAMION = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18"><path fill="#ffffff" d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>';
 
     function extraerCoordenadasLinea(geojson) {
@@ -326,6 +339,7 @@
         }
 
         function poll() {
+            if (!paginaActiva || window.__agrofusionLoggingOut) return;
             fetch(`${estadoUrl}?_=${Date.now()}`, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
@@ -354,8 +368,8 @@
         }
 
         poll();
-        setInterval(poll, 2000);
-        setInterval(tickAnimacion, 250);
+        timersGlobales.push(setInterval(poll, 2000));
+        timersGlobales.push(setInterval(tickAnimacion, 250));
 
         setTimeout(() => mapa.invalidateSize(), 300);
         window.addEventListener('resize', () => mapa.invalidateSize());

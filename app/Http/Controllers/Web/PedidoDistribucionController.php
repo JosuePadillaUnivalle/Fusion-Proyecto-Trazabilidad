@@ -229,7 +229,11 @@ class PedidoDistribucionController extends Controller
             'detalles' => 'nullable|array|min:1',
             'detalles.*.insumoid' => 'required|integer|exists:insumo,insumoid',
             'detalles.*.insumo_presentacionid' => 'required|integer|exists:insumo_presentacion,insumo_presentacionid',
+            'detalles.*.inventario_presentacion_loteid' => 'nullable|integer|exists:inventario_presentacion_lote,inventario_presentacion_loteid',
+            'detalles.*.almacen_mayorista_origenid' => 'nullable|integer|exists:almacen,almacenid',
             'detalles.*.cantidad' => 'required|numeric|gt:0',
+            'almacenes_recogida_orden' => 'nullable|array',
+            'almacenes_recogida_orden.*' => 'integer|exists:almacen,almacenid',
             'insumoid' => 'nullable|integer|exists:insumo,insumoid',
             'insumo_presentacionid' => 'nullable|integer|exists:insumo_presentacion,insumo_presentacionid',
             'cantidad' => 'nullable|numeric|gt:0',
@@ -305,6 +309,7 @@ class PedidoDistribucionController extends Controller
 
         $detallesPayload = [];
         $kgTotalPedido = 0.0;
+        $almacenesEnPedido = [];
 
         foreach ($lineasEntrada as $linea) {
             $cantidad = (float) ($linea['cantidad'] ?? 0);
@@ -317,12 +322,21 @@ class PedidoDistribucionController extends Controller
                 return back()->withInput()->with('error', 'El producto debe estar en almacén mayorista.');
             }
 
-            if ($almacenOrigenId !== null && (int) $insumoRef->almacenid !== (int) $almacenOrigenId) {
+            $lineaAlmacenId = isset($linea['almacen_mayorista_origenid'])
+                ? (int) $linea['almacen_mayorista_origenid']
+                : $almacenOrigenId;
+
+            if ($lineaAlmacenId !== null && $lineaAlmacenId > 0 && (int) $insumoRef->almacenid !== $lineaAlmacenId) {
                 return back()->withInput()->with('error', 'El producto «'.$insumoRef->nombre.'» no corresponde al almacén mayorista seleccionado.');
             }
 
+            $lineaAlmacenId = (int) $insumoRef->almacenid;
+            if (! in_array($lineaAlmacenId, $almacenesEnPedido, true)) {
+                $almacenesEnPedido[] = $lineaAlmacenId;
+            }
+
             if ($almacenOrigenId === null) {
-                $almacenOrigenId = (int) $insumoRef->almacenid;
+                $almacenOrigenId = $lineaAlmacenId;
             }
 
             $presentacionId = (int) $linea['insumo_presentacionid'];
@@ -356,6 +370,24 @@ class PedidoDistribucionController extends Controller
                 return back()->withInput()->with('error', $e->getMessage());
             }
 
+            $invLoteId = isset($linea['inventario_presentacion_loteid'])
+                ? (int) $linea['inventario_presentacion_loteid']
+                : null;
+            $referenciaLote = null;
+            if ($invLoteId) {
+                $invLote = \App\Models\InventarioPresentacionLote::query()->find($invLoteId);
+                if ($invLote === null) {
+                    return back()->withInput()->with('error', 'El lote seleccionado no es válido.');
+                }
+                if ((int) $invLote->almacenid !== $lineaAlmacenId) {
+                    return back()->withInput()->with('error', 'El lote no corresponde al almacén mayorista del producto.');
+                }
+                if ((float) $invLote->cantidad_unidades + 0.0001 < $cantidad) {
+                    return back()->withInput()->with('error', 'La cantidad supera el stock del lote seleccionado.');
+                }
+                $referenciaLote = trim((string) ($invLote->referencia_lote ?: $invLote->etiquetaLote()));
+            }
+
             $kgLinea = $cantidad * $presentacion->pesoNetoKg();
             $kgTotalPedido += $kgLinea;
 
@@ -363,10 +395,20 @@ class PedidoDistribucionController extends Controller
                 'cantidad' => $cantidad,
                 'es_solicitud_custom' => false,
                 'insumoid' => $insumoRef->insumoid,
+                'almacen_mayorista_origenid' => $lineaAlmacenId,
                 'insumo_presentacionid' => $presentacion->insumo_presentacionid,
+                'inventario_presentacion_loteid' => $invLoteId,
+                'referencia_lote' => $referenciaLote,
                 'tipo_envase' => $presentacion->tipo_envase,
                 'producto_nombre' => $insumoRef->nombre.' · '.$presentacion->nombre,
             ];
+        }
+
+        $ordenRecogida = array_values(array_filter(array_map('intval', $data['almacenes_recogida_orden'] ?? [])));
+        if ($ordenRecogida !== []) {
+            $almacenOrigenId = $ordenRecogida[0];
+        } elseif ($almacenesEnPedido !== []) {
+            $almacenOrigenId = $almacenesEnPedido[0];
         }
 
         try {
@@ -426,7 +468,8 @@ class PedidoDistribucionController extends Controller
                     $pedido,
                     (int) $data['transportista_usuarioid'],
                     (int) $data['vehiculoid'],
-                    (int) $user->usuarioid
+                    (int) $user->usuarioid,
+                    $ordenRecogida !== [] ? $ordenRecogida : null
                 );
             } catch (\Throwable $e) {
                 $pedido->detalles()->delete();
@@ -447,8 +490,12 @@ class PedidoDistribucionController extends Controller
             ? 'Envío registrado y transportista asignado. El minorista del punto de venta debe confirmar antes de salir en ruta.'
             : 'Solicitud enviada. El centro mayorista revisará el pedido y preparará el envío.';
 
-        return redirect()
-            ->route('punto-venta.pedidos.show', ['pedido' => $pedido->fresh(), 'ctx' => $ctxRedirect]);
+        $paramsRedirect = ['pedido' => $pedido->fresh(), 'ctx' => $ctxRedirect];
+        if ($esIniciadorMayorista) {
+            $paramsRedirect['paso'] = 3;
+        }
+
+        return redirect()->route('punto-venta.pedidos.show', $paramsRedirect);
     }
 
     public function show(Request $request, PedidoDistribucion $pedido): View
@@ -507,14 +554,19 @@ class PedidoDistribucionController extends Controller
             && (UsuarioRol::esAdminGlobal($user) || $esMinoristaDueño);
         $puedeReabrirRevision = ($puedeGestionarMayorista ?? false)
             && PedidoDistribucionCatalogo::puedeReabrirRevision($pedido);
-        $pasoActualFlujo = ($pendienteConfirmacionMinorista && $esMinoristaDueño) ? 3 : (
-            $pendienteMayorista ? 2 : (
-            $puedeDesignarTransportista ? 3 : (
-                ($transportistaDesignado && $pedido->estado === 'confirmado') ? 4 : (
-                    $pedido->estado === 'en_transito' ? 4 : ($pedido->estado === 'recibido' ? 5 : 3)
-                )
-            )
-        ));
+        $pasoActualFlujo = PedidoDistribucionCatalogo::pasoActualFlujo($pedido);
+        $pasosFlujo = PedidoDistribucionCatalogo::pasosFlujoUi(
+            $pedido,
+            $esMinoristaDueño,
+            $puedeEditarFlujo,
+            $transportistaDesignado,
+        );
+        $mostrarPanelCapacidadVehiculo = PedidoDistribucionCatalogo::mostrarPanelCapacidadVehiculo(
+            $pedido,
+            $puedeGestionarMayorista,
+            $puedeDesignarTransportista,
+            $transportistaDesignado,
+        );
         $pasoInicial = max(1, min(5, (int) request()->query('paso', 0) ?: $pasoActualFlujo));
         if (! $puedeEditarFlujo && $pasoInicial < $pasoActualFlujo) {
             $pasoInicial = $pasoActualFlujo;
@@ -579,6 +631,8 @@ class PedidoDistribucionController extends Controller
             'resumenCargaPedido',
             'pendienteConfirmacionMinorista',
             'puedeConfirmarEnvioMayorista',
+            'pasosFlujo',
+            'mostrarPanelCapacidadVehiculo',
         ));
     }
 

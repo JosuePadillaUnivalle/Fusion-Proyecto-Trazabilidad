@@ -535,6 +535,63 @@ class PedidoDistribucionFase2Test extends TestCase
         $response->assertOk();
         $response->assertSee('Confirmar envío', false);
         $response->assertSee('Confirme el envío entrante', false);
+        $response->assertDontSee('Recomendación de capacidad del vehículo', false);
+        $response->assertSee('Esperando confirmación del minorista', false);
+    }
+
+    public function test_minorista_puede_confirmar_envio_iniciado_por_mayorista(): void
+    {
+        [$admin, $chofer, $vehiculo, , , , $pedido] = $this->escenarioPedidoConfirmado();
+
+        $minorista = Usuario::query()->where('email', 'minorista.fase2@test.local')->firstOrFail();
+        Role::findOrCreate('minorista', 'web');
+        $minorista->syncRoles(['minorista']);
+        $pedido->update([
+            'envio_iniciado_mayorista' => true,
+            'fecha_confirmacion_minorista' => null,
+            'creado_por_usuarioid' => $admin->usuarioid,
+        ]);
+
+        $this->actingAs($admin);
+        $this->post(route('punto-venta.pedidos.designar-transportista', $pedido), [
+            'transportista_usuarioid' => $chofer->usuarioid,
+            'vehiculoid' => $vehiculo->vehiculoid,
+        ]);
+
+        $this->actingAs($minorista);
+        $this->post(route('punto-venta.pedidos.confirmar-envio-mayorista', $pedido->fresh()))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $pedido->refresh();
+        $this->assertNotNull($pedido->fecha_confirmacion_minorista);
+        $this->assertSame(
+            'Esperando confirmación del transportista',
+            PedidoDistribucionCatalogo::badgeEstado($pedido)['etiqueta']
+        );
+    }
+
+    public function test_mayorista_ve_paso_confirmacion_minorista_no_en_ruta(): void
+    {
+        [$admin, $chofer, $vehiculo, , , , $pedido] = $this->escenarioPedidoConfirmado();
+
+        $pedido->update([
+            'envio_iniciado_mayorista' => true,
+            'fecha_confirmacion_minorista' => null,
+        ]);
+
+        $this->actingAs($admin);
+        $this->post(route('punto-venta.pedidos.designar-transportista', $pedido), [
+            'transportista_usuarioid' => $chofer->usuarioid,
+            'vehiculoid' => $vehiculo->vehiculoid,
+        ]);
+
+        $response = $this->get(route('punto-venta.pedidos.show', ['pedido' => $pedido->fresh(), 'ctx' => 'mayorista']));
+
+        $response->assertOk();
+        $response->assertSee('data-paso-flujo="3"', false);
+        $response->assertSee('Confirmación minorista', false);
+        $response->assertDontSee('Recomendación de capacidad del vehículo', false);
     }
 
     public function test_transportista_no_puede_registrar_condiciones_sin_confirmacion_minorista(): void

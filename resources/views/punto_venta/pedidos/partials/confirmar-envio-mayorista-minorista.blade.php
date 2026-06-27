@@ -10,13 +10,14 @@
                 </p>
             </div>
         </div>
-        <form method="POST" action="{{ route('punto-venta.pedidos.confirmar-envio-mayorista', $pedido) }}">
+        <form method="POST" action="{{ route('punto-venta.pedidos.confirmar-envio-mayorista', $pedido) }}" class="js-form-confirmar-envio-mayorista">
             @csrf
-            <button type="button" class="btn btn-success btn-block"
+            <button type="submit" class="btn btn-success btn-block"
                 data-confirm-modal
                 data-confirm-title="Confirmar envío"
                 data-confirm-message="¿Confirma que espera este envío en su punto de venta? El transportista podrá continuar con el cierre operativo."
-                data-confirm-tone="success">
+                data-confirm-tone="success"
+                data-confirm-btn="Confirmar envío">
                 <i class="fas fa-check mr-1"></i> Confirmar envío
             </button>
         </form>

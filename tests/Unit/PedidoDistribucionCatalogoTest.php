@@ -47,6 +47,22 @@ class PedidoDistribucionCatalogoTest extends TestCase
         $this->assertCount(2, $estados);
     }
 
+    public function test_badge_estado_espera_confirmacion_minorista(): void
+    {
+        $pedido = new PedidoDistribucion([
+            'estado' => PedidoDistribucionCatalogo::ESTADO_CONFIRMADO,
+            'envio_iniciado_mayorista' => true,
+            'fecha_confirmacion_minorista' => null,
+            'transportista_usuarioid' => 10,
+            'rutadistribucionid' => 5,
+        ]);
+
+        $badge = PedidoDistribucionCatalogo::badgeEstado($pedido);
+
+        $this->assertSame('Esperando confirmación del minorista', $badge['etiqueta']);
+        $this->assertSame('revision', $badge['clase']);
+    }
+
     public function test_badge_estado_muestra_etiqueta_legible_listo_para_salida(): void
     {
         $pedido = new PedidoDistribucion([
@@ -70,5 +86,55 @@ class PedidoDistribucionCatalogoTest extends TestCase
 
         $this->assertTrue(PedidoDistribucionCatalogo::puedeConfirmarRecepcion($enTransito));
         $this->assertFalse(PedidoDistribucionCatalogo::puedeConfirmarRecepcion($recibido));
+    }
+
+    public function test_paso_actual_flujo_espera_confirmacion_minorista_antes_de_en_ruta(): void
+    {
+        $pedido = new PedidoDistribucion([
+            'estado' => PedidoDistribucionCatalogo::ESTADO_CONFIRMADO,
+            'envio_iniciado_mayorista' => true,
+            'fecha_confirmacion_minorista' => null,
+            'transportista_usuarioid' => 10,
+            'rutadistribucionid' => 5,
+        ]);
+
+        $this->assertTrue(PedidoDistribucionCatalogo::pendienteConfirmacionMinorista($pedido));
+        $this->assertSame(3, PedidoDistribucionCatalogo::pasoActualFlujo($pedido));
+    }
+
+    public function test_pasos_flujo_envio_mayorista_no_marca_solicitud_ni_revision_completadas(): void
+    {
+        $pedido = new PedidoDistribucion([
+            'estado' => PedidoDistribucionCatalogo::ESTADO_CONFIRMADO,
+            'envio_iniciado_mayorista' => true,
+            'fecha_confirmacion_minorista' => null,
+            'transportista_usuarioid' => 10,
+            'rutadistribucionid' => 5,
+        ]);
+
+        $pasos = PedidoDistribucionCatalogo::pasosFlujoUi($pedido, false, false, true);
+
+        $this->assertFalse($pasos[0]['hecho']);
+        $this->assertFalse($pasos[1]['hecho']);
+        $this->assertTrue($pasos[2]['activo']);
+        $this->assertSame('Confirmación minorista', $pasos[2]['label']);
+        $this->assertFalse($pasos[3]['activo']);
+    }
+
+    public function test_panel_capacidad_oculto_mientras_espera_confirmacion_minorista(): void
+    {
+        $pedido = new PedidoDistribucion([
+            'estado' => PedidoDistribucionCatalogo::ESTADO_CONFIRMADO,
+            'envio_iniciado_mayorista' => true,
+            'fecha_confirmacion_minorista' => null,
+            'transportista_usuarioid' => 10,
+        ]);
+
+        $this->assertFalse(PedidoDistribucionCatalogo::mostrarPanelCapacidadVehiculo(
+            $pedido,
+            true,
+            false,
+            true,
+        ));
     }
 }

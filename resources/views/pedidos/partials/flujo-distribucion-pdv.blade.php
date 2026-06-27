@@ -36,21 +36,20 @@
             <div class="alert alert-light border py-2 mb-3 small" id="pdv-paso-ayuda">
                 <strong>Paso a paso:</strong>
                 @if($esOrigenMayoristaPdv ?? $esAdminPdv ?? false)
-                    1) Elija el almacén mayorista (origen) en el mapa o en el buscador.
-                    2) Luego el punto de venta (destino). La ruta se traza automáticamente.
+                    1) Elija uno o más almacenes mayorista (origen) en orden. 2) Luego el punto de venta (destino). En el paso 2 indique productos por cada almacén.
                 @else
                     Elija el punto de venta (destino) en el mapa o en el buscador. La ruta se traza automáticamente.
                 @endif
             </div>
 
             @if($esOrigenMayoristaPdv ?? $esAdminPdv ?? false)
-            <div class="env-paso" id="bloque-origen-pdv">
+            <div class="env-paso" id="bloque-recogidas-pdv">
                 <div class="d-flex align-items-center mb-2">
                     <span class="env-paso__num">1</span>
-                    <strong>Origen</strong>
+                    <strong>Puntos de recogida — Almacenes mayorista</strong>
                 </div>
                 <div class="form-group mb-2">
-                    <label class="small text-muted mb-1">Almacén mayorista <span class="text-danger">*</span></label>
+                    <label class="small text-muted mb-1">Recogida 1 <span class="text-danger">*</span></label>
                     <div class="pedido-picker-field">
                         <input type="text" id="txtNombreOrigenPdv" class="picker-display text-muted" readonly
                                placeholder="Buscar almacén mayorista…" value="{{ $oldAlmacenLabel ?? '' }}">
@@ -69,14 +68,22 @@
                     <small id="txtOrigenPdvCoords" class="form-text text-muted"></small>
                     <small id="pdv-producto-preseleccion-resumen" class="text-success small d-none mt-1 mb-0"></small>
                 </div>
+                <div id="recogidas-extra-pdv-container"></div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnAgregarRecogidaPdv">
+                    <i class="fas fa-plus mr-1"></i> Agregar otro almacén mayorista
+                </button>
+                <small class="text-muted d-block mt-1">Opcional: recoger en 2 o más almacenes mayorista antes de entregar al punto de venta.</small>
             </div>
             @endif
 
             <div class="env-paso" id="bloque-destino-pdv">
                 <div class="d-flex align-items-center mb-2">
                     <span class="env-paso__num">{{ ($esOrigenMayoristaPdv ?? $esAdminPdv ?? false) ? '2' : '1' }}</span>
-                    <strong>Destino</strong>
+                    <strong>Destino — Punto de venta</strong>
                 </div>
+                @if($esOrigenMayoristaPdv ?? $esAdminPdv ?? false)
+                <small class="text-muted d-block mb-2" id="pdv-destino-bloqueado-msg">Primero elija la recogida 1 en almacén mayorista.</small>
+                @endif
                 <div class="pedido-picker-field">
                     <input type="text" id="txtNombreDestinoPdv" class="picker-display text-muted" readonly
                            placeholder="Buscar punto de venta…" value="{{ $oldPuntoLabel ?? '' }}">
@@ -182,15 +189,11 @@
         <div class="env-wizard-panel__head"><i class="fas fa-box-open"></i> Carga y productos</div>
         <div class="env-wizard-panel__body">
             <p class="small text-muted mb-3">
-                Elija uno o más productos con su <strong>presentación</strong> (empaque) desde el almacén mayorista.
-                La cantidad se indica en unidades de esa presentación; verá el equivalente en kilogramos.
+                Elija productos con su <strong>presentación</strong> (empaque) y <strong>lote</strong> en cada almacén mayorista de la ruta.
+                La cantidad se indica en unidades de esa presentación; al confirmar, líneas del mismo producto, lote y empaque se suman.
             </p>
-            <div class="d-flex justify-content-end mb-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary btn-agregar-producto-pdv" id="btnAgregarProductoPdv">
-                    <i class="fas fa-plus mr-1"></i> Agregar otro producto
-                </button>
-            </div>
-            <div id="pdv-productos-envio-container"></div>
+            <div id="pdv-productos-recogida-container"></div>
+            <div id="pdv-productos-envio-container" class="d-none"></div>
             @error('detalles')
                 <small class="text-danger d-block mt-2">{{ $message }}</small>
             @enderror

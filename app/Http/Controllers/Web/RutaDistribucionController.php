@@ -270,15 +270,8 @@ class RutaDistribucionController extends Controller
         }
 
         $mensaje = 'Ruta marcada en marcha. El pedido ya está en camino al punto de venta.';
-        $redirect = back()->with('success', $mensaje);
 
-        if (UsuarioRol::esAdminGlobal($user)) {
-            $redirect->with('info', 'Seguimiento en vivo disponible en Ruta en tiempo real.');
-        } elseif (UsuarioRol::esTransportista($user)) {
-            $redirect->with('info', 'Puede seguir su recorrido desde esta pantalla o Mis envíos.');
-        }
-
-        return $redirect;
+        return back()->with('success', $mensaje);
     }
 
     public function show(RutaDistribucion $ruta): View|RedirectResponse
@@ -292,6 +285,7 @@ class RutaDistribucionController extends Controller
         $ruta->load([
             'paradas.pedido.detalles',
             'paradas.puntoVenta',
+            'paradas.almacen',
             'pedidos.puntoVenta.minorista',
             'pedidos.detalles',
             'transportista.perfilTransportista.vehiculo',
@@ -303,7 +297,7 @@ class RutaDistribucionController extends Controller
         $trayectoPartes = $this->rutas->trayectoPartes($ruta);
         $trayectoTexto = $this->rutas->trayectoTexto($ruta);
         $paradasMapa = $this->rutas->paradasMapa($ruta);
-        $badge = RutaDistribucionCatalogo::badgeEstado($ruta);
+        $badge = RutaDistribucionCatalogo::badgeEstadoCabecera($ruta);
         $simulacionActiva = \App\Support\SimulacionRutaCatalogo::simulacionActivaDistribucion($ruta);
         $urlTiempoReal = $simulacionActiva
             ? route('logistica.rutas-tiempo-real.show', ['tipo' => 'distribucion', 'id' => $ruta->rutadistribucionid])

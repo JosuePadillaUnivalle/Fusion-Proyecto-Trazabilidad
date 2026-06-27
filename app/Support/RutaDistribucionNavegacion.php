@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\RutaDistribucion;
+use App\Models\RutaDistribucionParada;
 use App\Models\Usuario;
 use Illuminate\Support\Carbon;
 
@@ -62,6 +63,58 @@ final class RutaDistribucionNavegacion
     public static function fechaSalida(RutaDistribucion $ruta): ?Carbon
     {
         return $ruta->simulacion_inicio_at ?? $ruta->fecha_salida;
+    }
+
+    public static function etiquetaSalida(RutaDistribucion $ruta): string
+    {
+        $fecha = self::fechaSalida($ruta);
+        if ($fecha !== null) {
+            return $fecha->format('d/m/Y H:i');
+        }
+
+        $ruta->loadMissing('pedidos');
+        foreach ($ruta->pedidos as $pedido) {
+            if (PedidoDistribucionCatalogo::pendienteConfirmacionMinorista($pedido)) {
+                return 'Pendiente — confirmación del minorista';
+            }
+        }
+
+        if ($ruta->transportista_usuarioid !== null
+            && $ruta->estado === RutaDistribucionCatalogo::ESTADO_PLANIFICADA) {
+            return 'Pendiente — cierre del transportista';
+        }
+
+        return 'Sin programar';
+    }
+
+    /** @return array{titulo: string, subtitulo: string, badge: string} */
+    public static function presentacionParadaCarga(RutaDistribucionParada $parada, int $numeroRecogida): array
+    {
+        $parada->loadMissing('almacen');
+        $textoDestino = trim(str_replace(['Carga:', 'Entrega:'], '', (string) $parada->destino));
+        $subtitulo = AlmacenNombreCatalogo::etiquetaListaDesdeTexto(
+            $parada->almacen?->nombre ?? $textoDestino,
+            'mayorista'
+        );
+
+        return [
+            'titulo' => 'Recogida '.$numeroRecogida,
+            'subtitulo' => $subtitulo !== '—' ? $subtitulo : ($textoDestino !== '' ? $textoDestino : 'Almacén de carga'),
+            'badge' => self::etiquetaParadaCarga((string) $parada->tipo),
+        ];
+    }
+
+    /** @return array{titulo: string, subtitulo: ?string, badge: ?string} */
+    public static function presentacionParadaEntrega(RutaDistribucionParada $parada): array
+    {
+        $titulo = trim(str_replace('Entrega:', '', (string) $parada->destino));
+        $subtitulo = $parada->pedido?->numero_solicitud;
+
+        return [
+            'titulo' => $titulo !== '' ? $titulo : 'Entrega PDV',
+            'subtitulo' => is_string($subtitulo) && $subtitulo !== '' ? $subtitulo : null,
+            'badge' => 'Punto de entrega',
+        ];
     }
 
     public static function etiquetaParadaCarga(string $tipo): string

@@ -232,10 +232,22 @@ final class DocumentoEntregaArchivo
 
         $lineasProducto = [];
         if ($esRutaPdv && $rutaOperacion !== null) {
+            $todosDetalles = collect();
             foreach ($rutaOperacion->pedidos as $pedidoRuta) {
-                foreach ($pedidoRuta->detalles as $detalle) {
-                    $lineasProducto[] = self::lineaProductoDesdeDetallePdv($detalle);
+                $todosDetalles = $todosDetalles->concat($pedidoRuta->detalles);
+            }
+            foreach (\App\Support\PedidoDistribucionConsolidacion::consolidar($todosDetalles) as $grupo) {
+                $titulo = $grupo['producto'];
+                if ($grupo['lote'] !== '') {
+                    $titulo .= ' - '.$grupo['lote'];
                 }
+                $lineasProducto[] = [
+                    'producto' => $titulo,
+                    'cantidad' => number_format($grupo['cantidad'], 0, '.', ',').' '.$grupo['unidad']
+                        .($grupo['cantidad_kg'] > 0 ? ' ('.number_format($grupo['cantidad_kg'], 2, '.', '').' kg)' : ''),
+                    'empaquetaje' => $grupo['empaque'] ?: '—',
+                    'observaciones' => '—',
+                ];
             }
         } else {
             foreach ($pedido?->detalles ?? [] as $detalle) {
@@ -526,8 +538,8 @@ final class DocumentoEntregaArchivo
             [$nombreProducto] = explode(' · ', $nombreProducto, 2);
         }
 
-        $unidad = $detalle->insumo?->unidadMedida?->abreviatura
-            ?? $detalle->presentacion?->unidadMedida?->abreviatura
+        $unidad = $detalle->presentacion?->etiquetaUnidad()
+            ?? $detalle->insumo?->unidadMedida?->abreviatura
             ?? 'un';
 
         if ($empaque === null && str_contains((string) ($detalle->producto_nombre ?? ''), ' · ')) {
