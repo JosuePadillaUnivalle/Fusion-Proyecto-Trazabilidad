@@ -910,6 +910,7 @@ class LoteTrazabilidadService
                 null,
                 $evidenciaHistorial['icono'],
                 $evidenciaHistorial['tipo'],
+                $evidenciaHistorial['foto_url'],
             ));
         }
 
@@ -1609,6 +1610,7 @@ class LoteTrazabilidadService
         ?int $produccionid = null,
         ?string $evidenciaIcono = null,
         ?string $evidenciaTipo = null,
+        ?string $evidenciaFotoUrl = null,
     ): array {
         $row = [
             'fecha' => $fecha,
@@ -1643,6 +1645,9 @@ class LoteTrazabilidadService
         }
         if ($evidenciaTipo !== null) {
             $row['evidencia_tipo'] = $evidenciaTipo;
+        }
+        if ($evidenciaFotoUrl !== null) {
+            $row['evidencia_foto_url'] = $evidenciaFotoUrl;
         }
 
         return $row;
@@ -2066,28 +2071,30 @@ class LoteTrazabilidadService
     }
 
     /**
-     * @return array{url: ?string, icono: ?string, tipo: ?string}
+     * @return array{url: ?string, foto_url: ?string, icono: ?string, tipo: ?string}
      */
     private function evidenciaHistorialActividad(Actividad $actividad, string $tipoNombre): array
     {
-        $vacio = ['url' => null, 'icono' => null, 'tipo' => null];
+        $vacio = ['url' => null, 'foto_url' => null, 'icono' => null, 'tipo' => null];
         if ($actividad->fechafin === null) {
             return $vacio;
         }
 
-        $esRiego = str_contains($tipoNombre, 'riego') || str_contains($tipoNombre, 'regad');
-        if ($esRiego) {
-            return ['url' => null, 'icono' => 'tint', 'tipo' => 'icono'];
-        }
-
-        $imagenInsumo = $this->imagenInsumoDesdeDetalleActividad($actividad);
-        if ($imagenInsumo !== null) {
-            return ['url' => $imagenInsumo, 'icono' => null, 'tipo' => 'insumo'];
-        }
-
         $foto = EvidenciaFoto::urlDesdePath($actividad->evidencia_foto_path ?? null);
+        $insumo = $this->imagenInsumoDesdeDetalleActividad($actividad);
+        $esRiego = str_contains($tipoNombre, 'riego') || str_contains($tipoNombre, 'regad');
+
+        if ($insumo !== null && $foto !== null) {
+            return ['url' => $insumo, 'foto_url' => $foto, 'icono' => null, 'tipo' => 'insumo_foto'];
+        }
+        if ($insumo !== null) {
+            return ['url' => $insumo, 'foto_url' => null, 'icono' => null, 'tipo' => 'insumo'];
+        }
         if ($foto !== null) {
-            return ['url' => $foto, 'icono' => null, 'tipo' => 'foto'];
+            return ['url' => $foto, 'foto_url' => null, 'icono' => null, 'tipo' => 'foto'];
+        }
+        if ($esRiego) {
+            return ['url' => null, 'foto_url' => null, 'icono' => 'tint', 'tipo' => 'icono'];
         }
 
         return $vacio;

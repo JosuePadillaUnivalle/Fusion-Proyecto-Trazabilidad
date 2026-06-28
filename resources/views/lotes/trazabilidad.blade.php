@@ -336,8 +336,9 @@
                                 && ! $evento['completada']
                                 && ($evento['fase'] ?? '') !== 'siembra'
                                 && in_array((int) $evento['actividadid'], $actividades_marcables_ids ?? [], true);
-                            $tieneEvidencia = !empty($evento['evidencia_url']);
-                            $tieneEvidenciaIcono = !empty($evento['evidencia_icono']);
+                            $tieneEvidenciaVisual = !empty($evento['evidencia_url'])
+                                || !empty($evento['evidencia_foto_url'])
+                                || !empty($evento['evidencia_icono']);
                             $colorFaseEvento = ($fases_evento[$evento['fase']] ?? $fases[$evento['fase']])['color'] ?? '#6c757d';
                         @endphp
                         <div class="evento-trz-wrap" style="--paso-color: {{ $colorFaseEvento }};">
@@ -371,34 +372,8 @@
                                 @if($mostrarDesc)
                                     <p class="mb-1 small text-muted">{{ $descEvento }}</p>
                                 @endif
-                                @if($tieneEvidenciaIcono)
-                                    <div class="evento-trz-evidencia evento-trz-evidencia--icono mt-2">
-                                        <div class="evento-trz-evidencia__icono" title="Actividad de riego">
-                                            <i class="fas fa-{{ $evento['evidencia_icono'] }}"></i>
-                                        </div>
-                                        <span class="evento-trz-evidencia__caption small text-muted d-block mt-1">
-                                            <i class="fas fa-tint mr-1"></i> Riego registrado
-                                        </span>
-                                    </div>
-                                @elseif($tieneEvidencia)
-                                    <div class="evento-trz-evidencia mt-2">
-                                        <button type="button" class="evento-trz-evidencia__link btn-ver-evidencia border-0 p-0 bg-transparent"
-                                                data-url="{{ $evento['evidencia_url'] }}"
-                                                data-titulo="{{ $evento['titulo'] }}"
-                                                title="Ver evidencia en tamaño completo">
-                                            <img src="{{ $evento['evidencia_url'] }}"
-                                                 alt="{{ ($evento['evidencia_tipo'] ?? '') === 'insumo' ? 'Insumo aplicado: ' : 'Evidencia: ' }}{{ $evento['titulo'] }}"
-                                                 class="evento-trz-evidencia__img"
-                                                 loading="lazy" decoding="async">
-                                            <span class="evento-trz-evidencia__caption small text-muted">
-                                                @if(($evento['evidencia_tipo'] ?? '') === 'insumo')
-                                                    <i class="fas fa-flask mr-1"></i> Insumo utilizado
-                                                @else
-                                                    <i class="fas fa-camera mr-1"></i> Evidencia fotográfica
-                                                @endif
-                                            </span>
-                                        </button>
-                                    </div>
+                                @if($tieneEvidenciaVisual)
+                                    @include('lotes.partials.trazabilidad-evidencia', ['evento' => $evento])
                                 @endif
                                 <div class="d-flex flex-wrap align-items-center" style="gap: .35rem;">
                                     @if(!empty($evento['usuario']))

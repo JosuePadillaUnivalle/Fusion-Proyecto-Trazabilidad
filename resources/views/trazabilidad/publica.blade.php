@@ -213,26 +213,33 @@
 
 .trz-sin-resultados { text-align: center; color: #94a3b8; font-size: .85rem; padding: 1.5rem 0; display: none; }
 
-.trz-evidencia-wrap { margin: .65rem 0 .45rem; text-align: center; }
+.trz-evidencia-wrap { margin: .65rem 0 .45rem; }
+.trz-evidencia-galeria {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .65rem;
+}
 .trz-evidencia-card {
     display: inline-block;
-    max-width: 100%;
-    width: fit-content;
-    border-radius: 10px;
+    max-width: 148px;
+    width: 148px;
+    border-radius: 12px;
     overflow: hidden;
-    border: 1px solid #bbf7d0;
-    background: #fff;
-    box-shadow: 0 1px 6px rgba(5, 150, 105, .1);
+    border: 1px solid #d8e2ec;
+    background: linear-gradient(145deg, #ffffff 0%, #f4f7fb 100%);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .08);
     cursor: zoom-in;
     text-decoration: none;
     color: inherit;
     line-height: 0;
 }
 .trz-evidencia-card img {
-    max-width: 100%;
-    width: auto;
-    height: auto;
+    width: 100%;
+    height: 108px;
+    object-fit: cover;
     display: block;
+    border-bottom: 1px solid rgba(15, 23, 42, .06);
 }
 .trz-evidencia-caption {
     display: flex; align-items: center; justify-content: space-between;
@@ -392,7 +399,43 @@
                                 @endforeach
                             </ul>
                             @endif
-                            @if(!empty($evento['evidencia_url']))
+                            @php
+                                $tipoEvidenciaPub = (string) ($evento['evidencia_tipo'] ?? '');
+                                $urlInsumoPub = ($tipoEvidenciaPub === 'insumo' || $tipoEvidenciaPub === 'insumo_foto')
+                                    ? ($evento['evidencia_url'] ?? null)
+                                    : null;
+                                $urlFotoPub = match ($tipoEvidenciaPub) {
+                                    'insumo_foto' => $evento['evidencia_foto_url'] ?? null,
+                                    'foto' => $evento['evidencia_url'] ?? null,
+                                    default => null,
+                                };
+                            @endphp
+                            @if(filled($urlInsumoPub) || filled($urlFotoPub))
+                            <div class="trz-evidencia-wrap">
+                                <div class="trz-evidencia-galeria">
+                                    @if(filled($urlInsumoPub))
+                                    <a href="{{ $urlInsumoPub }}" class="trz-evidencia-card trz-evidencia-open" target="_blank" rel="noopener"
+                                       data-url="{{ $urlInsumoPub }}" data-titulo="{{ $evento['titulo'] }}">
+                                        <img src="{{ $urlInsumoPub }}" alt="Insumo: {{ $evento['titulo'] }}" decoding="async">
+                                        <span class="trz-evidencia-caption">
+                                            <span><i class="fas fa-flask mr-1"></i> Insumo utilizado</span>
+                                            <span><i class="fas fa-expand-alt"></i></span>
+                                        </span>
+                                    </a>
+                                    @endif
+                                    @if(filled($urlFotoPub))
+                                    <a href="{{ $urlFotoPub }}" class="trz-evidencia-card trz-evidencia-open" target="_blank" rel="noopener"
+                                       data-url="{{ $urlFotoPub }}" data-titulo="{{ $evento['titulo'] }}">
+                                        <img src="{{ $urlFotoPub }}" alt="Evidencia: {{ $evento['titulo'] }}" decoding="async">
+                                        <span class="trz-evidencia-caption">
+                                            <span><i class="fas fa-camera mr-1"></i> Evidencia fotográfica</span>
+                                            <span><i class="fas fa-expand-alt"></i></span>
+                                        </span>
+                                    </a>
+                                    @endif
+                                </div>
+                            </div>
+                            @elseif(!empty($evento['evidencia_url']))
                             <div class="trz-evidencia-wrap">
                                 <a href="{{ $evento['evidencia_url'] }}" class="trz-evidencia-card trz-evidencia-open" target="_blank" rel="noopener"
                                    data-url="{{ $evento['evidencia_url'] }}" data-titulo="{{ $evento['titulo'] }}">

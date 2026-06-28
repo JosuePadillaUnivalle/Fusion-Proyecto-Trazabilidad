@@ -89,19 +89,29 @@ class TrazabilidadProductoPdvService
 
         if ($lote) {
             $eventos = $eventos->merge(
-                $this->loteTrazabilidad->buildEventos($lote)->map(fn (array $e) => $this->normalizarEvento(
-                    $e['fecha'] ?? null,
-                    'agricola',
-                    (string) ($e['fase_label'] ?? 'Producción agrícola'),
-                    (string) ($e['titulo'] ?? 'Evento'),
-                    (string) ($e['descripcion'] ?? ''),
-                    (string) ($e['icono'] ?? $e['icon'] ?? 'leaf'),
-                    'success',
-                    $lote->nombre,
-                    $lote->codigo_trazabilidad,
-                    $e['evidencia_url'] ?? null,
-                    (string) ($e['tipo'] ?? '')
-                ))
+                $this->loteTrazabilidad->buildEventos($lote)->map(function (array $e) use ($lote) {
+                    $evento = $this->normalizarEvento(
+                        $e['fecha'] ?? null,
+                        'agricola',
+                        (string) ($e['fase_label'] ?? 'Producción agrícola'),
+                        (string) ($e['titulo'] ?? 'Evento'),
+                        (string) ($e['descripcion'] ?? ''),
+                        (string) ($e['icono'] ?? $e['icon'] ?? 'leaf'),
+                        'success',
+                        $lote->nombre,
+                        $lote->codigo_trazabilidad,
+                        $e['evidencia_url'] ?? null,
+                        (string) ($e['tipo'] ?? '')
+                    );
+                    if (! empty($e['evidencia_foto_url'])) {
+                        $evento['evidencia_foto_url'] = $e['evidencia_foto_url'];
+                    }
+                    if (! empty($e['evidencia_tipo'])) {
+                        $evento['evidencia_tipo'] = $e['evidencia_tipo'];
+                    }
+
+                    return $evento;
+                })
             );
         } else {
             $eventos = $eventos->merge($this->eventosAgricolaInferidos($insumo->nombre, $pedido));

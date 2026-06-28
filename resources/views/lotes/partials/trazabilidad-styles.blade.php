@@ -153,6 +153,57 @@
 .trz-dash .evento-trz-wrap[data-visible="false"],
 .trz-dash .evento-trz[data-visible="false"] { display: none; }
 .trz-dash .evento-trz-evidencia { max-width: 220px; }
+.trz-dash .evento-trz-evidencia-galeria {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: .75rem;
+}
+.trz-dash .evento-trz-evidencia-card {
+    margin: 0;
+    width: 148px;
+    flex: 0 0 auto;
+}
+.trz-dash .evento-trz-evidencia-card__btn {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: zoom-in;
+}
+.trz-dash .evento-trz-evidencia-card__frame {
+    display: block;
+    padding: .35rem;
+    border-radius: 12px;
+    background: linear-gradient(145deg, #ffffff 0%, #f4f7fb 100%);
+    border: 1px solid #d8e2ec;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .08), inset 0 1px 0 rgba(255, 255, 255, .9);
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.trz-dash .evento-trz-evidencia-card__btn:hover .evento-trz-evidencia-card__frame,
+.trz-dash .evento-trz-evidencia-card__btn:focus-visible .evento-trz-evidencia-card__frame {
+    transform: translateY(-1px);
+    border-color: #9ec5a8;
+    box-shadow: 0 8px 20px rgba(40, 167, 69, .16), inset 0 1px 0 rgba(255, 255, 255, .95);
+}
+.trz-dash .evento-trz-evidencia-card__img {
+    display: block;
+    width: 100%;
+    height: 108px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid rgba(15, 23, 42, .06);
+    background: #fff;
+}
+.trz-dash .evento-trz-evidencia-card__caption {
+    display: block;
+    margin-top: .4rem;
+    font-size: .72rem;
+    line-height: 1.25;
+    color: #64748b;
+}
 .trz-dash .evento-trz-evidencia__link {
     display: block;
     text-align: left;
