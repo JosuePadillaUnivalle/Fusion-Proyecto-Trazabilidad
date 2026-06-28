@@ -1,21 +1,30 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_BASE_URL = 'http://192.168.1.129:8080/api';
+import {
+  getApiBaseUrl,
+  resolveApiBaseUrl,
+  retryWithFallbackApi,
+  isNetworkFailure,
+} from './apiResolver';
 
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    Accept: 'application/json',
   },
-  timeout: 15000,
+  timeout: 30000,
+});
+
+export const apiReady = resolveApiBaseUrl().then((url) => {
+  apiClient.defaults.baseURL = url;
+  return url;
 });
 
 apiClient.interceptors.request.use(
   async (config) => {
+    config.baseURL = getApiBaseUrl();
     const token = await AsyncStorage.getItem('auth_token');
-    if (token) {
+    if (token && !String(token).startsWith('demo-')) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -33,11 +42,27 @@ apiClient.interceptors.response.use(
   }
 );
 
+async function withApiFallback(requestFn) {
+  await apiReady;
+  try {
+    return await requestFn();
+  } catch (error) {
+    if (!isNetworkFailure(error)) {
+      throw error;
+    }
+    const url = await retryWithFallbackApi();
+    apiClient.defaults.baseURL = url;
+    return requestFn();
+  }
+}
+
 export const authApi = {
-  login: (email, password) => apiClient.post('/login', { email, password }),
-  register: (data) => apiClient.post('/register', data),
-  me: () => apiClient.get('/me'),
-  logout: () => apiClient.post('/logout'),
+  login: (email, password) =>
+    withApiFallback(() => apiClient.post('/login', { email, password })),
+  register: (data) =>
+    withApiFallback(() => apiClient.post('/register', data)),
+  me: () => withApiFallback(() => apiClient.get('/me')),
+  logout: () => withApiFallback(() => apiClient.post('/logout')),
 };
 
 export const lotesApi = {

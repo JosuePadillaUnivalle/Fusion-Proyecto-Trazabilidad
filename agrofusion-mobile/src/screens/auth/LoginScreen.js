@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import FormInput from '../../components/FormInput';
 import { Colors } from '../../constants/colors';
+import { formatApiError } from '../../utils/apiHelpers';
 
 const DEMO_PREVIEWS = [
   { key: 'agricultor', label: 'Agricultor de campo', icon: 'leaf-outline' },
@@ -32,7 +33,10 @@ export default function LoginScreen({ navigation }) {
     try {
       await login(email.trim(), password);
     } catch (error) {
-      const msg = error.response?.data?.message || 'Credenciales incorrectas';
+      const msg = formatApiError(error, 'Credenciales incorrectas');
+      if (__DEV__) {
+        console.warn('[AgroFusion] Login falló:', error.response?.status, msg);
+      }
       Alert.alert('Error de inicio de sesión', msg);
     } finally {
       setLoading(false);
@@ -57,14 +61,6 @@ export default function LoginScreen({ navigation }) {
           </View>
           <Text style={styles.appName}>AgroFusion</Text>
           <Text style={styles.subtitle}>La nueva generación de trazabilidad agrícola</Text>
-          <TouchableOpacity
-            style={styles.storyLink}
-            onPress={() => navigation.navigate('PlataformaPresentacion')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="play-circle-outline" size={18} color={Colors.primary} />
-            <Text style={styles.storyLinkText}>Conoce la plataforma</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.formContainer}>
@@ -148,12 +144,6 @@ const styles = StyleSheet.create({
   },
   appName: { fontSize: 28, fontWeight: 'bold', color: Colors.text },
   subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 4, textAlign: 'center' },
-  storyLink: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14,
-    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
-    backgroundColor: Colors.primaryLight, borderWidth: 1, borderColor: Colors.border,
-  },
-  storyLinkText: { fontSize: 14, color: Colors.primary, fontWeight: '600' },
   formContainer: {
     backgroundColor: Colors.surface, borderRadius: 20, padding: 24,
     borderWidth: 1, borderColor: Colors.border,

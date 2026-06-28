@@ -8,6 +8,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
 import { Colors } from '../../constants/colors';
 import { formatDate } from '../../utils/helpers';
+import { unwrapApiList } from '../../utils/apiHelpers';
 
 export default function ActividadesScreen({ navigation }) {
   const [data, setData] = useState([]);
@@ -17,7 +18,7 @@ export default function ActividadesScreen({ navigation }) {
   const loadData = async () => {
     try {
       const res = await actividadesApi.list();
-      setData(res.data?.data || res.data || []);
+      setData(unwrapApiList(res));
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   };

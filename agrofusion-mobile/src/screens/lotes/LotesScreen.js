@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { canManageLotes, isAgricultor } from '../../constants/roles';
 import { USE_MOCK_DATA } from '../../constants/designMode';
 import { getMockLotes } from '../../data/mockAgricultorData';
+import { unwrapApiList } from '../../utils/apiHelpers';
 import StatusBadge from '../../components/StatusBadge';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
@@ -23,15 +24,14 @@ export default function LotesScreen({ navigation }) {
 
   const loadData = async () => {
     try {
-      if (esAgricultor && USE_MOCK_DATA) {
+      if (USE_MOCK_DATA) {
         setLotes(getMockLotes(user?.usuarioid));
       } else {
         const res = await lotesApi.list();
-        const all = res.data?.data || res.data || [];
-        setLotes(esAgricultor ? all.filter(l => l.usuarioid === user?.usuarioid) : all);
+        setLotes(unwrapApiList(res));
       }
     } catch (e) {
-      if (esAgricultor && USE_MOCK_DATA) {
+      if (USE_MOCK_DATA) {
         setLotes(getMockLotes(user?.usuarioid));
       }
     } finally {

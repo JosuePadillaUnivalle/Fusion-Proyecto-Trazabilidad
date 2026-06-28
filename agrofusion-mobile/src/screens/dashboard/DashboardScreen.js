@@ -43,6 +43,7 @@ import {
 import WorkerDashboardLayout from '../../components/WorkerDashboardLayout';
 
 import { lotesApi, produccionesApi } from '../../api/client';
+import { unwrapApiList } from '../../utils/apiHelpers';
 
 
 
@@ -162,9 +163,9 @@ export default function DashboardScreen({ navigation }) {
 
       setManagerStats({
 
-        lotes: lotesRes.status === 'fulfilled' ? (lotesRes.value.data?.data || lotesRes.value.data || []).length : 0,
+        lotes: lotesRes.status === 'fulfilled' ? unwrapApiList(lotesRes.value).length : 0,
 
-        producciones: prodRes.status === 'fulfilled' ? (prodRes.value.data?.data || prodRes.value.data || []).length : 0,
+        producciones: prodRes.status === 'fulfilled' ? unwrapApiList(prodRes.value).length : 0,
 
       });
 

@@ -17,6 +17,7 @@
     },
     "android": {
       "package": "com.agrofusion.mobile",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#10b981"

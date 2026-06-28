@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authApi } from '../api/client';
+import { authApi, apiReady } from '../api/client';
 import { USE_MOCK_DATA } from '../constants/designMode';
 import { DEMO_USERS } from '../data/mockWorkersData';
 import { ROLES } from '../constants/roles';
@@ -18,11 +18,34 @@ export const AuthProvider = ({ children }) => {
 
   const loadStoredAuth = async () => {
     try {
+      await apiReady;
+
       const storedToken = await AsyncStorage.getItem('auth_token');
       const storedUser = await AsyncStorage.getItem('user_data');
-      if (storedToken && storedUser) {
+
+      if (!storedToken || !storedUser) {
+        return;
+      }
+
+      if (storedToken.startsWith('demo-')) {
+        if (USE_MOCK_DATA) {
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser));
+        } else {
+          await AsyncStorage.multiRemove(['auth_token', 'user_data']);
+        }
+        return;
+      }
+
+      try {
+        const response = await authApi.me();
         setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        setUser(response.data);
+        await AsyncStorage.setItem('user_data', JSON.stringify(response.data));
+      } catch {
+        await AsyncStorage.multiRemove(['auth_token', 'user_data']);
+        setToken(null);
+        setUser(null);
       }
     } catch (e) {
       console.error('Error loading auth:', e);
@@ -52,7 +75,9 @@ export const AuthProvider = ({ children }) => {
       if (stored && !stored.startsWith('demo-')) {
         await authApi.logout();
       }
-    } catch (e) {}
+    } catch (e) {
+      // ignore
+    }
     await AsyncStorage.multiRemove(['auth_token', 'user_data']);
     setToken(null);
     setUser(null);

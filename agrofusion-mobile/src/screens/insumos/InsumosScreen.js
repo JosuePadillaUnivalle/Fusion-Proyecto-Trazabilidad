@@ -12,6 +12,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
 import StatusBadge from '../../components/StatusBadge';
 import { Colors } from '../../constants/colors';
+import { unwrapApiList } from '../../utils/apiHelpers';
 
 export default function InsumosScreen({ navigation }) {
   const { user } = useAuth();
@@ -27,7 +28,7 @@ export default function InsumosScreen({ navigation }) {
         setData(getMockInsumosCatalogo());
       } else {
         const res = await insumosApi.list();
-        setData(res.data?.data || res.data || []);
+        setData(unwrapApiList(res));
       }
     } catch (e) {
       if (USE_MOCK_DATA && esAgricultor) setData(getMockInsumosCatalogo());
