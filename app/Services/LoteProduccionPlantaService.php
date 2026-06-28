@@ -409,8 +409,66 @@ class LoteProduccionPlantaService
 
         DB::transaction(function () use ($usuario, $lote) {
             $this->revertirConsumoMaterias($lote, $usuario);
+            $this->limpiarDependenciasAntesDeEliminar($lote);
             $lote->delete();
         });
+    }
+
+    private function limpiarDependenciasAntesDeEliminar(LoteProduccionPedido $lote): void
+    {
+        $loteId = (int) $lote->loteproduccionpedidoid;
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('asignacion_etapa_planta')) {
+            \Illuminate\Support\Facades\DB::table('asignacion_etapa_planta')
+                ->where('loteproduccionpedidoid', $loteId)
+                ->delete();
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('registro_proceso_maquina_planta')) {
+            \Illuminate\Support\Facades\DB::table('registro_proceso_maquina_planta')
+                ->where('loteproduccionpedidoid', $loteId)
+                ->delete();
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('evaluacion_final_lote_produccion')) {
+            \Illuminate\Support\Facades\DB::table('evaluacion_final_lote_produccion')
+                ->where('loteproduccionpedidoid', $loteId)
+                ->delete();
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('almacenaje_lote_produccion')) {
+            \Illuminate\Support\Facades\DB::table('almacenaje_lote_produccion')
+                ->where('loteproduccionpedidoid', $loteId)
+                ->delete();
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('certificacion_lote_produccion')) {
+            \Illuminate\Support\Facades\DB::table('certificacion_lote_produccion')
+                ->where('loteproduccionpedidoid', $loteId)
+                ->delete();
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('inventario_presentacion_lote')) {
+            \Illuminate\Support\Facades\DB::table('inventario_presentacion_lote')
+                ->where('loteproduccionpedidoid', $loteId)
+                ->delete();
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('almacen_movimiento')
+            && \Illuminate\Support\Facades\Schema::hasColumn('almacen_movimiento', 'loteproduccionpedidoid')) {
+            \Illuminate\Support\Facades\DB::table('almacen_movimiento')
+                ->where('loteproduccionpedidoid', $loteId)
+                ->delete();
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('detalle_traslado_planta_mayorista')
+            && \Illuminate\Support\Facades\Schema::hasColumn('detalle_traslado_planta_mayorista', 'loteproduccionpedidoid')) {
+            \Illuminate\Support\Facades\DB::table('detalle_traslado_planta_mayorista')
+                ->where('loteproduccionpedidoid', $loteId)
+                ->update(['loteproduccionpedidoid' => null]);
+        }
+
+        $lote->materiasPrimas()->delete();
     }
 
     private function revertirConsumoMaterias(LoteProduccionPedido $lote, Usuario $usuario): void
@@ -455,6 +513,9 @@ class LoteProduccionPlantaService
                 true
             ));
 
-        return $tipo ?? TipoMovimientoAlmacen::activosPorNaturaleza('entrada')->firstOrFail();
+        return $tipo ?? TipoMovimientoAlmacen::activosPorNaturaleza('entrada')->first()
+            ?? throw new \InvalidArgumentException(
+                'No hay tipos de movimiento de entrada activos para revertir el stock del lote.'
+            );
     }
 }

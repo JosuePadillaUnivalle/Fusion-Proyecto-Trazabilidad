@@ -1188,7 +1188,23 @@ class LoteProduccionController extends Controller
         try {
             $this->loteService->eliminar(auth()->user(), $loteProduccion);
         } catch (\InvalidArgumentException $e) {
-            return back()->with('error', $e->getMessage());
+            return redirect()
+                ->route('procesamiento.index')
+                ->with([
+                    'error' => $e->getMessage(),
+                    'error_modal' => true,
+                    'error_modal_titulo' => 'No se puede eliminar',
+                ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()
+                ->route('procesamiento.index')
+                ->with([
+                    'error' => 'No se pudo eliminar el lote. Revise si tiene datos vinculados o contacte al administrador.',
+                    'error_modal' => true,
+                    'error_modal_titulo' => 'Error al eliminar',
+                ]);
         }
 
         return redirect()

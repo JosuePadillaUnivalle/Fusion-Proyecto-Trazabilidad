@@ -28,6 +28,7 @@ use App\Support\UsuarioRol;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Illuminate\View\View;
@@ -835,10 +836,20 @@ class PedidoDistribucionController extends Controller
         abort_unless(UsuarioRol::puedeGestionarDistribucionMayorista(auth()->user()), 403);
         MayoristaAccess::asegurarPuedeVerPedido(auth()->user(), $pedido);
 
-        $data = $request->validate([
-            'transportista_usuarioid' => 'required|integer|exists:usuario,usuarioid',
-            'vehiculoid' => 'required|integer|exists:vehiculo,vehiculoid',
+        $redirectPedido = route('punto-venta.pedidos.show', [
+            'pedido' => $pedido,
+            'ctx' => 'mayorista',
+            'paso' => 3,
         ]);
+
+        try {
+            $data = $request->validate([
+                'transportista_usuarioid' => 'required|integer|exists:usuario,usuarioid',
+                'vehiculoid' => 'required|integer|exists:vehiculo,vehiculoid',
+            ]);
+        } catch (ValidationException $e) {
+            throw $e->redirectTo($redirectPedido);
+        }
 
         try {
             app(PedidoDistribucionMayoristaService::class)->designarTransportista(
@@ -859,9 +870,18 @@ class PedidoDistribucionController extends Controller
                     ->with('success', 'Transportista y vehículo ya estaban asignados.');
             }
 
-            return back()
+            return redirect()
+                ->route('punto-venta.pedidos.show', [
+                    'pedido' => $pedido,
+                    'ctx' => 'mayorista',
+                    'paso' => 3,
+                ])
                 ->withInput()
-                ->with('error', $e->getMessage());
+                ->with([
+                    'error' => $e->getMessage(),
+                    'error_modal' => true,
+                    'error_modal_titulo' => 'No se pudo designar transportista',
+                ]);
         }
 
         return redirect()
