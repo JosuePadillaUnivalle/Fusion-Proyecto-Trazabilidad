@@ -485,7 +485,7 @@ class LoteProduccionPlantaService
             $insumo = $linea->insumo;
             $insumo->incrementarStock($cantidad);
 
-            if ($insumo->almacen) {
+            if ($tipoEntrada !== null && $insumo->almacen) {
                 AlmacenMovimiento::create([
                     'almacenid' => $insumo->almacen->almacenid,
                     'insumoid' => $insumo->insumoid,
@@ -501,7 +501,7 @@ class LoteProduccionPlantaService
         }
     }
 
-    private function tipoMovimientoEntradaReversion(): TipoMovimientoAlmacen
+    private function tipoMovimientoEntradaReversion(): ?TipoMovimientoAlmacen
     {
         $tipo = TipoMovimientoAlmacen::query()
             ->where('naturaleza', 'entrada')
@@ -513,9 +513,6 @@ class LoteProduccionPlantaService
                 true
             ));
 
-        return $tipo ?? TipoMovimientoAlmacen::activosPorNaturaleza('entrada')->first()
-            ?? throw new \InvalidArgumentException(
-                'No hay tipos de movimiento de entrada activos para revertir el stock del lote.'
-            );
+        return $tipo ?? TipoMovimientoAlmacen::activosPorNaturaleza('entrada')->first();
     }
 }

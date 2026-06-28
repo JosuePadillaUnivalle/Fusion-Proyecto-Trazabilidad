@@ -89,7 +89,7 @@ class TrazabilidadProductoPdvService
 
         if ($lote) {
             $eventos = $eventos->merge(
-                $this->loteTrazabilidad->buildEventos($lote)->map(function (array $e) use ($lote) {
+                $this->loteTrazabilidad->buildEventos($lote)->values()->map(function (array $e, int $idx) use ($lote) {
                     $evento = $this->normalizarEvento(
                         $e['fecha'] ?? null,
                         'agricola',
@@ -101,14 +101,11 @@ class TrazabilidadProductoPdvService
                         $lote->nombre,
                         $lote->codigo_trazabilidad,
                         $e['evidencia_url'] ?? null,
-                        (string) ($e['tipo'] ?? '')
+                        (string) ($e['tipo'] ?? ''),
+                        $e['evidencia_tipo'] ?? null,
+                        $e['evidencia_foto_url'] ?? null,
                     );
-                    if (! empty($e['evidencia_foto_url'])) {
-                        $evento['evidencia_foto_url'] = $e['evidencia_foto_url'];
-                    }
-                    if (! empty($e['evidencia_tipo'])) {
-                        $evento['evidencia_tipo'] = $e['evidencia_tipo'];
-                    }
+                    $evento['secuencia_agricola'] = $idx;
 
                     return $evento;
                 })
@@ -148,6 +145,7 @@ class TrazabilidadProductoPdvService
             ->filter(fn (array $e) => $e['fecha'] !== null)
             ->sortBy(fn (array $e) => [
                 $ordenEtapas[$e['etapa']] ?? 9,
+                isset($e['secuencia_agricola']) ? (int) $e['secuencia_agricola'] : 9999,
                 Carbon::parse($e['fecha'])->timestamp,
             ])
             ->values()
@@ -1355,6 +1353,8 @@ class TrazabilidadProductoPdvService
             $lineas[] = 'Cumple estándar de proceso';
         }
 
+        $imagenMaquina = $registro->procesoMaquina?->maquina?->imagenSrc();
+
         return $this->normalizarEvento(
             $registro->hora_inicio ?? $registro->fecha_registro,
             'planta',
@@ -1365,8 +1365,9 @@ class TrazabilidadProductoPdvService
             $registro->cumple_estandar === false ? 'warning' : 'info',
             $ubicacion,
             $referencia,
-            null,
-            $marcarTipo ? 'registro_proceso' : ''
+            $imagenMaquina,
+            $marcarTipo ? 'registro_proceso' : '',
+            $imagenMaquina ? 'maquina' : null,
         );
     }
 
@@ -1806,7 +1807,9 @@ class TrazabilidadProductoPdvService
         ?string $ubicacion = null,
         ?string $referencia = null,
         ?string $evidenciaUrl = null,
-        string $tipoEvento = ''
+        string $tipoEvento = '',
+        ?string $evidenciaTipo = null,
+        ?string $evidenciaFotoUrl = null,
     ): array {
         $evento = [
             'fecha' => $fecha,
@@ -1826,6 +1829,12 @@ class TrazabilidadProductoPdvService
         }
         if ($tipoEvento !== '') {
             $evento['tipo_evento'] = $tipoEvento;
+        }
+        if (filled($evidenciaTipo)) {
+            $evento['evidencia_tipo'] = $evidenciaTipo;
+        }
+        if (filled($evidenciaFotoUrl)) {
+            $evento['evidencia_foto_url'] = $evidenciaFotoUrl;
         }
 
         return $evento;

@@ -844,7 +844,7 @@ class LoteTrazabilidadService
         }
 
         foreach ($lote->loteInsumos as $insumo) {
-            if ($this->loteInsumoYaRepresentadoEnActividad($insumo)) {
+            if ($this->loteInsumoYaRepresentadoEnActividad($insumo, $lote)) {
                 continue;
             }
 
@@ -891,7 +891,7 @@ class LoteTrazabilidadService
             $fasePipeline = $this->resolverFasePipelineActividad($actividad, $lote);
             $nombreTipo = $actividad->tipoActividad->nombre ?? 'Actividad';
             $descripcionAct = $this->descripcionHistorialActividad($actividad);
-            $evidenciaHistorial = $this->evidenciaHistorialActividad($actividad, $tipoNombre);
+            $evidenciaHistorial = $this->evidenciaHistorialActividad($actividad, $tipoNombre, $lote);
             $fechaEvento = $actividad->fechafin ?? $actividad->fechainicio;
             $eventos->push($this->evento(
                 $fechaEvento,
@@ -1036,9 +1036,10 @@ class LoteTrazabilidadService
         'planificacion' => 1,
         'siembra' => 2,
         'actividad' => 3,
-        'cosecha' => 4,
-        'certificacion' => 5,
-        'almacen' => 6,
+        'insumo' => 4,
+        'cosecha' => 5,
+        'certificacion' => 6,
+        'almacen' => 7,
     ];
 
     /**
@@ -1085,6 +1086,10 @@ class LoteTrazabilidadService
             return 'siembra';
         }
 
+        if ($tipo === 'insumo') {
+            return 'insumo';
+        }
+
         if ($tipo === 'cosecha') {
             return 'cosecha';
         }
@@ -1106,7 +1111,7 @@ class LoteTrazabilidadService
             }
         }
 
-        if (in_array($tipo, ['actividad', 'insumo'], true)) {
+        if (in_array($tipo, ['actividad'], true)) {
             return 'actividad';
         }
 
@@ -1997,9 +2002,14 @@ class LoteTrazabilidadService
         })->values();
     }
 
-    private function loteInsumoYaRepresentadoEnActividad($insumo): bool
+    private function loteInsumoYaRepresentadoEnActividad($insumo, Lote $lote): bool
     {
         if (! empty($insumo->actividadid)) {
+            return true;
+        }
+
+        $marcadorAuto = \App\Services\OperacionAgricolaAutomaticaService::MARK.' insumo|'.(int) $insumo->loteinsumoid;
+        if ($lote->actividades->contains(fn (Actividad $a) => str_contains((string) ($a->observaciones ?? ''), $marcadorAuto))) {
             return true;
         }
 
@@ -2073,7 +2083,7 @@ class LoteTrazabilidadService
     /**
      * @return array{url: ?string, foto_url: ?string, icono: ?string, tipo: ?string}
      */
-    private function evidenciaHistorialActividad(Actividad $actividad, string $tipoNombre): array
+    private function evidenciaHistorialActividad(Actividad $actividad, string $tipoNombre, Lote $lote): array
     {
         $vacio = ['url' => null, 'foto_url' => null, 'icono' => null, 'tipo' => null];
         if ($actividad->fechafin === null) {
@@ -2081,7 +2091,8 @@ class LoteTrazabilidadService
         }
 
         $foto = EvidenciaFoto::urlDesdePath($actividad->evidencia_foto_path ?? null);
-        $insumo = $this->imagenInsumoDesdeDetalleActividad($actividad);
+        $insumo = $this->imagenInsumoDesdeDetalleActividad($actividad)
+            ?? $this->imagenInsumoDesdeActividadAutomatica($actividad, $lote);
         $esRiego = str_contains($tipoNombre, 'riego') || str_contains($tipoNombre, 'regad');
 
         if ($insumo !== null && $foto !== null) {
@@ -2098,6 +2109,21 @@ class LoteTrazabilidadService
         }
 
         return $vacio;
+    }
+
+    private function imagenInsumoDesdeActividadAutomatica(Actividad $actividad, Lote $lote): ?string
+    {
+        $obs = (string) ($actividad->observaciones ?? '');
+        if (! preg_match('/\[AUTO-OP\] insumo\|(\d+)/', $obs, $coincidencia)) {
+            return null;
+        }
+
+        $loteInsumo = $lote->loteInsumos->firstWhere('loteinsumoid', (int) $coincidencia[1]);
+        if ($loteInsumo?->insumo) {
+            return InsumoImagenCatalogo::urlPara($loteInsumo->insumo);
+        }
+
+        return null;
     }
 
     private function imagenInsumoDesdeDetalleActividad(Actividad $actividad): ?string

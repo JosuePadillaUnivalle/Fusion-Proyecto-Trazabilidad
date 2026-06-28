@@ -406,7 +406,7 @@
                                     : null;
                                 $urlFotoPub = match ($tipoEvidenciaPub) {
                                     'insumo_foto' => $evento['evidencia_foto_url'] ?? null,
-                                    'foto' => $evento['evidencia_url'] ?? null,
+                                    'foto', 'maquina' => $evento['evidencia_url'] ?? null,
                                     default => null,
                                 };
                             @endphp
@@ -428,7 +428,8 @@
                                        data-url="{{ $urlFotoPub }}" data-titulo="{{ $evento['titulo'] }}">
                                         <img src="{{ $urlFotoPub }}" alt="Evidencia: {{ $evento['titulo'] }}" decoding="async">
                                         <span class="trz-evidencia-caption">
-                                            <span><i class="fas fa-camera mr-1"></i> Evidencia fotográfica</span>
+                                            <span><i class="fas fa-{{ $tipoEvidenciaPub === 'maquina' ? 'cogs' : 'camera' }} mr-1"></i>
+                                                {{ $tipoEvidenciaPub === 'maquina' ? 'Equipo de planta' : 'Evidencia fotográfica' }}</span>
                                             <span><i class="fas fa-expand-alt"></i></span>
                                         </span>
                                     </a>
