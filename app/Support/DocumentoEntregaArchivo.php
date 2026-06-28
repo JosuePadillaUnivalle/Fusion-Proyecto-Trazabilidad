@@ -7,12 +7,14 @@ use App\Models\EnvioAsignacionMultiple;
 use App\Models\RutaDistribucion;
 use App\Support\RutaDistribucionCatalogo;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 final class DocumentoEntregaArchivo
 {
-    private const PDF_VERSION = 10;
+    private const PDF_VERSION = 11;
 
     /** @var array<string, string> */
     private const TIPOS_ETIQUETA = [
@@ -23,22 +25,71 @@ final class DocumentoEntregaArchivo
         'pod' => 'POD / comprobante de entrega',
     ];
 
-    public static function asegurarPdfOperativo(DocumentoEntrega $documento): bool
+    public static function asegurarPdfOperativo(DocumentoEntrega $documento, bool $bloqueante = true): bool
     {
         $path = trim((string) $documento->archivo_path);
         if ($path === '') {
             return false;
         }
 
-        if (
-            ! Storage::disk('public')->exists($path)
-            || self::esArchivoPlaceholder($path)
-            || ($documento->metadata['pdf_version'] ?? null) !== self::PDF_VERSION
-        ) {
-            return self::generarPdfOperativo($documento);
+        if (self::pdfListo($documento, $path)) {
+            return true;
         }
 
-        return true;
+        if (! $bloqueante) {
+            self::encolarGeneracionPdf($documento);
+
+            return false;
+        }
+
+        return self::generarPdfOperativo($documento);
+    }
+
+    public static function encolarGeneracionPdf(DocumentoEntrega $documento): void
+    {
+        $id = (int) $documento->documentoentregaid;
+        if ($id <= 0) {
+            return;
+        }
+
+        dispatch(static function () use ($id): void {
+            $documento = DocumentoEntrega::query()->find($id);
+            if ($documento === null) {
+                return;
+            }
+
+            self::generarPdfOperativo($documento);
+        })->afterResponse();
+    }
+
+    /** Genera el PDF al cerrar el envío; en pantalla solo se encola si hace falta. */
+    public static function materializarPdfDocumento(DocumentoEntrega $documento, bool $enSegundoPlano = false): bool
+    {
+        if (self::tienePdfListo($documento)) {
+            return true;
+        }
+
+        if ($enSegundoPlano) {
+            self::encolarGeneracionPdf($documento);
+
+            return false;
+        }
+
+        return self::generarPdfOperativo($documento);
+    }
+
+    public static function tienePdfListo(DocumentoEntrega $documento): bool
+    {
+        $path = trim((string) $documento->archivo_path);
+
+        return $path !== '' && self::pdfListo($documento, $path);
+    }
+
+    private static function pdfListo(DocumentoEntrega $documento, string $path): bool
+    {
+        return Storage::disk('public')->exists($path)
+            && ! self::esArchivoPlaceholder($path)
+            && ($documento->metadata['pdf_version'] ?? null) === self::PDF_VERSION;
     }
 
     public static function materializarSiFalta(DocumentoEntrega $documento): bool
@@ -79,27 +130,45 @@ final class DocumentoEntregaArchivo
             return false;
         }
 
-        $disk = Storage::disk('public');
-        $dir = dirname(str_replace('\\', '/', $path));
-        if ($dir !== '.' && $dir !== '') {
-            $disk->makeDirectory($dir);
+        if (self::pdfListo($documento, $path)) {
+            return true;
         }
 
-        $contexto = self::contextoPdf($documento);
-        $pdf = Pdf::loadView('logistica.documentos.pdf.comprobante', $contexto)
-            ->setPaper('a4', 'portrait');
+        @set_time_limit(120);
 
-        $guardado = (bool) $disk->put($path, $pdf->output());
+        try {
+            $disk = Storage::disk('public');
+            $dir = dirname(str_replace('\\', '/', $path));
+            if ($dir !== '.' && $dir !== '') {
+                $disk->makeDirectory($dir);
+            }
 
-        if ($guardado) {
-            $metadata = array_merge($documento->metadata ?? [], [
-                'pdf_version' => self::PDF_VERSION,
-                'pdf_generado_en' => now()->toIso8601String(),
+            $contexto = self::contextoPdf($documento);
+            $pdf = Pdf::loadView('logistica.documentos.pdf.comprobante', $contexto)
+                ->setPaper('a4', 'portrait')
+                ->setOption('isRemoteEnabled', false)
+                ->setOption('isHtml5ParserEnabled', true);
+
+            $guardado = (bool) $disk->put($path, $pdf->output());
+
+            if ($guardado) {
+                $metadata = array_merge($documento->metadata ?? [], [
+                    'pdf_version' => self::PDF_VERSION,
+                    'pdf_generado_en' => now()->toIso8601String(),
+                ]);
+                $documento->update(['metadata' => $metadata]);
+            }
+
+            return $guardado;
+        } catch (Throwable $e) {
+            Log::error('Error generando PDF de documento de entrega', [
+                'documentoentregaid' => $documento->documentoentregaid,
+                'archivo_path' => $path,
+                'mensaje' => $e->getMessage(),
             ]);
-            $documento->update(['metadata' => $metadata]);
-        }
 
-        return $guardado;
+            return false;
+        }
     }
 
     /** @return array<string, mixed> */
@@ -404,8 +473,8 @@ final class DocumentoEntregaArchivo
             'observacionesIncidentes' => $operacionChecklistIncidente?->observaciones,
             'observacionPersonalCondiciones' => self::extraerObservacionManual($operacionChecklistCondicion?->observaciones),
             'observacionPersonalIncidentes' => self::extraerObservacionManual($operacionChecklistIncidente?->observaciones),
-            'firmaTransportistaImg' => $operacionFirmaTransportista?->imagenfirma,
-            'firmaRecepcionImg' => $operacionFirmaRecepcion?->imagenfirma,
+            'firmaTransportistaImg' => FirmaPdfOptimizador::rutaParaDompdf($operacionFirmaTransportista?->imagenfirma),
+            'firmaRecepcionImg' => FirmaPdfOptimizador::rutaParaDompdf($operacionFirmaRecepcion?->imagenfirma),
             'firmaRecepcionEtiqueta' => $firmaRecepcionEtiqueta,
             'llegadaConfirmadaAt' => $operacionLlegadaAt,
         ];

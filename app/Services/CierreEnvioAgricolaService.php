@@ -13,6 +13,7 @@ use App\Models\FirmaRecepcionEnvio;
 use App\Models\FirmaTransportistaEnvio;
 use App\Models\TipoIncidenteTransporte;
 use App\Models\Usuario;
+use App\Support\DocumentoEntregaArchivo;
 use App\Support\EnvioAsignacionEstadoCatalogo;
 use App\Support\EnvioCierreAgricolaCatalogo;
 use App\Support\PedidoCatalogo;
@@ -301,6 +302,8 @@ class CierreEnvioAgricolaService
         if (EnvioAsignacionEstadoCatalogo::llegoADestino($envio)) {
             $existente = $this->buscarDocumentoTransporte($envio);
             if ($existente !== null) {
+                DocumentoEntregaArchivo::materializarPdfDocumento($existente);
+
                 return $existente;
             }
         }
@@ -313,7 +316,7 @@ class CierreEnvioAgricolaService
 
         $envio->loadMissing('pedido');
 
-        return DB::transaction(function () use ($envio, $usuario) {
+        $documento = DB::transaction(function () use ($envio, $usuario) {
             if ($envio->pedido) {
                 $this->recepcionPlanta->confirmarDesdePedido($envio->pedido, $usuario);
             } else {
@@ -324,6 +327,10 @@ class CierreEnvioAgricolaService
 
             return $this->generarDocumentoTransporte($envio, $usuario);
         });
+
+        DocumentoEntregaArchivo::materializarPdfDocumento($documento);
+
+        return $documento;
     }
 
     public function autorizarConfirmacionLlegada(Usuario $usuario, EnvioAsignacionMultiple $envio): void

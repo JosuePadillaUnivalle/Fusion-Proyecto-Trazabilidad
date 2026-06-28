@@ -368,7 +368,7 @@ class CierreEnvioPlantaMayoristaService
             throw new InvalidArgumentException('Complete condiciones, llegada, incidentes y firmas antes de finalizar.');
         }
 
-        return DB::transaction(function () use ($ruta, $usuario) {
+        $documento = DB::transaction(function () use ($ruta, $usuario) {
             $this->traslados->transferirInventarioAlCompletar($ruta, $usuario);
 
             $ruta->update([
@@ -382,6 +382,10 @@ class CierreEnvioPlantaMayoristaService
 
             return $documento;
         });
+
+        DocumentoEntregaArchivo::materializarPdfDocumento($documento);
+
+        return $documento;
     }
 
     public function autorizarConfirmacionLlegada(Usuario $usuario, RutaDistribucion $ruta): void

@@ -10,7 +10,9 @@ use App\Support\DocumentoEntregaCatalogo;
 use App\Support\DocumentoEntregaTransportista;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -131,38 +133,68 @@ class DocumentoEntregaController extends Controller
         $this->autorizarAccesoDocumento($documento);
         $documento->load(['usuario', 'pedido']);
 
-        DocumentoEntregaArchivo::asegurarPdfOperativo($documento->fresh());
-        $documento->refresh();
+        $pdfPendiente = false;
+
+        try {
+            if (! DocumentoEntregaArchivo::tienePdfListo($documento)) {
+                $pdfPendiente = true;
+                DocumentoEntregaArchivo::materializarPdfDocumento($documento->fresh(), enSegundoPlano: true);
+            }
+
+            $documento->refresh();
+        } catch (Throwable $e) {
+            Log::error('Error preparando vista de documento de entrega', [
+                'documentoentregaid' => $documento->documentoentregaid,
+                'mensaje' => $e->getMessage(),
+            ]);
+            $pdfPendiente = true;
+        }
 
         $puedePrevisualizar = $documento->archivo_path
             && Storage::disk('public')->exists($documento->archivo_path)
             && str_ends_with(strtolower($documento->archivo_path), '.pdf');
 
-        return view('logistica.documentos.show', compact('documento', 'puedePrevisualizar'));
+        return view('logistica.documentos.show', compact('documento', 'puedePrevisualizar', 'pdfPendiente'));
     }
 
     public function preview(DocumentoEntrega $documento): Response|RedirectResponse
     {
         $this->autorizarAccesoDocumento($documento);
 
-        DocumentoEntregaArchivo::asegurarPdfOperativo($documento->fresh());
-        $documento->refresh();
+        try {
+            if (! DocumentoEntregaArchivo::materializarPdfDocumento($documento->fresh())) {
+                return redirect()
+                    ->route('logistica.documentos.show', $documento)
+                    ->with('error', 'El PDF aún se está generando. Espere unos segundos y vuelva a intentar.');
+            }
 
-        if (! $documento->archivo_path || ! Storage::disk('public')->exists($documento->archivo_path)) {
+            $documento->refresh();
+
+            if (! $documento->archivo_path || ! Storage::disk('public')->exists($documento->archivo_path)) {
+                return redirect()
+                    ->route('logistica.documentos.show', $documento)
+                    ->with('error', 'El archivo no está disponible para previsualizar.');
+            }
+
+            $filename = $documento->metadata['original_name'] ?? ($documento->titulo.'.pdf');
+
+            return response()->file(
+                Storage::disk('public')->path($documento->archivo_path),
+                [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="'.$filename.'"',
+                ]
+            );
+        } catch (Throwable $e) {
+            Log::error('Error en previsualización de documento de entrega', [
+                'documentoentregaid' => $documento->documentoentregaid,
+                'mensaje' => $e->getMessage(),
+            ]);
+
             return redirect()
                 ->route('logistica.documentos.show', $documento)
-                ->with('error', 'El archivo no está disponible para previsualizar.');
+                ->with('error', 'No se pudo abrir el PDF. Intente descargarlo en unos segundos.');
         }
-
-        $filename = $documento->metadata['original_name'] ?? ($documento->titulo.'.pdf');
-
-        return response()->file(
-            Storage::disk('public')->path($documento->archivo_path),
-            [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="'.$filename.'"',
-            ]
-        );
     }
 
     public function edit(DocumentoEntrega $documento): View
@@ -231,19 +263,35 @@ class DocumentoEntregaController extends Controller
     {
         $this->autorizarAccesoDocumento($documento);
 
-        DocumentoEntregaArchivo::asegurarPdfOperativo($documento->fresh());
-        $documento->refresh();
+        try {
+            if (! DocumentoEntregaArchivo::materializarPdfDocumento($documento->fresh())) {
+                return redirect()
+                    ->route('logistica.documentos.show', $documento)
+                    ->with('error', 'El PDF aún no está listo. Recargue la página en unos segundos e intente descargar de nuevo.');
+            }
 
-        if (! $documento->archivo_path || ! Storage::disk('public')->exists($documento->archivo_path)) {
+            $documento->refresh();
+
+            if (! $documento->archivo_path || ! Storage::disk('public')->exists($documento->archivo_path)) {
+                return redirect()
+                    ->route('logistica.documentos.show', $documento)
+                    ->with('error', 'El archivo no está disponible. Vuelva a cargarlo desde Editar.');
+            }
+
+            return Storage::disk('public')->download(
+                $documento->archivo_path,
+                ($documento->metadata['original_name'] ?? $documento->titulo.'.pdf')
+            );
+        } catch (Throwable $e) {
+            Log::error('Error al descargar documento de entrega', [
+                'documentoentregaid' => $documento->documentoentregaid,
+                'mensaje' => $e->getMessage(),
+            ]);
+
             return redirect()
                 ->route('logistica.documentos.show', $documento)
-                ->with('error', 'El archivo no está disponible. Vuelva a cargarlo desde Editar.');
+                ->with('error', 'No se pudo descargar el PDF en este momento. Intente de nuevo en unos segundos.');
         }
-
-        return Storage::disk('public')->download(
-            $documento->archivo_path,
-            ($documento->metadata['original_name'] ?? $documento->titulo.'.pdf')
-        );
     }
 
     private function autorizarAccesoDocumento(DocumentoEntrega $documento): void

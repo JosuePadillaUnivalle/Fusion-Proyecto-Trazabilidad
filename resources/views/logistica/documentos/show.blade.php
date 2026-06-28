@@ -28,6 +28,12 @@
         </div>
     @endif
 
+    @if(!empty($pdfPendiente) && !($puedePrevisualizar ?? false))
+        <div class="alert alert-info border-0 mb-3" style="border-radius:10px">
+            El PDF se está generando en segundo plano. Recargue esta página en unos segundos para ver el documento completo con firmas.
+        </div>
+    @endif
+
     <div class="log-doc-det-card">
         <div class="log-doc-det-card__head">
             <div class="log-doc-det-card__head-inner">
