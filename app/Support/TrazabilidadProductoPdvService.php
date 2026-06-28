@@ -12,6 +12,7 @@ use App\Models\Insumo;
 use App\Models\Lote;
 use App\Models\LoteProduccionPedido;
 use App\Models\PedidoDistribucion;
+use App\Models\ProduccionAlmacenamiento;
 use App\Models\PlantillaTransformacion;
 use App\Models\PuntoVenta;
 use App\Models\RegistroProcesoMaquinaPlanta;
@@ -83,7 +84,13 @@ class TrazabilidadProductoPdvService
     {
         $codigo = $this->asegurarCodigo($insumo);
         $pedido = $this->resolverPedidoDistribucion($insumo);
-        $lote = $this->resolverLoteAgricola($insumo->nombre, (string) ($insumo->descripcion ?? ''));
+        $lote = $this->resolverLoteAgricola(
+            $insumo->nombre,
+            (string) ($insumo->descripcion ?? ''),
+            $insumo,
+            $pedido
+        );
+        $this->vincularLoteAgricolaEnInsumoPdv($insumo, $lote);
 
         $eventos = collect();
 
@@ -294,16 +301,23 @@ class TrazabilidadProductoPdvService
         ];
     }
 
-    private function resolverLoteAgricola(string $nombreProducto, string $descripcion = ''): ?Lote
-    {
+    private function resolverLoteAgricola(
+        string $nombreProducto,
+        string $descripcion = '',
+        ?Insumo $insumoPdv = null,
+        ?PedidoDistribucion $pedidoPdv = null,
+    ): ?Lote {
         if (preg_match('/(TRAZ-[A-Z0-9\-]+)/', $descripcion, $match)) {
-            $lote = Lote::query()
-                ->with(['cultivo', 'estadoTipo', 'usuario'])
-                ->where('codigo_trazabilidad', $match[1])
-                ->first();
-
+            $lote = $this->loteAgricolaConRelaciones($match[1]);
             if ($lote !== null) {
                 return $lote;
+            }
+        }
+
+        if ($insumoPdv !== null) {
+            $desdeCadena = $this->resolverLoteAgricolaDesdeCadenaSuministro($insumoPdv, $pedidoPdv);
+            if ($desdeCadena !== null) {
+                return $desdeCadena;
             }
         }
 
@@ -324,8 +338,219 @@ class TrazabilidadProductoPdvService
         return Lote::query()
             ->with(['cultivo', 'estadoTipo', 'usuario'])
             ->where('cultivoid', $cultivo->cultivoid)
+            ->withCount([
+                'actividades as actividades_completadas_count' => fn ($q) => $q->whereNotNull('fechafin'),
+                'producciones as producciones_count',
+            ])
+            ->orderByDesc('producciones_count')
+            ->orderByDesc('actividades_completadas_count')
             ->orderByDesc('fechamodificacion')
             ->first();
+    }
+
+    private function loteAgricolaConRelaciones(string $codigoTrazabilidad): ?Lote
+    {
+        return Lote::query()
+            ->with(['cultivo', 'estadoTipo', 'usuario'])
+            ->where('codigo_trazabilidad', $codigoTrazabilidad)
+            ->first();
+    }
+
+    private function resolverLoteAgricolaDesdeCadenaSuministro(
+        Insumo $insumoPdv,
+        ?PedidoDistribucion $pedidoPdv,
+    ): ?Lote {
+        $lotesVistos = [];
+
+        foreach ($this->resolverEnviosAgricolaPlantaCandidatos(null, $insumoPdv) as $envio) {
+            $detalle = $this->resolverDetallePedidoEnvio($envio, null);
+            $lote = $this->loteAgricolaDesdeDetallePedido($detalle);
+            if ($lote !== null && ! isset($lotesVistos[(int) $lote->loteid])) {
+                $lotesVistos[(int) $lote->loteid] = $lote;
+
+                return $lote->loadMissing(['cultivo', 'estadoTipo', 'usuario']);
+            }
+        }
+
+        $cultivoNombre = $this->nombreCultivoDesdeProducto($insumoPdv->nombre);
+        if ($cultivoNombre !== '') {
+            $detalles = DetallePedido::query()
+                ->with(['pedido.envioAsignacion'])
+                ->whereHas('pedido.envioAsignacion')
+                ->where(function ($q) use ($cultivoNombre) {
+                    $q->where('cultivo_personalizado', 'like', '%'.$cultivoNombre.'%')
+                        ->orWhereHas('insumo', fn ($sub) => $sub->where('nombre', 'like', '%'.$cultivoNombre.'%'));
+                })
+                ->where(function ($q) {
+                    $q->whereNotNull('produccionalmacenamientoid')
+                        ->orWhere('producto_ref', 'like', 'cosecha:%');
+                })
+                ->orderByDesc('detallepedidoid')
+                ->limit(30)
+                ->get();
+
+            foreach ($detalles as $detalle) {
+                $lote = $this->loteAgricolaDesdeDetallePedido($detalle);
+                if ($lote !== null && ! isset($lotesVistos[(int) $lote->loteid])) {
+                    $lotesVistos[(int) $lote->loteid] = $lote;
+
+                    return $lote->loadMissing(['cultivo', 'estadoTipo', 'usuario']);
+                }
+            }
+        }
+
+        if ($pedidoPdv !== null) {
+            $lotePlanta = $this->resolverLoteProduccionPedido($insumoPdv, $pedidoPdv, null);
+            if ($lotePlanta !== null) {
+                $lote = $this->resolverLoteAgricolaDesdeLoteProduccionPlanta($lotePlanta, $insumoPdv);
+                if ($lote !== null) {
+                    return $lote->loadMissing(['cultivo', 'estadoTipo', 'usuario']);
+                }
+            }
+        }
+
+        if (preg_match('/(LOTE-\d+-\d+)/i', $insumoPdv->nombre, $codigoPlanta)) {
+            $lotePlanta = LoteProduccionPedido::query()
+                ->where('codigo_lote', $codigoPlanta[1])
+                ->first();
+            if ($lotePlanta !== null) {
+                $lote = $this->resolverLoteAgricolaDesdeLoteProduccionPlanta($lotePlanta, $insumoPdv);
+                if ($lote !== null) {
+                    return $lote->loadMissing(['cultivo', 'estadoTipo', 'usuario']);
+                }
+            }
+        }
+
+        $cultivoNombre = $this->nombreCultivoDesdeProducto($insumoPdv->nombre);
+        if ($cultivoNombre !== '') {
+            $lote = $this->resolverLoteAgricolaConCosechaEnviada($cultivoNombre);
+            if ($lote !== null) {
+                return $lote->loadMissing(['cultivo', 'estadoTipo', 'usuario']);
+            }
+        }
+
+        return null;
+    }
+
+    private function resolverLoteAgricolaConCosechaEnviada(string $cultivoNombre): ?Lote
+    {
+        return Lote::query()
+            ->with(['cultivo', 'estadoTipo', 'usuario'])
+            ->whereHas('cultivo', fn ($q) => $q->where('nombre', 'like', '%'.$cultivoNombre.'%'))
+            ->whereHas('producciones.almacenamientos', function ($q) {
+                $q->whereIn('produccionalmacenamientoid', function ($sub) {
+                    $sub->select('produccionalmacenamientoid')
+                        ->from('detallepedido')
+                        ->whereNotNull('produccionalmacenamientoid');
+                });
+            })
+            ->withCount([
+                'actividades as actividades_completadas_count' => fn ($q) => $q->whereNotNull('fechafin'),
+            ])
+            ->orderByDesc('actividades_completadas_count')
+            ->orderByDesc('fechamodificacion')
+            ->first();
+    }
+
+    private function resolverLoteAgricolaDesdeLoteProduccionPlanta(
+        LoteProduccionPedido $lotePlanta,
+        Insumo $insumoPdv,
+    ): ?Lote {
+        $lotePlanta->loadMissing(['materiasPrimas.insumo']);
+
+        foreach ($lotePlanta->materiasPrimas as $materia) {
+            $nombreMp = Str::lower(trim((string) ($materia->insumo?->nombre ?? '')));
+            if ($nombreMp === '') {
+                continue;
+            }
+
+            $cultivo = Cultivo::query()
+                ->get()
+                ->first(function (Cultivo $c) use ($nombreMp) {
+                    $cn = Str::lower(trim($c->nombre));
+
+                    return $cn !== '' && (str_contains($nombreMp, $cn) || str_contains($cn, $nombreMp));
+                });
+
+            if ($cultivo === null) {
+                continue;
+            }
+
+            $lote = Lote::query()
+                ->with(['cultivo', 'estadoTipo', 'usuario'])
+                ->where('cultivoid', $cultivo->cultivoid)
+                ->whereHas('producciones')
+                ->withCount([
+                    'actividades as actividades_completadas_count' => fn ($q) => $q->whereNotNull('fechafin'),
+                ])
+                ->orderByDesc('actividades_completadas_count')
+                ->orderByDesc('fechamodificacion')
+                ->first();
+
+            if ($lote !== null) {
+                return $lote;
+            }
+        }
+
+        return null;
+    }
+
+    private function loteAgricolaDesdeDetallePedido(?DetallePedido $detalle): ?Lote
+    {
+        if ($detalle === null) {
+            return null;
+        }
+
+        $almId = (int) ($detalle->produccionalmacenamientoid ?? 0);
+        if ($almId <= 0 && filled($detalle->producto_ref) && str_starts_with((string) $detalle->producto_ref, 'cosecha:')) {
+            $almId = (int) str_replace('cosecha:', '', (string) $detalle->producto_ref);
+        }
+
+        if ($almId <= 0) {
+            return null;
+        }
+
+        $almacenamiento = ProduccionAlmacenamiento::query()
+            ->with('produccion.lote.cultivo')
+            ->find($almId);
+
+        return $almacenamiento?->produccion?->lote;
+    }
+
+    private function nombreCultivoDesdeProducto(string $nombreProducto): string
+    {
+        $nombre = Str::lower(trim($nombreProducto));
+        if ($nombre === '') {
+            return '';
+        }
+
+        $cultivo = Cultivo::query()
+            ->get()
+            ->sortByDesc(fn (Cultivo $c) => mb_strlen(trim($c->nombre ?? '')))
+            ->first(function (Cultivo $c) use ($nombre) {
+                $cn = Str::lower(trim($c->nombre));
+
+                return $cn !== '' && (str_contains($nombre, $cn) || str_contains($cn, explode(' ', $nombre)[0] ?? ''));
+            });
+
+        return trim((string) ($cultivo?->nombre ?? ''));
+    }
+
+    private function vincularLoteAgricolaEnInsumoPdv(Insumo $insumo, ?Lote $lote): void
+    {
+        if ($lote === null || blank($lote->codigo_trazabilidad)) {
+            return;
+        }
+
+        $codigo = (string) $lote->codigo_trazabilidad;
+        $descripcion = (string) ($insumo->descripcion ?? '');
+        if (str_contains($descripcion, $codigo)) {
+            return;
+        }
+
+        $insumo->update([
+            'descripcion' => trim($descripcion.' · Lote agrícola: '.$codigo),
+        ]);
     }
 
     /**
@@ -911,6 +1136,17 @@ class TrazabilidadProductoPdvService
             if ($porAlm !== null) {
                 return $porAlm;
             }
+        }
+
+        $conCosecha = $detalles->first(function (DetallePedido $d) {
+            if ((int) ($d->produccionalmacenamientoid ?? 0) > 0) {
+                return true;
+            }
+
+            return str_starts_with((string) ($d->producto_ref ?? ''), 'cosecha:');
+        });
+        if ($conCosecha !== null) {
+            return $conCosecha;
         }
 
         return $detalles->first();

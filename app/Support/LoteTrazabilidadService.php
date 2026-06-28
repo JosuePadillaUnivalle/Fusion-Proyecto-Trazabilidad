@@ -1614,11 +1614,11 @@ class LoteTrazabilidadService
             ->filter(fn (Actividad $a) => str_contains(mb_strtolower(trim($a->tipoActividad->nombre ?? '')), 'siembra'))
             ->sortByDesc(function (Actividad $a) {
                 $puntos = 0;
+                if (filled($a->evidencia_foto_path)) {
+                    $puntos += 20;
+                }
                 if ($a->fechafin !== null) {
                     $puntos += 10;
-                }
-                if (filled($a->evidencia_foto_path)) {
-                    $puntos += 5;
                 }
 
                 return $puntos * 1_000_000_000 + $this->parseFechaApp($a->fechafin ?? $a->fechainicio ?? now())->timestamp;
@@ -2239,9 +2239,7 @@ class LoteTrazabilidadService
         $descripcionSiembra = $siembra
             ? $this->descripcionSiembraHistorial($siembra, $lote, $cultivoSiembra)
             : $this->descripcionSiembraDesdeLote($lote);
-        $evidenciaSiembra = $siembra
-            ? EvidenciaFoto::urlDesdePath($siembra->evidencia_foto_path ?? null)
-            : null;
+        $evidenciaSiembra = $this->evidenciaFotoSiembraHistorial($lote, $siembra);
 
         $eventos->push($this->evento(
             $fecha,
@@ -2305,6 +2303,25 @@ class LoteTrazabilidadService
         }
 
         return implode("\n", $partes);
+    }
+
+    private function evidenciaFotoSiembraHistorial(Lote $lote, ?Actividad $siembra): ?string
+    {
+        if ($siembra !== null) {
+            $foto = EvidenciaFoto::urlDesdePath($siembra->evidencia_foto_path ?? null);
+            if ($foto !== null) {
+                return $foto;
+            }
+        }
+
+        foreach ($this->actividadesSiembraDelLote($lote) as $actividadSiembra) {
+            $foto = EvidenciaFoto::urlDesdePath($actividadSiembra->evidencia_foto_path ?? null);
+            if ($foto !== null) {
+                return $foto;
+            }
+        }
+
+        return EvidenciaFoto::urlDesdeImagenUrl($lote->imagenurl ?? null);
     }
 
     private function evidenciaFotoHermanaActividad(Actividad $actividad, Lote $lote, string $tipoNombre): ?string
