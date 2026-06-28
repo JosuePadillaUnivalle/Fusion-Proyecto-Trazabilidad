@@ -1,10 +1,24 @@
 [phases.setup]
-nixPkgs = ["php84", "php84Extensions.pdo", "php84Extensions.pdo_pgsql", "php84Extensions.pdo_sqlite", "php84Extensions.zip", "php84Extensions.mbstring", "php84Extensions.bcmath", "php84Extensions.xml", "php84Extensions.curl", "php84Extensions.gd", "php84Extensions.tokenizer"]
+nixPkgs = [
+  "php84",
+  "php84Extensions.pdo",
+  "php84Extensions.pdo_pgsql",
+  "php84Extensions.pdo_sqlite",
+  "php84Extensions.zip",
+  "php84Extensions.mbstring",
+  "php84Extensions.bcmath",
+  "php84Extensions.xml",
+  "php84Extensions.curl",
+  "php84Extensions.gd",
+  "php84Extensions.tokenizer",
+  "php84Extensions.fileinfo",
+]
 
 [phases.build]
 cmds = [
   "composer install --no-dev --optimize-autoloader --no-interaction",
-  "chmod +x railway-start.sh"
+  "chmod +x railway-start.sh",
+  "php -m | grep -i gd || echo 'AVISO: GD no cargado; PDFs usarán firmas solo como texto'",
 ]
 
 [start]

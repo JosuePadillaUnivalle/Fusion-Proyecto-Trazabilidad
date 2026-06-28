@@ -473,8 +473,8 @@ final class DocumentoEntregaArchivo
             'observacionesIncidentes' => $operacionChecklistIncidente?->observaciones,
             'observacionPersonalCondiciones' => self::extraerObservacionManual($operacionChecklistCondicion?->observaciones),
             'observacionPersonalIncidentes' => self::extraerObservacionManual($operacionChecklistIncidente?->observaciones),
-            'firmaTransportistaImg' => FirmaPdfOptimizador::rutaParaDompdf($operacionFirmaTransportista?->imagenfirma),
-            'firmaRecepcionImg' => FirmaPdfOptimizador::rutaParaDompdf($operacionFirmaRecepcion?->imagenfirma),
+            'firmaTransportistaImg' => self::firmaParaPdf($operacionFirmaTransportista?->imagenfirma),
+            'firmaRecepcionImg' => self::firmaParaPdf($operacionFirmaRecepcion?->imagenfirma),
             'firmaRecepcionEtiqueta' => $firmaRecepcionEtiqueta,
             'llegadaConfirmadaAt' => $operacionLlegadaAt,
         ];
@@ -528,6 +528,20 @@ final class DocumentoEntregaArchivo
             'vehiculo en condiciones optimas.',
             'transporte sin incidentes reportados.',
         ];
+    }
+
+    private static function firmaParaPdf(?string $dataUrl): ?string
+    {
+        $dataUrl = trim((string) $dataUrl);
+        if ($dataUrl === '') {
+            return null;
+        }
+
+        if (! extension_loaded('gd')) {
+            return null;
+        }
+
+        return FirmaPdfOptimizador::rutaParaDompdf($dataUrl);
     }
 
     private static function esObservacionManual(?string $texto): bool

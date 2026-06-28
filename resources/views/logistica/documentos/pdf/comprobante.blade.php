@@ -170,12 +170,16 @@
             <td>
                 @if(!empty($firmaTransportistaImg))
                     <img src="{{ $firmaTransportistaImg }}" alt="Firma transportista" style="max-height:60px;max-width:180px;">
+                @elseif(!empty($transportistaNombre))
+                    <em>Firmado digitalmente</em>
                 @endif
                 <br>Firma del transportista<br><small>{{ $transportistaNombre }}</small>
             </td>
             <td>
                 @if(!empty($firmaRecepcionImg))
                     <img src="{{ $firmaRecepcionImg }}" alt="Firma recepción" style="max-height:60px;max-width:180px;">
+                @elseif(!empty($recepcionNombre))
+                    <em>Firmado digitalmente</em>
                 @endif
                 <br>{{ $firmaRecepcionEtiqueta ?? 'Firma recepción en destino' }}<br><small>{{ $recepcionNombre ?? $destinoCliente ?? '—' }}</small>
             </td>
