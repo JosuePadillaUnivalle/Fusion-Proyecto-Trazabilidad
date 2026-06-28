@@ -270,10 +270,6 @@ class AlmacenAmbito
         }
 
         if (! $user || UsuarioRol::esAdminGlobal($user)) {
-            if ($lote->usuarioid) {
-                return $query->where('responsable_usuarioid', (int) $lote->usuarioid);
-            }
-
             return $query;
         }
 
@@ -309,9 +305,7 @@ class AlmacenAmbito
         }
 
         if (UsuarioRol::esAdminGlobal($user)) {
-            return $lote->usuarioid
-                ? $responsable === (int) $lote->usuarioid
-                : true;
+            return true;
         }
 
         if (UsuarioRol::esJefeAgricultor($user)) {
