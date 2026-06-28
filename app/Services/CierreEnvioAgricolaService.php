@@ -13,7 +13,6 @@ use App\Models\FirmaRecepcionEnvio;
 use App\Models\FirmaTransportistaEnvio;
 use App\Models\TipoIncidenteTransporte;
 use App\Models\Usuario;
-use App\Support\DocumentoEntregaArchivo;
 use App\Support\EnvioAsignacionEstadoCatalogo;
 use App\Support\EnvioCierreAgricolaCatalogo;
 use App\Support\PedidoCatalogo;
@@ -231,18 +230,26 @@ class CierreEnvioAgricolaService
             ]);
 
             $mapaManual = collect($incidentes ?? [])->keyBy('id');
+            $filas = [];
+            $ahora = now();
 
             foreach ($catalogo as $tipo) {
                 $ocurrio = $sinIncidentes
                     ? false
                     : $this->valorBooleano($mapaManual->get($tipo->tipoincidentetransporteid)['ocurrio'] ?? false);
 
-                ChecklistIncidenteEnvioDetalle::create([
+                $filas[] = [
                     'checklistincidenteenvioid' => $checklist->checklistincidenteenvioid,
                     'tipoincidentetransporteid' => $tipo->tipoincidentetransporteid,
                     'ocurrio' => $ocurrio,
                     'descripcion' => null,
-                ]);
+                    'created_at' => $ahora,
+                    'updated_at' => $ahora,
+                ];
+            }
+
+            if ($filas !== []) {
+                ChecklistIncidenteEnvioDetalle::insert($filas);
             }
 
             return $checklist->load('detalles.tipoIncidente');
@@ -289,6 +296,15 @@ class CierreEnvioAgricolaService
     public function finalizarEntrega(EnvioAsignacionMultiple $envio, Usuario $usuario): DocumentoEntrega
     {
         $this->autorizarFinalizar($usuario, $envio);
+        $envio->refresh();
+
+        if (EnvioAsignacionEstadoCatalogo::llegoADestino($envio)) {
+            $existente = $this->buscarDocumentoTransporte($envio);
+            if ($existente !== null) {
+                return $existente;
+            }
+        }
+
         $resumen = $this->resumenPasos($envio);
 
         if (! ($resumen['puede_finalizar'] ?? false)) {
@@ -406,8 +422,6 @@ class CierreEnvioAgricolaService
             ->first();
 
         if ($existente) {
-            DocumentoEntregaArchivo::generarPdfOperativo($existente);
-
             return $existente;
         }
 
@@ -425,8 +439,15 @@ class CierreEnvioAgricolaService
             ],
         ]);
 
-        DocumentoEntregaArchivo::generarPdfOperativo($documento);
-
         return $documento;
+    }
+
+    private function buscarDocumentoTransporte(EnvioAsignacionMultiple $envio): ?DocumentoEntrega
+    {
+        return DocumentoEntrega::query()
+            ->where('externo_envio_id', $envio->externo_envio_id)
+            ->where('tipo_documento', 'guia_transporte')
+            ->where('metadata->envio_cierre_agricola', true)
+            ->first();
     }
 }

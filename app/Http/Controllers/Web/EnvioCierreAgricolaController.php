@@ -198,6 +198,10 @@ class EnvioCierreAgricolaController extends Controller
             $documento = $this->cierre->finalizarEntrega($asignacion, $request->user());
         } catch (\InvalidArgumentException $e) {
             return $this->respuestaError($e->getMessage());
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $this->respuestaError('No se pudo finalizar la entrega. Intente de nuevo en unos segundos.');
         }
 
         if ($request->expectsJson()) {

@@ -717,5 +717,19 @@ document.querySelectorAll('.cond-radio-si, .cond-radio-no').forEach(function (ra
         if (radio.checked) radio.closest('.cierre-ag-toggle__btn').classList.add('active');
     });
 });
+
+['form-incidentes-detalle', 'form-incidentes-atajo'].forEach(function (formId) {
+    var form = document.getElementById(formId);
+    if (!form) return;
+    form.addEventListener('submit', function () {
+        form.querySelectorAll('button[type="submit"]').forEach(function (btn) {
+            btn.disabled = true;
+            if (!btn.dataset.labelOriginal) {
+                btn.dataset.labelOriginal = btn.innerHTML;
+            }
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Guardando…';
+        });
+    });
+});
 </script>
 @endpush

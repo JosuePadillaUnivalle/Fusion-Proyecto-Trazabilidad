@@ -174,8 +174,6 @@ class RecepcionQrFirmaService
             ]);
         }
 
-        $this->finalizarSiCompleto($operacion->fresh(['firmaTransportista', 'firmaRecepcion', 'transportista']));
-
         return $firma;
     }
 

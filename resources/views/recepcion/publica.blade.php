@@ -146,6 +146,7 @@
         document.getElementById('imagen_firma').value = imagen;
         const btn = document.getElementById('btn-enviar-firma');
         btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Guardando…';
 
         fetch(form.action, {
             method: 'POST',
@@ -164,14 +165,23 @@
             .then(function (res) {
                 if (res.ok) {
                     window.location.reload();
-                } else {
-                    alert(res.j.mensaje || 'No se pudo guardar la firma.');
-                    btn.disabled = false;
+                    return;
                 }
+
+                const mensaje = String(res.j.mensaje || '');
+                if (mensaje.toLowerCase().includes('ya fue registrada')) {
+                    window.location.reload();
+                    return;
+                }
+
+                alert(mensaje || 'No se pudo guardar la firma.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-file-signature mr-1"></i> Confirmar recepción';
             })
             .catch(function () {
                 alert('No se pudo conectar con el servidor. Intente de nuevo en unos segundos.');
                 btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-file-signature mr-1"></i> Confirmar recepción';
             });
     });
 
