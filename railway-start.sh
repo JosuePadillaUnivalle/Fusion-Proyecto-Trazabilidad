@@ -35,6 +35,12 @@ vincular_storage_volumen() {
 
 vincular_storage_volumen
 
+if php -m 2>/dev/null | grep -qi '^gd$'; then
+  echo "==> PHP ext-gd: disponible (firmas en PDF habilitadas)"
+else
+  echo "==> AVISO: PHP ext-gd NO cargada; los PDF usarán texto en lugar de imagen de firma"
+fi
+
 php artisan config:clear --no-interaction || true
 php artisan migrate --force --no-interaction || echo "==> Migraciones: revise la conexión a la base de datos en Variables."
 

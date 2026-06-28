@@ -14,7 +14,7 @@ use Throwable;
 
 final class DocumentoEntregaArchivo
 {
-    private const PDF_VERSION = 11;
+    private const PDF_VERSION = 12;
 
     /** @var array<string, string> */
     private const TIPOS_ETIQUETA = [

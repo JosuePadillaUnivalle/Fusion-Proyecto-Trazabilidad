@@ -1,24 +1,11 @@
-[phases.setup]
-nixPkgs = [
-  "php84",
-  "php84Extensions.pdo",
-  "php84Extensions.pdo_pgsql",
-  "php84Extensions.pdo_sqlite",
-  "php84Extensions.zip",
-  "php84Extensions.mbstring",
-  "php84Extensions.bcmath",
-  "php84Extensions.xml",
-  "php84Extensions.curl",
-  "php84Extensions.gd",
-  "php84Extensions.tokenizer",
-  "php84Extensions.fileinfo",
-]
+# Nixpacks detecta extensiones PHP desde composer.json (ext-gd, ext-pdo_pgsql, etc.).
+# Ver: https://nixpacks.com/docs/providers/php
 
 [phases.build]
 cmds = [
   "composer install --no-dev --optimize-autoloader --no-interaction",
   "chmod +x railway-start.sh",
-  "php -m | grep -i gd || echo 'AVISO: GD no cargado; PDFs usarán firmas solo como texto'",
+  "php -m | grep -i '^gd$' || echo 'AVISO BUILD: ext-gd no cargada; revise composer.json ext-gd'",
 ]
 
 [start]
