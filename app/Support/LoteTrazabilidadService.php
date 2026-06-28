@@ -1519,12 +1519,43 @@ class LoteTrazabilidadService
             return 'en_crecimiento';
         }
 
+        if ($this->esActividadPostSiembra($tipoNombre) && $actividad->fechafin !== null) {
+            return 'en_crecimiento';
+        }
+
         return 'siembra';
+    }
+
+    private function esActividadPostSiembra(string $tipoNombre): bool
+    {
+        return str_contains($tipoNombre, 'riego')
+            || str_contains($tipoNombre, 'regad')
+            || str_contains($tipoNombre, 'fertiliz')
+            || str_contains($tipoNombre, 'fumig')
+            || str_contains($tipoNombre, 'plaga')
+            || str_contains($tipoNombre, 'fitosanit');
     }
 
     private function loteSiembraRegistrada(Lote $lote): bool
     {
-        if ($lote->fechasiembra !== null) {
+        if ($this->siembraCompletada($lote)) {
+            return true;
+        }
+
+        if (
+            $this->milestoneRegado($lote)
+            || $this->milestoneFumigacion($lote)
+            || $this->milestoneFertilizacion($lote)
+            || $this->milestoneCosecha($lote)
+        ) {
+            return true;
+        }
+
+        if ($this->fechaHistorialSiembra($lote) !== null) {
+            return true;
+        }
+
+        if ((float) ($lote->cantidad_semilla_planificada ?? 0) > 0 && filled($lote->insumosemillaid)) {
             return true;
         }
 
@@ -1534,6 +1565,44 @@ class LoteTrazabilidadService
             return str_contains($nombre, 'siembra')
                 && ($a->fechafin !== null || filled($a->evidencia_foto_path));
         });
+    }
+
+    private function fechaHistorialSiembra(Lote $lote): ?Carbon
+    {
+        foreach ($lote->historialEstados as $historial) {
+            $slug = EstadoLoteCatalogo::slugFromNombre($historial->estadoTipo->nombre ?? '');
+            if ($slug === 'sembrado') {
+                return $this->parseFechaApp($historial->fecha_cambio);
+            }
+
+            if (preg_match('/Actividad\s*«\s*Siembra\s*»\s+completada/i', (string) ($historial->observaciones ?? ''))) {
+                return $this->parseFechaApp($historial->fecha_cambio);
+            }
+        }
+
+        return null;
+    }
+
+    private function fechaInferidaSiembraDesdeActividades(Lote $lote): ?Carbon
+    {
+        $primeraPostPlanificacion = $lote->actividades
+            ->filter(function (Actividad $a) {
+                if ($a->fechafin === null) {
+                    return false;
+                }
+                $nombre = mb_strtolower(trim($a->tipoActividad->nombre ?? ''));
+
+                return $this->esActividadPostSiembra($nombre)
+                    || str_contains($nombre, 'cosecha');
+            })
+            ->sortBy(fn (Actividad $a) => $this->parseFechaApp($a->fechafin)->timestamp)
+            ->first();
+
+        if ($primeraPostPlanificacion === null) {
+            return null;
+        }
+
+        return $this->parseFechaApp($primeraPostPlanificacion->fechafin)->subDay();
     }
 
     /**
@@ -2078,6 +2147,7 @@ class LoteTrazabilidadService
         $insumo = null;
         if ($esAplicacionInsumo) {
             $insumo = $this->imagenInsumoDesdeDetalleActividad($actividad)
+                ?? $this->imagenInsumoDesdeLoteInsumoPorActividad($actividad, $lote)
                 ?? $this->imagenInsumoDesdeActividadAutomatica($actividad, $lote)
                 ?? $this->imagenInsumoDesdeActividadHermana($actividad, $lote, $tipoNombre)
                 ?? $this->imagenInsumoDesdeLoteInsumoRelacionado($actividad, $lote, $tipoNombre);
@@ -2157,7 +2227,9 @@ class LoteTrazabilidadService
         $siembra = $this->resolverActividadSiembraParaHistorial($lote);
         $fecha = $siembra?->fechafin
             ?? $siembra?->fechainicio
-            ?? $lote->fechasiembra;
+            ?? $lote->fechasiembra
+            ?? $this->fechaHistorialSiembra($lote)
+            ?? $this->fechaInferidaSiembraDesdeActividades($lote);
 
         if ($fecha === null) {
             return;
@@ -2305,49 +2377,108 @@ class LoteTrazabilidadService
             : null;
     }
 
+    private function imagenInsumoDesdeLoteInsumoPorActividad(Actividad $actividad, Lote $lote): ?string
+    {
+        $actividadId = (int) $actividad->actividadid;
+
+        $loteInsumo = $lote->loteInsumos->first(function ($li) use ($actividadId) {
+            if ((int) $li->actividadid === $actividadId) {
+                return true;
+            }
+
+            $obs = (string) ($li->observaciones ?? '');
+
+            return preg_match('/Actividad\s*#'.$actividadId.'\b/i', $obs) === 1;
+        });
+
+        if ($loteInsumo?->insumo) {
+            return InsumoImagenCatalogo::urlPara($loteInsumo->insumo);
+        }
+
+        $marcadorAuto = \App\Services\OperacionAgricolaAutomaticaService::MARK.' insumo|';
+        $hermanaAuto = $lote->actividades->first(function (Actividad $otra) use ($actividad, $marcadorAuto) {
+            if ((int) $otra->actividadid === (int) $actividad->actividadid) {
+                return false;
+            }
+            if (! $this->esActividadAutomaticaInsumo($otra)) {
+                return false;
+            }
+
+            return mb_strtolower(trim($otra->tipoActividad->nombre ?? ''))
+                === mb_strtolower(trim($actividad->tipoActividad->nombre ?? ''));
+        });
+
+        if ($hermanaAuto && preg_match('/'.preg_quote($marcadorAuto, '/').'(\d+)/', (string) ($hermanaAuto->observaciones ?? ''), $coincidencia)) {
+            $loteInsumoAuto = $lote->loteInsumos->firstWhere('loteinsumoid', (int) $coincidencia[1]);
+            if ($loteInsumoAuto?->insumo) {
+                return InsumoImagenCatalogo::urlPara($loteInsumoAuto->insumo);
+            }
+        }
+
+        return null;
+    }
+
     private function imagenInsumoDesdeLoteInsumoRelacionado(Actividad $actividad, Lote $lote, string $tipoNombre): ?string
     {
         $fechaRef = $this->parseFechaApp($actividad->fechafin ?? $actividad->fechainicio);
         $tipoNorm = mb_strtolower(trim($tipoNombre));
 
-        $loteInsumo = $lote->loteInsumos
-            ->filter(function ($li) use ($tipoNorm, $fechaRef) {
-                $nombre = mb_strtolower(trim($li->insumo->nombre ?? ''));
-                $tipoIns = mb_strtolower(trim($li->insumo?->tipo?->nombre ?? ''));
-                $coincide = match (true) {
-                    str_contains($tipoNorm, 'fertiliz') => str_contains($nombre, 'fertil')
-                        || str_contains($nombre, 'npk')
-                        || str_contains($nombre, 'abono')
-                        || str_contains($nombre, 'urea')
-                        || str_contains($tipoIns, 'fertil'),
-                    str_contains($tipoNorm, 'plaga'),
-                    str_contains($tipoNorm, 'fumig'),
-                    str_contains($tipoNorm, 'fitosanit') => str_contains($nombre, 'fung')
-                        || str_contains($nombre, 'herb')
-                        || str_contains($nombre, 'insect')
-                        || str_contains($nombre, 'plaga')
-                        || str_contains($tipoIns, 'pestic'),
-                    default => false,
-                };
-                if (! $coincide) {
-                    return false;
-                }
-                if ($li->fechauo === null) {
-                    return true;
-                }
-
-                return abs($fechaRef->diffInHours($this->parseFechaApp($li->fechauo))) <= 168;
-            })
-            ->sortBy(fn ($li) => $li->fechauo === null
-                ? PHP_INT_MAX
-                : abs($fechaRef->diffInSeconds($this->parseFechaApp($li->fechauo))))
-            ->first();
+        $loteInsumo = $this->buscarLoteInsumoPorTipoActividad($lote, $tipoNorm, $fechaRef, true)
+            ?? $this->buscarLoteInsumoPorTipoActividad($lote, $tipoNorm, $fechaRef, false);
 
         if ($loteInsumo?->insumo) {
             return InsumoImagenCatalogo::urlPara($loteInsumo->insumo);
         }
 
         return null;
+    }
+
+    private function buscarLoteInsumoPorTipoActividad(Lote $lote, string $tipoNorm, Carbon $fechaRef, bool $exigirVentanaHoras): ?object
+    {
+        return $lote->loteInsumos
+            ->filter(function ($li) use ($tipoNorm, $fechaRef, $exigirVentanaHoras) {
+                if (! $this->loteInsumoCoincideTipoActividad($li, $tipoNorm)) {
+                    return false;
+                }
+                if (! $exigirVentanaHoras) {
+                    return true;
+                }
+                if ($li->fechauo === null) {
+                    return true;
+                }
+
+                $fechaUso = $this->parseFechaApp($li->fechauo);
+
+                return $fechaRef->isSameDay($fechaUso)
+                    || abs($fechaRef->diffInHours($fechaUso)) <= 168;
+            })
+            ->sortBy(fn ($li) => $li->fechauo === null
+                ? PHP_INT_MAX
+                : abs($fechaRef->diffInSeconds($this->parseFechaApp($li->fechauo))))
+            ->first();
+    }
+
+    private function loteInsumoCoincideTipoActividad(object $li, string $tipoNorm): bool
+    {
+        $nombre = mb_strtolower(trim($li->insumo->nombre ?? ''));
+        $tipoIns = mb_strtolower(trim($li->insumo?->tipo?->nombre ?? ''));
+
+        return match (true) {
+            str_contains($tipoNorm, 'fertiliz') => str_contains($nombre, 'fertil')
+                || str_contains($nombre, 'npk')
+                || str_contains($nombre, 'abono')
+                || str_contains($nombre, 'urea')
+                || str_contains($nombre, 'guano')
+                || str_contains($tipoIns, 'fertil'),
+            str_contains($tipoNorm, 'plaga'),
+            str_contains($tipoNorm, 'fumig'),
+            str_contains($tipoNorm, 'fitosanit') => str_contains($nombre, 'fung')
+                || str_contains($nombre, 'herb')
+                || str_contains($nombre, 'insect')
+                || str_contains($nombre, 'plaga')
+                || str_contains($tipoIns, 'pestic'),
+            default => false,
+        };
     }
 
     private function imagenInsumoDesdeActividadAutomatica(Actividad $actividad, Lote $lote): ?string
