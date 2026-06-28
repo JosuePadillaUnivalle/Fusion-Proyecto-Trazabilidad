@@ -798,28 +798,6 @@ class LoteTrazabilidadService
 
         $eventos = collect();
 
-        if ($lote->fechasiembra) {
-            $tieneActividadSiembra = $lote->actividades->contains(function ($actividad) {
-                $nombre = mb_strtolower(trim($actividad->tipoActividad->nombre ?? ''));
-
-                return str_contains($nombre, 'siembra');
-            });
-
-            if (! $tieneActividadSiembra) {
-                $cultivo = $this->nombreCultivoSiembrado($lote);
-                $eventos->push($this->evento(
-                    $lote->fechasiembra,
-                    'siembra',
-                    'siembra',
-                    'Siembra de '.$cultivo,
-                    '',
-                    null,
-                    'seedling',
-                    'success'
-                ));
-            }
-        }
-
         foreach ($lote->historialEstados as $historial) {
             if ($this->historialEstadoOmitirEnTrazabilidad($historial, $lote)) {
                 continue;
@@ -842,6 +820,8 @@ class LoteTrazabilidadService
                 'info'
             ));
         }
+
+        $this->agregarEventoSiembraHistorial($eventos, $lote);
 
         foreach ($lote->loteInsumos as $insumo) {
             if ($this->loteInsumoYaRepresentadoEnActividad($insumo, $lote)) {
@@ -883,6 +863,10 @@ class LoteTrazabilidadService
                 continue;
             }
 
+            if ($this->debeOmitirActividadAutomaticaEnHistorial($actividad, $lote)) {
+                continue;
+            }
+
             // La cosecha registrada en Producción ya tiene evento propio con foto y cantidades.
             if (str_contains($tipoNombre, 'cosecha') && $lote->producciones->isNotEmpty()) {
                 continue;
@@ -911,40 +895,6 @@ class LoteTrazabilidadService
                 $evidenciaHistorial['icono'],
                 $evidenciaHistorial['tipo'],
                 $evidenciaHistorial['foto_url'],
-            ));
-        }
-
-        $siembraCompletada = $lote->actividades
-            ->filter(function (Actividad $actividad) {
-                $nombre = mb_strtolower(trim($actividad->tipoActividad->nombre ?? ''));
-
-                return str_contains($nombre, 'siembra') && $actividad->fechafin !== null;
-            })
-            ->sortByDesc(fn (Actividad $a) => $this->parseFechaApp($a->fechafin ?? $a->fechainicio)->timestamp)
-            ->first();
-
-        if ($siembraCompletada) {
-            $cultivoSiembra = $this->nombreCultivoSiembrado($lote, $siembraCompletada);
-            $descripcionSiembra = $this->descripcionSiembraHistorial($siembraCompletada, $lote, $cultivoSiembra);
-            $evidenciaSiembra = EvidenciaFoto::urlDesdePath($siembraCompletada->evidencia_foto_path ?? null);
-            $eventos->push($this->evento(
-                $siembraCompletada->fechafin ?? $siembraCompletada->fechainicio,
-                'siembra',
-                'siembra',
-                'Siembra de '.$cultivoSiembra,
-                $descripcionSiembra,
-                app(ActividadSecuenciaService::class)->nombreEjecutor($siembraCompletada)
-                    ?? trim(($siembraCompletada->usuario->nombre ?? '').' '.($siembraCompletada->usuario->apellido ?? ''))
-                    ?: null,
-                'seedling',
-                'info',
-                true,
-                null,
-                null,
-                $evidenciaSiembra,
-                null,
-                null,
-                $evidenciaSiembra ? 'foto' : null,
             ));
         }
 
@@ -2090,10 +2040,20 @@ class LoteTrazabilidadService
             return $vacio;
         }
 
-        $foto = EvidenciaFoto::urlDesdePath($actividad->evidencia_foto_path ?? null);
-        $insumo = $this->imagenInsumoDesdeDetalleActividad($actividad)
-            ?? $this->imagenInsumoDesdeActividadAutomatica($actividad, $lote);
         $esRiego = str_contains($tipoNombre, 'riego') || str_contains($tipoNombre, 'regad');
+        $esAplicacionInsumo = $this->esActividadConInsumoAplicado($tipoNombre, $actividad);
+
+        $foto = EvidenciaFoto::urlDesdePath($actividad->evidencia_foto_path ?? null);
+        if ($foto === null && $esAplicacionInsumo) {
+            $foto = $this->evidenciaFotoHermanaActividad($actividad, $lote, $tipoNombre);
+        }
+
+        $insumo = null;
+        if ($esAplicacionInsumo) {
+            $insumo = $this->imagenInsumoDesdeDetalleActividad($actividad)
+                ?? $this->imagenInsumoDesdeActividadAutomatica($actividad, $lote)
+                ?? $this->imagenInsumoDesdeActividadHermana($actividad, $lote, $tipoNombre);
+        }
 
         if ($insumo !== null && $foto !== null) {
             return ['url' => $insumo, 'foto_url' => $foto, 'icono' => null, 'tipo' => 'insumo_foto'];
@@ -2109,6 +2069,185 @@ class LoteTrazabilidadService
         }
 
         return $vacio;
+    }
+
+    private function esActividadConInsumoAplicado(string $tipoNombre, Actividad $actividad): bool
+    {
+        if ($this->esActividadAutomaticaInsumo($actividad)) {
+            return true;
+        }
+
+        $detalle = json_decode((string) ($actividad->detalle_json ?? ''), true);
+
+        return is_array($detalle) && ($detalle['modo'] ?? '') === 'insumos'
+            || str_contains($tipoNombre, 'fertiliz')
+            || str_contains($tipoNombre, 'fumig')
+            || str_contains($tipoNombre, 'plaga')
+            || str_contains($tipoNombre, 'fitosanit');
+    }
+
+    private function esActividadAutomaticaInsumo(Actividad $actividad): bool
+    {
+        return str_contains(
+            (string) ($actividad->observaciones ?? ''),
+            \App\Services\OperacionAgricolaAutomaticaService::MARK.' insumo|'
+        );
+    }
+
+    private function debeOmitirActividadAutomaticaEnHistorial(Actividad $actividad, Lote $lote): bool
+    {
+        if (! $this->esActividadAutomaticaInsumo($actividad)) {
+            return false;
+        }
+
+        $tipoId = (int) $actividad->tipoactividadid;
+
+        return $lote->actividades->contains(function (Actividad $otra) use ($actividad, $tipoId) {
+            if ((int) $otra->actividadid === (int) $actividad->actividadid) {
+                return false;
+            }
+            if ($this->esActividadAutomaticaInsumo($otra)) {
+                return false;
+            }
+            if ((int) $otra->tipoactividadid !== $tipoId) {
+                return false;
+            }
+
+            return $otra->fechafin !== null;
+        });
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $eventos
+     */
+    private function agregarEventoSiembraHistorial(Collection $eventos, Lote $lote): void
+    {
+        $actividadesSiembra = $lote->actividades
+            ->filter(fn (Actividad $a) => str_contains(mb_strtolower(trim($a->tipoActividad->nombre ?? '')), 'siembra'))
+            ->sortByDesc(function (Actividad $a) {
+                $puntos = 0;
+                if ($a->fechafin !== null) {
+                    $puntos += 10;
+                }
+                if (filled($a->evidencia_foto_path)) {
+                    $puntos += 5;
+                }
+
+                return $puntos * 1_000_000_000 + $this->parseFechaApp($a->fechafin ?? $a->fechainicio ?? now())->timestamp;
+            });
+
+        $siembra = $actividadesSiembra->first();
+        $fecha = $siembra?->fechafin
+            ?? $siembra?->fechainicio
+            ?? $lote->fechasiembra;
+
+        if ($fecha === null) {
+            return;
+        }
+
+        if ($siembra?->fechafin === null && ! filled($siembra?->evidencia_foto_path) && $lote->fechasiembra === null) {
+            return;
+        }
+
+        $cultivoSiembra = $this->nombreCultivoSiembrado($lote, $siembra);
+        $descripcionSiembra = $siembra
+            ? $this->descripcionSiembraHistorial($siembra, $lote, $cultivoSiembra)
+            : '';
+        $evidenciaSiembra = $siembra
+            ? EvidenciaFoto::urlDesdePath($siembra->evidencia_foto_path ?? null)
+            : null;
+
+        $eventos->push($this->evento(
+            $fecha,
+            'siembra',
+            'siembra',
+            'Siembra de '.$cultivoSiembra,
+            $descripcionSiembra,
+            $siembra
+                ? (app(ActividadSecuenciaService::class)->nombreEjecutor($siembra)
+                    ?? trim(($siembra->usuario->nombre ?? '').' '.($siembra->usuario->apellido ?? ''))
+                    ?: null)
+                : null,
+            'seedling',
+            'success',
+            $siembra?->fechafin !== null,
+            $siembra ? (int) $siembra->actividadid : null,
+            null,
+            $evidenciaSiembra,
+            null,
+            null,
+            $evidenciaSiembra ? 'foto' : null,
+        ));
+    }
+
+    private function evidenciaFotoHermanaActividad(Actividad $actividad, Lote $lote, string $tipoNombre): ?string
+    {
+        $fechaRef = $this->parseFechaApp($actividad->fechafin ?? $actividad->fechainicio);
+        $tipoNorm = mb_strtolower(trim($tipoNombre));
+
+        $hermana = $lote->actividades
+            ->filter(function (Actividad $otra) use ($actividad, $tipoNorm) {
+                if ((int) $otra->actividadid === (int) $actividad->actividadid) {
+                    return false;
+                }
+                if ($otra->fechafin === null || ! filled($otra->evidencia_foto_path)) {
+                    return false;
+                }
+
+                return mb_strtolower(trim($otra->tipoActividad->nombre ?? '')) === $tipoNorm;
+            })
+            ->sortBy(fn (Actividad $otra) => abs(
+                $fechaRef->diffInSeconds($this->parseFechaApp($otra->fechafin ?? $otra->fechainicio))
+            ))
+            ->first();
+
+        return $hermana
+            ? EvidenciaFoto::urlDesdePath($hermana->evidencia_foto_path)
+            : null;
+    }
+
+    private function imagenInsumoDesdeActividadHermana(Actividad $actividad, Lote $lote, string $tipoNombre): ?string
+    {
+        $tipoNorm = mb_strtolower(trim($tipoNombre));
+
+        $hermanaAuto = $lote->actividades->first(function (Actividad $otra) use ($actividad, $tipoNorm) {
+            if ((int) $otra->actividadid === (int) $actividad->actividadid) {
+                return false;
+            }
+            if (! $this->esActividadAutomaticaInsumo($otra)) {
+                return false;
+            }
+
+            return mb_strtolower(trim($otra->tipoActividad->nombre ?? '')) === $tipoNorm;
+        });
+
+        if ($hermanaAuto) {
+            return $this->imagenInsumoDesdeActividadAutomatica($hermanaAuto, $lote);
+        }
+
+        $fechaRef = $this->parseFechaApp($actividad->fechafin ?? $actividad->fechainicio);
+        $hermanaManual = $lote->actividades
+            ->filter(function (Actividad $otra) use ($actividad, $tipoNorm) {
+                if ((int) $otra->actividadid === (int) $actividad->actividadid) {
+                    return false;
+                }
+                if ($this->esActividadAutomaticaInsumo($otra)) {
+                    return false;
+                }
+                if (mb_strtolower(trim($otra->tipoActividad->nombre ?? '')) !== $tipoNorm) {
+                    return false;
+                }
+
+                return $this->imagenInsumoDesdeDetalleActividad($otra) !== null;
+            })
+            ->sortBy(fn (Actividad $otra) => abs(
+                $fechaRef->diffInSeconds($this->parseFechaApp($otra->fechafin ?? $otra->fechainicio))
+            ))
+            ->first();
+
+        return $hermanaManual
+            ? $this->imagenInsumoDesdeDetalleActividad($hermanaManual)
+            : null;
     }
 
     private function imagenInsumoDesdeActividadAutomatica(Actividad $actividad, Lote $lote): ?string
