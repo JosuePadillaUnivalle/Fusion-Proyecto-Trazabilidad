@@ -244,7 +244,7 @@ class RecepcionQrFirmaService
     private function generarTokenUnico(): string
     {
         do {
-            $token = Str::random(48);
+            $token = Str::random(32);
         } while (RecepcionQrEnvio::query()->where('token', $token)->exists());
 
         return $token;

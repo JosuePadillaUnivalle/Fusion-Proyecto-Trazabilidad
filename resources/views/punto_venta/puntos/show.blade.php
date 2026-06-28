@@ -278,11 +278,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     canvas.innerHTML = '';
                     qrInstance = new QRCode(canvas, {
                         text: data.url,
-                        width: 200,
-                        height: 200,
+                        width: 240,
+                        height: 240,
                         colorDark: '#1e4620',
                         colorLight: '#ffffff',
-                        correctLevel: QRCode.CorrectLevel.M
+                        correctLevel: QRCode.CorrectLevel.L
                     });
                     document.getElementById('modalQrUrl').textContent = data.url;
                     var link = document.getElementById('modalQrAbrir');

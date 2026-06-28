@@ -18,7 +18,7 @@ final class PublicUrlHelper
 
     /**
      * URL absoluta para QR / acceso desde móvil.
-     * Usa APP_PUBLIC_URL o detecta la IP LAN aunque el PC use 127.0.0.1 en el navegador.
+     * En Railway usa el dominio público (https). En local, IP LAN si abre 127.0.0.1.
      */
     public static function absoluteForQr(string $path = ''): string
     {
@@ -35,6 +35,10 @@ final class PublicUrlHelper
 
     private static function resolveBaseUrl(bool $preferPublic = false): string
     {
+        if ($remota = self::resolveUrlDespliegueRemoto()) {
+            return $remota;
+        }
+
         if ($preferPublic && request()) {
             $host = strtolower(request()->getHost());
             $port = (int) request()->getPort();
@@ -49,12 +53,15 @@ final class PublicUrlHelper
 
         $publicUrl = trim((string) config('app.public_url', ''));
 
-        if ($publicUrl !== '') {
+        if ($publicUrl !== '' && ! ($preferPublic && self::esDespliegueRemoto() && self::esUrlPrivada($publicUrl))) {
             return rtrim($publicUrl, '/');
         }
 
         if (! app()->runningInConsole() && request()) {
-            return rtrim(request()->getSchemeAndHttpHost(), '/');
+            $host = strtolower(request()->getHost());
+            if (! self::esUrlPrivadaHost($host)) {
+                return rtrim(request()->getSchemeAndHttpHost(), '/');
+            }
         }
 
         $lanUrl = LanNetworkResolver::resolvePublicUrl(
@@ -64,7 +71,89 @@ final class PublicUrlHelper
             return rtrim($lanUrl, '/');
         }
 
-        return rtrim((string) config('app.url', 'http://localhost'), '/');
+        $appUrl = trim((string) config('app.url', 'http://localhost'));
+
+        return rtrim($appUrl !== '' && ! self::esUrlPrivada($appUrl) ? $appUrl : 'http://localhost', '/');
+    }
+
+    /** URL pública en Railway / hosting (nunca IP local). */
+    private static function resolveUrlDespliegueRemoto(): ?string
+    {
+        if (! self::esDespliegueRemoto()) {
+            return null;
+        }
+
+        foreach ([
+            getenv('RAILWAY_PUBLIC_DOMAIN') ?: null,
+            getenv('RAILWAY_STATIC_URL') ?: null,
+            config('app.url'),
+        ] as $candidato) {
+            $url = self::normalizarUrlPublica($candidato);
+            if ($url !== null) {
+                return $url;
+            }
+        }
+
+        if (request()) {
+            $host = strtolower(request()->getHost());
+            if (! self::esUrlPrivadaHost($host)) {
+                $scheme = request()->getScheme() === 'http' ? 'https' : request()->getScheme();
+
+                return rtrim($scheme.'://'.$host.(
+                    request()->getPort() && ! in_array((int) request()->getPort(), [80, 443], true)
+                        ? ':'.request()->getPort()
+                        : ''
+                ), '/');
+            }
+        }
+
+        return null;
+    }
+
+    private static function esDespliegueRemoto(): bool
+    {
+        return (bool) (getenv('RAILWAY_ENVIRONMENT') ?: getenv('RAILWAY_PROJECT_ID'));
+    }
+
+    private static function normalizarUrlPublica(mixed $valor): ?string
+    {
+        $valor = trim((string) $valor);
+        if ($valor === '') {
+            return null;
+        }
+
+        if (! str_contains($valor, '://')) {
+            $valor = 'https://'.ltrim($valor, '/');
+        }
+
+        $host = parse_url($valor, PHP_URL_HOST);
+        if (! is_string($host) || self::esUrlPrivadaHost(strtolower($host))) {
+            return null;
+        }
+
+        $scheme = parse_url($valor, PHP_URL_SCHEME);
+
+        return rtrim(($scheme === 'http' ? 'https' : ($scheme ?: 'https')).'://'.$host, '/');
+    }
+
+    private static function esUrlPrivada(string $url): bool
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+
+        return is_string($host) && self::esUrlPrivadaHost(strtolower($host));
+    }
+
+    private static function esUrlPrivadaHost(string $host): bool
+    {
+        if (self::esLoopback($host)) {
+            return true;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+        }
+
+        return false;
     }
 
     private static function esLoopback(string $host): bool

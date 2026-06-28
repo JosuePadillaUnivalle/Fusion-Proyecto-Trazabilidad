@@ -54,5 +54,9 @@ class AppServiceProvider extends ServiceProvider
         Blade::directive('superficie', function (string $expression) {
             return "<?php echo \\App\\Support\\SuperficieFormato::etiqueta($expression); ?>";
         });
+
+        if (getenv('RAILWAY_ENVIRONMENT') || getenv('RAILWAY_PROJECT_ID')) {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
     }
 }

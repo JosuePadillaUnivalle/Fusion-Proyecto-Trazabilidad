@@ -17,7 +17,13 @@
             <span class="small text-muted d-block mb-2">
                 El receptor debe escanear el código QR con su teléfono y firmar. Esta pantalla se actualizará automáticamente.
             </span>
-            <div id="cierre-qr-canvas" class="d-inline-block p-2 bg-white border rounded" style="line-height:0;"></div>
+            <div id="cierre-qr-canvas" class="d-inline-block p-3 bg-white border rounded" style="line-height:0;"></div>
+            <p class="small mt-2 mb-1">
+                <a href="{{ $qrUrl }}" target="_blank" rel="noopener" class="text-break">{{ $qrUrl }}</a>
+            </p>
+            <p class="small text-muted mb-0">
+                Si el escaneo falla, abra el enlace en el móvil o use «Abrir en el teléfono».
+            </p>
             <p class="small text-muted mt-2 mb-0">
                 <i class="fas fa-sync-alt fa-spin mr-1" id="cierre-qr-polling-icon" style="display:none;"></i>
                 <span id="cierre-qr-polling-text">Esperando firma del receptor…</span>
@@ -41,11 +47,11 @@
     box.innerHTML = '';
     new QRCode(box, {
         text: @json($qrUrl),
-        width: 168,
-        height: 168,
+        width: 240,
+        height: 240,
         colorDark: '#1e293b',
         colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M,
+        correctLevel: QRCode.CorrectLevel.L,
     });
 })();
 </script>

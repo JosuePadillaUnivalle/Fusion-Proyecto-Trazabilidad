@@ -35,4 +35,22 @@ class PublicUrlHelperTest extends TestCase
         $this->assertStringContainsString($detectada, $url);
         $this->assertStringNotContainsString('127.0.0.1', $url);
     }
+
+    public function test_qr_en_railway_usa_dominio_publico_aunque_app_public_url_sea_lan(): void
+    {
+        putenv('RAILWAY_ENVIRONMENT=production');
+        config([
+            'app.public_url' => 'http://192.168.26.3:8001',
+            'app.url' => 'https://agronexus-api-production.up.railway.app',
+        ]);
+
+        $url = PublicUrlHelper::absoluteForQr('/recepcion/abc123');
+
+        $this->assertSame(
+            'https://agronexus-api-production.up.railway.app/recepcion/abc123',
+            $url
+        );
+
+        putenv('RAILWAY_ENVIRONMENT');
+    }
 }
