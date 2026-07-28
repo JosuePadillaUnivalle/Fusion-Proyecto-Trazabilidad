@@ -643,11 +643,21 @@ class FlujoCompletoTrazabilidadQrSeeder extends Seeder
     ): ?ProduccionAlmacenamiento {
         $destinoId = null;
         if (Schema::hasTable('destinoproduccion')) {
-            $destinoId = DB::table('destinoproduccion')
+            $destinoId = \App\Models\DestinoProduccion::query()
                 ->whereRaw('LOWER(nombre) LIKE ?', ['%almacen%'])
                 ->orWhereRaw('LOWER(nombre) LIKE ?', ['%planta%'])
                 ->value('destinoproduccionid')
-                ?? DB::table('destinoproduccion')->value('destinoproduccionid');
+                ?? \App\Models\DestinoProduccion::query()->value('destinoproduccionid');
+
+            if (! $destinoId) {
+                $destinoId = \App\Models\DestinoProduccion::firstOrCreate(
+                    ['nombre' => 'almacenamiento']
+                )->destinoproduccionid;
+            }
+        }
+
+        if (! $destinoId) {
+            throw new \RuntimeException('No hay destinoproduccionid disponible para la cosecha.');
         }
 
         $produccion = Produccion::updateOrCreate(

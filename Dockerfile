@@ -1,4 +1,4 @@
-FROM php:8.4-fpm
+FROM php:8.3-cli-bookworm
 
 RUN apt-get update && apt-get install -y \
     git \
@@ -12,18 +12,27 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-install -j"$(nproc)" pdo pdo_pgsql zip gd \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www
+WORKDIR /app
 
 COPY . .
 
-# Instalar dependencias en build time (filesystem del contenedor = rápido, sin bind mount)
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+RUN mkdir -p \
+      storage/framework/cache/data \
+      storage/framework/sessions \
+      storage/framework/views \
+      storage/logs \
+      bootstrap/cache \
+      storage/app/public \
+    && chmod -R 777 storage bootstrap/cache \
+    && chmod +x railway-start.sh
 
-# Copiar entrypoint
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+ENV COMPOSER_ALLOW_SUPERUSER=1
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts \
+    && php artisan package:discover --ansi || true
 
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+ENV PORT=8080
+EXPOSE 8080
+
+CMD ["bash", "railway-start.sh"]

@@ -1,9 +1,17 @@
-# Nixpacks detecta extensiones PHP desde composer.json (ext-gd, ext-pdo_pgsql, etc.).
+# Nixpacks / Railpack — AgroFusion
 # Ver: https://nixpacks.com/docs/providers/php
+
+[phases.setup]
+cmds = [
+  "mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache",
+]
 
 [phases.build]
 cmds = [
-  "composer install --no-dev --optimize-autoloader --no-interaction",
+  "mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache",
+  "chmod -R 775 storage bootstrap/cache || true",
+  "COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader --no-interaction --no-scripts",
+  "php artisan package:discover --ansi || true",
   "chmod +x railway-start.sh",
   "php -m | grep -i '^gd$' || echo 'AVISO BUILD: ext-gd no cargada; revise composer.json ext-gd'",
 ]

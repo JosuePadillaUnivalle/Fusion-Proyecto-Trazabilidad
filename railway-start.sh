@@ -10,26 +10,19 @@ if [ -z "${APP_KEY:-}" ] || [ "${APP_KEY}" = "base64:" ]; then
   php artisan key:generate --force --no-interaction
 fi
 
-# Volumen persistente de archivos (fotos, evidencias, firmas).
-# IMPORTANTE: sin este volumen, cada redeploy “borra” lo subido a storage.
+# Volumen persistente: en Railway se monta en /app/storage/app/public.
+# NO borrar esa ruta (falla con "Device or resource busy").
 vincular_storage_volumen() {
-  if [ -d /app/storage/app/public ] && [ -f /var/www/artisan ]; then
-    echo "==> Enlazando storage al volumen persistente de Railway"
-    mkdir -p /var/www/storage/app /var/www/public
-    rm -rf /var/www/storage/app/public
-    ln -sfn /app/storage/app/public /var/www/storage/app/public
-    rm -f /var/www/public/storage
-    ln -sfn /var/www/storage/app/public /var/www/public/storage
-    return 0
-  fi
+  local public_storage="storage/app/public"
 
-  if [ -d /app/storage/app/public ] && [ -f ./artisan ]; then
-    echo "==> Enlazando storage (cwd) al volumen persistente"
-    mkdir -p storage/app public
-    rm -rf storage/app/public
-    ln -sfn /app/storage/app/public storage/app/public
-    rm -f public/storage
-    ln -sfn /app/storage/app/public public/storage
+  if [ -d "$public_storage" ] && [ -f ./artisan ]; then
+    mkdir -p "$public_storage" public
+    if [ ! -e public/storage ]; then
+      ln -sfn "$(pwd)/$public_storage" public/storage 2>/dev/null \
+        || php artisan storage:link --force --no-interaction 2>/dev/null \
+        || true
+    fi
+    echo "==> Storage listo en $public_storage"
     return 0
   fi
 
@@ -46,16 +39,11 @@ fi
 
 php artisan config:clear --no-interaction || true
 
-# Solo migraciones (esquema). NUNCA migrate:fresh ni seed automático en cada reinicio.
-# Eso era lo que hacía parecer que “volvió un backup”: cada restart re-sembraba datos demo.
+# Solo migraciones. Nunca migrate:fresh ni seed en cada reinicio.
 php artisan migrate --force --no-interaction || echo "==> Migraciones: revise DATABASE_URL / Postgres."
 
-# Locks en el volumen para que un seed no se repita aunque dejen la variable en true.
-SEED_LOCK_DIR="/app/storage/app/public"
-if [ ! -d "$SEED_LOCK_DIR" ]; then
-  SEED_LOCK_DIR="storage/app/public"
-  mkdir -p "$SEED_LOCK_DIR" 2>/dev/null || true
-fi
+SEED_LOCK_DIR="storage/app/public"
+mkdir -p "$SEED_LOCK_DIR" 2>/dev/null || true
 
 run_seed_once() {
   local flag_name="$1"
@@ -73,24 +61,22 @@ run_seed_once() {
     return 0
   fi
 
-  echo "==> Ejecutando seed único ($flag_name)..."
+  echo "==> Ejecutando seed unico ($flag_name)..."
   if eval "$seed_cmd"; then
     date -u +"%Y-%m-%dT%H:%M:%SZ" > "$lock_file" 2>/dev/null || true
     echo "==> Seed OK. Lock creado: $lock_file"
     echo "==> RECOMENDADO: pon $flag_name=false en Variables de Railway."
   else
-    echo "==> Seed falló; no se creó lock (se reintentará si la flag sigue en true)."
+    echo "==> Seed fallo; no se creo lock."
   fi
 }
 
-# Flujo completo QR (campo → planta → mayorista → PDV). Preferido para demo.
 run_seed_once \
   "RUN_FLUJO_SEED" \
   "${RUN_FLUJO_SEED:-false}" \
   "$SEED_LOCK_DIR/.seed_flujo_completo.done" \
   "php artisan db:seed --class=FlujoCompletoTrazabilidadQrSeeder --force --no-interaction"
 
-# Seed base completo (solo si lo pides explícitamente y NO pediste el de flujo).
 if [ "${RUN_FLUJO_SEED:-false}" != "true" ]; then
   run_seed_once \
     "RUN_SEED" \
@@ -100,7 +86,7 @@ if [ "${RUN_FLUJO_SEED:-false}" != "true" ]; then
 fi
 
 if [ "${RUN_FLUJO_SEED:-false}" != "true" ] && [ "${RUN_SEED:-false}" != "true" ]; then
-  echo "==> Seeders omitidos (RUN_FLUJO_SEED/RUN_SEED != true). Tus datos de BD están seguros."
+  echo "==> Seeders omitidos. Datos de BD seguros."
 fi
 
 vincular_storage_volumen
