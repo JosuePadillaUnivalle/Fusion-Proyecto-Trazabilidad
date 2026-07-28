@@ -192,6 +192,26 @@ class FlujoCompletoTrazabilidadQrSeeder extends Seeder
 
     private function asegurarCatalogos(): void
     {
+        // Roles + usuarios demo (necesario en BD vacía de Railway)
+        if (class_exists(RoleSeeder::class)) {
+            $this->call(RoleSeeder::class);
+        }
+        if (class_exists(ConsolidacionRolesPermisosSeeder::class)) {
+            $this->call(ConsolidacionRolesPermisosSeeder::class);
+        }
+        if (class_exists(RolePermissionSeeder::class)) {
+            $this->call(RolePermissionSeeder::class);
+        }
+        if (class_exists(AdminUserSeeder::class)) {
+            $this->call(AdminUserSeeder::class);
+        }
+        if (class_exists(CreateOperationalRoleUsersSeeder::class)) {
+            $this->call(CreateOperationalRoleUsersSeeder::class);
+        }
+        if (class_exists(MayoristaDemoSeeder::class)) {
+            $this->call(MayoristaDemoSeeder::class);
+        }
+
         $this->call(CatalogosOperacionAgricolaSeeder::class);
         InsumoCatalogo::asegurarCatalogosBase();
         TipoInsumo::firstOrCreate(
