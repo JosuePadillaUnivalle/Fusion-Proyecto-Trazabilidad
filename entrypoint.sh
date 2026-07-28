@@ -22,8 +22,15 @@ chmod -R 777 storage bootstrap/cache || true
 echo "🗄️ Ejecutando migraciones..."
 php artisan migrate --force || true
 
-echo "🌱 Ejecutando Seeder..."
-php artisan db:seed --force || true
+if [ "${RUN_FLUJO_SEED:-false}" = "true" ]; then
+    echo "🌱 Ejecutando FlujoCompletoTrazabilidadQrSeeder..."
+    php artisan db:seed --class=FlujoCompletoTrazabilidadQrSeeder --force || true
+elif [ "${RUN_SEED:-false}" = "true" ]; then
+    echo "🌱 Ejecutando Seeder completo..."
+    php artisan db:seed --force || true
+else
+    echo "⏭️ Seeders omitidos (RUN_SEED/RUN_FLUJO_SEED != true)"
+fi
 
 echo "🚀 Iniciando PHP-FPM..."
 exec php-fpm
