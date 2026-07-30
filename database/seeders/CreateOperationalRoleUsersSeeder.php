@@ -40,6 +40,7 @@ class CreateOperationalRoleUsersSeeder extends Seeder
                 'nombreusuario' => 'planta',
                 'telefono' => '700000003',
                 'role' => 'planta',
+                'extra_roles' => ['jefe_planta'],
                 'password' => self::DEMO_PASSWORD,
             ],
             [
@@ -52,6 +53,24 @@ class CreateOperationalRoleUsersSeeder extends Seeder
                 'password' => self::DEMO_PASSWORD,
             ],
             [
+                'email' => 'almacen@agrofusion.com',
+                'nombre' => 'Jorge',
+                'apellido' => 'Almacenero',
+                'nombreusuario' => 'almacen',
+                'telefono' => '700000105',
+                'role' => 'almacen',
+                'password' => self::DEMO_PASSWORD,
+            ],
+            [
+                'email' => 'operador@agrofusion.com',
+                'nombre' => 'Operador',
+                'apellido' => 'Logístico',
+                'nombreusuario' => 'operador',
+                'telefono' => '700000102',
+                'role' => 'operador',
+                'password' => self::DEMO_PASSWORD,
+            ],
+            [
                 'email' => 'minorista@agrofusion.com',
                 'nombre' => 'María',
                 'apellido' => 'Minorista Demo',
@@ -60,11 +79,24 @@ class CreateOperationalRoleUsersSeeder extends Seeder
                 'role' => 'minorista',
                 'password' => 'Minorista2026',
             ],
+            [
+                'email' => 'Mayorista@gmail.com',
+                'nombre' => 'Carlos',
+                'apellido' => 'Mayorista',
+                'nombreusuario' => 'mayorista',
+                'telefono' => '700000300',
+                'role' => 'mayorista',
+                'extra_roles' => ['jefe_mayorista'],
+                'password' => 'password',
+            ],
         ];
 
         foreach ($users as $entry) {
             $roleName = $entry['role'];
-            Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+            $roles = array_values(array_unique(array_merge([$roleName], $entry['extra_roles'] ?? [])));
+            foreach ($roles as $rn) {
+                Role::firstOrCreate(['name' => $rn, 'guard_name' => 'web']);
+            }
 
             $usuario = Usuario::updateOrCreate(
                 ['email' => $entry['email']],
@@ -82,7 +114,7 @@ class CreateOperationalRoleUsersSeeder extends Seeder
                 ]
             );
 
-            $usuario->syncRoles([$roleName]);
+            $usuario->syncRoles($roles);
         }
     }
 }
