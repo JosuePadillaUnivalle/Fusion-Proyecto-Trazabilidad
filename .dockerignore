@@ -17,3 +17,13 @@ yarn-error.log
 .gitignore
 README.md
 tests
+# Local artifacts (keep deploy lean)
+*.pptx
+pitch_preview/
+scripts/ficha_assets/
+scripts/pitch_bgs/
+scripts/__pycache__/
+scripts/_*.py
+scripts/*.png
+Ficha_tecnica*
+AgroFusion_PITCH*

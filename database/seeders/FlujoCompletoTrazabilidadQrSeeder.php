@@ -60,27 +60,27 @@ use Illuminate\Support\Facades\Schema;
  */
 class FlujoCompletoTrazabilidadQrSeeder extends Seeder
 {
-    private const MARK = '[FLUJO-COMPLETO-QR]';
+    private const MARK = '[AGROFUSION-TRAZ]';
 
-    private const LOTE_CODIGO = 'TRAZ-FLUJO-2026-001';
+    private const LOTE_CODIGO = 'TRAZ-ZAN-TIQ-2026-001';
 
-    private const LOTE_NOMBRE = 'Lote Zanahoria Flujo Completo';
+    private const LOTE_NOMBRE = 'Lote Zanahoria Valle Tiquipaya';
 
     private const PRODUCTO = 'Zanahoria Imperator envasada';
 
     private const PRODUCTO_PDV = 'Zanahoria Imperator envasada · Bolsa 1 kg';
 
-    private const LOTE_PLANTA_CODIGO = 'LPP-FLUJO-2026-001';
+    private const LOTE_PLANTA_CODIGO = 'LPP-ZAN-2026-001';
 
-    private const PEDIDO_AGRICOLA = 'PED-FLUJO-2026-001';
+    private const PEDIDO_AGRICOLA = 'PED-ZAN-2026-001';
 
-    private const ENVIO_AGRICOLA = 'ENV-FLUJO-2026-001';
+    private const ENVIO_AGRICOLA = 'ENV-ZAN-2026-001';
 
-    private const RUTA_MAYORISTA = 'RUT-PM-FLUJO-001';
+    private const RUTA_MAYORISTA = 'RUT-PM-ZAN-001';
 
-    private const PEDIDO_PDV = 'PDV-FLUJO-2026-001';
+    private const PEDIDO_PDV = 'PDV-ZAN-2026-001';
 
-    private const QR_CODIGO = 'TRZ-PDV-FLUJO-202601';
+    private const QR_CODIGO = 'TRZ-PDV-ZANAHORIA-202601';
 
     private const COSECHA_KG = 500.0;
 
@@ -178,7 +178,7 @@ class FlujoCompletoTrazabilidadQrSeeder extends Seeder
 
             $this->command?->newLine();
             $this->command?->info('══════════════════════════════════════════════════════');
-            $this->command?->info('  FLUJO COMPLETO LISTO — AgroFusion');
+            $this->command?->info('  Trazabilidad zanahoria lista — AgroFusion');
             $this->command?->info('══════════════════════════════════════════════════════');
             $this->command?->info('  Lote agrícola:  '.self::LOTE_NOMBRE.' ('.self::LOTE_CODIGO.')');
             $this->command?->info('  Lote planta:    '.self::LOTE_PLANTA_CODIGO);
@@ -236,8 +236,14 @@ class FlujoCompletoTrazabilidadQrSeeder extends Seeder
     private function limpiarDemoAnterior(): void
     {
         $loteIds = Lote::query()
-            ->where('codigo_trazabilidad', self::LOTE_CODIGO)
-            ->orWhere('nombre', self::LOTE_NOMBRE)
+            ->whereIn('codigo_trazabilidad', [
+                self::LOTE_CODIGO,
+                'TRAZ-FLUJO-2026-001',
+            ])
+            ->orWhereIn('nombre', [
+                self::LOTE_NOMBRE,
+                'Lote Zanahoria Flujo Completo',
+            ])
             ->pluck('loteid');
 
         if ($loteIds->isNotEmpty()) {
@@ -254,7 +260,9 @@ class FlujoCompletoTrazabilidadQrSeeder extends Seeder
             RegistroProcesoMaquinaPlanta::query()->whereIn('loteid', $loteIds)->delete();
         }
 
-        $pedidoAgr = Pedido::query()->where('numero_solicitud', self::PEDIDO_AGRICOLA)->first();
+        $pedidoAgr = Pedido::query()
+            ->whereIn('numero_solicitud', [self::PEDIDO_AGRICOLA, 'PED-FLUJO-2026-001'])
+            ->first();
         if ($pedidoAgr) {
             EnvioAsignacionMultiple::query()->where('pedidoid', $pedidoAgr->pedidoid)->delete();
             DetallePedido::query()->where('pedidoid', $pedidoAgr->pedidoid)->delete();
@@ -262,7 +270,7 @@ class FlujoCompletoTrazabilidadQrSeeder extends Seeder
         }
 
         $lotePlanta = LoteProduccionPedido::query()
-            ->where('codigo_lote', self::LOTE_PLANTA_CODIGO)
+            ->whereIn('codigo_lote', [self::LOTE_PLANTA_CODIGO, 'LPP-FLUJO-2026-001'])
             ->first();
         if ($lotePlanta) {
             EvaluacionFinalLoteProduccion::query()
@@ -277,7 +285,9 @@ class FlujoCompletoTrazabilidadQrSeeder extends Seeder
             $lotePlanta->delete();
         }
 
-        $ruta = RutaDistribucion::query()->where('codigo', self::RUTA_MAYORISTA)->first();
+        $ruta = RutaDistribucion::query()
+            ->whereIn('codigo', [self::RUTA_MAYORISTA, 'RUT-PM-FLUJO-001'])
+            ->first();
         if ($ruta) {
             DetalleTrasladoPlantaMayorista::query()
                 ->where('rutadistribucionid', $ruta->rutadistribucionid)
@@ -286,8 +296,9 @@ class FlujoCompletoTrazabilidadQrSeeder extends Seeder
         }
 
         $pedidoPdv = PedidoDistribucion::query()
-            ->where('numero_solicitud', self::PEDIDO_PDV)
+            ->whereIn('numero_solicitud', [self::PEDIDO_PDV, 'PDV-FLUJO-2026-001'])
             ->orWhere('observaciones', 'like', '%'.self::MARK.'%')
+            ->orWhere('observaciones', 'like', '%[FLUJO-COMPLETO-QR]%')
             ->get();
         foreach ($pedidoPdv as $p) {
             DetallePedidoDistribucion::query()
@@ -298,14 +309,20 @@ class FlujoCompletoTrazabilidadQrSeeder extends Seeder
         }
 
         Insumo::query()
-            ->where('codigo_trazabilidad', self::QR_CODIGO)
+            ->whereIn('codigo_trazabilidad', [self::QR_CODIGO, 'TRZ-PDV-FLUJO-202601'])
             ->orWhere('descripcion', 'like', '%'.self::MARK.'%')
+            ->orWhere('descripcion', 'like', '%[FLUJO-COMPLETO-QR]%')
             ->delete();
 
         AlmacenMovimiento::query()
             ->where('observaciones', 'like', '%'.self::MARK.'%')
-            ->orWhere('referencia', self::ENVIO_AGRICOLA)
-            ->orWhere('referencia', self::RUTA_MAYORISTA)
+            ->orWhere('observaciones', 'like', '%[FLUJO-COMPLETO-QR]%')
+            ->orWhereIn('referencia', [
+                self::ENVIO_AGRICOLA,
+                self::RUTA_MAYORISTA,
+                'ENV-FLUJO-2026-001',
+                'RUT-PM-FLUJO-001',
+            ])
             ->delete();
 
         if ($loteIds->isNotEmpty()) {
@@ -430,7 +447,7 @@ class FlujoCompletoTrazabilidadQrSeeder extends Seeder
             'estadolotetipoid' => $estadoFinal,
             'superficie' => 2.8,
             'unidadsuperficieid' => $haId,
-            'ubicacion' => 'Valle de Tiquipaya, Cochabamba — Parcela Flujo',
+            'ubicacion' => 'Valle de Tiquipaya, Cochabamba',
             'latitud' => -17.3380,
             'longitud' => -66.2150,
         ], false);

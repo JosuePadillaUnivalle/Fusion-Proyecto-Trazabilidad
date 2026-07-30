@@ -680,6 +680,13 @@ class InsumoCatalogo
                 if (InsumoImagenCatalogo::esImagenPersonalizada($actual)) {
                     continue;
                 }
+                // No pisar URLs https ya válidas (salvo placeholders / Wikimedia incorrectas)
+                if ($actual !== ''
+                    && (str_starts_with($actual, 'http://') || str_starts_with($actual, 'https://'))
+                    && ! InsumoImagenCatalogo::esUrlPlaceholder($actual)
+                    && ! InsumoImagenCatalogo::esUrlWikimediaProblematica($actual)) {
+                    continue;
+                }
                 $canonica = InsumoImagenCatalogo::urlPorNombreYTipo((string) $insumo->nombre, $slug);
                 if ($actual !== $canonica || InsumoImagenCatalogo::esUrlPlaceholder($actual)) {
                     $insumo->imagenurl = $canonica;
