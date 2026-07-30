@@ -27,3 +27,17 @@ scripts/_*.py
 scripts/*.png
 Ficha_tecnica*
 AgroFusion_PITCH*
+
+# Heavy / unused in Docker image
+agrofusion-mobile/
+docs/
+scripts/
+pitch_preview/
+storage/app/public/
+storage/logs/
+storage/framework/
+*.md
+MEMORY.md
+ORGTRACK-PLAN.md
+check_classes.php
+agronexus/
