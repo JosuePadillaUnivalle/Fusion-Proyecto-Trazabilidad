@@ -1,0 +1,16 @@
+.git
+vendor
+node_modules
+agrofusion-mobile
+docs
+scripts
+pitch_preview
+storage/logs
+storage/framework
+storage/app/public
+*.pptx
+*.md
+.env
+.env.*
+agronexus
+tests
