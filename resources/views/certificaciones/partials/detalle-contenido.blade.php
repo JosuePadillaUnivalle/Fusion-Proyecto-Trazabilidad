@@ -160,6 +160,64 @@
         @endif
     </div>
 
+    @if($cert->esCertificado() && filled($cert->blockchain_estado))
+        <div class="cert-det-v2__section" style="border-color:#c5d5c8;background:#f7faf8;">
+            <div class="cert-det-v2__section-title">
+                <i class="fas fa-link" style="color:#2c5530"></i> Ancla blockchain
+            </div>
+            <div class="cert-det-v2__grid">
+                <div>
+                    <span class="cert-det-v2__field-label">Estado</span>
+                    <span class="cert-det-v2__field-value">
+                        @php
+                            $bcEstado = $cert->blockchain_estado;
+                            $bcLabel = match ($bcEstado) {
+                                'confirmado' => 'Confirmado en cadena',
+                                'pendiente' => 'Pendiente de envío',
+                                'error' => 'Error al anclar',
+                                'omitido' => 'Omitido',
+                                default => $bcEstado,
+                            };
+                        @endphp
+                        @if($bcEstado === 'confirmado')
+                            <span class="badge badge-success">{{ $bcLabel }}</span>
+                        @elseif($bcEstado === 'error')
+                            <span class="badge badge-danger">{{ $bcLabel }}</span>
+                        @elseif($bcEstado === 'pendiente')
+                            <span class="badge badge-secondary">{{ $bcLabel }}</span>
+                        @else
+                            <span class="badge badge-light border">{{ $bcLabel }}</span>
+                        @endif
+                    </span>
+                </div>
+                <div>
+                    <span class="cert-det-v2__field-label">Dato ID</span>
+                    <span class="cert-det-v2__field-value" style="font-family:ui-monospace,monospace;font-size:.85rem;">
+                        {{ $cert->blockchain_dato_id ?: '—' }}
+                    </span>
+                </div>
+                <div class="cert-det-v2__field--wide">
+                    <span class="cert-det-v2__field-label">Tx ID</span>
+                    <span class="cert-det-v2__field-value" style="font-family:ui-monospace,monospace;font-size:.78rem;word-break:break-all;">
+                        {{ $cert->blockchain_txid ?: '—' }}
+                    </span>
+                </div>
+                @if($cert->blockchain_enviado_en)
+                    <div>
+                        <span class="cert-det-v2__field-label">Enviado</span>
+                        <span class="cert-det-v2__field-value">{{ $cert->blockchain_enviado_en->format('d/m/Y H:i') }}</span>
+                    </div>
+                @endif
+                @if($cert->blockchain_estado === 'error' && $cert->blockchain_error)
+                    <div class="cert-det-v2__field--wide">
+                        <span class="cert-det-v2__field-label">Detalle</span>
+                        <span class="cert-det-v2__field-value cert-det-v2__field-value--muted">{{ $cert->blockchain_error }}</span>
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
+
     @if($lote)
         <div class="cert-det-v2__section">
             <div class="cert-det-v2__section-title">

@@ -30,7 +30,7 @@ RUN mkdir -p \
 
 ENV COMPOSER_ALLOW_SUPERUSER=1
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts \
-    && php artisan package:discover --ansi || true
+    && php artisan package:discover --ansi
 
 ENV PORT=8080
 EXPOSE 8080

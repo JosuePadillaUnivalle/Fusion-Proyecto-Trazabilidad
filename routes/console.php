@@ -13,3 +13,6 @@ Schedule::command('clima:guardar')->dailyAt('08:00')->timezone('America/La_Paz')
 
 // Sincronizar envíos pendientes cada 5 minutos
 Schedule::command('envios:sincronizar')->everyFiveMinutes();
+
+// Reintentar anclas blockchain de certificaciones de campo
+Schedule::command('blockchain:sincronizar-certificaciones')->everyFiveMinutes();

@@ -204,6 +204,32 @@
                         Motivo: {{ $certificacion_campo->observaciones }}
                     @endif
                 </div>
+            @elseif(($certificacion_campo ?? null) && ($certificacion_campo->esCertificado() ?? false))
+                <div class="border rounded p-3 mb-3" id="panel-certificacion-campo" style="background:#f7faf8;border-color:#c5d5c8!important;">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between">
+                        <div>
+                            <strong style="color:#2c5530;"><i class="fas fa-certificate mr-1"></i>Certificado</strong>
+                            <span class="text-muted small ml-2">{{ $certificacion_campo->codigo_certificado }}</span>
+                        </div>
+                        @if($certificacion_campo->blockchainConfirmada())
+                            <span class="badge badge-success">Blockchain OK</span>
+                        @elseif(($certificacion_campo->blockchain_estado ?? null) === 'pendiente')
+                            <span class="badge badge-secondary">Blockchain pendiente</span>
+                        @elseif(($certificacion_campo->blockchain_estado ?? null) === 'error')
+                            <span class="badge badge-danger">Blockchain error</span>
+                        @endif
+                    </div>
+                    @if(filled($certificacion_campo->blockchain_txid))
+                        <div class="small text-muted mt-2" style="font-family:ui-monospace,monospace;word-break:break-all;">
+                            Tx: {{ $certificacion_campo->blockchain_txid }}
+                        </div>
+                    @endif
+                    @can('certificaciones.view')
+                        <a href="{{ route('certificaciones.show', $certificacion_campo) }}" class="small d-inline-block mt-2" style="color:#2c5530;">
+                            Ver detalle de certificación
+                        </a>
+                    @endcan
+                </div>
             @endif
 
             @php

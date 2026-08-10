@@ -54,4 +54,12 @@ return [
         'units' => env('WEATHER_UNITS', 'metric'),
     ],
 
+    // Alias opcional; la fuente canónica es config/blockchain.php
+    'blockchain' => [
+        'enabled' => env('BLOCKCHAIN_ENABLED', false),
+        'url' => env('BLOCKCHAIN_API_URL', 'http://127.0.0.1:3000'),
+        'api_key' => env('BLOCKCHAIN_API_KEY'),
+        'timeout' => env('BLOCKCHAIN_TIMEOUT', 20),
+    ],
+
 ];

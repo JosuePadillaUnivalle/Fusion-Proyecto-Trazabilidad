@@ -78,6 +78,9 @@ class CertificacionController extends Controller
             'usuarioid' => auth()->id(),
         ]);
 
-        return response()->json($cert->load(['lote', 'usuario']), 201);
+        app(\App\Services\Blockchain\CertificacionBlockchainService::class)
+            ->encolarSiCorresponde($cert->fresh());
+
+        return response()->json($cert->fresh()->load(['lote', 'usuario']), 201);
     }
 }

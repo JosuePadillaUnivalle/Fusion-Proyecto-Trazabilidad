@@ -29,6 +29,12 @@ class CertificacionLote extends Model
         'observaciones',
         'fecha_certificacion',
         'recomendaciones',
+        'blockchain_estado',
+        'blockchain_dato_id',
+        'blockchain_txid',
+        'blockchain_error',
+        'blockchain_enviado_en',
+        'blockchain_intentos',
     ];
 
     protected $casts = [
@@ -36,7 +42,14 @@ class CertificacionLote extends Model
         'loteid' => 'integer',
         'usuarioid' => 'integer',
         'fecha_certificacion' => 'datetime',
+        'blockchain_enviado_en' => 'datetime',
+        'blockchain_intentos' => 'integer',
     ];
+
+    public function blockchainConfirmada(): bool
+    {
+        return $this->blockchain_estado === 'confirmado' && filled($this->blockchain_txid);
+    }
 
     public function lote(): BelongsTo
     {

@@ -181,5 +181,8 @@ class CertificacionController extends Controller
             'observaciones'    => $histObs,
             'usuarioid'        => auth()->id(),
         ]);
+
+        app(\App\Services\Blockchain\CertificacionBlockchainService::class)
+            ->encolarSiCorresponde($certificacion->fresh());
     }
 }
