@@ -63,8 +63,9 @@
     </div>
 
     <button type="submit" class="btn-login" id="btnLoginAgrofusion">
-        <i class="fas fa-sign-in-alt"></i>
-        Iniciar Sesión
+        Iniciar sesión
+        <span class="btn-login-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+        <i class="fas fa-arrow-right btn-login-arrow"></i>
     </button>
 
     <div class="form-footer">

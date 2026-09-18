@@ -275,7 +275,6 @@
     </div>
 
     <button type="submit" class="btn-login" style="margin-top: 10px;">
-        <i class="fas fa-paper-plane"></i>
         Enviar solicitud
     </button>
 
