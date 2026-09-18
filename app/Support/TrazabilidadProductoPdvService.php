@@ -602,7 +602,7 @@ class TrazabilidadProductoPdvService
             return collect();
         }
 
-        $envio->loadMissing(['transportista', 'pedido.detalles', 'almacen', 'recepcionConfirmadaPor']);
+        $envio->loadMissing(['transportista', 'pedido.detalles', 'almacen', 'recepcionConfirmadaPor', 'ruta.paradas']);
         $pedido = $envio->pedido;
         $detalle = $this->resolverDetallePedidoEnvio($envio, $loteAgricola);
         $trayecto = $pedido ? EnvioPedidoService::trayectoPartesPedido($pedido) : null;
@@ -613,6 +613,7 @@ class TrazabilidadProductoPdvService
         $codigo = $envio->externo_envio_id ?? $pedido?->numero_solicitud ?? '—';
         $cantidad = $detalle ? number_format((float) $detalle->cantidad, 2).' kg' : null;
         $producto = $detalle?->cultivo_personalizado ?? $insumoPdv->nombre;
+        $mapaRuta = $this->normalizarPuntosMapa(EnvioPedidoService::paradasMapaEnvio($envio));
 
         $eventos = collect();
 
@@ -645,7 +646,10 @@ class TrazabilidadProductoPdvService
                 $origen,
                 $codigo,
                 null,
-                'envio_agricola_planta'
+                'envio_agricola_planta',
+                null,
+                null,
+                $mapaRuta
             ));
         }
 
@@ -677,7 +681,10 @@ class TrazabilidadProductoPdvService
                 $origen.' → '.$destino,
                 $codigo,
                 null,
-                'envio_agricola_planta'
+                'envio_agricola_planta',
+                null,
+                null,
+                $mapaRuta
             ));
         }
 
@@ -700,7 +707,10 @@ class TrazabilidadProductoPdvService
                 $destino,
                 $codigo,
                 null,
-                'envio_agricola_planta'
+                'envio_agricola_planta',
+                null,
+                null,
+                $mapaRuta
             ));
         }
 
@@ -729,7 +739,10 @@ class TrazabilidadProductoPdvService
                 $destino,
                 $codigo,
                 null,
-                'envio_agricola_planta'
+                'envio_agricola_planta',
+                null,
+                null,
+                $mapaRuta
             ));
         }
 
@@ -753,6 +766,7 @@ class TrazabilidadProductoPdvService
                 'almacenPlantaOrigen',
                 'almacenMayoristaDestino',
                 'detallesTraslado',
+                'paradas',
             ])
             ->whereNotNull('almacen_planta_origenid')
             ->where(function ($q) use ($nombreNorm, $pedido) {
@@ -785,6 +799,7 @@ class TrazabilidadProductoPdvService
             $cantidad = $detalle
                 ? number_format((float) $detalle->cantidad, 2).' kg'
                 : null;
+            $mapaRuta = $this->normalizarPuntosMapa($this->rutaService->paradasMapa($ruta));
 
             if ($ruta->fecha_salida || $ruta->simulacion_inicio_at) {
                 $lineas = [
@@ -813,7 +828,10 @@ class TrazabilidadProductoPdvService
                     $origen,
                     $codigo,
                     null,
-                    'envio_planta_mayorista'
+                    'envio_planta_mayorista',
+                    null,
+                    null,
+                    $mapaRuta
                 ));
             }
 
@@ -831,7 +849,10 @@ class TrazabilidadProductoPdvService
                     $origen.' → '.$destino,
                     $codigo,
                     null,
-                    'envio_planta_mayorista'
+                    'envio_planta_mayorista',
+                    null,
+                    null,
+                    $mapaRuta
                 ));
             }
 
@@ -849,7 +870,10 @@ class TrazabilidadProductoPdvService
                     $destino,
                     $codigo,
                     null,
-                    'envio_planta_mayorista'
+                    'envio_planta_mayorista',
+                    null,
+                    null,
+                    $mapaRuta
                 ));
             }
 
@@ -867,7 +891,10 @@ class TrazabilidadProductoPdvService
                     $destino,
                     $codigo,
                     null,
-                    'envio_planta_mayorista'
+                    'envio_planta_mayorista',
+                    null,
+                    null,
+                    $mapaRuta
                 ));
             }
         }
@@ -1839,6 +1866,10 @@ class TrazabilidadProductoPdvService
         }
 
         $ruta = $pedido->rutaDistribucion;
+        $mapaRuta = $ruta
+            ? $this->normalizarPuntosMapa($this->rutaService->paradasMapa($ruta))
+            : null;
+
         if ($ruta) {
             $trayecto = $this->rutaService->trayectoTexto($ruta);
             $transportista = $this->nombreUsuario($ruta->transportista);
@@ -1865,7 +1896,13 @@ class TrazabilidadProductoPdvService
                 implode("\n", $lineasRuta),
                 'route',
                 'primary',
-                $ruta->almacenOrigen?->nombre ?? $pedido->almacenPlantaOrigen?->nombre
+                $ruta->almacenOrigen?->nombre ?? $pedido->almacenPlantaOrigen?->nombre,
+                $ruta->codigo,
+                null,
+                'envio_mayorista_pdv',
+                null,
+                null,
+                $mapaRuta
             ));
         }
 
@@ -1900,7 +1937,13 @@ class TrazabilidadProductoPdvService
                 'primary',
                 $pedido->almacenMayoristaOrigen?->nombre
                     ?? $ruta?->almacenOrigen?->nombre
-                    ?? $pedido->almacenPlantaOrigen?->nombre
+                    ?? $pedido->almacenPlantaOrigen?->nombre,
+                $ruta?->codigo ?? $pedido->numero_solicitud,
+                null,
+                'envio_mayorista_pdv',
+                null,
+                null,
+                $mapaRuta
             ));
         }
 
@@ -2030,6 +2073,32 @@ class TrazabilidadProductoPdvService
     }
 
     /**
+     * @param  array<int, array{lat?: float|int|string, lng?: float|int|string, orden?: int|string, label?: string}>  $puntos
+     * @return array<int, array{lat: float, lng: float, orden: int, label: string}>|null
+     */
+    private function normalizarPuntosMapa(array $puntos): ?array
+    {
+        $out = [];
+        foreach ($puntos as $i => $punto) {
+            $lat = isset($punto['lat']) ? (float) $punto['lat'] : 0.0;
+            $lng = isset($punto['lng']) ? (float) $punto['lng'] : 0.0;
+            if ($lat == 0.0 && $lng == 0.0) {
+                continue;
+            }
+
+            $out[] = [
+                'lat' => $lat,
+                'lng' => $lng,
+                'orden' => (int) ($punto['orden'] ?? ($i + 1)),
+                'label' => (string) ($punto['label'] ?? ('Parada '.($i + 1))),
+            ];
+        }
+
+        return count($out) >= 2 ? array_values($out) : null;
+    }
+
+    /**
+     * @param  array<int, array{lat: float, lng: float, orden: int, label: string}>|null  $mapaRuta
      * @return array<string, mixed>
      */
     private function normalizarEvento(
@@ -2046,6 +2115,7 @@ class TrazabilidadProductoPdvService
         string $tipoEvento = '',
         ?string $evidenciaTipo = null,
         ?string $evidenciaFotoUrl = null,
+        ?array $mapaRuta = null,
     ): array {
         $evento = [
             'fecha' => $fecha,
@@ -2071,6 +2141,9 @@ class TrazabilidadProductoPdvService
         }
         if (filled($evidenciaFotoUrl)) {
             $evento['evidencia_foto_url'] = $evidenciaFotoUrl;
+        }
+        if ($mapaRuta !== null && count($mapaRuta) >= 2) {
+            $evento['mapa_ruta'] = $mapaRuta;
         }
 
         return $evento;

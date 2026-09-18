@@ -264,6 +264,63 @@
     position: absolute; top: 14px; right: 14px; border: 0; background: rgba(255,255,255,.15);
     color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 1.2rem; cursor: pointer;
 }
+
+.trz-mapa-btn {
+    display: inline-flex; align-items: center; gap: .45rem;
+    margin-top: .85rem; padding: .55rem .95rem;
+    border: 1.5px solid #4a7c59; border-radius: 8px;
+    background: #f8faf8; color: #2c5530;
+    font-size: .8rem; font-weight: 700; cursor: pointer;
+    transition: background .15s, box-shadow .15s;
+}
+.trz-mapa-btn:hover {
+    background: #eef5f0;
+    box-shadow: 0 2px 6px rgba(44, 85, 48, .12);
+}
+.trz-mapa-btn i { color: #4a7c59; }
+
+.trz-mapa-modal {
+    position: fixed; inset: 0; z-index: 10000;
+    display: none; align-items: center; justify-content: center;
+    padding: 1rem; background: rgba(15, 23, 42, .55);
+}
+.trz-mapa-modal.is-open { display: flex; }
+.trz-mapa-panel {
+    width: min(720px, 100%);
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 12px 36px rgba(15, 23, 42, .2);
+}
+.trz-mapa-panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: .75rem; padding: .85rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8f9fa;
+}
+.trz-mapa-panel-head h2 {
+    margin: 0; font-size: .95rem; font-weight: 700; color: #2c5530;
+    display: flex; align-items: center; gap: .5rem;
+}
+.trz-mapa-panel-close {
+    border: 1px solid #dee2e6; background: #fff; color: #64748b;
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 1.1rem;
+}
+.trz-mapa-panel-body { padding: .65rem; }
+#trzMapaRuta {
+    height: min(420px, 62vh); width: 100%;
+    border-radius: 8px; border: 1px solid #dee2e6;
+    background: #e8eef4; z-index: 1;
+}
+#trzMapaRuta.leaflet-container { font-family: inherit; }
+.leaflet-div-icon.ruta-parada-marker {
+    width: auto !important; height: auto !important; margin: 0 !important;
+    padding: 0 !important; background: transparent !important; border: none !important;
+}
+.trz-mapa-hint {
+    margin: .55rem .15rem 0; font-size: .72rem; color: #64748b;
+}
 </style>
 @endpush
 
@@ -460,6 +517,15 @@
                                     <span>{{ $evento['fecha_fmt'] }}</span>
                                 </span>
                             </div>
+                            @if(!empty($evento['mapa_ruta']) && count($evento['mapa_ruta']) >= 2)
+                            <button type="button"
+                                    class="trz-mapa-btn"
+                                    data-trz-mapa='@json($evento['mapa_ruta'])'
+                                    data-trz-mapa-titulo="{{ $evento['titulo'] }}">
+                                <i class="fas fa-map-marked-alt"></i>
+                                Ver ruta en mapa
+                            </button>
+                            @endif
                         </div>
                     </article>
                     @endforeach
@@ -476,6 +542,19 @@
         <div class="trz-lightbox-inner">
             <img src="" alt="" id="trzLightboxImg">
             <div class="trz-lightbox-title" id="trzLightboxTitle"></div>
+        </div>
+    </div>
+
+    <div class="trz-mapa-modal" id="trzMapaModal" aria-hidden="true" role="dialog" aria-labelledby="trzMapaTitulo">
+        <div class="trz-mapa-panel">
+            <div class="trz-mapa-panel-head">
+                <h2 id="trzMapaTitulo"><i class="fas fa-route"></i> <span>Ruta del envío</span></h2>
+                <button type="button" class="trz-mapa-panel-close" id="trzMapaClose" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="trz-mapa-panel-body">
+                <div id="trzMapaRuta"></div>
+                <p class="trz-mapa-hint" id="trzMapaHint">Ruta trazada por calles · OpenStreetMap</p>
+            </div>
         </div>
     </div>
 
@@ -631,8 +710,130 @@
         });
     }
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') cerrarLightbox();
+        if (e.key === 'Escape') {
+            cerrarLightbox();
+            cerrarMapa();
+        }
     });
+
+    /* —— Mapa interactivo por envío —— */
+    var mapaModal = document.getElementById('trzMapaModal');
+    var mapaClose = document.getElementById('trzMapaClose');
+    var mapaTituloSpan = document.querySelector('#trzMapaTitulo span');
+    var mapaHint = document.getElementById('trzMapaHint');
+    var mapaLeaflet = null;
+    var mapaCapas = null;
+    var mapaLibsPromise = null;
+
+    function cargarMapaLibs() {
+        if (window.L && window.RutaPorCalles) {
+            return Promise.resolve();
+        }
+        if (mapaLibsPromise) return mapaLibsPromise;
+
+        mapaLibsPromise = new Promise(function (resolve, reject) {
+            function loadScript(src) {
+                return new Promise(function (res, rej) {
+                    var s = document.createElement('script');
+                    s.src = src;
+                    s.onload = res;
+                    s.onerror = rej;
+                    document.head.appendChild(s);
+                });
+            }
+            function loadCss(href) {
+                if (document.querySelector('link[href="' + href + '"]')) return;
+                var l = document.createElement('link');
+                l.rel = 'stylesheet';
+                l.href = href;
+                document.head.appendChild(l);
+            }
+
+            loadCss('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+            loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js')
+                .then(function () {
+                    return loadScript(@json(asset('js/ruta-por-calles.js')));
+                })
+                .then(resolve)
+                .catch(reject);
+        });
+
+        return mapaLibsPromise;
+    }
+
+    async function dibujarMapa(paradas) {
+        await cargarMapaLibs();
+        var el = document.getElementById('trzMapaRuta');
+        if (!el || !window.L || !paradas.length) return;
+
+        if (!mapaLeaflet) {
+            mapaLeaflet = L.map(el, { scrollWheelZoom: true }).setView([paradas[0].lat, paradas[0].lng], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap',
+            }).addTo(mapaLeaflet);
+            mapaCapas = L.layerGroup().addTo(mapaLeaflet);
+        }
+
+        mapaLeaflet.invalidateSize({ animate: false, pan: false });
+
+        var routeResult = null;
+        if (paradas.length >= 2 && window.RutaPorCalles) {
+            routeResult = await RutaPorCalles.fetchRoute(paradas);
+        }
+
+        if (window.RutaPorCalles) {
+            RutaPorCalles.drawOnMap(mapaLeaflet, mapaCapas, paradas, routeResult);
+        }
+
+        if (mapaHint) {
+            mapaHint.textContent = routeResult && !routeResult.straight
+                ? 'Ruta trazada por calles · OpenStreetMap / OSRM'
+                : 'Trayecto aproximado (línea recta) · OpenStreetMap';
+        }
+
+        [50, 150, 350, 700].forEach(function (ms) {
+            setTimeout(function () {
+                if (mapaLeaflet) mapaLeaflet.invalidateSize({ animate: false, pan: false });
+            }, ms);
+        });
+    }
+
+    function abrirMapa(paradas, titulo) {
+        if (!mapaModal || !paradas || paradas.length < 2) return;
+        if (mapaTituloSpan) mapaTituloSpan.textContent = titulo || 'Ruta del envío';
+        mapaModal.classList.add('is-open');
+        mapaModal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                dibujarMapa(paradas);
+            });
+        });
+    }
+
+    function cerrarMapa() {
+        if (!mapaModal) return;
+        mapaModal.classList.remove('is-open');
+        mapaModal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('.trz-mapa-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var raw = btn.getAttribute('data-trz-mapa') || '[]';
+            var paradas = [];
+            try { paradas = JSON.parse(raw); } catch (e) { paradas = []; }
+            abrirMapa(paradas, btn.getAttribute('data-trz-mapa-titulo'));
+        });
+    });
+
+    if (mapaClose) mapaClose.addEventListener('click', cerrarMapa);
+    if (mapaModal) {
+        mapaModal.addEventListener('click', function (e) {
+            if (e.target === mapaModal) cerrarMapa();
+        });
+    }
 })();
 </script>
 @endpush
