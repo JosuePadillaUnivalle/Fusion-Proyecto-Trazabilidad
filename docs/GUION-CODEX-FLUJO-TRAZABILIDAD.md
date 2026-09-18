@@ -1,19 +1,38 @@
-# Prompt Codex — insertar datos inventados (flujo completo QR)
+# Prompt Codex — insertar datos inventados EN RAILWAY
 
-Copia **solo el bloque** entre las líneas `<<<PROMPT` y `PROMPT>>>` y pégalo en Codex.
+Copia **solo el bloque** entre `<<<PROMPT` y `PROMPT>>>` y pégalo en Codex.
 
 <<<PROMPT
-Trabaja en el repo AgroFusion (Laravel + PostgreSQL). Tu objetivo es INSERTAR datos inventados de un producto nuevo de punta a punta, para que exista un QR público de trazabilidad completa con mapas de ruta en cada envío.
+NO trabajes en el repo local. Tu entorno de verdad es la app YA DESPLEGADA en Railway.
 
-## Qué debes hacer
-1. NO inventes pantallas nuevas. Usa el código y modelos existentes.
-2. Prefiere crear/adaptar un seeder idempotente (basado en `database/seeders/FlujoCompletoTrazabilidadQrSeeder.php`) O insertar vía `php artisan tinker` / servicios existentes.
-3. Al terminar, imprime:
-   - el `codigo_trazabilidad` del insumo PDV
-   - la URL pública `/trazabilidad/{codigo}`
-   - confirmación de que hay eventos de envío con coordenadas (`mapa_ruta` / paradas con lat-lng)
+## URL base (obligatoria)
+https://agrofusion-production-ef8c.up.railway.app
 
-## Datos inventados OBLIGATORIOS (usa exactamente estos nombres)
+Si necesitas CLI de Railway:
+- Proyecto: AgroFusion
+- Service: agrofusion
+- Cuenta: zetacoreofficial / Zplir1501
+- Comando típico para seed/artisan en el contenedor:
+  railway run --service agrofusion php artisan …
+  o railway ssh / railway shell según lo disponible.
+
+## Objetivo
+INSERTAR datos inventados de un producto nuevo de punta a punta DENTRO de Railway, para que el QR público quede usable con mapa de ruta en cada envío.
+
+Al final debes darme:
+1. el codigo_trazabilidad del producto en PDV
+2. la URL completa del QR (https://agrofusion-production-ef8c.up.railway.app/trazabilidad/{codigo})
+3. confirmación de que en la timeline hay envíos con “Ver ruta en mapa”
+
+## Cómo insertar (elige la vía que funcione en Railway)
+Opción A (preferida si hay CLI): crear/ejecutar un seeder idempotente vía
+`railway run --service agrofusion php artisan db:seed --class=...`
+Opción B: cargar el flujo usando la UI de la app en la URL de Railway (login con cuentas demo).
+Opción C: `php artisan tinker` dentro del servicio Railway.
+
+NO digas “listo en local”. Todo debe quedar persistido en la Postgres de Railway.
+
+## Datos inventados OBLIGATORIOS
 - Cultivo: Papa Huaycha
 - Lote agrícola: Lote Papa Sacaba Norte
 - Código lote: TRAZ-PAP-SAC-2026-001
@@ -25,22 +44,22 @@ Trabaja en el repo AgroFusion (Laravel + PostgreSQL). Tu objetivo es INSERTAR da
 - Envío agrícola: ENV-PAP-2026-001
 - Ruta planta→mayorista: RUT-PM-PAP-001
 - Pedido PDV: PDV-PAP-2026-001
-- Coordenadas (Cochabamba / Sacaba) para que el mapa trace:
-  - Origen agrícola: lat -17.3985, lng -66.0402  (etiqueta: Almacén agrícola Sacaba)
-  - Planta: lat -17.3935, lng -66.1570  (etiqueta: Planta AgroFusion)
-  - Mayorista: lat -17.4140, lng -66.1655  (etiqueta: Centro mayorista)
-  - PDV: lat -17.3742, lng -66.1596  (etiqueta: Minimarket Los Olivos)
+- Coordenadas (para mapa):
+  - Origen agrícola: -17.3985, -66.0402 (Almacén agrícola Sacaba)
+  - Planta: -17.3935, -66.1570 (Planta AgroFusion)
+  - Mayorista: -17.4140, -66.1655 (Centro mayorista)
+  - PDV: -17.3742, -66.1596 (Minimarket Los Olivos)
 
-## Flujo de datos que debes dejar persistido
-1. Lote agrícola + actividades (siembra/riego/cosecha) + certificación conforme si el modelo lo permite.
-2. Pedido/envío agrícola → planta con transportista/vehículo y paradas/coords (para mapa).
-3. Recepción en planta + procesamiento (plantilla o registros de proceso) + stock producto terminado.
-4. Traslado planta → mayorista (RutaDistribucion con paradas lat/lng) completado/aprobado.
-5. Stock en mayorista.
-6. Pedido distribución minorista/PDV + ruta mayorista→PDV con paradas lat/lng + recepción en PDV.
-7. Insumo en almacén del PDV con `codigo_trazabilidad = TRZ-PDV-PAPA-HUAYCHA-202609` y stock > 0.
+## Flujo que debe quedar en Railway
+1. Lote + actividades + cosecha (+ certificación conforme si aplica)
+2. Envío agrícola → planta (con coords/paradas)
+3. Recepción + proceso en planta + producto terminado
+4. Traslado planta → mayorista (ruta con lat/lng) completado
+5. Stock mayorista
+6. Pedido + ruta mayorista → PDV (con lat/lng) + recepción
+7. Insumo PDV con codigo_trazabilidad = TRZ-PDV-PAPA-HUAYCHA-202609 y stock > 0
 
-## Usuarios/roles a reutilizar (no crear otros si ya existen)
+## Cuentas demo (login en la URL de Railway)
 - agricultor@agrofusion.com / 12345
 - planta@agrofusion.com / 12345
 - transportista@agrofusion.com / 12345
@@ -48,21 +67,14 @@ Trabaja en el repo AgroFusion (Laravel + PostgreSQL). Tu objetivo es INSERTAR da
 - minorista@agrofusion.com / Minorista2026
 - admin@agrofusion.com / 12345
 
-## Reglas del proyecto
-- PKs custom (`loteid`, `usuarioid`, etc.), tablas snake_case en español.
-- Muchos modelos sin timestamps Laravel; usa `fecharegistro` / fechas de dominio.
-- Respeta `$fillable` y relaciones existentes (EnvioAsignacionMultiple, RutaDistribucion, PedidoDistribucion, Insumo PDV).
-- No borres datos ajenos al demo de Papa Huaycha; limpia solo registros marcados de este flujo si rehaces el seed.
-- No toques `.env`, secretos ni `database.sqlite` con datos sensibles.
+## Verificación final (obligatoria)
+Abrí en navegador:
+https://agrofusion-production-ef8c.up.railway.app/trazabilidad/TRZ-PDV-PAPA-HUAYCHA-202609
 
-## Cómo ejecutar
-Si creas seeder, por ejemplo:
-`php artisan db:seed --class=FlujoPapaHuaychaTrazabilidadQrSeeder`
+Debe mostrar timeline completa (campo → planta → mayorista → distribución → tienda) y botón “Ver ruta en mapa” en los envíos.
 
-Si estás en Railway/producción, ejecuta el seed allí o genera un comando artisan y documenta el comando exacto.
-
-## Criterio de hecho
-- Existe `/trazabilidad/TRZ-PDV-PAPA-HUAYCHA-202609` con timeline: campo → planta → mayorista → distribución → tienda.
-- Hay al menos 3 tramos de envío y cada uno con puntos lat/lng suficientes para el botón “Ver ruta en mapa”.
-- Devuélveme al final el código QR y la URL completa lista para abrir.
+Si el código no existe aún, créalo con ese valor exacto.
+Devuélveme al final SOLO:
+- URL del QR
+- resumen corto de lo insertado en Railway
 PROMPT>>>
