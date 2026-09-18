@@ -73,27 +73,34 @@ class MaquinaPlanta extends Model
     public function imagenSrc(): ?string
     {
         $img = trim((string) ($this->imagenurl ?? ''));
-        if ($img === '') {
-            return null;
-        }
 
-        if (preg_match('#^(https?://|data:)#i', $img)) {
+        if ($img !== '' && preg_match('#^(https?://|data:)#i', $img)) {
             return $img;
         }
 
-        $rel = $img;
-        if (str_starts_with($rel, '/storage/')) {
-            $rel = substr($rel, 9);
-        } elseif (str_starts_with($rel, 'storage/')) {
-            $rel = substr($rel, 8);
+        if ($img !== '') {
+            if (str_starts_with($img, '/images/') || str_starts_with($img, 'images/')) {
+                return asset(ltrim($img, '/'));
+            }
+
+            $rel = $img;
+            if (str_starts_with($rel, '/storage/')) {
+                $rel = substr($rel, 9);
+            } elseif (str_starts_with($rel, 'storage/')) {
+                $rel = substr($rel, 8);
+            }
+
+            $fullPath = storage_path('app/public/'.ltrim($rel, '/'));
+            if (is_file($fullPath)) {
+                return asset('storage/'.ltrim($rel, '/'));
+            }
+
+            // En Railway el volumen a menudo no trae maquinas_planta/* descargadas en local.
+            // Preferir catálogo HTTPS antes de devolver un asset 404.
         }
 
-        $fullPath = storage_path('app/public/'.ltrim($rel, '/'));
-        if (! is_file($fullPath)) {
-            return null;
-        }
-
-        return asset('storage/'.ltrim($rel, '/'));
+        return \App\Support\MaquinaImagenCatalogo::urlPorCodigo($this->codigo)
+            ?? \App\Support\MaquinaImagenCatalogo::urlPorNombre($this->nombre);
     }
 }
 

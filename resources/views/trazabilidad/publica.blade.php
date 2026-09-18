@@ -483,7 +483,8 @@
                                     @if(filled($urlFotoPub))
                                     <a href="{{ $urlFotoPub }}" class="trz-evidencia-card trz-evidencia-open" target="_blank" rel="noopener"
                                        data-url="{{ $urlFotoPub }}" data-titulo="{{ $evento['titulo'] }}">
-                                        <img src="{{ $urlFotoPub }}" alt="Evidencia: {{ $evento['titulo'] }}" decoding="async">
+                                        <img src="{{ $urlFotoPub }}" alt="{{ $tipoEvidenciaPub === 'maquina' ? 'Equipo' : 'Evidencia' }}: {{ $evento['titulo'] }}"
+                                             decoding="async" loading="lazy" referrerpolicy="no-referrer">
                                         <span class="trz-evidencia-caption">
                                             <span><i class="fas fa-{{ $tipoEvidenciaPub === 'maquina' ? 'cogs' : 'camera' }} mr-1"></i>
                                                 {{ $tipoEvidenciaPub === 'maquina' ? 'Equipo de planta' : 'Evidencia fotográfica' }}</span>

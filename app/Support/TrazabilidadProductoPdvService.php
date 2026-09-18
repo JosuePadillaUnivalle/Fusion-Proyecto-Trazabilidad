@@ -1514,6 +1514,7 @@ class TrazabilidadProductoPdvService
             $lineas[] = 'Paso '.$orden.' de '.$totalPasos.' — '.$proceso;
 
             $titulo = $this->tituloPasoPlanta($proceso, $paso->notas, $orden);
+            $imagenMaquina = $paso->maquina?->imagenSrc();
 
             $eventos->push($this->normalizarEvento(
                 $fecha,
@@ -1524,7 +1525,10 @@ class TrazabilidadProductoPdvService
                 $this->iconoProcesoPlanta($proceso),
                 'info',
                 $ubicacion,
-                $plantilla->nombre
+                $plantilla->nombre,
+                $imagenMaquina,
+                '',
+                $imagenMaquina ? 'maquina' : null,
             ));
         }
 
