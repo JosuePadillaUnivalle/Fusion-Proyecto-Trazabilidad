@@ -11,6 +11,16 @@ class CertificacionLote extends Model
 
     public const RAZON_NO_CONFORME = 'No conforme';
 
+    public const BLOCKCHAIN_PENDIENTE = 'pendiente';
+
+    public const BLOCKCHAIN_CERTIFICADA = 'certificada';
+
+    public const BLOCKCHAIN_RECHAZADA = 'rechazada';
+
+    public const BLOCKCHAIN_ERROR = 'error';
+
+    public const BLOCKCHAIN_OMITIDA = 'omitida';
+
     /** @var list<string> */
     public const RAZONES = [
         self::RAZON_CERTIFICADO,
@@ -31,9 +41,14 @@ class CertificacionLote extends Model
         'recomendaciones',
         'blockchain_estado',
         'blockchain_dato_id',
+        'blockchain_solicitud_id',
+        'blockchain_operacion_id',
+        'blockchain_hash',
+        'blockchain_payload_version',
         'blockchain_txid',
         'blockchain_error',
         'blockchain_enviado_en',
+        'blockchain_certificado_en',
         'blockchain_intentos',
     ];
 
@@ -43,12 +58,15 @@ class CertificacionLote extends Model
         'usuarioid' => 'integer',
         'fecha_certificacion' => 'datetime',
         'blockchain_enviado_en' => 'datetime',
+        'blockchain_certificado_en' => 'datetime',
         'blockchain_intentos' => 'integer',
+        'blockchain_payload_version' => 'integer',
     ];
 
     public function blockchainConfirmada(): bool
     {
-        return $this->blockchain_estado === 'confirmado' && filled($this->blockchain_txid);
+        return in_array($this->blockchain_estado, [self::BLOCKCHAIN_CERTIFICADA, 'confirmado'], true)
+            && filled($this->blockchain_txid);
     }
 
     public function lote(): BelongsTo

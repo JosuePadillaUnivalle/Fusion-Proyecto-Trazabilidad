@@ -172,15 +172,18 @@
                         @php
                             $bcEstado = $cert->blockchain_estado;
                             $bcLabel = match ($bcEstado) {
-                                'confirmado' => 'Confirmado en cadena',
-                                'pendiente' => 'Pendiente de envío',
+                                'certificada', 'confirmado' => 'Certificado en cadena',
+                                'pendiente' => 'Pendiente de aprobación',
+                                'rechazada' => 'Rechazado',
                                 'error' => 'Error al anclar',
-                                'omitido' => 'Omitido',
+                                'omitida', 'omitido' => 'Omitido',
                                 default => $bcEstado,
                             };
                         @endphp
-                        @if($bcEstado === 'confirmado')
+                        @if(in_array($bcEstado, ['certificada', 'confirmado'], true))
                             <span class="badge badge-success">{{ $bcLabel }}</span>
+                        @elseif($bcEstado === 'rechazada')
+                            <span class="badge badge-warning">{{ $bcLabel }}</span>
                         @elseif($bcEstado === 'error')
                             <span class="badge badge-danger">{{ $bcLabel }}</span>
                         @elseif($bcEstado === 'pendiente')
@@ -196,6 +199,24 @@
                         {{ $cert->blockchain_dato_id ?: '—' }}
                     </span>
                 </div>
+                <div>
+                    <span class="cert-det-v2__field-label">Solicitud</span>
+                    <span class="cert-det-v2__field-value" style="font-family:ui-monospace,monospace;font-size:.85rem;">
+                        {{ $cert->blockchain_solicitud_id ?: '—' }}
+                    </span>
+                </div>
+                <div class="cert-det-v2__field--wide">
+                    <span class="cert-det-v2__field-label">Operación</span>
+                    <span class="cert-det-v2__field-value" style="font-family:ui-monospace,monospace;font-size:.78rem;word-break:break-all;">
+                        {{ $cert->blockchain_operacion_id ?: '—' }}
+                    </span>
+                </div>
+                <div class="cert-det-v2__field--wide">
+                    <span class="cert-det-v2__field-label">Hash del registro</span>
+                    <span class="cert-det-v2__field-value" style="font-family:ui-monospace,monospace;font-size:.78rem;word-break:break-all;">
+                        {{ $cert->blockchain_hash ?: '—' }}
+                    </span>
+                </div>
                 <div class="cert-det-v2__field--wide">
                     <span class="cert-det-v2__field-label">Tx ID</span>
                     <span class="cert-det-v2__field-value" style="font-family:ui-monospace,monospace;font-size:.78rem;word-break:break-all;">
@@ -208,7 +229,13 @@
                         <span class="cert-det-v2__field-value">{{ $cert->blockchain_enviado_en->format('d/m/Y H:i') }}</span>
                     </div>
                 @endif
-                @if($cert->blockchain_estado === 'error' && $cert->blockchain_error)
+                @if($cert->blockchain_certificado_en)
+                    <div>
+                        <span class="cert-det-v2__field-label">Certificado en blockchain</span>
+                        <span class="cert-det-v2__field-value">{{ $cert->blockchain_certificado_en->format('d/m/Y H:i') }}</span>
+                    </div>
+                @endif
+                @if(in_array($cert->blockchain_estado, ['error', 'rechazada'], true) && $cert->blockchain_error)
                     <div class="cert-det-v2__field--wide">
                         <span class="cert-det-v2__field-label">Detalle</span>
                         <span class="cert-det-v2__field-value cert-det-v2__field-value--muted">{{ $cert->blockchain_error }}</span>
