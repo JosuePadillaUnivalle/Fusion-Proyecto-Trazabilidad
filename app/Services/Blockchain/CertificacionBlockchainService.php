@@ -8,45 +8,59 @@ use Illuminate\Support\Facades\Log;
 
 class CertificacionBlockchainService
 {
-    public const ESTADO_PENDIENTE = 'pendiente';
+    public const ESTADO_PENDIENTE = CertificacionLote::BLOCKCHAIN_PENDIENTE;
 
-    public const ESTADO_CONFIRMADO = 'confirmado';
+    public const ESTADO_CERTIFICADA = CertificacionLote::BLOCKCHAIN_CERTIFICADA;
 
-    public const ESTADO_ERROR = 'error';
+    public const ESTADO_CONFIRMADO = CertificacionLote::BLOCKCHAIN_CERTIFICADA;
 
-    public const ESTADO_OMITIDO = 'omitido';
+    public const ESTADO_RECHAZADA = CertificacionLote::BLOCKCHAIN_RECHAZADA;
+
+    public const ESTADO_ERROR = CertificacionLote::BLOCKCHAIN_ERROR;
+
+    public const ESTADO_OMITIDA = CertificacionLote::BLOCKCHAIN_OMITIDA;
+
+    public const ESTADO_OMITIDO = CertificacionLote::BLOCKCHAIN_OMITIDA;
+
+    private const TIPO_DATO = 'certificacion_lote';
 
     public function __construct(
         private readonly BlockchainClient $client,
+        private readonly CertificacionLotePayloadBuilder $payloadBuilder,
     ) {}
 
     /**
-     * Encola el ancla on-chain tras una certificación conforme (no bloquea la UI).
+     * Encola la certificacion de lote tras una evaluacion conforme, sin bloquear la UI.
      */
     public function encolarSiCorresponde(CertificacionLote $certificacion): void
     {
         if (! $certificacion->esCertificado()) {
-            $certificacion->forceFill([
-                'blockchain_estado' => self::ESTADO_OMITIDO,
-                'blockchain_error' => 'Solo se anclan certificaciones conformes.',
-            ])->save();
+            $this->marcarOmitida($certificacion, 'Solo se anclan certificaciones conformes.');
 
             return;
         }
 
         if (! $this->client->enabled()) {
-            $certificacion->forceFill([
-                'blockchain_estado' => self::ESTADO_OMITIDO,
-                'blockchain_error' => 'Integración blockchain deshabilitada.',
-            ])->save();
+            $this->marcarOmitida($certificacion, 'Integración blockchain deshabilitada.');
 
             return;
         }
 
+        $construido = $this->payloadBuilder->construir($certificacion);
+        $hash = $construido['hash'];
+        $datoId = $this->datoIdPara($certificacion);
+        $operacionId = $this->operacionIdPara($certificacion, $hash);
+
         $certificacion->forceFill([
             'blockchain_estado' => self::ESTADO_PENDIENTE,
             'blockchain_error' => null,
-            'blockchain_dato_id' => $this->datoIdPara($certificacion),
+            'blockchain_dato_id' => $datoId,
+            'blockchain_solicitud_id' => null,
+            'blockchain_operacion_id' => $operacionId,
+            'blockchain_hash' => $hash,
+            'blockchain_payload_version' => CertificacionLotePayloadBuilder::VERSION,
+            'blockchain_txid' => null,
+            'blockchain_certificado_en' => null,
         ])->save();
 
         RegistrarCertificacionBlockchainJob::dispatch($certificacion->certificacionid)
@@ -61,91 +75,35 @@ class CertificacionBlockchainService
         }
 
         if (! $cert->esCertificado()) {
-            $cert->forceFill([
-                'blockchain_estado' => self::ESTADO_OMITIDO,
-                'blockchain_error' => 'Solo se anclan certificaciones conformes.',
-            ])->save();
+            $this->marcarOmitida($cert, 'Solo se anclan certificaciones conformes.');
 
             return false;
         }
 
         if (! $this->client->enabled()) {
-            $cert->forceFill([
-                'blockchain_estado' => self::ESTADO_OMITIDO,
-                'blockchain_error' => 'Integración blockchain deshabilitada.',
-            ])->save();
+            $this->marcarOmitida($cert, 'Integración blockchain deshabilitada.');
 
             return false;
         }
 
-        if ($cert->blockchain_estado === self::ESTADO_CONFIRMADO && filled($cert->blockchain_txid)) {
+        if ($cert->blockchainConfirmada()) {
             return true;
         }
 
-        $datoId = $cert->blockchain_dato_id ?: $this->datoIdPara($cert);
-        $tipo = 'certificacion_lote';
-        $payload = $this->payloadPara($cert);
-
-        $cert->forceFill([
-            'blockchain_dato_id' => $datoId,
-            'blockchain_intentos' => ((int) $cert->blockchain_intentos) + 1,
-            'blockchain_estado' => self::ESTADO_PENDIENTE,
-        ])->save();
-
-        $result = $this->client->crearDato($datoId, $tipo, $payload);
-
-        // Si ya existía en el ledger (reintento / re-certificación), actualizar.
-        if (! $result['ok'] && $this->pareceYaExiste($result)) {
-            $result = $this->client->actualizarDato($datoId, $tipo, $payload);
+        if (filled($cert->blockchain_operacion_id)) {
+            $sincronizada = $this->sincronizarOperacion($cert);
+            if ($sincronizada !== null) {
+                return $sincronizada;
+            }
         }
 
-        if ($result['ok'] && filled($result['tx_id'])) {
-            $cert->forceFill([
-                'blockchain_estado' => self::ESTADO_CONFIRMADO,
-                'blockchain_txid' => $result['tx_id'],
-                'blockchain_error' => null,
-                'blockchain_enviado_en' => now(),
-            ])->save();
-
-            Log::info('Certificación anclada en blockchain', [
-                'certificacionid' => $cert->certificacionid,
-                'datoId' => $datoId,
-                'txId' => $result['tx_id'],
-            ]);
-
-            return true;
-        }
-
-        // 201/200 sin txId raro pero posible: marcar confirmado si status OK.
-        if ($result['ok']) {
-            $cert->forceFill([
-                'blockchain_estado' => self::ESTADO_CONFIRMADO,
-                'blockchain_txid' => $result['tx_id'],
-                'blockchain_error' => null,
-                'blockchain_enviado_en' => now(),
-            ])->save();
-
-            return true;
-        }
-
-        $cert->forceFill([
-            'blockchain_estado' => self::ESTADO_ERROR,
-            'blockchain_error' => mb_substr($result['message'] ?: 'Error desconocido al anclar', 0, 2000),
-        ])->save();
-
-        Log::warning('Fallo al anclar certificación en blockchain', [
-            'certificacionid' => $cert->certificacionid,
-            'status' => $result['status'],
-            'message' => $result['message'],
-        ]);
-
-        return false;
+        return $this->crearSolicitud($cert);
     }
 
     /**
-     * Reintenta pendientes/errores con intentos bajo el máximo.
+     * Revisa pendientes/errores con intentos bajo el maximo.
      *
-     * @return array{procesados:int, confirmados:int, fallidos:int}
+     * @return array{procesados:int, certificadas:int, confirmados:int, pendientes:int, rechazadas:int, fallidos:int}
      */
     public function sincronizarPendientes(?int $limite = 50): array
     {
@@ -154,29 +112,38 @@ class CertificacionBlockchainService
 
         $ids = CertificacionLote::query()
             ->where('resultado', CertificacionLote::RAZON_CERTIFICADO)
-            ->where(function ($q) {
-                $q->whereNull('blockchain_estado')
-                    ->orWhereIn('blockchain_estado', [self::ESTADO_PENDIENTE, self::ESTADO_ERROR]);
-            })
+            ->whereIn('blockchain_estado', [self::ESTADO_PENDIENTE, self::ESTADO_ERROR])
             ->where('blockchain_intentos', '<', $max)
             ->orderBy('certificacionid')
             ->limit($limite)
             ->pluck('certificacionid');
 
-        $confirmados = 0;
+        $certificadas = 0;
+        $pendientes = 0;
+        $rechazadas = 0;
         $fallidos = 0;
 
         foreach ($ids as $id) {
-            if ($this->enviar((int) $id)) {
-                $confirmados++;
-            } else {
-                $fallidos++;
-            }
+            $this->enviar((int) $id);
+
+            $estado = CertificacionLote::query()
+                ->whereKey($id)
+                ->value('blockchain_estado');
+
+            match ($estado) {
+                self::ESTADO_CERTIFICADA => $certificadas++,
+                self::ESTADO_PENDIENTE => $pendientes++,
+                self::ESTADO_RECHAZADA => $rechazadas++,
+                default => $fallidos++,
+            };
         }
 
         return [
             'procesados' => $ids->count(),
-            'confirmados' => $confirmados,
+            'certificadas' => $certificadas,
+            'confirmados' => $certificadas,
+            'pendientes' => $pendientes,
+            'rechazadas' => $rechazadas,
             'fallidos' => $fallidos,
         ];
     }
@@ -188,31 +155,182 @@ class CertificacionBlockchainService
         return 'AF-'.$codigo;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function payloadPara(CertificacionLote $cert): array
+    private function crearSolicitud(CertificacionLote $cert): bool
     {
-        $lote = $cert->lote;
-        $usuario = $cert->usuario;
+        $construido = $this->payloadBuilder->construir($cert);
+        $hash = $construido['hash'];
+        $payload = $construido['payload'];
+        $datoId = $cert->blockchain_dato_id ?: $this->datoIdPara($cert);
+        $operacionId = $cert->blockchain_operacion_id ?: $this->operacionIdPara($cert, $hash);
 
+        $cert->forceFill([
+            'blockchain_dato_id' => $datoId,
+            'blockchain_operacion_id' => $operacionId,
+            'blockchain_hash' => $hash,
+            'blockchain_payload_version' => CertificacionLotePayloadBuilder::VERSION,
+            'blockchain_intentos' => ((int) $cert->blockchain_intentos) + 1,
+            'blockchain_estado' => self::ESTADO_PENDIENTE,
+            'blockchain_error' => null,
+            'blockchain_enviado_en' => now(),
+        ])->save();
+
+        $result = $this->client->crearDato($datoId, self::TIPO_DATO, $payload, $this->headersPara($operacionId));
+
+        if (! $result['ok'] && $this->pareceYaExiste($result)) {
+            $result = $this->client->actualizarDato($datoId, self::TIPO_DATO, $payload, $this->headersPara($operacionId));
+        }
+
+        return $this->aplicarResultado($cert->fresh(), $result, $datoId, $operacionId, $hash);
+    }
+
+    /**
+     * @return bool|null true si ya quedo certificada, false si sigue pendiente/fallo, null si no se pudo consultar.
+     */
+    private function sincronizarOperacion(CertificacionLote $cert): ?bool
+    {
+        $result = $this->client->consultarOperacion((string) $cert->blockchain_operacion_id);
+
+        if ($result['status'] === 404) {
+            return null;
+        }
+
+        if (! $result['ok']) {
+            $cert->forceFill([
+                'blockchain_error' => mb_substr($result['message'] ?: 'No se pudo consultar la operación blockchain.', 0, 2000),
+            ])->save();
+
+            return false;
+        }
+
+        return $this->aplicarResultado(
+            $cert,
+            $result,
+            $cert->blockchain_dato_id ?: $this->datoIdPara($cert),
+            (string) $cert->blockchain_operacion_id,
+            (string) $cert->blockchain_hash,
+            false
+        );
+    }
+
+    /**
+     * @param  array{ok: bool, status: int, estado: ?string, solicitud_id: ?string, operacion_id: ?string, dato_id: ?string, tx_id: ?string, body: mixed, message: string}  $result
+     */
+    private function aplicarResultado(
+        ?CertificacionLote $cert,
+        array $result,
+        string $datoId,
+        string $operacionId,
+        string $hash,
+        bool $registrarErrorComoFallo = true,
+    ): bool {
+        if (! $cert) {
+            return false;
+        }
+
+        $estado = mb_strtolower((string) $result['estado']);
+
+        if ($result['ok'] && filled($result['tx_id'])) {
+            $cert->forceFill([
+                'blockchain_estado' => self::ESTADO_CERTIFICADA,
+                'blockchain_dato_id' => $result['dato_id'] ?: $datoId,
+                'blockchain_solicitud_id' => $result['solicitud_id'] ?: $cert->blockchain_solicitud_id,
+                'blockchain_operacion_id' => $result['operacion_id'] ?: $operacionId,
+                'blockchain_hash' => $hash ?: $cert->blockchain_hash,
+                'blockchain_payload_version' => CertificacionLotePayloadBuilder::VERSION,
+                'blockchain_txid' => $result['tx_id'],
+                'blockchain_error' => null,
+                'blockchain_enviado_en' => $cert->blockchain_enviado_en ?: now(),
+                'blockchain_certificado_en' => now(),
+            ])->save();
+
+            Log::info('Certificación de lote certificada en blockchain', [
+                'certificacionid' => $cert->certificacionid,
+                'datoId' => $datoId,
+                'operacionId' => $operacionId,
+                'txId' => $result['tx_id'],
+            ]);
+
+            return true;
+        }
+
+        if ($result['ok'] && in_array($estado, ['pendiente', 'en_proceso', 'procesando', 'aprobada'], true)) {
+            $cert->forceFill([
+                'blockchain_estado' => self::ESTADO_PENDIENTE,
+                'blockchain_dato_id' => $result['dato_id'] ?: $datoId,
+                'blockchain_solicitud_id' => $result['solicitud_id'] ?: $cert->blockchain_solicitud_id,
+                'blockchain_operacion_id' => $result['operacion_id'] ?: $operacionId,
+                'blockchain_hash' => $hash ?: $cert->blockchain_hash,
+                'blockchain_payload_version' => CertificacionLotePayloadBuilder::VERSION,
+                'blockchain_error' => null,
+                'blockchain_enviado_en' => $cert->blockchain_enviado_en ?: now(),
+            ])->save();
+
+            return false;
+        }
+
+        if ($result['ok'] && in_array($estado, ['rechazada', 'rechazado'], true)) {
+            $cert->forceFill([
+                'blockchain_estado' => self::ESTADO_RECHAZADA,
+                'blockchain_solicitud_id' => $result['solicitud_id'] ?: $cert->blockchain_solicitud_id,
+                'blockchain_operacion_id' => $result['operacion_id'] ?: $operacionId,
+                'blockchain_error' => mb_substr($result['message'] ?: 'Solicitud blockchain rechazada.', 0, 2000),
+            ])->save();
+
+            return false;
+        }
+
+        if ($registrarErrorComoFallo) {
+            $cert->forceFill([
+                'blockchain_estado' => self::ESTADO_ERROR,
+                'blockchain_error' => mb_substr($result['message'] ?: 'Error desconocido al solicitar certificación blockchain.', 0, 2000),
+            ])->save();
+
+            Log::warning('Fallo al solicitar certificación de lote en blockchain', [
+                'certificacionid' => $cert->certificacionid,
+                'status' => $result['status'],
+                'message' => $result['message'],
+            ]);
+        }
+
+        return false;
+    }
+
+    private function operacionIdPara(CertificacionLote $cert, string $hash): string
+    {
+        $base = sprintf(
+            'agrofusion.certificacion_lote.%s.v%s.%s',
+            $cert->certificacionid,
+            CertificacionLotePayloadBuilder::VERSION,
+            substr($hash, 0, 16)
+        );
+
+        return preg_replace('/[^A-Za-z0-9_.-]/', '-', $base) ?: $base;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function headersPara(string $operacionId): array
+    {
         return [
-            'origen' => 'agrofusion',
-            'certificacionid' => $cert->certificacionid,
-            'loteid' => $cert->loteid,
-            'codigo_certificado' => $cert->codigo_certificado,
-            'codigo_trazabilidad' => $lote?->codigo_trazabilidad,
-            'resultado' => $cert->resultado,
-            'observaciones' => $cert->observaciones,
-            'fecha_certificacion' => optional($cert->fecha_certificacion)->toIso8601String(),
-            'lote_nombre' => $lote?->nombre,
-            'cultivo' => $lote?->cultivo?->nombre ?? $lote?->cultivo_etiqueta,
-            'ubicacion' => $lote?->ubicacion,
-            'certificado_por' => $usuario
-                ? trim(($usuario->nombre ?? '').' '.($usuario->apellido ?? ''))
-                : null,
-            'usuarioid' => $cert->usuarioid,
+            'X-Operacion-Id' => $operacionId,
+            'X-Actor-Id' => 'agrofusion-certificacion-lote',
+            'X-Actor-Name' => 'AgroFusion',
+            'X-Actor-Rol' => 'sistema_integrador',
         ];
+    }
+
+    private function marcarOmitida(CertificacionLote $certificacion, string $motivo): void
+    {
+        $certificacion->forceFill([
+            'blockchain_estado' => self::ESTADO_OMITIDA,
+            'blockchain_error' => $motivo,
+            'blockchain_solicitud_id' => null,
+            'blockchain_operacion_id' => null,
+            'blockchain_hash' => null,
+            'blockchain_txid' => null,
+            'blockchain_certificado_en' => null,
+        ])->save();
     }
 
     /**

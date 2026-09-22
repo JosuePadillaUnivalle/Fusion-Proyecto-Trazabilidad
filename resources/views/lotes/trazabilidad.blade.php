@@ -212,13 +212,20 @@
                             <span class="text-muted small ml-2">{{ $certificacion_campo->codigo_certificado }}</span>
                         </div>
                         @if($certificacion_campo->blockchainConfirmada())
-                            <span class="badge badge-success">Blockchain OK</span>
+                            <span class="badge badge-success">Blockchain certificado</span>
                         @elseif(($certificacion_campo->blockchain_estado ?? null) === 'pendiente')
-                            <span class="badge badge-secondary">Blockchain pendiente</span>
+                            <span class="badge badge-secondary">Blockchain pendiente de aprobación</span>
+                        @elseif(($certificacion_campo->blockchain_estado ?? null) === 'rechazada')
+                            <span class="badge badge-warning">Blockchain rechazada</span>
                         @elseif(($certificacion_campo->blockchain_estado ?? null) === 'error')
                             <span class="badge badge-danger">Blockchain error</span>
                         @endif
                     </div>
+                    @if(filled($certificacion_campo->blockchain_solicitud_id))
+                        <div class="small text-muted mt-2" style="font-family:ui-monospace,monospace;word-break:break-all;">
+                            Solicitud: {{ $certificacion_campo->blockchain_solicitud_id }}
+                        </div>
+                    @endif
                     @if(filled($certificacion_campo->blockchain_txid))
                         <div class="small text-muted mt-2" style="font-family:ui-monospace,monospace;word-break:break-all;">
                             Tx: {{ $certificacion_campo->blockchain_txid }}
