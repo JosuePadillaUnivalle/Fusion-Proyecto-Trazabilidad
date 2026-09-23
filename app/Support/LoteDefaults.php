@@ -59,9 +59,35 @@ class LoteDefaults
 
     public static function unidadHectareaId(): ?int
     {
-        $id = UnidadMedida::whereRaw('LOWER(TRIM(nombre)) = ?', ['hectárea'])->value('unidadmedidaid');
+        $id = UnidadMedida::query()
+            ->where(function ($q) {
+                $q->whereRaw('LOWER(TRIM(nombre)) IN (?, ?, ?, ?, ?)', [
+                    'hectárea', 'hectarea', 'hectáreas', 'hectareas', 'ha',
+                ]);
+                if (Schema::hasColumn('unidadmedida', 'abreviatura')) {
+                    $q->orWhereRaw("LOWER(TRIM(COALESCE(abreviatura, ''))) = ?", ['ha']);
+                }
+            })
+            ->value('unidadmedidaid');
 
-        return $id ? (int) $id : UnidadMedida::where('nombre', 'Hectárea')->value('unidadmedidaid');
+        if ($id) {
+            return (int) $id;
+        }
+
+        $attrs = ['nombre' => 'Hectárea'];
+        if (Schema::hasColumn('unidadmedida', 'abreviatura')) {
+            $attrs['abreviatura'] = 'ha';
+        }
+        if (Schema::hasColumn('unidadmedida', 'categoria')) {
+            $attrs['categoria'] = 'superficie';
+        }
+
+        $unidad = UnidadMedida::query()->firstOrCreate(
+            ['nombre' => 'Hectárea'],
+            $attrs
+        );
+
+        return (int) $unidad->unidadmedidaid;
     }
 
     public static function estadoPlanificadoId(): ?int
