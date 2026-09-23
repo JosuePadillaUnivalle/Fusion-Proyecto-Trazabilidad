@@ -449,8 +449,8 @@ class ReporteCentroService
     public function pedidosPdvPreview(): ?string
     {
         $n = PedidoDistribucion::query()
-            ->whereRaw('UPPER(COALESCE(numero_solicitud, "")) NOT LIKE ?', ['%DEMO%'])
-            ->whereRaw('UPPER(COALESCE(numero_solicitud, "")) NOT LIKE ?', ['MOD-PED-%'])
+            ->whereRaw("UPPER(COALESCE(numero_solicitud, '')) NOT LIKE ?", ['%DEMO%'])
+            ->whereRaw("UPPER(COALESCE(numero_solicitud, '')) NOT LIKE ?", ['MOD-PED-%'])
             ->count();
 
         return $n > 0 ? $n.' pedidos' : null;

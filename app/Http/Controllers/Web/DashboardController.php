@@ -33,6 +33,7 @@ use App\Models\Cultivo;
 use App\Models\EstadoLoteTipo;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use App\Models\UsuarioNotificacion;
