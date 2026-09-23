@@ -223,7 +223,7 @@ class AlmacenController extends Controller
 
         $data['unidadmedidaid'] = $this->unidadKilogramoId();
 
-        $data['tipoalmacenid'] = $this->tipoAlmacenPorDefecto();
+        $data['tipoalmacenid'] = $this->tipoAlmacenPorDefecto($ctx['ambito']);
 
         if (Schema::hasColumn('almacen', 'responsable_usuarioid')) {
             if (
@@ -342,7 +342,7 @@ class AlmacenController extends Controller
         $data['unidadmedidaid'] = $this->unidadKilogramoId();
 
         if (! $almacen->tipoalmacenid) {
-            $data['tipoalmacenid'] = $this->tipoAlmacenPorDefecto();
+            $data['tipoalmacenid'] = $this->tipoAlmacenPorDefecto($ctx['ambito']);
         } else {
             unset($data['tipoalmacenid']);
         }
@@ -575,34 +575,42 @@ class AlmacenController extends Controller
 
 
 
-    private function tipoAlmacenPorDefecto(): ?int
-
+    private function tipoAlmacenPorDefecto(?string $ambito = null): ?int
     {
+        $ambito ??= AlmacenAmbito::AGRICOLA;
 
-        $id = TipoAlmacen::query()
+        $preferidos = match ($ambito) {
+            AlmacenAmbito::PLANTA => ['Planta', 'Central', 'Secundario'],
+            AlmacenAmbito::MAYORISTA => ['Mayorista', 'Central', 'Secundario'],
+            AlmacenAmbito::PUNTO_VENTA => ['Punto de venta', 'Minorista', 'Central', 'Secundario'],
+            default => ['Agrícola', 'Agricola', 'Central', 'Secundario'],
+        };
 
-            ->whereIn('nombre', ['Central', 'Secundario', 'Planta'])
-
-            ->orderByRaw("CASE nombre WHEN 'Central' THEN 1 WHEN 'Secundario' THEN 2 ELSE 3 END")
-
-            ->value('tipoalmacenid');
-
-
-
-        if ($id) {
-
-            return (int) $id;
-
+        foreach ($preferidos as $nombre) {
+            $id = TipoAlmacen::query()
+                ->whereRaw('LOWER(TRIM(nombre)) = ?', [mb_strtolower($nombre)])
+                ->value('tipoalmacenid');
+            if ($id) {
+                return (int) $id;
+            }
         }
 
+        // Evitar asignar "Planta"/"Mayorista" a un almacén agrícola por accidente.
+        $excluir = match ($ambito) {
+            AlmacenAmbito::AGRICOLA => ['planta', 'mayorista', 'punto de venta', 'minorista'],
+            AlmacenAmbito::PLANTA => ['agrícola', 'agricola', 'mayorista', 'punto de venta', 'minorista'],
+            AlmacenAmbito::MAYORISTA => ['agrícola', 'agricola', 'planta', 'punto de venta', 'minorista'],
+            default => [],
+        };
 
-
-        $fallback = TipoAlmacen::query()->orderBy('tipoalmacenid')->value('tipoalmacenid');
-
-
+        $fallback = TipoAlmacen::query()
+            ->when($excluir !== [], function ($q) use ($excluir) {
+                $q->whereRaw('LOWER(TRIM(nombre)) NOT IN ('.implode(',', array_fill(0, count($excluir), '?')).')', $excluir);
+            })
+            ->orderBy('tipoalmacenid')
+            ->value('tipoalmacenid');
 
         return $fallback ? (int) $fallback : null;
-
     }
 
 
