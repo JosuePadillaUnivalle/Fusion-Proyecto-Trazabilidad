@@ -12,6 +12,7 @@
         const dosisPreview = document.getElementById('dosisSiembraPreview');
         const dosisTexto = document.getElementById('dosisSiembraTexto');
         const calibreSelect = document.getElementById('planCalibreSelect');
+        const calibreWrap = document.getElementById('planCalibreWrap');
         const objetivoUnidades = document.getElementById('planObjetivoUnidades');
         const objetivoEmpaques = document.getElementById('planObjetivoEmpaques');
         const objetivoUnidadesWrap = document.getElementById('planObjetivoUnidadesWrap');
@@ -172,7 +173,7 @@
                 + '<div class="plan-resultado-item"><strong>' + fmtNum(res.kg_cosecha_estimados, 0) + ' kg</strong><span>Cosecha</span></div>';
         }
 
-        function mostrarError(msg) {
+        function mostrarError(msg, bloqueante) {
             if (!errorPreview || !errorTexto) return;
             if (!msg) {
                 errorPreview.classList.add('d-none');
@@ -185,8 +186,28 @@
             errorPreview.classList.remove('d-none');
             panel?.classList.remove('d-none');
             cosechaPreview?.classList.add('d-none');
-            planificacionErrorActiva = true;
-            ultimoMensajeError = msg;
+            // Avisos informativos (modo básico, etc.) no deben bloquear el guardado.
+            const esBloqueante = bloqueante !== false;
+            planificacionErrorActiva = esBloqueante;
+            ultimoMensajeError = esBloqueante ? msg : '';
+        }
+
+        function actualizarUiCalibre(ctx) {
+            const avanzado = modoAvanzadoDisponible(ctx || {});
+            if (calibreWrap) {
+                calibreWrap.classList.toggle('d-none', !avanzado);
+            }
+            if (avanzado) {
+                poblarCalibres(ctx.calibres || [], calibreInicial || ctx.calibre_default_id);
+            } else {
+                poblarCalibres([]);
+                if (calibreHidden) {
+                    calibreHidden.value = '';
+                }
+                if (calibreSelect) {
+                    calibreSelect.innerHTML = '<option value="">No aplica en modo básico</option>';
+                }
+            }
         }
 
         function mostrarAvisoLimite(msg) {
@@ -634,16 +655,14 @@
                     mostrarError('');
                     ultimoContexto = ctx;
                     actualizarAtributosMaximos();
+                    actualizarUiCalibre(ctx);
+                    actualizarModosDisponibles(ctx);
+                    if (cantWrap) cantWrap.classList.remove('d-none');
 
                     if (modoAvanzadoDisponible(ctx)) {
-                        poblarCalibres(ctx.calibres, calibreInicial || ctx.calibre_default_id);
-                        actualizarModosDisponibles(ctx);
-                        if (cantWrap) cantWrap.classList.remove('d-none');
                         recalcular();
                     } else {
-                        actualizarModosDisponibles(ctx);
-                        if (cantWrap) cantWrap.classList.remove('d-none');
-                        mostrarError('Modo básico: ingrese hectáreas para calcular la semilla.');
+                        mostrarError('Modo básico: ingrese hectáreas para calcular la semilla.', false);
                         recalcularBasico(ctx);
                     }
                 })

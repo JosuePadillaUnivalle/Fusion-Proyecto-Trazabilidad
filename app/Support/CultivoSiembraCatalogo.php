@@ -7,6 +7,9 @@ use App\Models\Insumo;
 
 final class CultivoSiembraCatalogo
 {
+    /** kg/ha genérico cuando el insumo tiene calibres pero aún no define rendimiento. */
+    public const RENDIMIENTO_FALLBACK_KG_HA = 10000.0;
+
     /**
      * Dosis de referencia por nombre de cultivo (semilla o plántulas por hectárea).
      *

@@ -26,6 +26,11 @@ class PlanificacionCosechaService
         $dosis = CultivoSiembraCatalogo::sugerenciaParaInsumo($insumo, 1.0);
         $rendimientoKgHa = CultivoSiembraCatalogo::rendimientoCosechaKgHaDesdeInsumo($insumo);
         $calibres = $this->calibresParaInsumo($insumoId);
+        // Insumos nuevos suelen tener calibre estándar pero sin rendimiento: usar fallback
+        // para no dejar el formulario en "Cargando…" / modo básico bloqueado.
+        if (($rendimientoKgHa === null || $rendimientoKgHa <= 0) && $calibres !== []) {
+            $rendimientoKgHa = CultivoSiembraCatalogo::RENDIMIENTO_FALLBACK_KG_HA;
+        }
         $stock = (float) ($insumo->stock ?? 0);
         $stockUnidad = $insumo->unidadMedida?->abreviatura ?? $insumo->unidadMedida?->nombre ?? ($dosis['unidad'] ?? 'kg');
 

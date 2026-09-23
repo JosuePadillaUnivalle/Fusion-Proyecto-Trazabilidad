@@ -887,7 +887,11 @@ final class PedidoCatalogo
             return $cultivo->nombre;
         }
 
-        $limpio = preg_replace('/^(semilla\s+certificada|semilla|material de siembra)\s+/iu', '', $insumo->nombre);
+        $limpio = preg_replace(
+            '/^(semilla\s+certificada|semilla\s+de|semillas?\s+de|semilla|material de siembra)\s+/iu',
+            '',
+            $insumo->nombre
+        );
 
         return trim((string) $limpio) ?: $insumo->nombre;
     }

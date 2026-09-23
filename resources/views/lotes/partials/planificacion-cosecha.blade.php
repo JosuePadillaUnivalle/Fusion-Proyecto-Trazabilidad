@@ -98,7 +98,7 @@
     <input type="hidden" name="plan_objetivo_empaques" id="planObjetivoEmpaquesHidden" value="{{ old('plan_objetivo_empaques', '') }}">
     <input type="hidden" name="plan_objetivo_unidades" id="planObjetivoUnidadesHidden" value="{{ old('plan_objetivo_unidades', '') }}">
 
-    <div class="form-group mb-2">
+    <div id="planCalibreWrap" class="form-group mb-2">
         <label class="small font-weight-bold mb-1" for="planCalibreSelect">Calibre al cosechar</label>
         <select id="planCalibreSelect" class="form-control form-control-sm">
             <option value="">Cargando…</option>
