@@ -3,12 +3,17 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\CatalogoTamanoConteo;
 use App\Models\Insumo;
+use App\Models\TipoEmpaque;
 use App\Support\InsumoCatalogo;
 use App\Support\InsumoImagenCatalogo;
+use App\Support\TipoEmpaqueAmbito;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class InsumoController extends Controller
 {
@@ -42,16 +47,22 @@ class InsumoController extends Controller
         return view('insumos.create', [
             'tipos' => InsumoCatalogo::tiposOrdenados(),
             'unidadesPorTipo' => InsumoCatalogo::unidadesPorTipoParaJs(),
+            'tiposEmpaque' => $this->tiposEmpaqueAgricola(),
+            'calibre' => null,
         ]);
     }
 
     public function store(Request $request)
     {
         $data = $this->validarInsumo($request);
+        $calibreData = $data['_calibre'] ?? null;
+        unset($data['_calibre']);
+
         $data['stockminimo'] = InsumoCatalogo::UMBRAL_ALERTA_STOCK;
         $data = $this->aplicarImagenInsumo($request, $data);
 
-        Insumo::create($data);
+        $insumo = Insumo::create($data);
+        $this->guardarCalibreSiembra($insumo, $calibreData);
 
         return redirect()->route('insumos.index')->with('success', 'Insumo registrado correctamente.');
     }
@@ -79,6 +90,8 @@ class InsumoController extends Controller
             'insumo' => $insumo,
             'tipos' => InsumoCatalogo::tiposOrdenados(),
             'unidadesPorTipo' => InsumoCatalogo::unidadesPorTipoParaJs(),
+            'tiposEmpaque' => $this->tiposEmpaqueAgricola(),
+            'calibre' => $this->calibrePrincipal($insumo),
         ]);
     }
 
@@ -88,10 +101,14 @@ class InsumoController extends Controller
         InsumoCatalogo::asegurarInsumoOperativo($insumo);
 
         $data = $this->validarInsumo($request);
+        $calibreData = $data['_calibre'] ?? null;
+        unset($data['_calibre']);
+
         $data['stockminimo'] = InsumoCatalogo::UMBRAL_ALERTA_STOCK;
         $data = $this->aplicarImagenInsumo($request, $data, $insumo);
 
         $insumo->update($data);
+        $this->guardarCalibreSiembra($insumo->fresh(), $calibreData);
 
         return redirect()->route('insumos.index')->with('success', 'Insumo actualizado.');
     }
@@ -123,6 +140,10 @@ class InsumoController extends Controller
             'semillas_por_kg' => 'nullable|numeric|min:0',
             'imagen' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:4096',
             'quitar_imagen' => 'nullable|boolean',
+            'calibre_nombre' => 'nullable|string|max:150',
+            'calibre_conteo_por_empaque' => 'nullable|integer|min:1',
+            'calibre_peso_promedio_kg' => 'nullable|numeric|min:0.0001',
+            'calibre_tipoempaqueid' => 'nullable|exists:tipo_empaque,tipoempaqueid',
         ]);
 
         $tipo = InsumoCatalogo::tiposOrdenados()->firstWhere('tipoinsumoid', (int) $data['tipoinsumoid']);
@@ -130,13 +151,34 @@ class InsumoController extends Controller
         $permitidas = collect(InsumoCatalogo::unidadesPorTipoParaJs()[$slug] ?? [])->pluck('id')->all();
 
         if ($permitidas !== [] && ! in_array((int) $data['unidadmedidaid'], $permitidas, true)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'unidadmedidaid' => 'La unidad no corresponde al tipo de insumo seleccionado.',
             ]);
         }
 
         if ($slug !== 'material_siembra') {
             $data['semillas_por_kg'] = null;
+            $data['_calibre'] = null;
+        } else {
+            $calibreRules = $request->validate([
+                'calibre_nombre' => 'required|string|max:150',
+                'calibre_conteo_por_empaque' => 'required|integer|min:1',
+                'calibre_peso_promedio_kg' => 'required|numeric|min:0.0001',
+                'calibre_tipoempaqueid' => 'nullable|exists:tipo_empaque,tipoempaqueid',
+            ], [
+                'calibre_nombre.required' => 'Indique el nombre del calibre de cosecha (obligatorio para material de siembra).',
+                'calibre_conteo_por_empaque.required' => 'Indique cuántas unidades caben por empaque.',
+                'calibre_peso_promedio_kg.required' => 'Indique el peso promedio por unidad (kg).',
+            ]);
+
+            $data['_calibre'] = [
+                'nombre' => trim((string) $calibreRules['calibre_nombre']),
+                'conteo_por_empaque' => (int) $calibreRules['calibre_conteo_por_empaque'],
+                'peso_promedio_kg' => (float) $calibreRules['calibre_peso_promedio_kg'],
+                'tipoempaqueid' => ! empty($calibreRules['calibre_tipoempaqueid'])
+                    ? (int) $calibreRules['calibre_tipoempaqueid']
+                    : null,
+            ];
         }
 
         $um = \App\Models\UnidadMedida::find((int) $data['unidadmedidaid']);
@@ -144,11 +186,70 @@ class InsumoController extends Controller
             ? InsumoCatalogo::normalizarDosisUnidad($um->abreviatura, $slug)
             : null;
 
-        unset($data['imagen'], $data['quitar_imagen']);
+        unset(
+            $data['imagen'],
+            $data['quitar_imagen'],
+            $data['calibre_nombre'],
+            $data['calibre_conteo_por_empaque'],
+            $data['calibre_peso_promedio_kg'],
+            $data['calibre_tipoempaqueid'],
+        );
 
         $data['stock'] = max(0.0, (float) $data['stock']);
 
         return $data;
+    }
+
+    /** @param  array{nombre: string, conteo_por_empaque: int, peso_promedio_kg: float, tipoempaqueid: int|null}|null  $calibre */
+    private function guardarCalibreSiembra(Insumo $insumo, ?array $calibre): void
+    {
+        if ($calibre === null || ! Schema::hasTable('catalogo_tamano_conteo')) {
+            return;
+        }
+
+        $existente = $this->calibrePrincipal($insumo);
+
+        $payload = [
+            'insumoid' => (int) $insumo->insumoid,
+            'nombre' => $calibre['nombre'],
+            'conteo_por_empaque' => $calibre['conteo_por_empaque'],
+            'peso_promedio_kg' => $calibre['peso_promedio_kg'],
+            'tipoempaqueid' => $calibre['tipoempaqueid'],
+            'activo' => true,
+        ];
+
+        if ($existente) {
+            $existente->update($payload);
+        } else {
+            CatalogoTamanoConteo::query()->create($payload);
+        }
+    }
+
+    private function calibrePrincipal(Insumo $insumo): ?CatalogoTamanoConteo
+    {
+        if (! Schema::hasTable('catalogo_tamano_conteo')) {
+            return null;
+        }
+
+        return CatalogoTamanoConteo::query()
+            ->where('insumoid', $insumo->insumoid)
+            ->where('activo', true)
+            ->orderBy('catalogotamanoconteoid')
+            ->first();
+    }
+
+    /** @return \Illuminate\Support\Collection<int, string> */
+    private function tiposEmpaqueAgricola()
+    {
+        if (! Schema::hasTable('tipo_empaque')) {
+            return collect();
+        }
+
+        return TipoEmpaque::query()
+            ->where('activo', true)
+            ->tap(fn ($q) => TipoEmpaqueAmbito::scopeAgricola($q))
+            ->orderBy('nombre')
+            ->pluck('nombre', 'tipoempaqueid');
     }
 
     /** @param  array<string, mixed>  $data */

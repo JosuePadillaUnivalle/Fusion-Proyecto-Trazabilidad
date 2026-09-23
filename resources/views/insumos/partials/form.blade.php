@@ -4,6 +4,8 @@
     $insumo = $insumo ?? null;
     $tipos = $tipos ?? collect();
     $unidadesPorTipo = $unidadesPorTipo ?? [];
+    $tiposEmpaque = $tiposEmpaque ?? collect();
+    $calibre = $calibre ?? null;
     $tipoSlugInicial = $insumo
         ? (InsumoCatalogo::slugFromNombreTipo($insumo->tipo?->nombre) ?? 'material_siembra')
         : (InsumoCatalogo::slugFromNombreTipo($tipos->first()?->nombre) ?? 'material_siembra');
@@ -475,6 +477,61 @@
                         </div>
                     </div>
 
+                    <div class="ins-form-section" id="insCalibreSection" style="{{ $tipoSlugInicial === 'material_siembra' ? '' : 'display:none;' }}">
+                        <div class="ins-section-label"><i class="fas fa-ruler-combined"></i> Calibre de cosecha <span class="text-danger">*</span></div>
+                        <p class="ins-field-hint mb-2">Obligatorio para material de siembra. Se usa al planificar el lote (unidades / cajas estimadas).</p>
+                        @error('calibre_nombre')
+                            <div class="alert alert-danger small py-2">{{ $message }}</div>
+                        @enderror
+                        @error('calibre_conteo_por_empaque')
+                            <div class="alert alert-danger small py-2">{{ $message }}</div>
+                        @enderror
+                        @error('calibre_peso_promedio_kg')
+                            <div class="alert alert-danger small py-2">{{ $message }}</div>
+                        @enderror
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="ins-field-label" for="calibre_nombre">Nombre del calibre <span class="text-danger">*</span></label>
+                                <input type="text" name="calibre_nombre" id="calibre_nombre" class="form-control"
+                                    value="{{ old('calibre_nombre', $calibre->nombre ?? '') }}"
+                                    placeholder="Ej. Mediano (120-150 g)"
+                                    @if($tipoSlugInicial === 'material_siembra') required @endif
+                                    maxlength="150">
+                                <div class="ins-field-hint">Ej. Pequeño, Mediano, Grande o Estándar.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="ins-field-label" for="calibre_tipoempaqueid">Tipo de empaque</label>
+                                <select name="calibre_tipoempaqueid" id="calibre_tipoempaqueid" class="form-control">
+                                    <option value="">— Opcional —</option>
+                                    @foreach($tiposEmpaque as $empaqueId => $empaqueNombre)
+                                        <option value="{{ $empaqueId }}"
+                                            @selected((string) old('calibre_tipoempaqueid', $calibre->tipoempaqueid ?? '') === (string) $empaqueId)>
+                                            {{ $empaqueNombre }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <label class="ins-field-label" for="calibre_conteo_por_empaque">Unidades por empaque <span class="text-danger">*</span></label>
+                                <input type="number" step="1" min="1" name="calibre_conteo_por_empaque" id="calibre_conteo_por_empaque" class="form-control"
+                                    value="{{ old('calibre_conteo_por_empaque', $calibre->conteo_por_empaque ?? '') }}"
+                                    placeholder="Ej. 50"
+                                    @if($tipoSlugInicial === 'material_siembra') required @endif>
+                                <div class="ins-field-hint">Cuántas unidades caben en una caja/canasta.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="ins-field-label" for="calibre_peso_promedio_kg">Peso promedio por unidad (kg) <span class="text-danger">*</span></label>
+                                <input type="number" step="0.0001" min="0.0001" name="calibre_peso_promedio_kg" id="calibre_peso_promedio_kg" class="form-control"
+                                    value="{{ old('calibre_peso_promedio_kg', $calibre->peso_promedio_kg ?? '') }}"
+                                    placeholder="Ej. 0.135"
+                                    @if($tipoSlugInicial === 'material_siembra') required @endif>
+                                <div class="ins-field-hint">Peso medio de una unidad cosechada en kilogramos.</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="ins-form-section">
                         <div class="ins-section-label"><i class="fas fa-sticky-note"></i> Notas</div>
                         <label class="ins-field-label" for="descripcion">Descripción <span class="text-muted font-weight-normal">(opcional)</span></label>
@@ -540,6 +597,10 @@
     const dosisPorHaHint = document.getElementById('insDosisPorHaHint');
     const dosisUnidadHint = document.getElementById('insDosisUnidadHint');
     const semillasPorKgRow = document.getElementById('insSemillasPorKgRow');
+    const calibreSection = document.getElementById('insCalibreSection');
+    const calibreNombre = document.getElementById('calibre_nombre');
+    const calibreConteo = document.getElementById('calibre_conteo_por_empaque');
+    const calibrePeso = document.getElementById('calibre_peso_promedio_kg');
     const inputImagen = document.getElementById('imagen');
     const previewWrap = document.getElementById('insImagenPreview');
     const previewImg = document.getElementById('insImagenPreviewImg');
@@ -703,6 +764,18 @@
         }
         if (semillasPorKgRow) {
             semillasPorKgRow.style.display = slug === 'material_siembra' ? '' : 'none';
+        }
+        if (calibreSection) {
+            const esSiembra = slug === 'material_siembra';
+            calibreSection.style.display = esSiembra ? '' : 'none';
+            [calibreNombre, calibreConteo, calibrePeso].forEach(function (el) {
+                if (!el) return;
+                if (esSiembra) {
+                    el.setAttribute('required', 'required');
+                } else {
+                    el.removeAttribute('required');
+                }
+            });
         }
         pintarUnidades();
     }

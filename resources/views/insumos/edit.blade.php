@@ -18,5 +18,7 @@
     'insumo' => $insumo,
     'tipos' => $tipos,
     'unidadesPorTipo' => $unidadesPorTipo,
+    'tiposEmpaque' => $tiposEmpaque ?? collect(),
+    'calibre' => $calibre ?? null,
 ])
 @endsection
