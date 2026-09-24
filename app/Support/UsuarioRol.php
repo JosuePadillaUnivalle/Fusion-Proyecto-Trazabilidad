@@ -8,13 +8,30 @@ use Illuminate\Database\Eloquent\Builder;
 
 final class UsuarioRol
 {
+    /** Rol Spatie canónico del administrador de la plataforma. */
+    public const ROL_ADMIN = 'admin';
+
+    /** Slugs legacy del administrador aún presentes en datos antiguos (columna `role`). */
+    private const ROLES_ADMIN_LEGACY = ['Admin'];
+
+    /**
+     * Nombres de rol que identifican al admin, para consultas SQL sobre `role` o `roles.name`.
+     * Única fuente de la compatibilidad legacy: no repetir ['admin', 'Admin'] en otros archivos.
+     *
+     * @return list<string>
+     */
+    public static function nombresRolAdmin(): array
+    {
+        return [self::ROL_ADMIN, ...self::ROLES_ADMIN_LEGACY];
+    }
+
     /**
      * Administrador de la plataforma (incluye el slug legacy «Admin»).
      *
      * El admin es un rol de SUPERVISIÓN: puede consultar todo y administrar usuarios,
      * solicitudes, catálogos y reportes, pero no ejecuta flujos de negocio
      * (actividades, tareas de planta, transporte, firmas, pedidos). Use este helper
-     * solo para visibilidad/alcance de consultas; para acciones use {@see puedeOperar()}.
+     * solo para visibilidad/alcance de consultas; para acciones use {@see puedeEjecutarOperacion()}.
      */
     public static function esAdminGlobal(?Usuario $user): bool
     {
@@ -22,13 +39,49 @@ final class UsuarioRol
             return false;
         }
 
-        return $user->hasAnyRole(['admin', 'Admin']) || strtolower((string) ($user->role ?? '')) === 'admin';
+        return $user->hasAnyRole(self::nombresRolAdmin())
+            || strtolower((string) ($user->role ?? '')) === self::ROL_ADMIN;
+    }
+
+    /**
+     * Supervisión global de solo lectura (lotes, planta, rutas, pedidos, reportes, trazabilidad).
+     * Nunca debe usarse para autorizar una escritura.
+     */
+    public static function puedeSupervisarTodo(?Usuario $user): bool
+    {
+        return self::esAdminGlobal($user);
     }
 
     /** Usuario autenticado que puede ejecutar flujos operativos (todos menos el admin supervisor). */
     public static function puedeOperar(?Usuario $user): bool
     {
         return $user !== null && ! self::esAdminGlobal($user);
+    }
+
+    /**
+     * Ejecutar una operación de negocio: exige ser actor operativo Y tener el permiso explícito.
+     * La supervisión global ({@see puedeSupervisarTodo()}) no concede operación. El ownership
+     * (lote, etapa, ruta, pedido) sigue siendo responsabilidad de cada módulo.
+     */
+    public static function puedeEjecutarOperacion(?Usuario $user, string $permiso): bool
+    {
+        return self::puedeOperar($user) && $user->can($permiso);
+    }
+
+    /**
+     * Administración global de usuarios, roles y solicitudes. Solo el admin: tener permisos
+     * `usuarios.*` en la matriz NO convierte a un rol operativo en administrador global.
+     */
+    public static function administraUsuariosGlobal(?Usuario $user): bool
+    {
+        return self::esAdminGlobal($user);
+    }
+
+    /** Acceso al módulo Gestión de usuarios: admin (global) o jefe agrícola/planta (solo su equipo). */
+    public static function puedeGestionarUsuarios(?Usuario $user): bool
+    {
+        return self::administraUsuariosGlobal($user)
+            || (self::puedeOperar($user) && self::puedeGestionarEmpleados($user));
     }
 
     public static function esAgricultorOperativo(?Usuario $user): bool
@@ -69,7 +122,7 @@ final class UsuarioRol
         return Usuario::query()
             ->where('activo', true)
             ->whereHas('roles', fn (Builder $q) => $q->where('name', 'planta'))
-            ->whereDoesntHave('roles', fn (Builder $q) => $q->whereIn('name', ['jefe_planta', 'admin']))
+            ->whereDoesntHave('roles', fn (Builder $q) => $q->whereIn('name', ['jefe_planta', ...self::nombresRolAdmin()]))
             ->where(function (Builder $q) {
                 $q->whereNull('email')
                     ->orWhere('email', '!=', 'planta@agrofusion.com');
@@ -280,10 +333,6 @@ final class UsuarioRol
 
     public static function puedeAprobarSolicitud(?Usuario $user, ?string $rolSolicitado): bool
     {
-        if (! $user) {
-            return false;
-        }
-
-        return self::esAdminGlobal($user);
+        return self::administraUsuariosGlobal($user);
     }
 }

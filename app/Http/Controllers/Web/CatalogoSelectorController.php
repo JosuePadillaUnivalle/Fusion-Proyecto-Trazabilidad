@@ -89,7 +89,7 @@ class CatalogoSelectorController extends Controller
 
         // El administrador supervisa el sistema; no es responsable operativo de parcelas.
         if (! $incluirSelfActor && ! $request->boolean('incluir_admin')) {
-            $query->whereNotIn('role', ['admin', 'Admin']);
+            $query->whereNotIn('role', UsuarioRol::nombresRolAdmin());
         }
 
         if ($request->boolean('solo_empleados_equipo') && $request->filled('supervisor_usuarioid')) {
