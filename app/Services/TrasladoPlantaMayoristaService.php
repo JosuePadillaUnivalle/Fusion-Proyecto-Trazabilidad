@@ -103,6 +103,14 @@ class TrasladoPlantaMayoristaService
 
         }
 
+        // MAY-BUG-01: un traslado a un almacén sin mayorista responsable activo quedaba entregado
+        // (se veía en movimientos) pero ningún mayorista lo veía ni podía recibirlo.
+        if (\App\Support\MayoristaAccess::responsableMayorista($mayoristaDestino) === null) {
+
+            throw new InvalidArgumentException('El almacén mayorista destino no tiene un mayorista responsable activo. Asígnelo antes de enviar el traslado.');
+
+        }
+
 
 
         $plantasRecogida = $this->resolverPlantasRecogida($plantaOrigen, $recogidasPlantasExtraIds);

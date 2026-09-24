@@ -150,7 +150,7 @@ class TrasladoPlantaMayoristaTest extends TestCase
 
 
 
-        return Almacen::create([
+        $almacen = Almacen::create([
 
             'nombre' => $nombre,
 
@@ -165,6 +165,13 @@ class TrasladoPlantaMayoristaTest extends TestCase
             'activo' => true,
 
         ]);
+
+        // Todo destino mayorista tiene un mayorista responsable que pueda recibir (MAY-BUG-01).
+        if ($ambito === AlmacenAmbito::MAYORISTA) {
+            $this->mayoristaResponsable($almacen);
+        }
+
+        return $almacen->fresh();
 
     }
 
@@ -687,7 +694,7 @@ class TrasladoPlantaMayoristaTest extends TestCase
         }
         $this->assertEquals(300.0, (float) $inventario->fresh()->cantidad_unidades);
 
-        $receptor = $this->mayoristaResponsable($mayorista);
+        $receptor = Usuario::query()->findOrFail($mayorista->fresh()->responsable_usuarioid);
         \App\Models\FirmaTransportistaEnvio::create([
             'rutadistribucionid' => $ruta->rutadistribucionid,
             'imagenfirma' => 'data:image/png;base64,iVBORw0KGgo=',
