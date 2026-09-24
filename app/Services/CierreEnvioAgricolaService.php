@@ -353,7 +353,7 @@ class CierreEnvioAgricolaService
 
     private function autorizarFirmaTransportista(Usuario $usuario, EnvioAsignacionMultiple $envio): void
     {
-        if (! $this->esTransportistaAsignado($usuario, $envio) && ! $this->esAdminOperativo($usuario)) {
+        if (! $this->esTransportistaAsignado($usuario, $envio)) {
             throw new InvalidArgumentException('Solo el transportista asignado puede firmar como transportista.');
         }
     }
@@ -361,8 +361,7 @@ class CierreEnvioAgricolaService
     private function autorizarFirmaRecepcion(Usuario $usuario, EnvioAsignacionMultiple $envio): void
     {
         if (
-            $this->esAdminOperativo($usuario)
-            || $usuario->can('recepcion_planta.confirm')
+            $usuario->can('recepcion_planta.confirm')
             || $this->esTransportistaAsignado($usuario, $envio)
         ) {
             return;
@@ -411,9 +410,10 @@ class CierreEnvioAgricolaService
         return filter_var($valor, FILTER_VALIDATE_BOOLEAN);
     }
 
+    /** Coordinador logístico con permiso de asignaciones (el admin supervisor no opera cierres). */
     private function esAdminOperativo(Usuario $usuario): bool
     {
-        return UsuarioRol::esAdminGlobal($usuario) || $usuario->can('asignaciones.update');
+        return UsuarioRol::puedeOperar($usuario) && $usuario->can('asignaciones.update');
     }
 
     private function generarDocumentoTransporte(EnvioAsignacionMultiple $envio, Usuario $usuario): DocumentoEntrega

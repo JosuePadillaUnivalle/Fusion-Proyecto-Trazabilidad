@@ -476,11 +476,11 @@ class PedidoDistribucionMayoristaService
 
         $pedido->loadMissing(['detalles.insumo', 'puntoVenta']);
 
-        $esAdmin = \App\Support\UsuarioRol::esAdminGlobal($usuario);
+        // Solo el minorista dueño edita su solicitud (el admin supervisa).
         $esDueño = \App\Support\UsuarioRol::esMinorista($usuario)
             && (int) $pedido->puntoVenta?->usuarioid === (int) $usuario->usuarioid;
 
-        if (! $esAdmin && ! $esDueño) {
+        if (! $esDueño) {
             throw new InvalidArgumentException('No tiene permiso para editar esta solicitud.');
         }
 

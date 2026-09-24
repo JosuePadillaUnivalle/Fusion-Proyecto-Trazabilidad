@@ -24,9 +24,10 @@ final class PuntoVentaAccess
             && (int) $puntoVenta->usuarioid === (int) $user->usuarioid;
     }
 
+    /** Solo el minorista dueño edita su punto de venta; el admin únicamente lo consulta. */
     public static function puedeEditarPunto(?Usuario $user, PuntoVenta $puntoVenta): bool
     {
-        return self::puedeVerPunto($user, $puntoVenta);
+        return UsuarioRol::puedeOperar($user) && self::puedeVerPunto($user, $puntoVenta);
     }
 
     public static function puedeVerPedido(?Usuario $user, PedidoDistribucion $pedido): bool
@@ -77,17 +78,10 @@ final class PuntoVentaAccess
         return $query->whereRaw('1 = 0');
     }
 
+    /** Firma de recepción: solo el minorista receptor (doble control con el transportista). */
     public static function puedeFirmarRecepcionRuta(?Usuario $user, RutaDistribucion $ruta): bool
     {
-        if (! $user) {
-            return false;
-        }
-
-        if (UsuarioRol::esAdminGlobal($user)) {
-            return true;
-        }
-
-        if (! UsuarioRol::esMinorista($user)) {
+        if (! UsuarioRol::puedeOperar($user) || ! UsuarioRol::esMinorista($user)) {
             return false;
         }
 

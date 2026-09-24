@@ -409,7 +409,8 @@
         $esAdmin = $esAdmin ?? false;
         $puedeVerRutaTiempoReal = $puedeVerRutaTiempoReal ?? false;
         $urlTiempoRealPedido = $urlTiempoRealPedido ?? null;
-        $puedeOperarSalidaRuta = ($esAdmin ?? false) || ($esTransportistaAsignado ?? false);
+        // Solo el transportista asignado opera la salida en ruta (el admin supervisa).
+        $puedeOperarSalidaRuta = ($esTransportistaAsignado ?? false);
         $urlUbicacionPdv = $pedido->puntoVenta
             ? route('punto-venta.pedidos.ubicacion.pdv', $pedido)
             : null;

@@ -16,11 +16,8 @@ final class MayoristaAccess
             return false;
         }
 
-        if (UsuarioRol::esAdminGlobal($user)) {
-            return AlmacenAmbito::resolverAmbito($almacen) === AlmacenAmbito::MAYORISTA;
-        }
-
-        if (! UsuarioRol::esMayorista($user)) {
+        // El admin supervisa almacenes mayoristas pero no los opera.
+        if (! UsuarioRol::puedeOperar($user) || ! UsuarioRol::esMayorista($user)) {
             return false;
         }
 
@@ -41,10 +38,6 @@ final class MayoristaAccess
             return false;
         }
 
-        if (UsuarioRol::esAdminGlobal($user)) {
-            return true;
-        }
-
         $ruta->loadMissing('almacenOrigen');
         $almacen = $ruta->almacenOrigen;
 
@@ -55,10 +48,6 @@ final class MayoristaAccess
     {
         if (! RutaDistribucionCatalogo::esTrasladoPlantaMayorista($ruta)) {
             return false;
-        }
-
-        if (UsuarioRol::esAdminGlobal($user)) {
-            return true;
         }
 
         $ruta->loadMissing('almacenMayoristaDestino');
