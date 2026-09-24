@@ -29,6 +29,7 @@ class SimulacionRutaService
     public function empezarAgricola(EnvioAsignacionMultiple $envio): void
     {
         $envio->loadMissing(['pedido', 'ruta.paradas']);
+        $this->asegurarSinOtroViajeEnCurso((int) $envio->transportista_usuarioid, $envio, null);
 
         if (! SimulacionRutaCatalogo::puedeEmpezarAgricola($envio)) {
             throw new InvalidArgumentException('Este envío no está listo para iniciar la ruta.');
@@ -46,13 +47,39 @@ class SimulacionRutaService
         $geo = $this->construirGeoJson($paradas);
         $duracion = $this->calcularDuracionSegundos($geo, $paradas);
 
-        $envio->update([
-            'estado' => 'en_transporte_planta',
-            'fecha_asignacion' => $envio->fecha_asignacion ?? now(),
-            'simulacion_inicio_at' => now(),
-            'simulacion_duracion_seg' => $duracion,
-            'simulacion_geojson' => $geo,
-        ]);
+        DB::transaction(function () use ($envio, $geo, $duracion) {
+            // Lock del conductor y del envío + revalidación (TRA-06, TRA-15): dos «Empezar ruta»
+            // simultáneos no inician dos veces ni dejan al conductor con dos viajes en curso.
+            $this->bloquearConductor((int) $envio->transportista_usuarioid);
+            $bloqueado = EnvioAsignacionMultiple::query()->whereKey($envio->envioasignacionmultipleid)->lockForUpdate()->firstOrFail();
+            if ($bloqueado->simulacion_inicio_at !== null) {
+                throw new InvalidArgumentException('Este envío ya está en ruta.');
+            }
+            $this->asegurarSinOtroViajeEnCurso((int) $envio->transportista_usuarioid, $envio, null);
+
+            $envio->update([
+                'estado' => 'en_transporte_planta',
+                'fecha_asignacion' => $envio->fecha_asignacion ?? now(),
+                'simulacion_inicio_at' => now(),
+                'simulacion_duracion_seg' => $duracion,
+                'simulacion_geojson' => $geo,
+            ]);
+        });
+    }
+
+    private function bloquearConductor(int $conductorId): void
+    {
+        if ($conductorId > 0) {
+            Usuario::query()->whereKey($conductorId)->lockForUpdate()->first();
+        }
+    }
+
+    private function asegurarSinOtroViajeEnCurso(int $conductorId, ?EnvioAsignacionMultiple $envio, ?RutaDistribucion $ruta): void
+    {
+        $enCurso = \App\Support\ViajeAcceso::viajeEnCursoDelConductor($conductorId, $envio, $ruta);
+        if ($enCurso !== null) {
+            throw new InvalidArgumentException("El transportista ya tiene un viaje en curso ({$enCurso}). Debe completarlo antes de iniciar otro.");
+        }
     }
 
     public function empezarDistribucion(RutaDistribucion $ruta): void
@@ -62,6 +89,8 @@ class SimulacionRutaService
         if (! SimulacionRutaCatalogo::puedeEmpezarDistribucion($ruta)) {
             throw new InvalidArgumentException('Esta ruta no está lista para iniciar.');
         }
+
+        $this->asegurarSinOtroViajeEnCurso((int) $ruta->transportista_usuarioid, null, $ruta);
 
         if (RutaDistribucionCatalogo::esTrasladoPlantaMayorista($ruta)
             && ! app(CierreEnvioPlantaMayoristaService::class)->tieneCondicionesVehiculo($ruta)) {
@@ -82,6 +111,13 @@ class SimulacionRutaService
         $duracion = $this->calcularDuracionSegundos($geo, $paradas);
 
         DB::transaction(function () use ($ruta, $geo, $duracion) {
+            $this->bloquearConductor((int) $ruta->transportista_usuarioid);
+            $bloqueada = RutaDistribucion::query()->whereKey($ruta->rutadistribucionid)->lockForUpdate()->firstOrFail();
+            if (! SimulacionRutaCatalogo::puedeEmpezarDistribucion($bloqueada)) {
+                throw new InvalidArgumentException('Esta ruta ya fue iniciada o no está lista para iniciar.');
+            }
+            $this->asegurarSinOtroViajeEnCurso((int) $ruta->transportista_usuarioid, null, $ruta);
+
             $ruta->update([
                 'estado' => RutaDistribucionCatalogo::ESTADO_EN_RUTA,
                 'fecha_salida' => now(),

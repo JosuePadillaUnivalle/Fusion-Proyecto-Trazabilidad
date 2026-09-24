@@ -265,10 +265,20 @@ class CierreEnvioPlantaMayoristaService
             throw new InvalidArgumentException('Primero debe llegar al destino. Espere a que el recorrido GPS llegue al 100% antes de confirmar la llegada.');
         }
 
-        $ruta->update([
-            'llegada_confirmada_at' => now(),
-            'llegada_confirmada_usuarioid' => $usuario->usuarioid,
-        ]);
+        // Actualización condicional atómica (TRA-15): una segunda confirmación concurrente no pisa la primera.
+        $actualizadas = RutaDistribucion::query()
+            ->whereKey($ruta->rutadistribucionid)
+            ->whereNull('llegada_confirmada_at')
+            ->update([
+                'llegada_confirmada_at' => now(),
+                'llegada_confirmada_usuarioid' => $usuario->usuarioid,
+            ]);
+
+        if ($actualizadas === 0) {
+            throw new InvalidArgumentException('La llegada ya fue confirmada.');
+        }
+
+        $ruta->refresh();
     }
 
     /**
@@ -298,6 +308,11 @@ class CierreEnvioPlantaMayoristaService
         }
 
         return DB::transaction(function () use ($ruta, $sinIncidentes, $incidentes, $observaciones, $catalogo) {
+            RutaDistribucion::query()->whereKey($ruta->rutadistribucionid)->lockForUpdate()->first();
+            if ($ruta->checklistIncidente()->exists()) {
+                throw new InvalidArgumentException('Los incidentes ya fueron registrados.');
+            }
+
             $checklist = ChecklistIncidenteEnvio::create([
                 'rutadistribucionid' => $ruta->rutadistribucionid,
                 'fecha' => now(),

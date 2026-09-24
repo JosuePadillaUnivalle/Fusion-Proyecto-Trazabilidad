@@ -158,6 +158,39 @@ final class ViajeAcceso
             && (! $pedidoId || in_array((int) $pedidoId, $pedidos, true));
     }
 
+    /**
+     * Código del viaje EN CURSO del conductor en cualquiera de los tres trayectos, o null.
+     * Un conductor no puede tener dos viajes en ruta a la vez (TRA-06).
+     */
+    public static function viajeEnCursoDelConductor(
+        int $conductorId,
+        ?EnvioAsignacionMultiple $excluirEnvio = null,
+        ?RutaDistribucion $excluirRuta = null,
+    ): ?string {
+        if ($conductorId <= 0) {
+            return null;
+        }
+
+        $envio = EnvioAsignacionMultiple::query()
+            ->where('transportista_usuarioid', $conductorId)
+            ->whereNotNull('simulacion_inicio_at')
+            ->whereNull('fecha_recepcion_planta')
+            ->whereNotIn('estado', ['recibido_planta', 'entregado', 'entregada'])
+            ->when($excluirEnvio, fn (Builder $q) => $q->whereKeyNot($excluirEnvio->envioasignacionmultipleid))
+            ->first();
+        if ($envio !== null) {
+            return (string) ($envio->externo_envio_id ?: 'Envío #'.$envio->envioasignacionmultipleid);
+        }
+
+        $ruta = RutaDistribucion::query()
+            ->where('transportista_usuarioid', $conductorId)
+            ->where('estado', RutaDistribucionCatalogo::ESTADO_EN_RUTA)
+            ->when($excluirRuta, fn (Builder $q) => $q->whereKeyNot($excluirRuta->rutadistribucionid))
+            ->first();
+
+        return $ruta !== null ? (string) ($ruta->codigo ?: 'Ruta #'.$ruta->rutadistribucionid) : null;
+    }
+
     /** @return array{0: list<string>, 1: list<int>} */
     private static function viajesDelConductor(Usuario $user): array
     {
