@@ -322,6 +322,9 @@ return [
 
             'delete' => 'punto_venta.delete',
 
+            // MIN-06: ajuste explícito del stock del PDV (con motivo y movimiento auditado).
+            'ajustar' => 'punto_venta.ajuste_stock',
+
         ],
 
         'pedidos_distribucion' => [
@@ -664,6 +667,8 @@ return [
             'punto_venta.update',
 
             'punto_venta.delete',
+
+            'punto_venta.ajuste_stock',
 
             'pedidos_distribucion.view',
 
