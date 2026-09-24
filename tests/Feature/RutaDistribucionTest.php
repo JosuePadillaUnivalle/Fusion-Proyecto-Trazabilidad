@@ -97,6 +97,8 @@ class RutaDistribucionTest extends TestCase
             'marca' => 'Toyota',
             'modelo' => 'Hilux',
             'activo' => true,
+            // Conductor y vehículo de la misma flota (TRA-04).
+            'ambito_flota' => TransportistaFlotaCatalogo::MAYORISTA,
         ]);
 
         PerfilTransportista::create([

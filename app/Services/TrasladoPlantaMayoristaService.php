@@ -1044,35 +1044,9 @@ class TrasladoPlantaMayoristaService
 
     {
 
-        $transportista = Usuario::query()
+        $transportista = Usuario::query()->with('perfilTransportista')->find($transportistaId);
 
-            ->with('perfilTransportista')
-
-            ->where('usuarioid', $transportistaId)
-
-            ->where('role', 'transportista')
-
-            ->where('activo', true)
-
-            ->first();
-
-
-
-        if ($transportista === null) {
-
-            throw new InvalidArgumentException('El transportista seleccionado no está disponible.');
-
-        }
-
-
-
-        $ambito = $transportista->perfilTransportista?->ambito_flota ?? TransportistaFlotaCatalogo::AGRICOLA;
-
-        if ($ambito !== TransportistaFlotaCatalogo::PLANTA) {
-
-            throw new InvalidArgumentException('Seleccione un chofer de flota planta.');
-
-        }
+        \App\Support\TransportistaPool::asegurarAsignable($transportista, TransportistaFlotaCatalogo::PLANTA);
 
 
 
@@ -1107,6 +1081,9 @@ class TrasladoPlantaMayoristaService
             throw new InvalidArgumentException('Seleccione un vehículo de flota planta.');
 
         }
+
+        // Licencia compatible, vehículo operativo y no en ruta (TRA-10): antes solo se validaba en M → PDV.
+        $this->capacidadTransporte->validarAsignacion($transportista, $vehiculo->loadMissing('tipoVehiculo'));
 
     }
 
