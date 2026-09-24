@@ -266,6 +266,16 @@ class GestionUsuariosController extends Controller
             return back()->withErrors(['rol' => 'La solicitud no tiene un rol válido.']);
         }
 
+        // TRA-05: el admin decide la flota del transportista; ya no queda «agrícola» por defecto.
+        $ambitoFlota = null;
+        if ($rolNombre === 'transportista') {
+            $ambitoFlota = $request->validate([
+                'ambito_flota' => ['required', 'in:'.implode(',', \App\Support\TransportistaFlotaCatalogo::valores())],
+            ], [
+                'ambito_flota.required' => 'Elija la flota (agrícola, planta o mayorista) del transportista antes de aprobar.',
+            ])['ambito_flota'];
+        }
+
         Role::firstOrCreate(['name' => $rolNombre, 'guard_name' => 'web']);
         PermissionMatrixSync::syncRole($rolNombre);
 
@@ -290,7 +300,7 @@ class GestionUsuariosController extends Controller
         $usuario->syncRoles([$rolNombre]);
 
         if ($rolNombre === 'transportista') {
-            $this->crearPerfilTransportistaDesdeSolicitud($usuario);
+            $this->crearPerfilTransportistaDesdeSolicitud($usuario, $ambitoFlota);
         }
 
         return redirect()->route('gestion.show', $usuario)->with(
@@ -502,7 +512,7 @@ class GestionUsuariosController extends Controller
         abort(403);
     }
 
-    private function crearPerfilTransportistaDesdeSolicitud(Usuario $usuario): void
+    private function crearPerfilTransportistaDesdeSolicitud(Usuario $usuario, string $ambitoFlota): void
     {
         if (! Schema::hasTable('perfil_transportista')) {
             return;
@@ -518,7 +528,9 @@ class GestionUsuariosController extends Controller
         PerfilTransportista::updateOrCreate(
             ['usuarioid' => $usuario->usuarioid],
             [
+                'ambito_flota' => $ambitoFlota,
                 'tipo_licencia' => $usuario->tipo_licencia,
+                'licencias_json' => $usuario->licencias_json,
                 'licencia' => $usuario->ci_nit,
                 'estadotransportistaid' => $estadoId,
                 'disponible' => true,

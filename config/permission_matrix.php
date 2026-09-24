@@ -322,6 +322,9 @@ return [
 
             'delete' => 'punto_venta.delete',
 
+            // MIN-06: ajuste explícito del stock del PDV (con motivo y movimiento auditado).
+            'ajustar' => 'punto_venta.ajuste_stock',
+
         ],
 
         'pedidos_distribucion' => [
@@ -627,8 +630,6 @@ return [
 
             'envios.view',
 
-            'envios.update',
-
             'asignaciones.view',
 
             'rutas_multi.view',
@@ -641,17 +642,13 @@ return [
 
             'incidentes.create',
 
+            // TRA-11: sin envios.update, pedidos_distribucion.update, monitoreo.view ni incidentes.delete;
+            // incidentes.update queda acotado a los incidentes que él reportó (TRA-07).
             'incidentes.update',
-
-            'incidentes.delete',
 
             'pedidos.view',
 
             'pedidos_distribucion.view',
-
-            'pedidos_distribucion.update',
-
-            'monitoreo.view',
 
         ],
 
@@ -664,6 +661,8 @@ return [
             'punto_venta.update',
 
             'punto_venta.delete',
+
+            'punto_venta.ajuste_stock',
 
             'pedidos_distribucion.view',
 
@@ -709,13 +708,7 @@ return [
 
             'pedidos.create',
 
-            'usuarios.view',
-
-            'usuarios.create',
-
-            'usuarios.update',
-
-            'usuarios.delete',
+            // MAY-01: sin usuarios.* — el mayorista (incluido este slug legacy) no administra usuarios.
 
         ],
 

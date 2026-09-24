@@ -1281,7 +1281,7 @@
                                 <i class="fas fa-chevron-right ag-sub-arrow"></i>
                             </a>
                             <ul class="ag-subnav ag-subnav-nested {{ $logMasOpen ? 'open' : '' }}" id="sub-log-mas">
-                                @if(($isAdmin || auth()->user()?->can('envios.view')) && ! auth()->user()?->hasRole('transportista'))
+                                @if(auth()->user()?->can('envios.view') && auth()->user()?->can('reportes.view'))
                                 <li class="ag-sub-li"><a href="{{ route('envios.reportes-distribucion') }}" class="ag-sub-a {{ request()->routeIs('envios.reportes-distribucion') ? 'active' : '' }}">Reportes distribución</a></li>
                                 @endif
                             </ul>
