@@ -114,8 +114,13 @@ Route::name('api.')->group(function () use ($recursoProtegido) {
     $recursoProtegido('producciones-almacenamiento', ProduccionAlmacenamientoController::class, 'inventario');
     Route::get('almacen-movimientos', [AlmacenMovimientoController::class, 'index'])
         ->middleware(['auth:sanctum', 'action.permission:almacen_movimientos,read']);
-    Route::post('almacen-movimientos/{naturaleza}', [AlmacenMovimientoController::class, 'store'])
-        ->middleware(['auth:sanctum', 'action.permission:almacen_movimientos,read']);
+    // Escritura: exige el permiso de creación de ingreso/salida en la ruta (no el de lectura).
+    Route::post('almacen-movimientos/ingreso', [AlmacenMovimientoController::class, 'store'])
+        ->defaults('naturaleza', 'ingreso')
+        ->middleware(['auth:sanctum', 'action.permission:almacen_ingresos,create']);
+    Route::post('almacen-movimientos/salida', [AlmacenMovimientoController::class, 'store'])
+        ->defaults('naturaleza', 'salida')
+        ->middleware(['auth:sanctum', 'action.permission:almacen_salidas,create']);
 
     // ========================================================
     // GRUPO: INSUMOS Y APLICACIONES

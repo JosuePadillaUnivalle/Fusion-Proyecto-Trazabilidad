@@ -1399,7 +1399,7 @@
                         <li class="ag-sub-li">
                             <a href="{{ route('almacen-mayorista.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-mayorista.index', 'almacen-mayorista.show', 'almacen-mayorista.create', 'almacen-mayorista.edit', 'almacen-mayorista.inventario.*') ? 'active' : '' }}">Almacenes</a>
                         </li>
-                        @can('inventario.read')
+                        @can('inventario.view')
                         <li class="ag-sub-li">
                             <a href="{{ route('almacen-mayorista.traslados-planta.index') }}" class="ag-sub-a {{ request()->routeIs('almacen-mayorista.traslados-planta.*') ? 'active' : '' }}">Recepciones de planta</a>
                         </li>
@@ -1480,7 +1480,7 @@
                 @endif
                 @endif {{-- /TEMPORAL ! $isAdmin --}}
 
-                @if($isAdmin || auth()->user()?->can('usuarios.view') || \App\Support\ReporteCatalogo::usuarioTieneAcceso(auth()->user()))
+                @if(\App\Support\UsuarioRol::puedeGestionarUsuarios($authUser) || \App\Support\ReporteCatalogo::usuarioTieneAcceso(auth()->user()))
                 <span class="ag-nav-label">{{ ($esJefeAgr || ($authUser && $authUser->hasRole('jefe_planta'))) && ! $isAdmin ? 'Equipo' : 'Administración' }}</span>
 
                 @if($isAdmin && $pendientesSolicitudes > 0)
@@ -1493,7 +1493,7 @@
                 </li>
                 @endif
 
-                @if($isAdmin || auth()->user()?->can('usuarios.view'))
+                @if(\App\Support\UsuarioRol::puedeGestionarUsuarios($authUser))
                 <li class="ag-nav-li">
                     <a href="{{ route('gestion.index') }}" class="ag-nav-a {{ request()->routeIs('gestion.*') ? 'active' : '' }}">
                         <i class="ag-nav-icon fas fa-users-cog"></i>

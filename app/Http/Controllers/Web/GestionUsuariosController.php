@@ -28,6 +28,7 @@ class GestionUsuariosController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->autorizarModulo();
         $modoJefe = $this->modoJefe();
         $query = $this->usuariosFilteredQuery($request);
 
@@ -59,6 +60,7 @@ class GestionUsuariosController extends Controller
 
     public function create(): View
     {
+        $this->autorizarModulo();
         $modoJefe = $this->modoJefe();
 
         return view('usuarios.create', [
@@ -112,6 +114,8 @@ class GestionUsuariosController extends Controller
 
     public function storeUsuario(Request $request): RedirectResponse
     {
+        $this->autorizarModulo();
+
         if ($this->modoJefe()) {
             return $this->storeEmpleadoJefe($request);
         }
@@ -220,7 +224,7 @@ class GestionUsuariosController extends Controller
 
     public function storeRol(Request $request): RedirectResponse
     {
-        abort_unless(UsuarioRol::esAdminGlobal(auth()->user()), 403);
+        abort_unless(UsuarioRol::administraUsuariosGlobal(auth()->user()), 403);
 
         $data = $request->validate([
             'nombre' => 'required|string|max:50|unique:roles,name',
@@ -233,7 +237,7 @@ class GestionUsuariosController extends Controller
 
     public function updateRol(Request $request, Role $role): RedirectResponse
     {
-        abort_unless(UsuarioRol::esAdminGlobal(auth()->user()), 403);
+        abort_unless(UsuarioRol::administraUsuariosGlobal(auth()->user()), 403);
 
         $data = $request->validate([
             'nombre' => ['required', 'string', 'max:50', Rule::unique('roles', 'name')->ignore($role->id)],
@@ -246,7 +250,7 @@ class GestionUsuariosController extends Controller
 
     public function destroyRol(Role $role): RedirectResponse
     {
-        abort_unless(UsuarioRol::esAdminGlobal(auth()->user()), 403);
+        abort_unless(UsuarioRol::administraUsuariosGlobal(auth()->user()), 403);
 
         $role->delete();
 
@@ -467,12 +471,21 @@ class GestionUsuariosController extends Controller
     private function modoJefe(): bool
     {
         return UsuarioRol::puedeGestionarEmpleados(auth()->user())
-            && ! UsuarioRol::esAdminGlobal(auth()->user());
+            && ! UsuarioRol::administraUsuariosGlobal(auth()->user());
+    }
+
+    /**
+     * Solo el admin (global) o un jefe agrícola/planta (su equipo) usan este módulo.
+     * Cualquier otro rol con permisos `usuarios.*` en la matriz no obtiene administración global.
+     */
+    private function autorizarModulo(): void
+    {
+        abort_unless(UsuarioRol::puedeGestionarUsuarios(auth()->user()), 403);
     }
 
     private function autorizarAccesoUsuario(Usuario $usuario): void
     {
-        if (UsuarioRol::esAdminGlobal(auth()->user())) {
+        if (UsuarioRol::administraUsuariosGlobal(auth()->user())) {
             return;
         }
 
@@ -486,7 +499,7 @@ class GestionUsuariosController extends Controller
             return;
         }
 
-        abort_unless(auth()->user()?->can('usuarios.view'), 403);
+        abort(403);
     }
 
     private function crearPerfilTransportistaDesdeSolicitud(Usuario $usuario): void

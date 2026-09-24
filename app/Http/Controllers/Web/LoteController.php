@@ -721,8 +721,7 @@ class LoteController extends Controller
 
     private function usuarioEsAdmin(Usuario $usuario): bool
     {
-        return UsuarioRol::esAdminGlobal($usuario)
-            || in_array(strtolower((string) ($usuario->role ?? '')), ['admin'], true);
+        return UsuarioRol::esAdminGlobal($usuario);
     }
 
     private function aplicarScopeLotesVisibles($query, ?Usuario $user): void
