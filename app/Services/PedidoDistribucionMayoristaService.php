@@ -148,13 +148,16 @@ class PedidoDistribucionMayoristaService
 
                 }
 
-            } else {
-
-                $updates['almacen_mayorista_origenid'] = null;
-
             }
 
+            // El origen ya no se borra cuando falta stock: el pedido sigue asignado a este mayorista
+            // (MAY-11) y pasa por coordinación con planta.
             $pedido->update($updates);
+
+            // Reserva: dos pedidos confirmados no consumen el mismo stock (MAY-10).
+            if (! $requierePlanta) {
+                app(PedidoDistribucionReservaService::class)->reservar($pedido->fresh(['detalles.presentacion', 'detalles.insumo']));
+            }
 
             return $pedido->fresh([
 

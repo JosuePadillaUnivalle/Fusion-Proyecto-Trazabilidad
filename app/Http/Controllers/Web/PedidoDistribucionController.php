@@ -424,44 +424,53 @@ class PedidoDistribucionController extends Controller
             ? PedidoDistribucionCatalogo::ESTADO_CONFIRMADO
             : PedidoDistribucionCatalogo::ESTADO_PENDIENTE;
 
-        $pedido = DB::transaction(function () use (
-            $data,
-            $tipoSolicitud,
-            $detallesPayload,
-            $request,
-            $almacenOrigenId,
-            $estadoInicial,
-            $esIniciadorMayorista,
-            $user
-        ) {
-            $pedido = PedidoDistribucion::create([
-                'numero_solicitud' => PedidoDistribucionCatalogo::generarNumeroSolicitud(),
-                'puntoventaid' => (int) $data['puntoventaid'],
-                'almacen_mayorista_origenid' => $almacenOrigenId,
-                'estado' => $estadoInicial,
-                'tipo_solicitud' => $tipoSolicitud,
-                'espera_stock' => false,
-                'requiere_coordinacion_planta' => false,
-                'coordinacion_planta_resuelta' => false,
-                'fechapedido' => now(),
-                'fecha_entrega_deseada' => $data['fecha_entrega_deseada'],
-                'hora_entrega_deseada' => $data['hora_entrega_deseada'] ?? null,
-                'observaciones' => $data['observaciones'] ?? null,
-                'creado_por_usuarioid' => $user->usuarioid,
-                'envio_iniciado_mayorista' => $esIniciadorMayorista,
-                'fecha_confirmacion_minorista' => null,
-                'fecha_aceptacion' => $esIniciadorMayorista ? now() : null,
-                'aceptado_por_usuarioid' => $esIniciadorMayorista ? $user->usuarioid : null,
-            ]);
+        try {
+            $pedido = DB::transaction(function () use (
+                $data,
+                $tipoSolicitud,
+                $detallesPayload,
+                $request,
+                $almacenOrigenId,
+                $estadoInicial,
+                $esIniciadorMayorista,
+                $user
+            ) {
+                $pedido = PedidoDistribucion::create([
+                    'numero_solicitud' => PedidoDistribucionCatalogo::generarNumeroSolicitud(),
+                    'puntoventaid' => (int) $data['puntoventaid'],
+                    'almacen_mayorista_origenid' => $almacenOrigenId,
+                    'estado' => $estadoInicial,
+                    'tipo_solicitud' => $tipoSolicitud,
+                    'espera_stock' => false,
+                    'requiere_coordinacion_planta' => false,
+                    'coordinacion_planta_resuelta' => false,
+                    'fechapedido' => now(),
+                    'fecha_entrega_deseada' => $data['fecha_entrega_deseada'],
+                    'hora_entrega_deseada' => $data['hora_entrega_deseada'] ?? null,
+                    'observaciones' => $data['observaciones'] ?? null,
+                    'creado_por_usuarioid' => $user->usuarioid,
+                    'envio_iniciado_mayorista' => $esIniciadorMayorista,
+                    'fecha_confirmacion_minorista' => null,
+                    'fecha_aceptacion' => $esIniciadorMayorista ? now() : null,
+                    'aceptado_por_usuarioid' => $esIniciadorMayorista ? $user->usuarioid : null,
+                ]);
 
-            foreach ($detallesPayload as $detallePayload) {
-                DetallePedidoDistribucion::create(array_merge([
-                    'pedidodistribucionid' => $pedido->pedidodistribucionid,
-                ], $detallePayload));
-            }
+                foreach ($detallesPayload as $detallePayload) {
+                    DetallePedidoDistribucion::create(array_merge([
+                        'pedidodistribucionid' => $pedido->pedidodistribucionid,
+                    ], $detallePayload));
+                }
 
-            return $pedido;
-        });
+                // El envío iniciado por el mayorista nace confirmado: reserva el stock ya (MAY-10).
+                if ($estadoInicial === PedidoDistribucionCatalogo::ESTADO_CONFIRMADO) {
+                    app(\App\Services\PedidoDistribucionReservaService::class)->reservar($pedido->fresh(['detalles.presentacion', 'detalles.insumo']));
+                }
+
+                return $pedido;
+            });
+        } catch (InvalidArgumentException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
 
         if ($esIniciadorMayorista) {
             try {
