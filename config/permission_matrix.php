@@ -630,8 +630,6 @@ return [
 
             'envios.view',
 
-            'envios.update',
-
             'asignaciones.view',
 
             'rutas_multi.view',
@@ -644,17 +642,13 @@ return [
 
             'incidentes.create',
 
+            // TRA-11: sin envios.update, pedidos_distribucion.update, monitoreo.view ni incidentes.delete;
+            // incidentes.update queda acotado a los incidentes que él reportó (TRA-07).
             'incidentes.update',
-
-            'incidentes.delete',
 
             'pedidos.view',
 
             'pedidos_distribucion.view',
-
-            'pedidos_distribucion.update',
-
-            'monitoreo.view',
 
         ],
 
