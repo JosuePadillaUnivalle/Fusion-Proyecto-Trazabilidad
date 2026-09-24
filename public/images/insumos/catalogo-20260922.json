@@ -1,0 +1,1502 @@
+{
+  "images": [
+    {
+      "id": 1,
+      "name": "Papa amarilla",
+      "path": "/images/insumos/catalogo-20260922/insumo-1.jpg",
+      "sha256": "219a11e0a329606d650c779b6a8b1f2febc1812295baba2d495baf5acf07e119",
+      "page": "https://commons.wikimedia.org/wiki/File:Yukon-gold-potatoes.jpg",
+      "og": "https://upload.wikimedia.org/wikipedia/commons/f/fa/Yukon-gold-potatoes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "metadata": {
+        "DateTime": {
+          "value": "2011-10-27 17:17:57",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Yukon-gold-potatoes",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "CC-Zero|Solanum tuberosum 'Yukon Gold'|Sliced potatoes",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Golden Flesh Yukon Gold Potato",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2011-10-27",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "History of Yukon Gold Potatoes",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "University of Guelph",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 17,
+      "name": "Semilla Papa Huaycha",
+      "path": "/images/insumos/catalogo-20260922/insumo-17.jpg",
+      "sha256": "770e14aeefe2911e68ba775ec2f76a63c429e28dc26d7655b203e985019b666a",
+      "page": "https://commons.wikimedia.org/wiki/File:Chitted_seed_potatoes.jpg",
+      "og": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/94/Chitted_seed_potatoes.jpg/960px-Chitted_seed_potatoes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "metadata": {
+        "DateTime": {
+          "value": "2025-03-31 11:09:38",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Chitted seed potatoes",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Gardening|Self-published work|Potato sprouts|Potato production",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Seed potatoes in a cardboard tray with sprouts growing from them.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2025-03-31",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Kangarooth\" title=\"User:Kangarooth\">Kangarooth</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 4.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 4.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-4.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 18,
+      "name": "Fertilizante NPK 15-15-15",
+      "path": "/images/insumos/catalogo-20260922/insumo-18.png",
+      "sha256": "61c5dc82f520c400035c799332a58983bb77b8af07b37105a799dda6a7e4f400",
+      "page": "https://commons.wikimedia.org/wiki/File:%D0%90%D0%B7%D0%BE%D1%84%D0%BE%D1%81%D0%BA%D0%B0.png",
+      "og": "https://upload.wikimedia.org/wikipedia/commons/9/99/%D0%90%D0%B7%D0%BE%D1%84%D0%BE%D1%81%D0%BA%D0%B0.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "metadata": {
+        "DateTime": {
+          "value": "2017-05-21 09:12:32",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Азофоска",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Self-published work|Fertilizer pellets|NPK Fertilizer",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Азофоска (нитроаммофоска, NPK)",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2017-05-21",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Grimly123&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Grimly123 (page does not exist)\">Grimly123</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 4.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 4.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-4.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 19,
+      "name": "Bioinsecticida neem",
+      "path": "/images/insumos/catalogo-20260922/insumo-19.jpg",
+      "sha256": "5c78d5448aa0dfc44aa1b88e7343c94549e17a74febac695c236d3ff7d48338a",
+      "page": "https://bonide.com/product/neem-oil-conc/",
+      "url": "https://files.plytix.com/api/v1.1/file/public_files/pim/assets/43/37/8d/5e/5e8d3743202d9eba64d3af60/images/25/c6/db/63/63dbc6259050d56a4d952765/024_LifeStyle_01.jpg",
+      "metadata": {
+        "Artist": {
+          "value": "Bonide"
+        },
+        "LicenseShortName": {
+          "value": "Fotografía del fabricante; derechos de su titular"
+        }
+      },
+      "modification": "Redimensionada a 1200 px; sin recorte."
+    },
+    {
+      "id": 33,
+      "name": "Urea granulada 46%",
+      "path": "/images/insumos/catalogo-20260922/insumo-33.jpg",
+      "sha256": "d87e623ef79b711873ef3ccde707100cbd5da4d59b36b18c5e4cb91a8b2b542c",
+      "note": "Fotografía existente conservada."
+    },
+    {
+      "id": 34,
+      "name": "Abono orgánico compost",
+      "path": "/images/insumos/catalogo-20260922/insumo-34.jpg",
+      "sha256": "653cb8109d691f349764373e234fee544c47f3915af06863aea4c926ef69669c",
+      "note": "Fotografía existente conservada."
+    },
+    {
+      "id": 35,
+      "name": "Fungicida cobre hidróxido",
+      "path": "/images/insumos/catalogo-20260922/insumo-35.jpg",
+      "sha256": "771ec9560b334f03c40f8cfee6a79d0a43234ae9bb7e5a31c001247b61a74229",
+      "page": "https://chemicalwarehouse.com/products/nu-cop-hb",
+      "og": "https://chemicalwarehouse.com/cdn/shop/files/NU-COP_10LB_ChemicalWarehouse_1200x1200.jpg?v=1778692832"
+    },
+    {
+      "id": 36,
+      "name": "Insecticida piretroides",
+      "path": "/images/insumos/catalogo-20260922/insumo-36.jpg",
+      "sha256": "f9648b1641fdffa003ec1b69fef9c8836ea908d8f52c6b46e8dc98e8900ae8e7",
+      "page": "https://www.millsupplyco.com/lawn-and-garden/insect-and-pest-control/insecticides/concentrate-garden/spray-concentrate-eight-pt-684-4260",
+      "og": "https://www.millsupplyco.com/nsimages/6844260.jpg"
+    },
+    {
+      "id": 37,
+      "name": "Herbicida glifosato",
+      "path": "/images/insumos/catalogo-20260922/insumo-37.webp",
+      "sha256": "51612b92b917c5fa0233d3c4b885d3db997d8d5cf34246b2526cc8924b24afed",
+      "page": "https://www.pomais.com/product/glyphosate/",
+      "og": "https://www.pomais.com/wp-content/uploads/2024/08/10.10-草甘膦主图2.webp"
+    },
+    {
+      "id": 58,
+      "name": "Semilla Zanahoria Imperator",
+      "path": "/images/insumos/catalogo-20260922/insumo-58.jpg",
+      "sha256": "68da012f6bad5c668b07d53071886b96640273dd220e8416ba194da29cb1d5e4",
+      "note": "Fotografía existente conservada."
+    },
+    {
+      "id": 59,
+      "name": "Fertilizante NPK 15-15-15",
+      "path": "/images/insumos/catalogo-20260922/insumo-59.jpg",
+      "sha256": "19a93770bf076d2852d86f09e2bc9b04fa4b3954380fc024c0260be116155a9e",
+      "note": "Fotografía existente conservada."
+    },
+    {
+      "id": 60,
+      "name": "Bioinsecticida neem",
+      "path": "/images/insumos/catalogo-20260922/insumo-60.png",
+      "sha256": "402fe5345588f6948602f8426584437c62a042288bce633938e18af07cd6473f",
+      "page": "https://summitchemical.com/products/summit-neem-85-cold-pressed-neem-oil/",
+      "og": "https://summitchemical.com/wp-content/uploads/2025/08/Neem_pint_2-removebg-opt.png"
+    },
+    {
+      "id": 120,
+      "name": "Papa industrial Monalisa",
+      "path": "/images/insumos/catalogo-20260922/insumo-120.png",
+      "sha256": "bb86ac3f7a93cb863b5b813e2934a5334c9f333fa2965dfaea36e500d74434a2",
+      "page": "https://commons.wikimedia.org/wiki/File:Pommes_de_terre_Monalisa.png",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/6/6f/Pommes_de_terre_Monalisa.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2010-02-01 17:12:31",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Pommes de terre Monalisa",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "GFDL|CC-BY-SA-3.0,2.5,2.0,1.0|License migration redundant|Monalisa (potato)|Self-published work",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "variété de pomme de terre 'Monalisa'",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2010-02-01",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Spedona\" title=\"User:Spedona\">Spedona</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 3.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 3.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/3.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-3.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 121,
+      "name": "Papa rubíola granel",
+      "path": "/images/insumos/catalogo-20260922/insumo-121.jpg",
+      "sha256": "639c50c48a7f0246da1ed753b41c14567f245dcb224a2ef33b650303a1635213",
+      "page": "https://commons.wikimedia.org/wiki/File:Red_potatoes.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/ac/Red_potatoes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2024-07-09 11:02:16",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Red potatoes",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Potatoes|Self-published work",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Red Potatoes",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2024-07-09",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Albertinon\" title=\"User:Albertinon\">Albertinon</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY 4.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution 4.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by/4.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-4.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 122,
+      "name": "Zanahoria fresca Imperator",
+      "path": "/images/insumos/catalogo-20260922/insumo-122.jpg",
+      "sha256": "4570e77760e3964d275f4801fdc83b7ffe31e1999c3b5ac421b1177f783a1b21",
+      "page": "https://commons.wikimedia.org/wiki/File:Carrots.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/c/c8/Carrots.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2008-02-16 20:12:15",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Carrots",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Taken with Nikon Coolpix L3|PD-user|Carrots",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Морковь - Carrot",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2007-08-01",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\">Self-photographed</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "Medved'",
+          "source": "commons-desc-page"
+        },
+        "Permission": {
+          "value": "<table class=\"licensetpl\" style=\"display:none\">\n<tbody><tr>\n<td><span class=\"licensetpl_short\">Public domain</span><span class=\"licensetpl_long\">Public domain</span><span class=\"licensetpl_link_req\">false</span><span class=\"licensetpl_attr_req\">false</span>\n</td></tr></tbody></table>\n<table style=\"width: 100%; clear: both; margin: 0.5em auto; background-color: var(--background-color-progressive-subtle, #f7f8ff); color: var(--color-base, #202122); border: var(--border-subtle, 2px solid #8888aa); border-spacing: 8px; padding: 0px;\" dir=\"ltr\" class=\"layouttemplate\" lang=\"en\">\n<tbody><tr>\n<td><span typeof=\"mw:File\"><span title=\"Public domain\"><img alt=\"Public domain\" src=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/6/62/PD-icon.svg/120px-PD-icon.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail\" decoding=\"async\" loading=\"lazy\" width=\"64\" height=\"64\" class=\"mw-file-element\" srcset=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/6/62/PD-icon.svg/250px-PD-icon.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail 2x\" data-file-width=\"196\" data-file-height=\"196\"></span></span>\n</td>\n<td>This work has been released into the <b><a href=\"https://en.wikipedia.org/wiki/en:public_domain\" class=\"extiw\" title=\"w:en:public domain\">public domain</a></b> by its author, <b><a href=\"https://en.wikipedia.org/wiki/ru:User:Medved%27\" class=\"extiw\" title=\"w:ru:User:Medved'\">Medved'</a> at <a href=\"https://en.wikipedia.org/wiki/ru:\" class=\"extiw\" title=\"w:ru:\">Russian Wikipedia</a></b>. This applies worldwide.<br><small>In some countries this may not be legally possible; if so:</small><br><a href=\"https://en.wikipedia.org/wiki/ru:User:Medved%27\" class=\"extiw\" title=\"wikipedia:ru:User:Medved'\">Medved'</a> grants anyone the right to use this work <b>for any purpose</b>, without any conditions, unless such conditions are required by law.<span class=\"licensetpl_short\" style=\"display:none;\">Public domain</span><span class=\"licensetpl_long\" style=\"display:none;\">Public domain</span><span class=\"licensetpl_link_req\" style=\"display:none;\">false</span><span class=\"licensetpl_attr_req\" style=\"display:none;\">false</span>\n</td></tr></tbody></table>",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseShortName": {
+          "value": "Public domain",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Public domain",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Copyrighted": {
+          "value": "False",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "pd",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 123,
+      "name": "Cebolla blanca granel",
+      "path": "/images/insumos/catalogo-20260922/insumo-123.jpg",
+      "sha256": "79c1498cf2e3fdcc76ccf8101e5504152519ef90170b37718050812a7663e21b",
+      "page": "https://commons.wikimedia.org/wiki/File:White_Onions.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/d/d9/White_Onions.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2021-03-02 18:34:31",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "White Onions",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Images from Wiki Loves Africa 2021|Self-published work|Images from Wiki Loves Africa 2021 to check|Onions in Nigeria|White onions|Images from Wiki Loves Africa 2021 in Nigeria",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Picture of White Onions",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "02/03/2021",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:James_Moore200\" title=\"User:James Moore200\">James Moore200</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 4.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 4.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-4.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 124,
+      "name": "Cebolla colorada granel",
+      "path": "/images/insumos/catalogo-20260922/insumo-124.jpg",
+      "sha256": "07b54442476d232f19f99169fc5b1c828415e7bc21b9ded296f30a2956fbfdbc",
+      "page": "https://commons.wikimedia.org/wiki/File:Red_Onion_on_White.JPG",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Red_Onion_on_White.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2012-04-22 21:43:43",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Red Onion on White",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Red onions|Self-published work|Information field template with formatting|Square photos of flora|Allium cepa (onions)|Food on white background|Onion bulbs|Photographs by User:Colin|Square photos of food|Bulbs on white background",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "quality",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "A <a href=\"https://en.wikipedia.org/wiki/Red_onion\" class=\"extiw\" title=\"en:Red onion\">red onion</a> on a white background.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2012-04-22",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Colin\" title=\"User:Colin\">Colin</a>",
+          "source": "commons-desc-page"
+        },
+        "Attribution": {
+          "value": "© <a href=\"//commons.wikimedia.org/wiki/User:Colin\" title=\"User:Colin\">User:Colin</a> / <a href=\"//commons.wikimedia.org/wiki/Main_Page\" title=\"Main Page\">Wikimedia Commons</a>",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 3.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 3.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/3.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-3.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 125,
+      "name": "Tomate pera granel",
+      "path": "/images/insumos/catalogo-20260922/insumo-125.jpg",
+      "sha256": "75a649770bd6fb5ce06352998fcff9221a631fdd563a7a2d95e43c05ac3236c7",
+      "page": "https://commons.wikimedia.org/wiki/File:Roma_tomatoes.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Roma_tomatoes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2013-02-27 23:12:09",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Roma tomatoes",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "PD-author|Images uploaded by Fæ|Public-domain-image.com|Roma (tomato)",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "<br>\n<dl><dd>Image title: Roma tomatoes</dd>\n<dd>Image from Public domain images website, <a rel=\"nofollow\" class=\"external free\" href=\"http://www.public-domain-image.com/full-image/flora-plants-public-domain-images-pictures/vegetables-public-domain-images-pictures/tomato-pictures/roma-tomatoes.jpg.html\">http://www.public-domain-image.com/full-image/flora-plants-public-domain-images-pictures/vegetables-public-domain-images-pictures/tomato-pictures/roma-tomatoes.jpg.html</a></dd></dl>",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "<p>Not given\n</p>\n<ul><li>Transferred by <a href=\"//commons.wikimedia.org/wiki/User:F%C3%A6\" title=\"User:Fæ\">Fæ</a> on 2013-02-27</li></ul>",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<a rel=\"nofollow\" class=\"external free\" href=\"http://www.public-domain-image.com/public-domain-images-pictures-free-stock-photos/flora-plants-public-domain-images-pictures/vegetables-public-domain-images-pictures/tomato-pictures/roma-tomatoes.jpg\">http://www.public-domain-image.com/public-domain-images-pictures-free-stock-photos/flora-plants-public-domain-images-pictures/vegetables-public-domain-images-pictures/tomato-pictures/roma-tomatoes.jpg</a>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "John Harvey",
+          "source": "commons-desc-page"
+        },
+        "Permission": {
+          "value": "This file is in public domain, not copyrighted, no rights reserved, free for any use. You can use this picture for any use including commercial purposes without the prior written permission and without fee or obligation.",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseShortName": {
+          "value": "Public domain",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Public domain",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Copyrighted": {
+          "value": "False",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "pd",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 126,
+      "name": "Lechuga crespa granel",
+      "path": "/images/insumos/catalogo-20260922/insumo-126.jpg",
+      "sha256": "8e927da8b819048f59a84877f67aeb30a8426e9b30e54127745a644b6a66730c",
+      "page": "https://commons.wikimedia.org/wiki/File:Insalata_lollo_bionda.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/4/4f/Insalata_lollo_bionda.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2011-06-15 17:35:09",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Insalata lollo bionda",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Lactuca sativa var. crispa|Taken with Fujifilm FinePix 2800 Zoom|Flickr images reviewed by File Upload Bot (Magnus Manske)",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Lollo biondo lettuce",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2002-10-08 16:50",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<p><a rel=\"nofollow\" class=\"external text\" href=\"https://www.flickr.com/photos/nsalt/2808200115/\">Lollo biondo lettuce</a>\n</p>\n<ul><li>Uploaded by <a href=\"//commons.wikimedia.org/wiki/User:Nemo_bis\" title=\"User:Nemo bis\">Nemo_bis</a></li></ul>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a rel=\"nofollow\" class=\"external text\" href=\"https://www.flickr.com/people/7554150@N05\">Nick Saltmarsh</a> from London, UK",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY 2.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution 2.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by/2.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-2.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 127,
+      "name": "Repollo blanco granel",
+      "path": "/images/insumos/catalogo-20260922/insumo-127.jpg",
+      "sha256": "0caeb0a9afda3b99c2a5723e31ce74e4a218b3081d87de4d0cc4a5edf18807e1",
+      "page": "https://commons.wikimedia.org/wiki/File:White_cabbage.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/a8/White_cabbage.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2025-03-25 01:14:50",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "White cabbage",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Self-published work|Uploaded via Campaign:wlafrica|Cabbages in Libya|Images from Wiki Loves Africa 2025|Images from Wiki Loves Africa 2025 in Libya|Images from Wiki Loves Africa 2025 to check",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "This is an image with the theme \"<i>Farm to Plate</i>\" from:",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2025-03-08",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Selimee\" title=\"User:Selimee\">Selimee</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 4.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 4.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-4.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 128,
+      "name": "Mandioca fresca",
+      "path": "/images/insumos/catalogo-20260922/insumo-128.jpg",
+      "sha256": "557410eb40aaf718575af73e2b0a4c4f07763c025e7e62e02d31ae6b8f5fdc92",
+      "page": "https://commons.wikimedia.org/wiki/File:Manihot_esculenta_dsc07325.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Manihot_esculenta_dsc07325.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2005-08-29 20:37:37",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Manihot esculenta dsc07325",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "GFDL|Taken with Sony DSC-P92|San José de los Arroyos|License migration completed|Vegetables of Réunion|Manihot esculenta (roots)",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "La mandioca: uno de los productos principales de San José de los Arroyos",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2005",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:David.Monniaux\" title=\"User:David.Monniaux\">David Monniaux</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 3.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 3.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/licenses/by-sa/3.0/",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-3.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 129,
+      "name": "Maíz grano amarillo",
+      "path": "/images/insumos/catalogo-20260922/insumo-129.jpg",
+      "sha256": "5cc45baef227e5e53ba2660f3d97be6a1d81ac4f86b5bda0e230bbf706f22949",
+      "page": "https://commons.wikimedia.org/wiki/File:Corn_kernels.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/0/05/Corn_kernels.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2007-10-08 10:47:16",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Corn kernels",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "GFDL|Taken with Canon EOS 350D|CC-BY-SA-3.0,2.5,2.0,1.0|License migration redundant|Self-published work|Maize kernel textures",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Corn kernels",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2007-10-06",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Danielgrad&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Danielgrad (page does not exist)\">Danielgrad</a>",
+          "source": "commons-desc-page"
+        },
+        "Permission": {
+          "value": "You may select the license of your choice.",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 3.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 3.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/3.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-3.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 130,
+      "name": "Naranja Valencia",
+      "path": "/images/insumos/catalogo-20260922/insumo-130.jpg",
+      "sha256": "7f9fdb238abbfbf6a187a13bfc4b4e55acac90379f19f1f5b07b311f9ee9af91",
+      "page": "https://commons.wikimedia.org/wiki/File:Orange-Fruit-Pieces.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Orange-Fruit-Pieces.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2014-11-12 07:35:56",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Orange-Fruit-Pieces",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Taken with Sony DSLR-A700|Oranges|Evan Amos|Cross sections of oranges|Citrus fruits on white background",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "quality",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Two navel oranges, one whole and the other cut it pieces.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2012-05-02",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Evan-Amos\" title=\"User:Evan-Amos\">Evan-Amos</a>",
+          "source": "commons-desc-page"
+        },
+        "Permission": {
+          "value": "<div class=\"responsive-license-cc layouttemplate licensetpl\" dir=\"ltr\" lang=\"en\"><div class=\"rlicense-icons\"><span class=\"skin-invert\" typeof=\"mw:File\"><span title=\"w:en:Creative Commons\"><img alt=\"w:en:Creative Commons\" src=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/7/79/CC_some_rights_reserved.svg/120px-CC_some_rights_reserved.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail\" decoding=\"async\" loading=\"lazy\" width=\"90\" height=\"36\" class=\"mw-file-element\" srcset=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/7/79/CC_some_rights_reserved.svg/250px-CC_some_rights_reserved.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail 2x\" data-file-width=\"744\" data-file-height=\"300\"></span></span><br>\n<span class=\"skin-invert\" typeof=\"mw:File\"><span title=\"attribution\"><img alt=\"attribution\" src=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/1/11/Cc-by_new_white.svg/40px-Cc-by_new_white.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail\" decoding=\"async\" loading=\"lazy\" width=\"24\" height=\"24\" class=\"mw-file-element\" srcset=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/1/11/Cc-by_new_white.svg/60px-Cc-by_new_white.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail 2x\" data-file-width=\"64\" data-file-height=\"64\"></span></span> <span class=\"skin-invert\" typeof=\"mw:File\"><span title=\"share alike\"><img alt=\"share alike\" src=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/d/df/Cc-sa_white.svg/40px-Cc-sa_white.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail\" decoding=\"async\" loading=\"lazy\" width=\"24\" height=\"24\" class=\"mw-file-element\" srcset=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/d/df/Cc-sa_white.svg/60px-Cc-sa_white.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail 2x\" data-file-width=\"64\" data-file-height=\"64\"></span></span></div><div class=\"rlicense-text\"><div class=\"rlicense-declaration\">This file is licensed under the <a href=\"https://en.wikipedia.org/wiki/en:Creative_Commons\" class=\"extiw\" title=\"w:en:Creative Commons\">Creative Commons</a> <a href=\"//creativecommons.org/licenses/by-sa/3.0/deed.en\" class=\"extiw\" title=\"creativecommons:by-sa/3.0/deed.en\">Attribution-Share Alike 3.0 Unported</a> license.</div><div class=\"rlicense-desc\" style=\"text-align:start;\" lang=\"en\">\n<dl><dd>You are free:\n<ul><li><b>to share</b> – to copy, distribute and transmit the work</li>\n<li><b>to remix</b> – to adapt the work</li></ul></dd>\n<dd>Under the following conditions:\n<ul><li><b>attribution</b> – You must give appropriate credit, provide a link to the license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.</li>\n<li><b>share alike</b> – If you remix, transform, or build upon the material, you must distribute your contributions under the <a href=\"https://creativecommons.org/share-your-work/licensing-considerations/compatible-licenses\" class=\"extiw\" title=\"ccorg:share-your-work/licensing-considerations/compatible-licenses\">same or compatible license</a> as the original.</li></ul></dd></dl></div><span class=\"licensetpl_link\" style=\"display:none;\">https://creativecommons.org/licenses/by-sa/3.0</span><span class=\"licensetpl_short\" style=\"display:none;\">CC BY-SA 3.0 </span><span class=\"licensetpl_long\" style=\"display:none;\">Creative Commons Attribution-Share Alike 3.0 </span><span class=\"licensetpl_link_req\" style=\"display:none;\">true</span><span class=\"licensetpl_attr_req\" style=\"display:none;\">true</span></div></div>",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 3.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 3.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/3.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-3.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 131,
+      "name": "Mango Tommy",
+      "path": "/images/insumos/catalogo-20260922/insumo-131.jpg",
+      "sha256": "f164d471ea9f91c4e71a65b2771c0250c061c93f43012a4b98cc367366e4c8bb",
+      "page": "https://commons.wikimedia.org/wiki/File:Mangos_-_single_and_halved.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Mangos_-_single_and_halved.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2022-01-29 17:33:36",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Mangos - single and halved",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Reflections|Self-published work|Featured pictures on Wikipedia, English|Featured pictures on Wikipedia, Persian|Featured pictures by iifar|2 fruit|Fruits on gray background|Mangoes in Brazil|Sliced mangoes|Focus stacking images of fruits|Uploads by iifar|Focus stacked image",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "featured",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Mango fruits – single and halved. Grown in Brazil",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2022-01-27 20:53:48",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Iifar\" title=\"User:Iifar\">Ivar Leidus</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 4.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 4.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-4.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 140,
+      "name": "Papa Huaycha",
+      "path": "/images/insumos/catalogo-20260922/insumo-140.jpg",
+      "sha256": "b29d9d14cbc92520e415080a8dd7eb58447b2eddc5be0a2b95707e10c6110dce",
+      "page": "https://commons.wikimedia.org/wiki/File:Potatoes.jpg",
+      "og": "https://upload.wikimedia.org/wikipedia/commons/f/f3/Potatoes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "metadata": {
+        "DateTime": {
+          "value": "2021-07-20 16:00:20",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Potatoes",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Files with no machine-readable author|Solanum tuberosum 'Russet Burbank'|PD USDA|Media lacking author information",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/Potato\" title=\"Potato\">Potatoes</a>.",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "From <a rel=\"nofollow\" class=\"external text\" data-mw-original-href=\"http://www.usda.gov/oc/photo/94cs3834.htm\" href=\"https://www.usda.gov/oc/photo/94cs3834.htm\">http://www.usda.gov/oc/photo/94cs3834.htm</a>, public domain. Originally uploaded on English Wikipedia by <a href=\"https://en.wikipedia.org/wiki/User:Ed_g2s\" class=\"extiw\" title=\"en:User:Ed g2s\">Ed g2s</a>.",
+          "source": "commons-desc-page"
+        },
+        "Permission": {
+          "value": "<i>This image or file is a work of a <a href=\"https://en.wikipedia.org/wiki/United_States_Department_of_Agriculture\" class=\"extiw\" title=\"w:United States Department of Agriculture\">United States Department of Agriculture</a> employee, taken or made as part of that person's official duties. As a <a href=\"https://en.wikipedia.org/wiki/Work_of_the_United_States_Government\" class=\"extiw\" title=\"en:Work of the United States Government\">work</a> of the <a href=\"https://en.wikipedia.org/wiki/Federal_Government_of_the_United_States\" class=\"extiw\" title=\"en:Federal Government of the United States\">U.S. federal government</a>, the image is in the <b><a href=\"//commons.wikimedia.org/wiki/Public_domain\" class=\"mw-redirect\" title=\"Public domain\">public domain</a></b>.</i>",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseShortName": {
+          "value": "Public domain",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Public domain",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Copyrighted": {
+          "value": "False",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "pd",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": 145,
+      "name": "Semilla de Chirimoya",
+      "path": "/images/insumos/catalogo-20260922/insumo-145.jpg",
+      "sha256": "9126555e11eb3ec4f57e4e539c0bfedc437602b3a742c8a0f6b31fd9c46501d8",
+      "page": "https://commons.wikimedia.org/wiki/File:Cherimoya_seeds.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/f/f6/Cherimoya_seeds.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "metadata": {
+        "DateTime": {
+          "value": "2012-02-05 16:11:46",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Cherimoya seeds",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "GFDL|CC-BY-SA-3.0,2.5,2.0,1.0|License migration redundant|Self-published work|Annona cherimola (fruit)|Measured seeds of Magnoliales",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "<a href=\"https://en.wikipedia.org/wiki/Annona_cherimola\" class=\"extiw\" title=\"en:Annona cherimola\">Annona cherimola</a>, cherimoya, chirimoyo, momona or kelemoio seeds",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2012-01-20",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Rillke\" title=\"User:Rillke\">Rillke</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 3.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 3.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/3.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-3.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}
