@@ -1144,6 +1144,8 @@
                     $puedeAlmacenPlanta = $isAdmin || $esPlantaOperativo || $esJefePlantaNav;
                 @endphp
 
+                {{-- TEMPORAL (solo UX): el admin no ve las secciones operativas en el sidebar. No afecta autorización backend. --}}
+                @if(! $isAdmin)
                 @if($showProdAgricola)
                 <span class="ag-nav-label">Producción agrícola</span>
 
@@ -1476,6 +1478,7 @@
                     </ul>
                 </li>
                 @endif
+                @endif {{-- /TEMPORAL ! $isAdmin --}}
 
                 @if($isAdmin || auth()->user()?->can('usuarios.view') || \App\Support\ReporteCatalogo::usuarioTieneAcceso(auth()->user()))
                 <span class="ag-nav-label">{{ ($esJefeAgr || ($authUser && $authUser->hasRole('jefe_planta'))) && ! $isAdmin ? 'Equipo' : 'Administración' }}</span>
