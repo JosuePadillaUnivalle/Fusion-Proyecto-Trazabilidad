@@ -8,13 +8,27 @@ use Illuminate\Database\Eloquent\Builder;
 
 final class UsuarioRol
 {
+    /**
+     * Administrador de la plataforma (incluye el slug legacy «Admin»).
+     *
+     * El admin es un rol de SUPERVISIÓN: puede consultar todo y administrar usuarios,
+     * solicitudes, catálogos y reportes, pero no ejecuta flujos de negocio
+     * (actividades, tareas de planta, transporte, firmas, pedidos). Use este helper
+     * solo para visibilidad/alcance de consultas; para acciones use {@see puedeOperar()}.
+     */
     public static function esAdminGlobal(?Usuario $user): bool
     {
         if ($user === null) {
             return false;
         }
 
-        return $user->hasRole('admin') || ($user->role ?? '') === 'admin';
+        return $user->hasAnyRole(['admin', 'Admin']) || strtolower((string) ($user->role ?? '')) === 'admin';
+    }
+
+    /** Usuario autenticado que puede ejecutar flujos operativos (todos menos el admin supervisor). */
+    public static function puedeOperar(?Usuario $user): bool
+    {
+        return $user !== null && ! self::esAdminGlobal($user);
     }
 
     public static function esAgricultorOperativo(?Usuario $user): bool
@@ -64,7 +78,7 @@ final class UsuarioRol
 
     public static function puedeConfirmarRecepcionPlanta(?Usuario $user): bool
     {
-        return (bool) ($user && ($user->hasAnyRole(['planta', 'jefe_planta']) || $user->hasRole('admin')));
+        return self::puedeOperar($user) && $user->hasAnyRole(['planta', 'jefe_planta']);
     }
 
     public static function esTransportista(?Usuario $user): bool
@@ -88,28 +102,27 @@ final class UsuarioRol
         return (bool) ($user && $user->hasAnyRole(['mayorista', 'jefe_mayorista']));
     }
 
+    /** Gestiona (acepta, rechaza, despacha) pedidos de distribución como mayorista. */
     public static function puedeGestionarDistribucionMayorista(?Usuario $user): bool
     {
-        return self::esAdminGlobal($user) || self::esMayorista($user);
+        return self::puedeOperar($user) && self::esMayorista($user);
     }
 
+    /** Solo el transportista asignado inicia la ruta (doble control: nadie firma/inicia por él). */
     public static function puedeMarcarEnRutaDistribucion(?Usuario $user, RutaDistribucion $ruta): bool
     {
-        if (! $user) {
-            return false;
-        }
-
-        if (self::esAdminGlobal($user)) {
-            return true;
-        }
-
-        return self::esTransportista($user)
+        return self::puedeOperar($user)
+            && self::esTransportista($user)
             && (int) $ruta->transportista_usuarioid === (int) $user->usuarioid;
     }
 
+    /**
+     * Planificación manual de rutas de distribución (módulo deshabilitado en el menú).
+     * Antes era exclusiva del admin; al ser supervisor ya no la ejecuta y ningún rol operativo la tiene asignada.
+     */
     public static function puedePlanificarDistribucion(?Usuario $user): bool
     {
-        return self::esAdminGlobal($user);
+        return false;
     }
 
     public static function puedeGestionarDistribucionPlanta(?Usuario $user): bool
@@ -117,14 +130,16 @@ final class UsuarioRol
         return self::puedeGestionarDistribucionMayorista($user);
     }
 
+    /** Jefe agrícola que gestiona el campo (asigna/completa actividades de su equipo). */
     public static function gestionaCampo(?Usuario $user): bool
     {
-        return self::esAdminGlobal($user) || self::esJefeAgricultor($user);
+        return self::puedeOperar($user) && self::esJefeAgricultor($user);
     }
 
+    /** Jefe de planta que gestiona transformación (asigna etapas, cierra fases). */
     public static function gestionaPlanta(?Usuario $user): bool
     {
-        return self::esAdminGlobal($user) || self::esJefePlanta($user);
+        return self::puedeOperar($user) && self::esJefePlanta($user);
     }
 
     /** Agricultor de campo: solo ve lotes/actividades asignados a él (no jefes). */

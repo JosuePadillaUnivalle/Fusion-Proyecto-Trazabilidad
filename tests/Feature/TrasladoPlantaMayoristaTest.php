@@ -318,7 +318,8 @@ class TrasladoPlantaMayoristaTest extends TestCase
 
 
 
-        app(TrasladoPlantaMayoristaService::class)->aceptar($ruta->fresh(), $admin);
+        // La aprobación de planta la hace el jefe de planta (el admin supervisa).
+        app(TrasladoPlantaMayoristaService::class)->aceptar($ruta->fresh(), $this->jefePlanta());
 
         $ruta->refresh();
 
@@ -366,7 +367,7 @@ class TrasladoPlantaMayoristaTest extends TestCase
 
 
 
-    public function test_admin_puede_crear_traslado_desde_formulario(): void
+    public function test_admin_supervisor_no_crea_traslado_desde_formulario(): void
 
     {
 
@@ -404,13 +405,9 @@ class TrasladoPlantaMayoristaTest extends TestCase
 
 
 
-        $ruta = RutaDistribucion::query()->first();
+        $response->assertForbidden();
 
-        $this->assertNotNull($ruta);
-
-        $response->assertRedirect(route('logistica.traslados-planta.show', $ruta));
-
-        $this->assertCount(1, $ruta->detallesTraslado);
+        $this->assertNull(RutaDistribucion::query()->first());
 
     }
 
@@ -773,7 +770,10 @@ class TrasladoPlantaMayoristaTest extends TestCase
 
 
 
-        $response = $this->actingAs($admin)->patch(route('logistica.traslados-planta.empezar-ruta', $ruta));
+        // El admin supervisor no inicia transporte.
+        $this->actingAs($admin)->patch(route('logistica.traslados-planta.empezar-ruta', $ruta))->assertForbidden();
+
+        $response = $this->actingAs($this->jefePlanta())->patch(route('logistica.traslados-planta.empezar-ruta', $ruta));
 
         $response->assertRedirect();
 

@@ -551,8 +551,8 @@ class PedidoDistribucionController extends Controller
                 || (int) $ruta?->transportista_usuarioid === (int) $user->usuarioid
             );
         $puedeEditarFlujo = PedidoDistribucionCatalogo::puedeEditarFlujoAntesDeRuta($pedido);
-        $puedeEditarSolicitud = $puedeEditarFlujo
-            && (UsuarioRol::esAdminGlobal($user) || $esMinoristaDueño);
+        // Solo el minorista dueño edita/elimina su solicitud; el admin supervisa (ADM-04).
+        $puedeEditarSolicitud = $puedeEditarFlujo && $esMinoristaDueño;
         $puedeReabrirRevision = ($puedeGestionarMayorista ?? false)
             && PedidoDistribucionCatalogo::puedeReabrirRevision($pedido);
         $pasoActualFlujo = PedidoDistribucionCatalogo::pasoActualFlujo($pedido);
@@ -591,7 +591,7 @@ class PedidoDistribucionController extends Controller
             ->first();
 
         $puedeEliminarSolicitud = $pedido->estado === PedidoDistribucionCatalogo::ESTADO_PENDIENTE
-            && (UsuarioRol::esAdminGlobal($user) || $esMinoristaDueño);
+            && $esMinoristaDueño;
 
         $esBandejaMayorista = PedidoDistribucionVista::esBandejaMayorista($request, $user);
         $ctxVolver = $esBandejaMayorista ? 'mayorista' : 'pdv';
@@ -756,7 +756,7 @@ class PedidoDistribucionController extends Controller
             ]);
         }
 
-        if (! UsuarioRol::esAdminGlobal($user) && ! $esMinoristaDueño) {
+        if (! $esMinoristaDueño) {
             abort(403);
         }
 

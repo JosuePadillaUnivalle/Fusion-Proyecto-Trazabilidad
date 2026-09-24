@@ -30,7 +30,8 @@ class RutaDistribucionController extends Controller
     private function autorizarVerRuta(RutaDistribucion $ruta): void
     {
         $user = auth()->user();
-        if (UsuarioRol::puedePlanificarDistribucion($user)) {
+        // El admin supervisa (solo lectura) todas las rutas.
+        if (UsuarioRol::esAdminGlobal($user)) {
             return;
         }
         if (UsuarioRol::puedeGestionarDistribucionMayorista($user)) {

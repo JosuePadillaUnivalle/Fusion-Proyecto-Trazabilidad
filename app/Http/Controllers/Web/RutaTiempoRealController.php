@@ -249,9 +249,9 @@ class RutaTiempoRealController extends Controller
     {
         $user = auth()->user();
 
-        return $user && (
-            UsuarioRol::esAdminGlobal($user)
-            || UsuarioRol::esJefePlanta($user)
+        // El admin supervisa el mapa en tiempo real pero no cierra envíos.
+        return UsuarioRol::puedeOperar($user) && (
+            UsuarioRol::esJefePlanta($user)
             || UsuarioRol::esJefeAgricultor($user)
             || ($user->can('asignaciones.update') && ! UsuarioRol::esTransportista($user))
         );

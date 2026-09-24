@@ -342,7 +342,110 @@ return [
 
     'role_permissions' => [
 
-        'admin' => ['*'],
+        // Admin = supervisión: consulta todos los módulos y administra usuarios, solicitudes,
+        // catálogos y reportes. No ejecuta flujos de negocio (sin create/update/delete operativos).
+        'admin' => [
+
+            // Administración de la plataforma
+            'usuarios.view',
+
+            'usuarios.create',
+
+            'usuarios.update',
+
+            'usuarios.delete',
+
+            'usuarios.admin',
+
+            'solicitudes.view',
+
+            'solicitudes.approve',
+
+            'catalogos.view',
+
+            'catalogos.create',
+
+            'catalogos.update',
+
+            'catalogos.delete',
+
+            'reportes.view',
+
+            // Datos maestros de flota (no son flujos de negocio; ningún otro rol los administra)
+            'vehiculos.view',
+
+            'vehiculos.create',
+
+            'vehiculos.update',
+
+            'vehiculos.delete',
+
+            'transportistas.view',
+
+            'transportistas.create',
+
+            'transportistas.update',
+
+            'transportistas.delete',
+
+            'direcciones.view',
+
+            'direcciones.create',
+
+            'direcciones.update',
+
+            'direcciones.delete',
+
+            // Consulta global (solo lectura)
+            'envios.view',
+
+            'envios.admin.view',
+
+            'lotes.view',
+
+            'inventario.view',
+
+            'pedidos.view',
+
+            'ventas.view',
+
+            'certificaciones.view',
+
+            'incidentes.view',
+
+            'documentos.view',
+
+            'rutas_multi.view',
+
+            'asignaciones.view',
+
+            'monitoreo.view',
+
+            'panel_planta.view',
+
+            'recepcion_planta.view',
+
+            'lote_produccion.view',
+
+            'panel_transportista.view',
+
+            'almacen.ingresos.view',
+
+            'almacen.salidas.view',
+
+            'almacen.movimientos.view',
+
+            'almacen.reportes.view',
+
+            'panel_agricultor.view',
+
+            'panel_mayorista.view',
+
+            'punto_venta.view',
+
+            'pedidos_distribucion.view',
+
+        ],
 
         'jefe_agricultor' => [
 

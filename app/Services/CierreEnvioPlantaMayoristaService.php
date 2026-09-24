@@ -408,7 +408,7 @@ class CierreEnvioPlantaMayoristaService
 
     private function autorizarFirmaTransportista(Usuario $usuario, RutaDistribucion $ruta): void
     {
-        if (! $this->esTransportistaAsignado($usuario, $ruta) && ! $this->esAdminOperativo($usuario)) {
+        if (! $this->esTransportistaAsignado($usuario, $ruta)) {
             throw new InvalidArgumentException('Solo el transportista asignado puede firmar como transportista.');
         }
     }
@@ -416,8 +416,7 @@ class CierreEnvioPlantaMayoristaService
     private function autorizarFirmaRecepcion(Usuario $usuario, RutaDistribucion $ruta): void
     {
         if (
-            $this->esAdminOperativo($usuario)
-            || MayoristaAccess::puedeGestionarTraslado($usuario, $ruta)
+            MayoristaAccess::puedeGestionarTraslado($usuario, $ruta)
             || $this->esTransportistaAsignado($usuario, $ruta)
         ) {
             return;
@@ -475,9 +474,10 @@ class CierreEnvioPlantaMayoristaService
         return filter_var($valor, FILTER_VALIDATE_BOOLEAN);
     }
 
+    /** Coordinador logístico con permiso de asignaciones (el admin supervisor no opera cierres). */
     private function esAdminOperativo(Usuario $usuario): bool
     {
-        return UsuarioRol::esAdminGlobal($usuario) || $usuario->can('asignaciones.update');
+        return UsuarioRol::puedeOperar($usuario) && $usuario->can('asignaciones.update');
     }
 
     private function generarDocumentoTransporte(RutaDistribucion $ruta, Usuario $usuario): DocumentoEntrega

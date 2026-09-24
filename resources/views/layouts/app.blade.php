@@ -1006,7 +1006,7 @@
     $userImg     = $authUser ? $authUser->avatarUrl() : \App\Support\UsuarioAvatar::placeholder();
     $userImgFallback = \App\Support\UsuarioAvatar::placeholder();
     $userRole    = $authUser ? ($authUser->getRoleNames()->first() ?? 'sin rol') : 'invitado';
-    $isAdmin     = $authUser && ($authUser->hasRole('Admin') || $authUser->hasRole('admin'));
+    $isAdmin     = \App\Support\UsuarioRol::esAdminGlobal($authUser);
     $esJefeAgr = $authUser && \App\Support\UsuarioRol::esJefeAgricultor($authUser);
     $esAgricultorOperativo = $authUser && \App\Support\UsuarioRol::debeAcotarPorAsignacion($authUser);
     $esPlantaOperativo = $authUser && \App\Support\UsuarioRol::esPlantaOperativo($authUser) && ! $isAdmin;

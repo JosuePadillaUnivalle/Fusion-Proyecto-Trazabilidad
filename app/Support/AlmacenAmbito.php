@@ -91,7 +91,8 @@ class AlmacenAmbito
             return false;
         }
 
-        if ($user->hasRole('admin')) {
+        // Visibilidad (no operación): el admin supervisa todos los ámbitos.
+        if (UsuarioRol::esAdminGlobal($user)) {
             return true;
         }
 
@@ -296,16 +297,9 @@ class AlmacenAmbito
         }
 
         $responsable = (int) ($almacen->responsable_usuarioid ?? 0);
-        if ($responsable <= 0) {
-            return $user !== null && UsuarioRol::esAdminGlobal($user);
-        }
-
-        if (! $user) {
+        // Enviar cosecha a un almacén es operativo: el admin supervisor no lo hace.
+        if ($responsable <= 0 || ! UsuarioRol::puedeOperar($user)) {
             return false;
-        }
-
-        if (UsuarioRol::esAdminGlobal($user)) {
-            return true;
         }
 
         if (UsuarioRol::esJefeAgricultor($user)) {
