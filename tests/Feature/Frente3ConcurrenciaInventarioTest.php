@@ -159,10 +159,18 @@ class Frente3ConcurrenciaInventarioTest extends TestCase
             $this->assertStringContainsString('disponible sin reservar 3', $e->getMessage());
         }
 
-        // Rechazar/cancelar A libera la reserva.
+        // De punta a punta: el mayorista no puede aceptar B mientras A tiene el stock reservado.
+        $this->actingAs($mayorista)
+            ->post(route('punto-venta.pedidos.aceptar', $pedidoB))
+            ->assertSessionHas('error');
+        $this->assertSame(PedidoDistribucionCatalogo::ESTADO_PENDIENTE, $pedidoB->fresh()->estado);
+
+        // Rechazar/cancelar A libera la reserva y B ya puede aceptarse.
         $pedidoA->update(['estado' => PedidoDistribucionCatalogo::ESTADO_RECHAZADO]);
-        DB::transaction(fn () => $reservas->reservar($pedidoB));
-        $this->assertTrue(true);
+        $this->actingAs($mayorista)
+            ->post(route('punto-venta.pedidos.aceptar', $pedidoB))
+            ->assertSessionMissing('error');
+        $this->assertSame(PedidoDistribucionCatalogo::ESTADO_CONFIRMADO, $pedidoB->fresh()->estado);
     }
 
     // ---------------------------------------------------------------- TRA-06 / TRA-15

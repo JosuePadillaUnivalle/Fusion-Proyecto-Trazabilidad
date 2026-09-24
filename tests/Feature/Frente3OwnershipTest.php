@@ -71,6 +71,23 @@ class Frente3OwnershipTest extends TestCase
     {
         [$a, , $almA] = $this->dosMayoristas();
         $producto = $this->productoTerminado($almA, 'Producto intacto', 40);
+        $this->tipoMovimiento('salida');
+
+        // Pedido confirmado que aún no salió: antes, abrir el almacén «reconciliaba» y lo descontaba.
+        $pedido = \App\Models\PedidoDistribucion::create([
+            'numero_solicitud' => 'PDV-GET-SIN-EFECTOS',
+            'puntoventaid' => $this->puntoVenta($this->actor('minorista'), 'Tienda GET')->puntoventaid,
+            'almacen_mayorista_origenid' => $almA->almacenid,
+            'estado' => \App\Support\PedidoDistribucionCatalogo::ESTADO_CONFIRMADO,
+            'fechapedido' => now(),
+        ]);
+        \App\Models\DetallePedidoDistribucion::create([
+            'pedidodistribucionid' => $pedido->pedidodistribucionid,
+            'almacen_mayorista_origenid' => $almA->almacenid,
+            'insumoid' => $producto->insumoid,
+            'producto_nombre' => $producto->nombre,
+            'cantidad' => 5,
+        ]);
         $movimientosAntes = AlmacenMovimiento::query()->count();
 
         $this->actingAs($a)->get(route('almacen-mayorista.show', $almA))->assertOk();

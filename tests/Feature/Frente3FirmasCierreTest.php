@@ -294,7 +294,34 @@ class Frente3FirmasCierreTest extends TestCase
 
     public function test_endpoint_legacy_confirmar_recepcion_no_acredita_inventario(): void
     {
-        [$ruta, $pedido, , $minorista] = $this->entregaPdvEnDestino();
+        // Ruta en tránsito SIN condiciones ni llegada: antes el endpoint histórico acreditaba igual.
+        $mayorista = $this->actor('mayorista');
+        $minorista = $this->actor('minorista');
+        $almacen = $this->almacenMayorista($mayorista, 'Mayorista legacy');
+        $producto = $this->productoTerminado($almacen, 'Galletas legacy', 100);
+        $ruta = RutaDistribucion::create([
+            'codigo' => 'RD-LEGACY', 'nombre' => 'Legacy',
+            'tipo_ruta' => RutaDistribucionCatalogo::TIPO_RUTA_MAYORISTA_PDV,
+            'almacen_mayorista_origenid' => $almacen->almacenid,
+            'transportista_usuarioid' => $this->conductor()->usuarioid,
+            'estado' => RutaDistribucionCatalogo::ESTADO_EN_RUTA,
+            'simulacion_inicio_at' => now(),
+        ]);
+        $pedido = PedidoDistribucion::create([
+            'numero_solicitud' => 'PDV-LEGACY',
+            'puntoventaid' => $this->puntoVenta($minorista, 'Tienda legacy')->puntoventaid,
+            'almacen_mayorista_origenid' => $almacen->almacenid,
+            'rutadistribucionid' => $ruta->rutadistribucionid,
+            'estado' => PedidoDistribucionCatalogo::ESTADO_EN_TRANSITO,
+            'fechapedido' => now(),
+        ]);
+        DetallePedidoDistribucion::create([
+            'pedidodistribucionid' => $pedido->pedidodistribucionid,
+            'almacen_mayorista_origenid' => $almacen->almacenid,
+            'insumoid' => $producto->insumoid,
+            'producto_nombre' => 'Galletas legacy',
+            'cantidad' => 10,
+        ]);
 
         $this->actingAs($minorista)
             ->post(route('punto-venta.pedidos.confirmar-recepcion', $pedido))
