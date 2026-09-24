@@ -415,6 +415,26 @@ class TrasladoPlantaMayoristaService
 
 
 
+        // Receptor real (MAY-08): el inventario solo se acredita si el mayorista dueño del destino
+        // firmó la recepción con su cuenta; un cierre manual o un tercero no la sustituyen.
+        $ruta->loadMissing('firmaRecepcion');
+        $firma = $ruta->firmaRecepcion;
+        $firmante = $firma !== null && $firma->firmante_usuarioid ? Usuario::query()->find($firma->firmante_usuarioid) : null;
+        if ($firmante === null
+            || ! \App\Support\FirmaCierreReglas::recepcionValida($firma, $ruta->transportista_usuarioid)
+            || ! \App\Support\MayoristaAccess::puedeGestionarTraslado($firmante, $ruta)) {
+            throw new InvalidArgumentException('El mayorista del almacén destino debe firmar la recepción antes de acreditar el inventario.');
+        }
+
+        // Idempotencia: la transferencia de un traslado se aplica una sola vez.
+        if (AlmacenMovimiento::query()
+            ->where('almacenid', $almacenMayorista->almacenid)
+            ->where('referencia', $ruta->codigo)
+            ->where('observaciones', 'like', '[Traslado planta → mayorista — ingreso]%')
+            ->exists()) {
+            throw new InvalidArgumentException('El inventario de este traslado ya fue transferido.');
+        }
+
         $tipoIngreso = TipoMovimientoAlmacen::activosPorNaturaleza('ingreso')->firstOrFail();
 
         $tipoSalida = TipoMovimientoAlmacen::activosPorNaturaleza('salida')->firstOrFail();

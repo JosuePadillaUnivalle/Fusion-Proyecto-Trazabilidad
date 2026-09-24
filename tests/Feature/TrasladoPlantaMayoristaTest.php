@@ -170,6 +170,26 @@ class TrasladoPlantaMayoristaTest extends TestCase
 
 
 
+    private function mayoristaResponsable(Almacen $almacen): Usuario
+    {
+        Role::findOrCreate('mayorista', 'web');
+
+        $user = Usuario::create([
+            'nombre' => 'Mayorista',
+            'apellido' => 'Destino',
+            'email' => 'mayorista.destino'.$almacen->almacenid.'@test.local',
+            'nombreusuario' => 'mayorista_destino_'.$almacen->almacenid,
+            'passwordhash' => Hash::make('Password'),
+            'role' => 'mayorista',
+            'fecharegistro' => now(),
+            'activo' => true,
+        ]);
+        $user->assignRole('mayorista');
+        $almacen->update(['responsable_usuarioid' => $user->usuarioid]);
+
+        return $user;
+    }
+
     /** @return array{transportista: Usuario, vehiculo: Vehiculo} */
 
     private function flotaPlanta(): array
@@ -195,6 +215,10 @@ class TrasladoPlantaMayoristaTest extends TestCase
             'activo' => true,
 
         ]);
+
+        // Rol canónico Spatie sincronizado con la columna legacy (TRA-09).
+        Role::findOrCreate('transportista', 'web');
+        $transportista->assignRole('transportista');
 
 
 
@@ -654,7 +678,38 @@ class TrasladoPlantaMayoristaTest extends TestCase
 
         $ruta->update(['estado' => RutaDistribucionCatalogo::ESTADO_PLANIFICADA]);
 
-        $service->transferirInventarioAlCompletar($ruta, $admin);
+        // Sin la firma del mayorista destino no se acredita nada (MAY-08).
+        try {
+            $service->transferirInventarioAlCompletar($ruta->fresh(), $admin);
+            $this->fail('La transferencia no debe aplicarse sin la recepción firmada por el mayorista destino.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString('debe firmar la recepción', $e->getMessage());
+        }
+        $this->assertEquals(300.0, (float) $inventario->fresh()->cantidad_unidades);
+
+        $receptor = $this->mayoristaResponsable($mayorista);
+        \App\Models\FirmaTransportistaEnvio::create([
+            'rutadistribucionid' => $ruta->rutadistribucionid,
+            'imagenfirma' => 'data:image/png;base64,iVBORw0KGgo=',
+            'firmante_usuarioid' => $flota['transportista']->usuarioid,
+            'fechafirma' => now(),
+        ]);
+        \App\Models\FirmaRecepcionEnvio::create([
+            'rutadistribucionid' => $ruta->rutadistribucionid,
+            'imagenfirma' => 'data:image/png;base64,iVBORw0KGgo=',
+            'firmante_usuarioid' => $receptor->usuarioid,
+            'fechafirma' => now(),
+        ]);
+
+        $service->transferirInventarioAlCompletar($ruta->fresh(), $receptor);
+
+        // Idempotencia: una segunda llamada no vuelve a transferir.
+        try {
+            $service->transferirInventarioAlCompletar($ruta->fresh(), $receptor);
+            $this->fail('La transferencia del traslado no debe aplicarse dos veces.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString('ya fue transferido', $e->getMessage());
+        }
 
         $inventario->refresh();
 
