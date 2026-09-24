@@ -235,6 +235,10 @@ class PedidoDistribucionController extends Controller
             'detalles.*.cantidad' => 'required|numeric|gt:0',
             'almacenes_recogida_orden' => 'nullable|array',
             'almacenes_recogida_orden.*' => 'integer|exists:almacen,almacenid',
+            'canal_origen' => [
+                $esIniciadorMayorista ? 'required' : 'nullable',
+                'in:'.implode(',', array_keys(PedidoDistribucionCatalogo::CANALES_EXTERNOS)),
+            ],
             'insumoid' => 'nullable|integer|exists:insumo,insumoid',
             'insumo_presentacionid' => 'nullable|integer|exists:insumo_presentacion,insumo_presentacionid',
             'cantidad' => 'nullable|numeric|gt:0',
@@ -262,6 +266,7 @@ class PedidoDistribucionController extends Controller
             'detalles.*.cantidad.gt' => 'La cantidad debe ser mayor que cero.',
             'transportista_usuarioid.required' => 'Seleccione el transportista para el envío.',
             'vehiculoid.required' => 'Seleccione el vehículo para el envío.',
+            'canal_origen.required' => 'Indique por qué canal recibió el pedido (WhatsApp, teléfono, presencial u otro).',
         ]);
 
         $lineasEntrada = $data['detalles'] ?? [];
@@ -311,6 +316,8 @@ class PedidoDistribucionController extends Controller
         $detallesPayload = [];
         $kgTotalPedido = 0.0;
         $almacenesEnPedido = [];
+        // Ownership (MAY-04, MAY-12): el mayorista solo despacha desde sus almacenes, línea por línea.
+        $almacenesPropios = $esIniciadorMayorista ? MayoristaAccess::idsAlmacenesMayorista($user) : [];
 
         foreach ($lineasEntrada as $linea) {
             $cantidad = (float) ($linea['cantidad'] ?? 0);
@@ -332,6 +339,9 @@ class PedidoDistribucionController extends Controller
             }
 
             $lineaAlmacenId = (int) $insumoRef->almacenid;
+            if ($esIniciadorMayorista && ! in_array($lineaAlmacenId, $almacenesPropios, true)) {
+                abort(403, 'El producto «'.$insumoRef->nombre.'» pertenece a un almacén mayorista que no es suyo.');
+            }
             if (! in_array($lineaAlmacenId, $almacenesEnPedido, true)) {
                 $almacenesEnPedido[] = $lineaAlmacenId;
             }
@@ -406,6 +416,21 @@ class PedidoDistribucionController extends Controller
         }
 
         $ordenRecogida = array_values(array_filter(array_map('intval', $data['almacenes_recogida_orden'] ?? [])));
+        // El orden de recogida solo puede nombrar almacenes de las líneas del pedido (MAY-04).
+        if (array_diff($ordenRecogida, $almacenesEnPedido) !== []) {
+            return back()->withInput()->with('error', 'El orden de recogida incluye un almacén que no corresponde a los productos del pedido.');
+        }
+
+        // Todas las líneas se abastecen de almacenes de UN mismo mayorista con dueño: ninguna línea
+        // descuenta stock de otro mayorista ni queda un pedido «de cualquiera» (MAY-11, MAY-12).
+        $duenos = Almacen::query()
+            ->whereIn('almacenid', $almacenesEnPedido ?: [-1])
+            ->pluck('responsable_usuarioid')
+            ->map(fn ($id) => (int) $id);
+        if ($duenos->contains(0) || $duenos->unique()->count() > 1) {
+            return back()->withInput()->with('error', 'Un pedido solo puede abastecerse de almacenes de un mismo mayorista responsable.');
+        }
+
         if ($ordenRecogida !== []) {
             $almacenOrigenId = $ordenRecogida[0];
         } elseif ($almacenesEnPedido !== []) {
@@ -453,6 +478,11 @@ class PedidoDistribucionController extends Controller
                     'fecha_confirmacion_minorista' => null,
                     'fecha_aceptacion' => $esIniciadorMayorista ? now() : null,
                     'aceptado_por_usuarioid' => $esIniciadorMayorista ? $user->usuarioid : null,
+                    // Pedido externo explícito (MAY-13): canal y quién lo registró; no aparenta ser del minorista.
+                    'canal_origen' => $esIniciadorMayorista
+                        ? $data['canal_origen']
+                        : PedidoDistribucionCatalogo::CANAL_SISTEMA,
+                    'registrado_manual_por_usuarioid' => $esIniciadorMayorista ? $user->usuarioid : null,
                 ]);
 
                 foreach ($detallesPayload as $detallePayload) {
@@ -560,8 +590,8 @@ class PedidoDistribucionController extends Controller
                 || (int) $ruta?->transportista_usuarioid === (int) $user->usuarioid
             );
         $puedeEditarFlujo = PedidoDistribucionCatalogo::puedeEditarFlujoAntesDeRuta($pedido);
-        // Solo el minorista dueño edita/elimina su solicitud; el admin supervisa (ADM-04).
-        $puedeEditarSolicitud = $puedeEditarFlujo && $esMinoristaDueño;
+        // Solo el minorista dueño edita su solicitud y solo mientras está pendiente (MIN-04).
+        $puedeEditarSolicitud = $esMinoristaDueño && PedidoDistribucionCatalogo::puedeEditarSolicitudMinorista($pedido);
         $puedeReabrirRevision = ($puedeGestionarMayorista ?? false)
             && PedidoDistribucionCatalogo::puedeReabrirRevision($pedido);
         $pasoActualFlujo = PedidoDistribucionCatalogo::pasoActualFlujo($pedido);
