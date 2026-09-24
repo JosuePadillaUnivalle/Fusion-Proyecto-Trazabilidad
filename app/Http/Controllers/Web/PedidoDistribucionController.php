@@ -994,25 +994,16 @@ class PedidoDistribucionController extends Controller
             403
         );
 
+        // Única vía canónica (MIN-01): la recepción contable ocurre en el cierre con llegada, incidentes
+        // y firmas. Este endpoint histórico ya no acredita inventario; solo lleva al cierre.
         $pedido->loadMissing('rutaDistribucion');
         $ruta = $pedido->rutaDistribucion;
         if ($ruta !== null && ! $ruta->esTrasladoPlantaMayorista()) {
-            $cierre = app(\App\Services\CierreEnvioDistribucionPdvService::class);
-            if ($cierre->tieneCondicionesVehiculo($ruta) || $ruta->llegada_confirmada_at) {
-                return redirect()
-                    ->route('punto-venta.rutas.cierre.panel', $ruta)
-                    ->with('info', 'Use el cierre operativo con firmas para registrar la recepción en punto de venta.');
-            }
+            return redirect()
+                ->route('punto-venta.rutas.cierre.panel', $ruta)
+                ->with('info', 'Use el cierre operativo con firmas para registrar la recepción en punto de venta.');
         }
 
-        try {
-            app(RecepcionPuntoVentaService::class)->confirmar($pedido, auth()->user());
-        } catch (\Throwable $e) {
-            return back()->with('error', $e->getMessage());
-        }
-
-        return redirect()
-            ->route('punto-venta.puntos.show', $pedido->puntoventaid)
-            ->with('success', 'Llegada del pedido confirmada. El inventario del punto de venta fue actualizado.');
+        return back()->with('error', 'Este pedido no tiene una ruta de entrega: la recepción se registra en el cierre operativo de la ruta.');
     }
 }

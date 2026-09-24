@@ -31,6 +31,7 @@ use App\Models\Usuario;
 use App\Models\Vehiculo;
 
 use App\Models\CondicionTransporte;
+use App\Models\TipoIncidenteTransporte;
 use App\Services\CierreEnvioDistribucionPdvService;
 use App\Services\SimulacionRutaService;
 
@@ -500,7 +501,19 @@ class PedidoDistribucionFase2Test extends TestCase
 
 
 
-        app(SimulacionRutaService::class)->completarDistribucion($ruta->fresh());
+        // Cierre canónico: llegada, incidentes, firma del chofer, firma del minorista y finalización.
+        $ruta->refresh()->update(['simulacion_inicio_at' => now()->subHour()]);
+        TipoIncidenteTransporte::query()->firstOrCreate(['codigo' => 'INC_PDV_TEST'], ['titulo' => 'Retraso', 'descripcion' => 'Test']);
+        $cierre = app(CierreEnvioDistribucionPdvService::class);
+        $cierre->confirmarLlegada($ruta->fresh(), $chofer);
+        $cierre->registrarIncidentes($ruta->fresh(), $chofer, true);
+        $cierre->guardarFirmaTransportista($ruta->fresh(), $chofer, 'data:image/png;base64,iVBORw0KGgo=');
+
+        $minorista = $pedido->puntoVenta->minorista()->firstOrFail();
+        Role::findOrCreate('minorista', 'web');
+        $minorista->syncRoles(['minorista']);
+        $cierre->guardarFirmaRecepcion($ruta->fresh(), $minorista, 'data:image/png;base64,iVBORw0KGgo=');
+        $cierre->finalizarEntrega($ruta->fresh(), $chofer);
 
 
 
