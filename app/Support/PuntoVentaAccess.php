@@ -106,16 +106,9 @@ final class PuntoVentaAccess
         if (UsuarioRol::puedeGestionarDistribucionMayorista($user)) {
             $almacenIds = MayoristaAccess::idsAlmacenesOperados($user);
 
+            // Solo pedidos dirigidos a sus almacenes: un custom sin origen no es de «cualquier mayorista» (MAY-11).
             if ($almacenIds !== []) {
-                return $query->where(function ($w) use ($almacenIds) {
-                    $w->whereIn('almacen_mayorista_origenid', $almacenIds)
-                        ->orWhere(function ($q) {
-                            $q->where(function ($sinDestino) {
-                                $sinDestino->whereNull('almacen_mayorista_origenid')
-                                    ->orWhere('almacen_mayorista_origenid', 0);
-                            })->where('tipo_solicitud', PedidoDistribucionCatalogo::TIPO_SOLICITUD_CUSTOM);
-                        });
-                });
+                return $query->whereIn('almacen_mayorista_origenid', $almacenIds);
             }
 
             return $query->whereRaw('1 = 0');
