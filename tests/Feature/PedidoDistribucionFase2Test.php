@@ -195,6 +195,10 @@ class PedidoDistribucionFase2Test extends TestCase
 
         ]);
 
+        // Rol canónico Spatie sincronizado con la columna legacy (TRA-09).
+        Role::findOrCreate('transportista', 'web');
+        $chofer->assignRole('transportista');
+
 
 
         $vehiculo = Vehiculo::create([
