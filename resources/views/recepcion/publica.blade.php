@@ -79,15 +79,27 @@
                 <i class="fas fa-check-circle mr-1"></i>
                 La recepción ya fue firmada. Puede cerrar esta página.
             </div>
+        @elseif($requiereSesion)
+            <div class="rcp-alert rcp-alert--info">
+                <i class="fas fa-user-lock mr-1"></i>
+                Para firmar la recepción inicie sesión con la cuenta del receptor del destino.
+            </div>
+            <a href="{{ route('login') }}" class="rcp-btn rcp-btn--primary d-inline-block text-decoration-none">
+                <i class="fas fa-sign-in-alt mr-1"></i> Iniciar sesión para firmar
+            </a>
+        @elseif(! $puedeFirmar)
+            <div class="rcp-alert rcp-alert--warn mb-0">
+                <i class="fas fa-ban mr-1"></i>
+                La cuenta con la que inició sesión no es la del receptor de este envío.
+                El transportista no puede firmar la recepción.
+            </div>
         @else
             <p class="small text-muted mb-3">
-                Indique su nombre y firme para confirmar la recepción de la carga.
+                Firme para confirmar la recepción de la carga como
+                <strong>{{ trim(($usuario->nombre ?? '').' '.($usuario->apellido ?? '')) }}</strong>.
             </p>
             <form method="POST" action="{{ route('recepcion.publica.firmar', $token) }}" id="form-recepcion-publica">
                 @csrf
-                <label class="rcp-label" for="nombrefirmante">Nombre completo del receptor</label>
-                <input type="text" class="rcp-input" id="nombrefirmante" name="nombrefirmante"
-                       value="{{ old('nombrefirmante') }}" placeholder="Ej: María López" autocomplete="name">
 
                 <label class="rcp-label">Firma</label>
                 <canvas class="rcp-firma-box" data-firma-canvas="recepcion" width="400" height="180"></canvas>
@@ -104,17 +116,10 @@
     </div>
 </div>
 
-<div class="rcp-modal-backdrop" id="modal-nombre-requerido" hidden>
-    <div class="rcp-modal" role="dialog" aria-modal="true" aria-labelledby="modal-nombre-titulo">
-        <h2 id="modal-nombre-titulo">Nombre requerido</h2>
-        <p>Debe escribir su nombre antes de confirmar la recepción.</p>
-        <button type="button" class="rcp-btn rcp-btn--primary" id="btn-cerrar-modal-nombre">Entendido</button>
-    </div>
-</div>
 @endsection
 
 @push('scripts')
-@if(! $yaFirmado && ! $sinFirmaTransportista)
+@if(! $yaFirmado && ! $sinFirmaTransportista && $puedeFirmar)
 <script src="{{ asset('js/firma-canvas.js') }}?v=3"></script>
 <script>
 (function () {
@@ -123,11 +128,6 @@
 
     form.addEventListener('submit', function (e) {
         e.preventDefault();
-        const nombre = document.getElementById('nombrefirmante').value.trim();
-        if (!nombre) {
-            document.getElementById('modal-nombre-requerido').hidden = false;
-            return;
-        }
 
         const canvas = document.querySelector('[data-firma-canvas="recepcion"]');
         if (!canvas) return;
@@ -157,7 +157,6 @@
                 'X-Requested-With': 'XMLHttpRequest',
             },
             body: JSON.stringify({
-                nombrefirmante: nombre,
                 imagen_firma: imagen,
             }),
         })
@@ -184,20 +183,6 @@
                 btn.innerHTML = '<i class="fas fa-file-signature mr-1"></i> Confirmar recepción';
             });
     });
-
-    const modalNombre = document.getElementById('modal-nombre-requerido');
-    const btnCerrarModal = document.getElementById('btn-cerrar-modal-nombre');
-    if (modalNombre && btnCerrarModal) {
-        btnCerrarModal.addEventListener('click', function () {
-            modalNombre.hidden = true;
-            document.getElementById('nombrefirmante')?.focus();
-        });
-        modalNombre.addEventListener('click', function (ev) {
-            if (ev.target === modalNombre) {
-                modalNombre.hidden = true;
-            }
-        });
-    }
 })();
 </script>
 @endif

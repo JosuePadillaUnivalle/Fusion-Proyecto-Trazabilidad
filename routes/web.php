@@ -95,8 +95,8 @@ Route::match(['get', 'post'], '/logout', [AuthController::class, 'logout'])->nam
 
 Route::get('/trazabilidad/{codigo}', [TrazabilidadPublicaController::class, 'show'])->name('trazabilidad.publica');
 
+// El QR abre la pantalla sin sesión; firmar exige la cuenta del receptor (CROSS-A).
 Route::get('/recepcion/{token}', [RecepcionQrPublicaController::class, 'show'])->name('recepcion.publica');
-Route::post('/recepcion/{token}', [RecepcionQrPublicaController::class, 'firmar'])->name('recepcion.publica.firmar');
 
 
 // RUTAS PROTEGIDAS (REQUIEREN ESTAR LOGUEADO)
@@ -104,6 +104,7 @@ Route::post('/recepcion/{token}', [RecepcionQrPublicaController::class, 'firmar'
 Route::middleware(['auth', 'cuenta.aprobada'])->group(function () {
 
     Route::get('/api/cierre/firmas-estado', [CierreFirmasEstadoController::class, 'show'])->name('cierre.firmas-estado');
+    Route::post('/recepcion/{token}', [RecepcionQrPublicaController::class, 'firmar'])->name('recepcion.publica.firmar');
 
     // Perfil de Usuario
     Route::get('/perfil', [UserProfileController::class, 'show'])->name('profile.show');

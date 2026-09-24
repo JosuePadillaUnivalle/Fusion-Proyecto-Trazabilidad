@@ -16,12 +16,14 @@ use App\Models\TipoIncidenteTransporte;
 use App\Models\Usuario;
 use App\Support\DocumentoEntregaArchivo;
 use App\Support\EnvioCierreAgricolaCatalogo;
+use App\Support\FirmaCierreReglas;
 use App\Support\MayoristaAccess;
 use App\Support\PedidoDistribucionCatalogo;
 use App\Support\PuntoVentaAccess;
 use App\Support\RutaDistribucionCatalogo;
 use App\Support\SimulacionRutaCatalogo;
 use App\Support\UsuarioRol;
+use App\Support\ViajeAcceso;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -65,7 +67,7 @@ class CierreEnvioDistribucionPdvService
             'firmaRecepcion',
         ]);
 
-        $estadoSim = $this->simulacion->estadoDistribucion($ruta, false);
+        $estadoSim = $this->simulacion->estadoDistribucion($ruta);
         $progreso = (float) ($estadoSim['progreso'] ?? 0);
         $enRuta = SimulacionRutaCatalogo::simulacionActivaDistribucion($ruta);
         $llegadaConfirmada = $ruta->llegada_confirmada_at !== null;
@@ -73,7 +75,8 @@ class CierreEnvioDistribucionPdvService
         $tieneCondiciones = $this->tieneCondicionesVehiculo($ruta);
         $tieneIncidentes = $ruta->checklistIncidente !== null;
         $firmaTransportista = $ruta->firmaTransportista !== null;
-        $firmaRecepcion = $ruta->firmaRecepcion !== null;
+        // Solo cuenta la recepción firmada por el minorista receptor autenticado (CROSS-A).
+        $firmaRecepcion = FirmaCierreReglas::recepcionValida($ruta->firmaRecepcion, $ruta->transportista_usuarioid);
         $pendienteConfirmacionMinorista = ! SimulacionRutaCatalogo::pedidosListosParaSalida($ruta);
         $condicionesVigentes = $tieneCondiciones && ! $pendienteConfirmacionMinorista;
 
@@ -208,7 +211,7 @@ class CierreEnvioDistribucionPdvService
             throw new InvalidArgumentException('La ruta debe estar en camino para confirmar la llegada.');
         }
 
-        $estado = $this->simulacion->estadoDistribucion($ruta, false);
+        $estado = $this->simulacion->estadoDistribucion($ruta);
         if ((float) ($estado['progreso'] ?? 0) < 100) {
             throw new InvalidArgumentException('Primero debe llegar al destino. Espere a que el recorrido GPS llegue al 100% antes de confirmar la llegada.');
         }
@@ -275,19 +278,25 @@ class CierreEnvioDistribucionPdvService
 
     public function guardarFirmaTransportista(RutaDistribucion $ruta, Usuario $usuario, string $imagenBase64): FirmaTransportistaEnvio
     {
-        $this->autorizarFirmaTransportista($usuario, $ruta);
+        FirmaCierreReglas::asegurarPuedeFirmarComoTransportista($usuario, $ruta->transportista_usuarioid);
         $this->validarPreFirmas($ruta);
+        $imagen = $this->normalizarImagenFirma($imagenBase64);
 
-        if ($ruta->firmaTransportista()->exists()) {
-            throw new InvalidArgumentException('La firma del transportista ya fue registrada.');
-        }
+        $firma = DB::transaction(function () use ($ruta, $usuario, $imagen) {
+            RutaDistribucion::query()->whereKey($ruta->rutadistribucionid)->lockForUpdate()->first();
 
-        $firma = FirmaTransportistaEnvio::create([
-            'rutadistribucionid' => $ruta->rutadistribucionid,
-            'imagenfirma' => $this->normalizarImagenFirma($imagenBase64),
-            'nombrefirmante' => RecepcionQrFirmaService::nombreDesdeUsuario($usuario),
-            'fechafirma' => now(),
-        ]);
+            if ($ruta->firmaTransportista()->exists()) {
+                throw new InvalidArgumentException('La firma del transportista ya fue registrada.');
+            }
+
+            return FirmaTransportistaEnvio::create([
+                'rutadistribucionid' => $ruta->rutadistribucionid,
+                'imagenfirma' => $imagen,
+                'nombrefirmante' => RecepcionQrFirmaService::nombreDesdeUsuario($usuario),
+                'firmante_usuarioid' => $usuario->usuarioid,
+                'fechafirma' => now(),
+            ]);
+        });
 
         app(RecepcionQrFirmaService::class)->ensureToken($ruta);
 
@@ -300,18 +309,50 @@ class CierreEnvioDistribucionPdvService
 
     public function guardarFirmaRecepcion(RutaDistribucion $ruta, Usuario $usuario, string $imagenBase64): FirmaRecepcionEnvio
     {
-        $this->autorizarFirmaRecepcion($usuario, $ruta);
+        $this->validarRutaPdv($ruta);
+        FirmaCierreReglas::asegurarPuedeFirmarRecepcion(
+            $usuario,
+            $ruta->transportista_usuarioid,
+            $this->esReceptor($usuario, $ruta),
+            'No tiene permiso para firmar la recepción en el punto de venta.',
+        );
         $this->validarPreFirmas($ruta);
+        $imagen = $this->normalizarImagenFirma($imagenBase64);
 
-        if ($ruta->firmaRecepcion()->exists()) {
-            throw new InvalidArgumentException('La firma de recepción ya fue registrada.');
-        }
+        return DB::transaction(function () use ($ruta, $usuario, $imagen) {
+            RutaDistribucion::query()->whereKey($ruta->rutadistribucionid)->lockForUpdate()->first();
 
-        return FirmaRecepcionEnvio::create([
-            'rutadistribucionid' => $ruta->rutadistribucionid,
-            'imagenfirma' => $this->normalizarImagenFirma($imagenBase64),
-            'fechafirma' => now(),
-        ]);
+            if (! $ruta->firmaTransportista()->exists()) {
+                throw new InvalidArgumentException('Primero debe firmar el transportista la entrega.');
+            }
+
+            $existente = $ruta->firmaRecepcion()->first();
+            if (FirmaCierreReglas::recepcionValida($existente, $ruta->transportista_usuarioid)) {
+                throw new InvalidArgumentException('La firma de recepción ya fue registrada.');
+            }
+
+            $datos = [
+                'imagenfirma' => $imagen,
+                'nombrefirmante' => RecepcionQrFirmaService::nombreDesdeUsuario($usuario),
+                'firmante_usuarioid' => $usuario->usuarioid,
+                'fechafirma' => now(),
+            ];
+
+            // Una firma anónima previa (QR sin sesión) se reemplaza por la del receptor autenticado.
+            if ($existente !== null) {
+                $existente->update($datos);
+
+                return $existente->fresh();
+            }
+
+            return FirmaRecepcionEnvio::create(['rutadistribucionid' => $ruta->rutadistribucionid] + $datos);
+        });
+    }
+
+    /** Minorista dueño del punto de venta destino (MIN-07). */
+    public function esReceptor(?Usuario $usuario, RutaDistribucion $ruta): bool
+    {
+        return PuntoVentaAccess::puedeFirmarRecepcionRuta($usuario, $ruta);
     }
 
     public function finalizarEntrega(RutaDistribucion $ruta, Usuario $usuario): DocumentoEntrega
@@ -324,6 +365,16 @@ class CierreEnvioDistribucionPdvService
         }
 
         $documento = DB::transaction(function () use ($ruta, $usuario) {
+            // Lock + revalidación: dos finalizaciones concurrentes no acreditan dos veces (MIN-03, TRA-15).
+            $bloqueada = RutaDistribucion::query()->whereKey($ruta->rutadistribucionid)->lockForUpdate()->firstOrFail();
+            if ($bloqueada->estado === RutaDistribucionCatalogo::ESTADO_COMPLETADA) {
+                throw new InvalidArgumentException('Esta entrega ya fue completada.');
+            }
+
+            // La entrega logística no acredita inventario sin la recepción del minorista (MIN-10).
+            $ruta->load(['firmaTransportista', 'firmaRecepcion']);
+            FirmaCierreReglas::asegurarFirmasParaCierre($ruta->firmaTransportista, $ruta->firmaRecepcion, $ruta->transportista_usuarioid);
+
             $ruta->loadMissing('pedidos');
             foreach ($ruta->pedidos as $pedido) {
                 if (PedidoDistribucionCatalogo::puedeConfirmarRecepcion($pedido)) {
@@ -367,28 +418,9 @@ class CierreEnvioDistribucionPdvService
         throw new InvalidArgumentException('No tiene permiso para registrar incidentes en esta entrega.');
     }
 
-    private function autorizarFirmaTransportista(Usuario $usuario, RutaDistribucion $ruta): void
-    {
-        if (! $this->esTransportistaAsignado($usuario, $ruta)) {
-            throw new InvalidArgumentException('Solo el transportista asignado puede firmar como transportista.');
-        }
-    }
-
-    private function autorizarFirmaRecepcion(Usuario $usuario, RutaDistribucion $ruta): void
-    {
-        if (
-            $this->esTransportistaAsignado($usuario, $ruta)
-            || PuntoVentaAccess::puedeFirmarRecepcionRuta($usuario, $ruta)
-        ) {
-            return;
-        }
-
-        throw new InvalidArgumentException('No tiene permiso para firmar la recepción en el punto de venta.');
-    }
-
     private function autorizarFinalizar(Usuario $usuario, RutaDistribucion $ruta): void
     {
-        if ($this->esTransportistaAsignado($usuario, $ruta)
+        if (ViajeAcceso::esConductorAsignado($usuario, $ruta->transportista_usuarioid)
             || $this->esAdminOperativo($usuario)
             || PuntoVentaAccess::puedeFirmarRecepcionRuta($usuario, $ruta)
             || MayoristaAccess::puedeGestionarRutaDistribucion($usuario, $ruta)) {

@@ -17,11 +17,17 @@ class RecepcionQrPublicaController extends Controller
         private readonly RecepcionQrFirmaService $recepcionQr,
     ) {}
 
-    public function show(string $token): View
+    public function show(Request $request, string $token): View
     {
         $qr = $this->recepcionQr->resolverPorToken($token);
         $operacion = $this->recepcionQr->resolverOperacion($qr);
         $operacion->loadMissing('firmaTransportista', 'firmaRecepcion');
+        $usuario = $request->user();
+
+        // Tras iniciar sesión, el receptor vuelve a esta misma pantalla para firmar.
+        if ($usuario === null) {
+            $request->session()->put('url.intended', $request->fullUrl());
+        }
 
         $titulo = 'Firma de recepción';
         $codigo = $operacion instanceof RutaDistribucion
@@ -32,26 +38,24 @@ class RecepcionQrPublicaController extends Controller
             'token' => $token,
             'titulo' => $titulo,
             'codigo' => $codigo,
-            'yaFirmado' => $operacion->firmaRecepcion !== null,
+            'yaFirmado' => $this->recepcionQr->recepcionFirmada($operacion),
             'sinFirmaTransportista' => $operacion->firmaTransportista === null,
+            'requiereSesion' => $usuario === null,
+            'puedeFirmar' => $this->recepcionQr->esReceptorAutorizado($operacion, $usuario),
+            'usuario' => $usuario,
         ]);
     }
 
     public function firmar(Request $request, string $token): RedirectResponse|JsonResponse
     {
-        $request->merge([
-            'nombrefirmante' => trim((string) $request->input('nombrefirmante', '')),
-        ]);
-
         $validated = $request->validate([
-            'nombrefirmante' => ['required', 'string', 'max:200'],
             'imagen_firma' => ['required', 'string'],
         ]);
 
         try {
-            $this->recepcionQr->guardarFirmaRecepcionPublica(
+            $this->recepcionQr->guardarFirmaRecepcionConCuenta(
                 $token,
-                $validated['nombrefirmante'],
+                $request->user(),
                 $validated['imagen_firma'],
             );
         } catch (\InvalidArgumentException $e) {
