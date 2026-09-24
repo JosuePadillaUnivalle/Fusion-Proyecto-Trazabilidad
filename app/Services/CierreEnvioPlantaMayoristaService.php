@@ -369,7 +369,11 @@ class CierreEnvioPlantaMayoristaService
         return $firma;
     }
 
-    public function guardarFirmaRecepcion(RutaDistribucion $ruta, Usuario $usuario, string $imagenBase64): FirmaRecepcionEnvio
+    /**
+     * @param  array<int|string, array{recibido?: float|int|string|null, motivo?: string|null}>  $recepcion
+     *         Cantidad recibida por línea (detalletrasladoid). Sin dato = se recibió lo despachado (MAY-14).
+     */
+    public function guardarFirmaRecepcion(RutaDistribucion $ruta, Usuario $usuario, string $imagenBase64, array $recepcion = []): FirmaRecepcionEnvio
     {
         $this->validarTrasladoActivo($ruta);
         FirmaCierreReglas::asegurarPuedeFirmarRecepcion(
@@ -381,7 +385,40 @@ class CierreEnvioPlantaMayoristaService
         $this->validarPreFirmas($ruta);
         $imagen = $this->normalizarImagenFirma($imagenBase64);
 
-        return $this->registrarFirmaRecepcion($ruta, $usuario, $imagen);
+        return $this->registrarFirmaRecepcion($ruta, $usuario, $imagen, $recepcion);
+    }
+
+    /**
+     * MAY-14: cantidad recibida y motivo de diferencia por línea. No se puede recibir más de lo
+     * despachado y toda diferencia exige motivo; lo no recibido no se acredita al mayorista.
+     *
+     * @param  array<int|string, array{recibido?: float|int|string|null, motivo?: string|null}>  $recepcion
+     */
+    private function registrarCantidadesRecibidas(RutaDistribucion $ruta, array $recepcion): void
+    {
+        foreach ($ruta->detallesTraslado()->get() as $detalle) {
+            $linea = $recepcion[$detalle->detalletrasladoid] ?? $recepcion[(string) $detalle->detalletrasladoid] ?? [];
+            $despachado = $detalle->cantidadDespachada();
+            $valor = $linea['recibido'] ?? null;
+            $recibido = ($valor === null || $valor === '') ? $despachado : (float) $valor;
+            $motivo = trim((string) ($linea['motivo'] ?? ''));
+
+            if ($recibido < 0 || $recibido > $despachado + 0.0001) {
+                throw new InvalidArgumentException(
+                    'La cantidad recibida de «'.$detalle->producto_nombre.'» debe estar entre 0 y lo despachado ('.number_format($despachado, 2).').'
+                );
+            }
+
+            $hayDiferencia = $recibido < $despachado - 0.0001;
+            if ($hayDiferencia && $motivo === '') {
+                throw new InvalidArgumentException('Indique el motivo de la diferencia en «'.$detalle->producto_nombre.'».');
+            }
+
+            $detalle->update([
+                'cantidad_recibida' => round($recibido, 4),
+                'motivo_diferencia' => $hayDiferencia ? mb_substr($motivo, 0, 255) : null,
+            ]);
+        }
     }
 
     /** Mayorista dueño del almacén destino: el único que recibe el traslado (MAY-08, MAY-15). */
@@ -390,9 +427,9 @@ class CierreEnvioPlantaMayoristaService
         return MayoristaAccess::puedeGestionarTraslado($usuario, $ruta);
     }
 
-    private function registrarFirmaRecepcion(RutaDistribucion $ruta, Usuario $usuario, string $imagen): FirmaRecepcionEnvio
+    private function registrarFirmaRecepcion(RutaDistribucion $ruta, Usuario $usuario, string $imagen, array $recepcion = []): FirmaRecepcionEnvio
     {
-        return DB::transaction(function () use ($ruta, $usuario, $imagen) {
+        return DB::transaction(function () use ($ruta, $usuario, $imagen, $recepcion) {
             RutaDistribucion::query()->whereKey($ruta->rutadistribucionid)->lockForUpdate()->first();
 
             if (! $ruta->firmaTransportista()->exists()) {
@@ -403,6 +440,8 @@ class CierreEnvioPlantaMayoristaService
             if (FirmaCierreReglas::recepcionValida($existente, $ruta->transportista_usuarioid)) {
                 throw new InvalidArgumentException('La firma de recepción ya fue registrada.');
             }
+
+            $this->registrarCantidadesRecibidas($ruta, $recepcion);
 
             $datos = [
                 'imagenfirma' => $imagen,

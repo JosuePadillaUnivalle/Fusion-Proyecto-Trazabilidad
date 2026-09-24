@@ -139,9 +139,14 @@ class RecepcionQrFirmaService
      * podía firmar sin sesión escribiendo un nombre. Ahora el QR solo abre la pantalla: la firma
      * pasa por el mismo servicio de cierre que valida que sea el receptor del destino.
      */
-    public function guardarFirmaRecepcionConCuenta(string $token, Usuario $usuario, string $imagenBase64): FirmaRecepcionEnvio
+    /** @param  array<int|string, array{recibido?: mixed, motivo?: string|null}>  $recepcion  Cantidades recibidas (solo planta → mayorista). */
+    public function guardarFirmaRecepcionConCuenta(string $token, Usuario $usuario, string $imagenBase64, array $recepcion = []): FirmaRecepcionEnvio
     {
         $operacion = $this->resolverOperacion($this->resolverPorToken($token));
+
+        if ($operacion instanceof RutaDistribucion && $operacion->esTrasladoPlantaMayorista()) {
+            return app(CierreEnvioPlantaMayoristaService::class)->guardarFirmaRecepcion($operacion, $usuario, $imagenBase64, $recepcion);
+        }
 
         return $this->servicioCierre($operacion)->guardarFirmaRecepcion($operacion, $usuario, $imagenBase64);
     }

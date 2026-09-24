@@ -41,6 +41,10 @@ class RecepcionQrPublicaController extends Controller
             'yaFirmado' => $this->recepcionQr->recepcionFirmada($operacion),
             'sinFirmaTransportista' => $operacion->firmaTransportista === null,
             'requiereSesion' => $usuario === null,
+            // MAY-14: el mayorista indica lo que realmente recibió por línea.
+            'lineasTraslado' => $operacion instanceof RutaDistribucion && $operacion->esTrasladoPlantaMayorista()
+                ? $operacion->detallesTraslado()->get()
+                : collect(),
             'puedeFirmar' => $this->recepcionQr->esReceptorAutorizado($operacion, $usuario),
             'usuario' => $usuario,
         ]);
@@ -50,6 +54,9 @@ class RecepcionQrPublicaController extends Controller
     {
         $validated = $request->validate([
             'imagen_firma' => ['required', 'string'],
+            'recepcion' => ['nullable', 'array'],
+            'recepcion.*.recibido' => ['nullable', 'numeric', 'min:0'],
+            'recepcion.*.motivo' => ['nullable', 'string', 'max:255'],
         ]);
 
         try {
@@ -57,6 +64,7 @@ class RecepcionQrPublicaController extends Controller
                 $token,
                 $request->user(),
                 $validated['imagen_firma'],
+                $validated['recepcion'] ?? [],
             );
         } catch (\InvalidArgumentException $e) {
             if ($request->expectsJson()) {

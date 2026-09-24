@@ -377,7 +377,8 @@ class TrasladoPlantaMayoristaService
 
     {
 
-        $ruta->loadMissing([
+        // load (no loadMissing): las cantidades recibidas se registran al firmar y deben leerse frescas.
+        $ruta->load([
 
             'detallesTraslado.insumo.unidadMedida',
 
@@ -768,6 +769,15 @@ class TrasladoPlantaMayoristaService
 
         $cantidadUnidades = (float) ($detalle->cantidad_unidades ?? 0);
 
+        // MAY-14: sale de planta lo despachado; al mayorista se acredita solo lo recibido.
+        $factorRecibido = $detalle->factorRecibido();
+        $kgRecibidos = round($cantidad * $factorRecibido, 4);
+        $unidadesRecibidas = round($cantidadUnidades * $factorRecibido, 4);
+        $notaDiferencia = $factorRecibido < 0.99999
+            ? ' · Recibido '.number_format((float) $detalle->cantidad_recibida, 2).' de '
+                .number_format($detalle->cantidadDespachada(), 2).' (diferencia: '.($detalle->motivo_diferencia ?: 'sin motivo').')'
+            : '';
+
         $insumoOrigen = $detalle->insumo;
 
         $detalle->loadMissing(['presentacion', 'inventarioLote']);
@@ -892,15 +902,15 @@ class TrasladoPlantaMayoristaService
 
             'fecha' => now()->toDateString(),
 
-            'cantidad' => $cantidad,
+            'cantidad' => $kgRecibidos,
 
-            'cantidad_unidades' => $cantidadUnidades > 0 ? $cantidadUnidades : null,
+            'cantidad_unidades' => $unidadesRecibidas > 0 ? $unidadesRecibidas : null,
 
             'referencia' => $ref,
 
             'destino_motivo' => $almacenMayorista->nombre,
 
-            'observaciones' => '[Traslado planta → mayorista — ingreso] '.$ref,
+            'observaciones' => '[Traslado planta → mayorista — ingreso] '.$ref.$notaDiferencia,
 
         ]);
 
@@ -910,7 +920,7 @@ class TrasladoPlantaMayoristaService
 
             $this->inventarioPresentacion->descontar($detalle->inventarioLote, $cantidadUnidades, $cantidad);
 
-            if ($detalle->presentacion) {
+            if ($detalle->presentacion && $unidadesRecibidas > 0) {
 
                 $presentacionDestino = $this->inventarioPresentacion->replicarPresentacionEnInsumo(
 
@@ -932,9 +942,9 @@ class TrasladoPlantaMayoristaService
 
                     $detalle->inventarioLote->referencia_lote,
 
-                    $cantidadUnidades,
+                    $unidadesRecibidas,
 
-                    $cantidad
+                    $kgRecibidos
 
                 );
 
@@ -951,7 +961,9 @@ class TrasladoPlantaMayoristaService
 
             $insumoOrigen->decrementarStock($cantidad);
 
-            $insumoDestino->incrementarStock($cantidad);
+            if ($kgRecibidos > 0) {
+                $insumoDestino->incrementarStock($kgRecibidos);
+            }
 
             $this->descontarAlmacenajePlanta(
                 (int) $insumoOrigen->almacenid,

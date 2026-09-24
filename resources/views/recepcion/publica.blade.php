@@ -100,6 +100,20 @@
             </p>
             <form method="POST" action="{{ route('recepcion.publica.firmar', $token) }}" id="form-recepcion-publica">
                 @csrf
+                @if(($lineasTraslado ?? collect())->isNotEmpty())
+                    <label class="rcp-label">Cantidad recibida por producto</label>
+                    <p class="small text-muted mb-2">Si llegó menos de lo despachado, indique cuánto y por qué. Solo se acredita lo recibido.</p>
+                    @foreach($lineasTraslado as $linea)
+                        @php $despachado = $linea->cantidadDespachada(); @endphp
+                        <div class="mb-2" data-linea-recepcion="{{ $linea->detalletrasladoid }}">
+                            <div class="small font-weight-bold">{{ $linea->producto_nombre }} — despachado {{ rtrim(rtrim(number_format($despachado, 2, '.', ''), '0'), '.') }}</div>
+                            <input type="number" class="rcp-input mb-1" step="0.01" min="0" max="{{ $despachado }}"
+                                   data-recibido value="{{ $despachado }}" aria-label="Cantidad recibida de {{ $linea->producto_nombre }}">
+                            <input type="text" class="rcp-input" maxlength="255" data-motivo
+                                   placeholder="Motivo de la diferencia (si corresponde)">
+                        </div>
+                    @endforeach
+                @endif
 
                 <label class="rcp-label">Firma</label>
                 <canvas class="rcp-firma-box" data-firma-canvas="recepcion" width="400" height="180"></canvas>
@@ -158,6 +172,16 @@
             },
             body: JSON.stringify({
                 imagen_firma: imagen,
+                recepcion: (function () {
+                    const lineas = {};
+                    document.querySelectorAll('[data-linea-recepcion]').forEach(function (fila) {
+                        lineas[fila.getAttribute('data-linea-recepcion')] = {
+                            recibido: fila.querySelector('[data-recibido]').value,
+                            motivo: fila.querySelector('[data-motivo]').value,
+                        };
+                    });
+                    return lineas;
+                })(),
             }),
         })
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })

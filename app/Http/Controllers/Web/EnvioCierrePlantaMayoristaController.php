@@ -220,10 +220,13 @@ class EnvioCierrePlantaMayoristaController extends Controller
 
         $validated = $request->validate([
             'imagen_firma' => ['required', 'string'],
+            'recepcion' => ['nullable', 'array'],
+            'recepcion.*.recibido' => ['nullable', 'numeric', 'min:0'],
+            'recepcion.*.motivo' => ['nullable', 'string', 'max:255'],
         ]);
 
         try {
-            $this->cierre->guardarFirmaRecepcion($ruta, $request->user(), $validated['imagen_firma']);
+            $this->cierre->guardarFirmaRecepcion($ruta, $request->user(), $validated['imagen_firma'], $validated['recepcion'] ?? []);
         } catch (\InvalidArgumentException $e) {
             return $this->respuestaError($e->getMessage());
         }
