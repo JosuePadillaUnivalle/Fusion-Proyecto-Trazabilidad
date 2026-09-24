@@ -441,10 +441,12 @@ class SeguridadBaseRbacTest extends TestCase
 
     public function test_rol_con_permisos_usuarios_no_se_convierte_en_admin_global(): void
     {
-        // jefe_mayorista (legacy) conserva usuarios.* en la matriz: antes caía en el modo global
-        // y podía ver/editar/eliminar a cualquiera y crear cuentas con rol admin.
+        // jefe_mayorista (legacy) tenía usuarios.* en la matriz: antes caía en el modo global
+        // y podía ver/editar/eliminar a cualquiera y crear cuentas con rol admin. La matriz ya no
+        // se los da (MAY-01), pero aun concedidos a mano no deben convertirlo en administrador.
         $admin = $this->crearUsuario('admin');
         $jefeMayorista = $this->crearUsuario('jefe_mayorista');
+        $jefeMayorista->givePermissionTo(['usuarios.view', 'usuarios.create', 'usuarios.update', 'usuarios.delete']);
         $this->assertTrue($jefeMayorista->can('usuarios.create'));
         $rolAdmin = Role::findByName('admin', 'web');
 

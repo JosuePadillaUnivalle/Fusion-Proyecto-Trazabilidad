@@ -709,13 +709,7 @@ return [
 
             'pedidos.create',
 
-            'usuarios.view',
-
-            'usuarios.create',
-
-            'usuarios.update',
-
-            'usuarios.delete',
+            // MAY-01: sin usuarios.* — el mayorista (incluido este slug legacy) no administra usuarios.
 
         ],
 
